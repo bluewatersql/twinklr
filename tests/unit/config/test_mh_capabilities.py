@@ -1,8 +1,8 @@
 """Explicit fixture capabilities and run initial state for the physical renderer.
 
-Nothing renders from these contracts yet; they are validated and they enter render
-identity. Physical-only config paths are evidenced here, not by the legacy-output
-fixture snapshot, because by design they do not change legacy output.
+They are validated, enter render identity, and feed the physical compile, frame
+encoder and preposition pass. Physical-only config paths are evidenced here, not by the
+legacy-output fixture snapshot, because by design they do not change legacy output.
 """
 
 from __future__ import annotations
@@ -21,7 +21,12 @@ import pytest
 
 from tests.config_effects_registry import CONFIG_EFFECTS, ConfigDispositionKind
 from tests.golden.harness import RIGS, build_beat_grid, build_fixture_group, build_plan
-from tests.support.mh_physical import initial_state_payload, physical_segment, profile_payload
+from tests.support.mh_physical import (
+    initial_state_payload,
+    physical_segment,
+    preposition_profile_payload,
+    profile_payload,
+)
 from twinklr.core.config.fixtures import (
     AxisCapability,
     FixtureCapabilities,
@@ -39,6 +44,10 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
 )
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.physical import DiscreteChange, wheel_changes
+from twinklr.core.sequencer.moving_heads.compile.preposition import (
+    PrepositionResult,
+    plan_prepositions,
+)
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     EncodedFixtureFrame,
     encode_fixture_frames,
@@ -119,6 +128,44 @@ def test_missing_default_or_unknown_initial_state_reported() -> None:
     problems = profile.check_initial_state(InitialFixtureState(**state))
     assert any("pan" in problem for problem in problems)
     assert any("dimmer" in problem for problem in problems)
+
+
+@pytest.mark.parametrize(
+    ("visibility", "state", "contradicts"),
+    [
+        pytest.param({}, {"dimmer": 0.0, "shutter": "open"}, False, id="dimmer-zero"),
+        pytest.param({}, {"dimmer": 0.5, "shutter": "closed"}, False, id="shutter-closed"),
+        pytest.param({}, {"dimmer": 0.5, "shutter": "open"}, True, id="lit-dimmer-open-shutter"),
+        pytest.param(
+            {"dimmer_zero_extinguishes": False},
+            {"dimmer": 0.0, "shutter": "open"},
+            True,
+            id="undeclared-dimmer-darkness",
+        ),
+        pytest.param(
+            {"extinguishing_shutter_states": []},
+            {"dimmer": 0.5, "shutter": "closed"},
+            True,
+            id="undeclared-shutter-darkness",
+        ),
+    ],
+)
+def test_dark_initial_state_needs_declared_darkness(
+    visibility: dict[str, Any], state: dict[str, Any], contradicts: bool
+) -> None:
+    """Contradictory evidence is not darkness: `dark=True` needs a dimmer or shutter the
+    profile declares extinguishing."""
+    payload = profile_payload()
+    payload["visibility"].update(visibility)
+    initial = initial_state_payload()
+    initial["dimmer"] = state["dimmer"]
+    initial["discrete_states"]["shutter"] = state["shutter"]
+
+    problems = _profile(payload).check_initial_state(InitialFixtureState(**initial))
+
+    assert any("dark=True" in problem for problem in problems) == contradicts
+    initial["dark"] = False
+    assert _profile(payload).check_initial_state(InitialFixtureState(**initial)) == ()
 
 
 @pytest.mark.parametrize(
@@ -570,7 +617,9 @@ def test_other_invalid_fixture_config_keeps_its_legacy_behavior() -> None:
 
 # --- Registry evidence for physical-only config paths -----------------------------------
 
-Component = Literal["rejected", "words", "frames", "changes", "check", "fingerprint"]
+Component = Literal[
+    "rejected", "words", "frames", "changes", "check", "preposition", "darkness", "fingerprint"
+]
 
 _COMPONENT_NOTES: dict[Component, str] = {
     "rejected": "exact path's alternative values are rejected by validation",
@@ -578,7 +627,9 @@ _COMPONENT_NOTES: dict[Component, str] = {
     "frames": "exact path changes the encoded fixture frames",
     "changes": "exact path changes the listed wheel state changes",
     "check": "exact path changes the initial-state check",
-    "fingerprint": "identity only; consumer lands in P1.3–P1.5",
+    "preposition": "exact path changes the planned preposition transactions",
+    "darkness": "exact path changes which planned cues start dark",
+    "fingerprint": "identity only; no physical consumer yet",
 }
 """The registry note each evidence component must carry, so none overclaims."""
 
@@ -600,7 +651,7 @@ _PROFILE_MUTATIONS: dict[str, Mutation] = {
     "": ("words", lambda p: p.clear()),
     "schema_version": ("rejected", lambda p: _set(p, ("schema_version",), "2")),
     "profile_id": ("fingerprint", lambda p: _set(p, ("profile_id",), "other_spot")),
-    "provenance": ("fingerprint", lambda p: _set(p, ("provenance",), "measured")),
+    "provenance": ("preposition", lambda p: _set(p, ("provenance",), "measured")),
     "footprint": ("frames", _add_spare_default),
     "defaults": ("frames", lambda p: _set(p, ("defaults", 8), 255)),
     "axes": ("words", lambda p: p["axes"].pop("tilt")),
@@ -616,11 +667,11 @@ _PROFILE_MUTATIONS: dict[str, Mutation] = {
     "axes.fine_offset": ("words", lambda p: _set(p, ("axes", "pan", "fine_offset"), None)),
     "axes.inverted": ("words", lambda p: _set(p, ("axes", "pan", "inverted"), True)),
     "axes.travel_speed_per_s": (
-        "fingerprint",
+        "preposition",
         lambda p: _set(p, ("axes", "pan", "travel_speed_per_s"), 90.0),
     ),
-    "axes.latency_ms": ("fingerprint", lambda p: _set(p, ("axes", "pan", "latency_ms"), 10)),
-    "axes.settle_ms": ("fingerprint", lambda p: _set(p, ("axes", "pan", "settle_ms"), 40)),
+    "axes.latency_ms": ("preposition", lambda p: _set(p, ("axes", "pan", "latency_ms"), 10)),
+    "axes.settle_ms": ("preposition", lambda p: _set(p, ("axes", "pan", "settle_ms"), 40)),
     "discrete": ("check", lambda p: p["discrete"].pop("color")),
     "discrete.offset": ("frames", lambda p: _set(p, ("discrete", "color", "offset"), 8)),
     "discrete.states": ("check", lambda p: p["discrete"]["color"]["states"].pop("red")),
@@ -648,28 +699,28 @@ _PROFILE_MUTATIONS: dict[str, Mutation] = {
         ),
     ),
     "discrete.closed_state": (
-        "fingerprint",
+        "preposition",
         lambda p: _set(p, ("discrete", "shutter", "closed_state"), None),
     ),
     "discrete.open_state": (
         "fingerprint",
         lambda p: _set(p, ("discrete", "shutter", "open_state"), None),
     ),
-    "visibility": ("fingerprint", lambda p: _set(p, ("visibility",), {})),
+    "visibility": ("preposition", lambda p: _set(p, ("visibility",), {})),
     "visibility.dimmer_zero_extinguishes": (
-        "fingerprint",
+        "darkness",
         lambda p: _set(p, ("visibility", "dimmer_zero_extinguishes"), False),
     ),
     "visibility.extinguishing_shutter_states": (
-        "fingerprint",
+        "darkness",
         lambda p: _set(p, ("visibility", "extinguishing_shutter_states"), []),
     ),
     "visibility.close_latency_ms": (
-        "fingerprint",
+        "preposition",
         lambda p: _set(p, ("visibility", "close_latency_ms"), 40),
     ),
     "visibility.open_latency_ms": (
-        "fingerprint",
+        "preposition",
         lambda p: _set(p, ("visibility", "open_latency_ms"), 20),
     ),
 }
@@ -682,8 +733,8 @@ _INITIAL_STATE_MUTATIONS: dict[str, Mutation] = {
     "tilt_deg": ("check", lambda s: _set(s, ("tilt_deg",), -140.0)),
     "dimmer": ("check", lambda s: _set(s, ("dimmer",), None)),
     "discrete_states": ("check", lambda s: _set(s, ("discrete_states", "shutter"), "half")),
-    "settled": ("fingerprint", lambda s: _set(s, ("settled",), False)),
-    "dark": ("fingerprint", lambda s: _set(s, ("dark",), False)),
+    "settled": ("preposition", lambda s: _set(s, ("settled",), False)),
+    "dark": ("preposition", lambda s: _set(s, ("dark",), False)),
 }
 
 
@@ -756,6 +807,62 @@ def _probe_wheel_segments() -> list[FixtureSegment]:
     ]
 
 
+def _registry_payload() -> dict[str, Any]:
+    """The profile every evidence case mutates: the preposition timing declared, with a
+    20 ms close latency so a lit or dark predecessor plans differently."""
+    payload = preposition_profile_payload()
+    payload["visibility"]["close_latency_ms"] = 20
+    return payload
+
+
+def _probe_cues() -> list[FixtureSegment]:
+    """Red cues: A moved to from the dark initial state and B from lit A, then C dark only
+    by its dimmer and D dark only by its shutter."""
+
+    def cue(
+        name: str, t0: int, pan: float, dimmer: float = 1.0, shutter: str = "open"
+    ) -> FixtureSegment:
+        def line(value: float) -> ContinuousTrajectory:
+            return ContinuousTrajectory.model_validate(
+                {
+                    "unit": "degree",
+                    "points": [{"t_ms": t0, "value": value}, {"t_ms": t0 + 200, "value": value}],
+                    "interpolation": "linear",
+                }
+            )
+
+        def state(value: str) -> DiscreteTrajectory:
+            return DiscreteTrajectory.model_validate({"events": [{"t_ms": t0, "state": value}]})
+
+        level = ContinuousTrajectory.model_validate(
+            {
+                "unit": "normalized",
+                "points": [{"t_ms": t0, "value": dimmer}],
+                "interpolation": "hold",
+            }
+        )
+        return physical_segment(
+            {
+                ChannelName.PAN: line(pan),
+                ChannelName.TILT: line(0.0),
+                ChannelName.DIMMER: level,
+                ChannelName.SHUTTER: state(shutter),
+                ChannelName.COLOR: state("red"),
+            },
+            t0_ms=t0,
+            t1_ms=t0 + 200,
+            segment_id=name,
+            section_id=name,
+        )
+
+    return [
+        cue("A", 200, 45.0),
+        cue("B", 1600, 90.0),
+        cue("C", 2600, 90.0, dimmer=0.0),
+        cue("D", 3600, 90.0, shutter="closed"),
+    ]
+
+
 def _contract_snapshot(
     prefix: str, profile: dict[str, Any] | None, initial_states: dict[str, Any]
 ) -> dict[Component, Any]:
@@ -764,7 +871,8 @@ def _contract_snapshot(
     The validation error locations, the encoded DMX word at probe values on every
     declared axis, the frames encoded from a probe segment that writes every attribute
     but leaves channel 8 to its default, the wheel changes across probe segments with
-    an unauthored gap, MH1's initial-state check, and the render fingerprint.
+    an unauthored gap, MH1's initial-state check, the preposition plan for the probe
+    cues and which of them it finds dark at their start, and the render fingerprint.
     """
     try:
         group = FixtureGroup.model_validate(
@@ -778,6 +886,8 @@ def _contract_snapshot(
     frames: tuple[Any, ...] = ()
     changes: tuple[Any, ...] = ()
     check: tuple[str, ...] = ()
+    preposition: PrepositionResult | tuple[str, str] | None = None
+    darkness: tuple[Any, ...] = ()
     if capabilities is not None:
         for name, axis in capabilities.axes.items():
             probes = (0.0, 0.5, 1.0) if axis.unit == "normalized" else (-180.0, -45.0, 0.0, 180.0)
@@ -795,11 +905,27 @@ def _contract_snapshot(
         except (PhysicalChannelError, ValueError) as error:
             changes = ("unlisted", str(error))
         check = capabilities.check_initial_state(policy.initial_states.get("MH1"))
+        try:
+            preposition = plan_prepositions(
+                _probe_cues(),
+                {"MH1": capabilities},
+                initial_states=policy.initial_states,
+                locks=(),
+                frame_ms=20,
+                sequence_end_ms=4000,
+            )
+            darkness = tuple(
+                (d.cue_ms, d.status, d.optical_reveal_ms) for d in preposition.diagnostics
+            )
+        except (PhysicalChannelError, ValueError) as error:
+            preposition = ("unplannable", str(error))
     return {
         "words": words,
         "frames": frames,
         "changes": changes,
         "check": check,
+        "preposition": preposition,
+        "darkness": darkness,
         "fingerprint": render_fingerprint(fixtures=group, policy=policy, **_identity_inputs()),
     }
 
@@ -838,6 +964,18 @@ def _assert_component_changed(
             assert "rejected" not in side and side["changes"], side
             assert all(isinstance(change, DiscreteChange) for change in side["changes"])
         assert changed["changes"] != base["changes"]
+    elif component == "preposition":
+        # A real plan on both sides, from a base the pass accepts without error.
+        for side in (base, changed):
+            assert isinstance(side.get("preposition"), PrepositionResult), side
+        assert not base["preposition"].has_errors, base["preposition"].diagnostics
+        assert changed["preposition"] != base["preposition"]
+    elif component == "darkness":
+        # The planner's own judgment of which cues start dark, not the authored bytes.
+        for side in (base, changed):
+            assert isinstance(side.get("preposition"), PrepositionResult), side
+            assert not side["preposition"].has_errors, side["preposition"].diagnostics
+        assert changed["darkness"] != base["darkness"]
     else:
         assert "rejected" not in changed, changed
         assert changed[component] != base[component]
@@ -849,12 +987,12 @@ def test_physical_profile_field_changes_contract(config_path: str) -> None:
     prefix, suffix = _split(config_path, (_INSTANCE_PREFIX, _BASE_PREFIX))
     component, mutate = _PROFILE_MUTATIONS[suffix]
     states = {"MH1": initial_state_payload()}
-    payload = copy.deepcopy(profile_payload())
+    payload = copy.deepcopy(_registry_payload())
     mutate(payload)
 
     _assert_component_changed(
         component,
-        _contract_snapshot(prefix, profile_payload(), states),
+        _contract_snapshot(prefix, _registry_payload(), states),
         _contract_snapshot(prefix, payload or None, states),
     )
 
@@ -869,6 +1007,6 @@ def test_initial_state_field_changes_contract(config_path: str) -> None:
 
     _assert_component_changed(
         component,
-        _contract_snapshot(_INSTANCE_PREFIX, profile_payload(), {"MH1": initial_state_payload()}),
-        _contract_snapshot(_INSTANCE_PREFIX, profile_payload(), {"MH1": state} if state else {}),
+        _contract_snapshot(_INSTANCE_PREFIX, _registry_payload(), {"MH1": initial_state_payload()}),
+        _contract_snapshot(_INSTANCE_PREFIX, _registry_payload(), {"MH1": state} if state else {}),
     )

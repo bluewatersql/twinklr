@@ -105,6 +105,68 @@ class RenderLock(BaseModel):
         return self
 
 
+TransitionStatus = Literal["feasible", "preserve_aim", "drop_accent", "error"]
+TransitionCode = Literal[
+    "unknown_initial_state", "unknown_motion_rate", "infeasible_transition", "lock_conflict"
+]
+"""The shared diagnostic codes (architecture §6) a reposition transaction can raise."""
+
+
+class TransitionDiagnostic(BaseModel):
+    """How one cue's reposition transaction was decided.
+
+    `cue_ms` is the aligned cue, which is also the reveal command; `optical_reveal_ms`
+    adds the declared open latency and is None when the cue starts dark or nothing
+    could be planned. An `error` status aborts emission; `preserve_aim` and
+    `drop_accent` name the substitution made and `code` the failure it replaced.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    fixture_id: str
+    cue_ms: int
+    status: TransitionStatus
+    code: TransitionCode | None = None
+    required_ms: int | None = Field(description="Whole-frame time needed; None when unknown")
+    available_ms: int | None = Field(description="Time available; None when unbounded")
+    optical_reveal_ms: int | None = None
+    reason: str
+    provenance: Literal["synthetic", "manufacturer", "measured"] = Field(
+        description="Provenance of the profile whose timing decided the transaction"
+    )
+
+    @model_validator(mode="after")
+    def _code_names_failures_only(self) -> TransitionDiagnostic:
+        if (self.status == "feasible") != (self.code is None):
+            raise ValueError("code is required unless the transition is feasible")
+        return self
+
+
+class TransitionDependency(BaseModel):
+    """The half-open span `[start_ms, end_ms)` of one fixture a transaction depends on.
+
+    From the predecessor cue's start (its whole content sets the state the transaction
+    leaves from), or time zero for the run's initial state, through the reveal frame
+    and the optical reveal. Editing anything inside it invalidates the transaction; it
+    grants no permission to change locked frames.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source_section_id: str | None
+    target_section_id: str
+    fixture_id: str
+    channels: tuple[ChannelName, ...]
+    start_ms: int = Field(ge=0)
+    end_ms: int
+
+    @model_validator(mode="after")
+    def _validate_span(self) -> TransitionDependency:
+        if self.end_ms <= self.start_ms:
+            raise ValueError("end_ms must be greater than start_ms")
+        return self
+
+
 class PhysicalChannelError(Exception):
     """A physical channel value the fixture's profile cannot honor."""
 

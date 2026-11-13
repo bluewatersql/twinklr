@@ -2569,19 +2569,21 @@ for _fixture_path, _fixture_disposition in tuple(CONFIG_EFFECTS.items()):
 # Physical-profile and run initial-state fields feed only the opt-in physical renderer,
 # so by design they cannot change the legacy-output snapshot above. Registered after
 # that loop, each exact path mutates its field and must change the one component of
-# the physical contract its note names. "Identity only" paths have no consumer yet
+# the physical contract its note names. "Identity only" paths have no consumer
 # beyond the render fingerprint; the task that adds one repoints them.
 _PHYSICAL_REJECTED = "exact path's alternative values are rejected by validation"
 _PHYSICAL_WORDS = "exact path changes the encoded DMX word"
 _PHYSICAL_CHECK = "exact path changes the initial-state check"
-_PHYSICAL_IDENTITY_ONLY = "identity only; consumer lands in P1.3–P1.5"
+_PHYSICAL_IDENTITY_ONLY = "identity only; no physical consumer yet"
+_PHYSICAL_PREPOSITION = "exact path changes the planned preposition transactions"
+_PHYSICAL_DARKNESS = "exact path changes which planned cues start dark"
 _PHYSICAL_FRAMES = "exact path changes the encoded fixture frames"
 _PHYSICAL_CHANGES = "exact path changes the listed wheel state changes"
 _PHYSICAL_PROFILE_FIELDS = {
     "": _PHYSICAL_WORDS,
     "schema_version": _PHYSICAL_REJECTED,
     "profile_id": _PHYSICAL_IDENTITY_ONLY,
-    "provenance": _PHYSICAL_IDENTITY_ONLY,
+    "provenance": _PHYSICAL_PREPOSITION,
     "footprint": _PHYSICAL_FRAMES,
     "defaults": _PHYSICAL_FRAMES,
     "axes": _PHYSICAL_WORDS,
@@ -2593,9 +2595,9 @@ _PHYSICAL_PROFILE_FIELDS = {
     "axes.coarse_offset": _PHYSICAL_FRAMES,
     "axes.fine_offset": _PHYSICAL_WORDS,
     "axes.inverted": _PHYSICAL_WORDS,
-    "axes.travel_speed_per_s": _PHYSICAL_IDENTITY_ONLY,
-    "axes.latency_ms": _PHYSICAL_IDENTITY_ONLY,
-    "axes.settle_ms": _PHYSICAL_IDENTITY_ONLY,
+    "axes.travel_speed_per_s": _PHYSICAL_PREPOSITION,
+    "axes.latency_ms": _PHYSICAL_PREPOSITION,
+    "axes.settle_ms": _PHYSICAL_PREPOSITION,
     "discrete": _PHYSICAL_CHECK,
     "discrete.offset": _PHYSICAL_FRAMES,
     "discrete.states": _PHYSICAL_CHECK,
@@ -2604,13 +2606,13 @@ _PHYSICAL_PROFILE_FIELDS = {
     "discrete.states.value": _PHYSICAL_FRAMES,
     "discrete.states.settle_ms": _PHYSICAL_CHANGES,
     "discrete.default_state": _PHYSICAL_CHANGES,
-    "discrete.closed_state": _PHYSICAL_IDENTITY_ONLY,
+    "discrete.closed_state": _PHYSICAL_PREPOSITION,
     "discrete.open_state": _PHYSICAL_IDENTITY_ONLY,
-    "visibility": _PHYSICAL_IDENTITY_ONLY,
-    "visibility.dimmer_zero_extinguishes": _PHYSICAL_IDENTITY_ONLY,
-    "visibility.extinguishing_shutter_states": _PHYSICAL_IDENTITY_ONLY,
-    "visibility.close_latency_ms": _PHYSICAL_IDENTITY_ONLY,
-    "visibility.open_latency_ms": _PHYSICAL_IDENTITY_ONLY,
+    "visibility": _PHYSICAL_PREPOSITION,
+    "visibility.dimmer_zero_extinguishes": _PHYSICAL_DARKNESS,
+    "visibility.extinguishing_shutter_states": _PHYSICAL_DARKNESS,
+    "visibility.close_latency_ms": _PHYSICAL_PREPOSITION,
+    "visibility.open_latency_ms": _PHYSICAL_PREPOSITION,
 }
 for _profile_root in (
     "fixture.fixtures[FixtureInstance].config.physical_profile",
@@ -2630,8 +2632,8 @@ for _field, _note in {
     "tilt_deg": _PHYSICAL_CHECK,
     "dimmer": _PHYSICAL_CHECK,
     "discrete_states": _PHYSICAL_CHECK,
-    "settled": _PHYSICAL_IDENTITY_ONLY,
-    "dark": _PHYSICAL_IDENTITY_ONLY,
+    "settled": _PHYSICAL_PREPOSITION,
+    "dark": _PHYSICAL_PREPOSITION,
 }.items():
     _initial_state_path = "job.moving_heads.initial_states" + (f".{_field}" if _field else "")
     CONFIG_EFFECTS[_initial_state_path] = ConfigDisposition(

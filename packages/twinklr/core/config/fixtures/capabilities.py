@@ -336,6 +336,16 @@ class FixtureCapabilities(BaseModel):
                 )
         for extra in sorted(state.discrete_states.keys() - self.discrete.keys()):
             problems.append(f"initial {extra} state names a channel the profile does not declare")
+        # Contradictory evidence is not darkness: dark=True needs a declared extinction.
+        visibility = self.visibility
+        if state.dark and not (
+            (visibility.dimmer_zero_extinguishes and state.dimmer == 0)
+            or state.discrete_states.get("shutter") in visibility.extinguishing_shutter_states
+        ):
+            problems.append(
+                "initial state claims dark=True, but neither its dimmer nor its shutter "
+                "extinguishes the fixture under the profile's visibility declaration"
+            )
         return tuple(problems)
 
 
