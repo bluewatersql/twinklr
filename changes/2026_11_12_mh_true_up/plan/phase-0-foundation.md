@@ -1,6 +1,6 @@
 ---
 type: plan
-status: proposed
+status: active
 area: engineering
 created: 2026-11-12
 updated: 2026-11-13
