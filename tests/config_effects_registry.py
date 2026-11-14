@@ -2759,6 +2759,20 @@ for _field in ("physical_shutter_state", "physical_color", "physical_gobo"):
         _PHYSICAL_TEMPLATE_COMPILED,
     )
 
+# P2.4a reposition fallbacks: a step's opt-in and the job's policy, both required. Each
+# exact path is evidenced by a physical render whose cue that cannot be repositioned is
+# kept dark with both set and refused once that one path is back at its default.
+for _fallback_path in (
+    "template.template.steps.physical_reposition_fallback",
+    "job.moving_heads.reposition_fallback",
+):
+    CONFIG_EFFECTS[_fallback_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/compile/test_entry_window.py::"
+        f"test_reposition_fallback_field_changes_preposition[{_fallback_path}]",
+        _PHYSICAL_PREPOSITION,
+    )
+
 # Exact App/Job discriminators. These overrides prevent stale generic smoke-test
 # pointers from re-entering the accountable ledger.
 for _root_path in ("app.project_root", "app.cache_dir"):

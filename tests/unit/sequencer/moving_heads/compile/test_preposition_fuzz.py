@@ -16,20 +16,30 @@ from typing import Any
 
 import pytest
 
-from tests.support.mh_physical import assert_honest_transactions
+from tests.support.mh_physical import (
+    assert_honest_transactions,
+    discrete_profile_payload,
+    preposition_profile_payload,
+)
 from twinklr.core.config.fixtures import AxisCapability, FixtureCapabilities, InitialFixtureState
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import (
     ContinuousTrajectory,
     DiscretePoint,
     DiscreteTrajectory,
+    PhysicalChannelError,
     PhysicalPoint,
     RenderLock,
+    TransitionDiagnostic,
 )
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
+from twinklr.core.sequencer.moving_heads.compile.physical import _check_travel_rate
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     FailureMode,
+    follow_cues,
+    follow_lag,
     plan_prepositions,
+    worst_case_entry_ms,
 )
 
 _FRAME = 20
@@ -785,3 +795,599 @@ def test_every_feasible_plan_passes_the_byte_oracle(
     assert feasible >= min_feasible * len(seeds), (
         f"{arm}: only {feasible} of {len(seeds)} plans feasible; the fuzz has degraded"
     )
+
+
+# --- The section-entry bound (P2.4a) ------------------------------------------------------
+
+BOUND_SEEDS = 900
+_POSE_KEYS = (("pan", ChannelName.PAN), ("tilt", ChannelName.TILT))
+_WHEEL_KEYS = (("color", ChannelName.COLOR), ("gobo", ChannelName.GOBO))
+
+type _Range = tuple[float, float]
+
+
+def _span(rng: random.Random, low: float, high: float) -> _Range:
+    """A random sub-range of `[low, high]`, a single pose a third of the time."""
+    a = rng.choice([low, high, rng.uniform(low, high)])
+    b = a if rng.random() < 1 / 3 else rng.choice([low, high, rng.uniform(low, high)])
+    return min(a, b), max(a, b)
+
+
+def _bound_case(
+    seed: int, kind: str
+) -> tuple[
+    FixtureCapabilities,
+    InitialFixtureState,
+    list[FixtureSegment],
+    dict[ChannelName, _Range],
+    dict[ChannelName, set[str]],
+    dict[ChannelName, _Range],
+]:
+    """A predecessor, then (a minute later) a target cue entered from it.
+
+    `static`: the run's initial state, anywhere inside a random envelope, with any wheel,
+    dimmer and shutter state. `moving`: a predecessor cue moving at exactly the
+    configured speed on every axis up to its last frame, enveloped by the pose its last
+    frame commands (or a random envelope around it). `short-wheel`: a one-to-three
+    frame predecessor, often moving, that selects other wheel states than the initial
+    ones. Latency and settle are zero on the pose axes in half the cases. The target
+    holds a pose drawn from a random entry range and a wheel state from random entry
+    sets. Returns the profile, initial state, cues and the bound's three inputs.
+    """
+    rng = random.Random(seed)
+    payload = _profile_payload(rng, "p0", known=True)
+    visibility = payload["visibility"]
+    if (
+        not visibility["dimmer_zero_extinguishes"]
+        and not visibility["extinguishing_shutter_states"]
+    ):
+        if "dimmer" in payload["axes"]:
+            visibility["dimmer_zero_extinguishes"] = True
+        elif "shutter" in payload["discrete"]:
+            visibility["extinguishing_shutter_states"] = ["closed"]
+    if rng.random() < 0.5:
+        for key, _ in _POSE_KEYS:
+            if key in payload["axes"]:
+                payload["axes"][key].update(latency_ms=0, settle_ms=0)
+    if kind != "static" and rng.random() < 0.3:
+        # Coarse and slow: one 8-bit pan word takes 46 ms at 45.5 degrees/s, more than a
+        # frame, so a predecessor at the speed limit can trail its commands by more.
+        visibility["close_latency_ms"] = 0
+        for key, _ in _POSE_KEYS:
+            axis = payload["axes"].get(key)
+            if axis is not None:
+                axis.pop("fine_offset", None)
+                axis["travel_speed_per_s"] = 45.5
+                capability = AxisCapability.model_validate(axis)
+                payload["defaults"][axis["coarse_offset"]] = capability.dmx_word(
+                    sum(capability.operable_range) / 2
+                )
+    profile = FixtureCapabilities.model_validate(payload)
+    axes = {ch: profile.axes[key] for key, ch in _POSE_KEYS if key in profile.axes}
+    wheels = {ch: profile.discrete[key] for key, ch in _WHEEL_KEYS if key in profile.discrete}
+    shutter = profile.discrete.get("shutter")
+    dark_states = profile.visibility.extinguishing_shutter_states
+
+    def uniform(span: _Range) -> float:
+        return rng.uniform(*span) if rng.random() < 0.6 else rng.choice(span)
+
+    def looks(lit: bool) -> dict[ChannelName, ContinuousTrajectory | DiscreteTrajectory]:
+        """Dimmer and shutter (lit, or dark by every declared mechanism), at time 0."""
+        channels: dict[ChannelName, ContinuousTrajectory | DiscreteTrajectory] = {}
+        if "dimmer" in profile.axes:
+            level = PhysicalPoint(t_ms=0, value=1.0 if lit else 0.0)
+            channels[ChannelName.DIMMER] = ContinuousTrajectory(
+                unit="normalized", points=(level,), interpolation="hold"
+            )
+        if shutter is not None:
+            options = [s for s in sorted(shutter.states) if (s in dark_states) != lit]
+            state = rng.choice(options or sorted(shutter.states))
+            channels[ChannelName.SHUTTER] = DiscreteTrajectory(
+                events=(DiscretePoint(t_ms=0, state=state),)
+            )
+        return channels
+
+    def cue(
+        name: str,
+        t0: int,
+        t1: int,
+        poses: dict[ChannelName, _Range],
+        selected: dict[ChannelName, str],
+    ) -> FixtureSegment:
+        channels = looks(rng.random() < 0.7)
+        channels = {c: _shifted_value(v, t0) for c, v in channels.items()}
+        for channel, (start, end) in poses.items():
+            channels[channel] = _line(start, end, t0, t1)
+        for channel, state in selected.items():
+            channels[channel] = DiscreteTrajectory(events=(DiscretePoint(t_ms=t0, state=state),))
+        return FixtureSegment(
+            section_id=name,
+            segment_id=name,
+            step_id="step",
+            template_id="tpl",
+            fixture_id="MH1",
+            t0_ms=t0,
+            t1_ms=t1,
+            channels={c: ChannelValue(channel=c, physical=v) for c, v in channels.items()},
+        )
+
+    windows = {ch: axis.operable_range for ch, axis in axes.items()}
+    entry_pose = {ch: _span(rng, *window) for ch, window in windows.items()}
+    entry_wheels = {
+        ch: set(rng.sample(sorted(w.states), rng.randint(1, len(w.states))))
+        for ch, w in wheels.items()
+    }
+    initial_wheels = {ch: rng.choice(sorted(w.states)) for ch, w in wheels.items()}
+    states = {key: initial_wheels[ch] for key, ch in _WHEEL_KEYS if ch in initial_wheels}
+    if shutter is not None:
+        states["shutter"] = rng.choice(sorted(shutter.states))
+
+    cues: list[FixtureSegment] = []
+    if kind == "static":
+        envelope = {ch: _span(rng, *window) for ch, window in windows.items()}
+        start = {ch: uniform(span) for ch, span in envelope.items()}
+        end_ms = 0
+    else:
+        start = {ch: rng.uniform(*window) for ch, window in windows.items()}
+        frames = rng.randint(1, 3) if kind == "short-wheel" else rng.choice([1, 2, 5, 20, 60])
+        t0 = 60_000
+        t1 = t0 + frames * _FRAME
+        poses: dict[ChannelName, _Range] = {}
+        for ch, axis in axes.items():
+            low, high = windows[ch]
+            assert axis.travel_speed_per_s is not None
+            reach = axis.travel_speed_per_s * frames * _FRAME / 1000
+            if kind == "short-wheel" and rng.random() < 0.3:
+                reach = 0.0  # a held predecessor that only turns its wheels
+            reach = min(reach, high - low)
+            direction = rng.choice([-1, 1])
+            begin = (
+                rng.uniform(low, high - reach) if direction > 0 else rng.uniform(low + reach, high)
+            )
+            poses[ch] = (begin, begin + direction * reach)
+        selected = {ch: rng.choice(sorted(w.states)) for ch, w in wheels.items()}
+        if kind == "short-wheel":
+            for ch, w in wheels.items():
+                others = [s for s in sorted(w.states) if s != initial_wheels[ch]]
+                selected[ch] = rng.choice(others or sorted(w.states))
+        cues.append(cue("pred", t0, t1, poses, selected))
+        # The pose the predecessor's last frame commands, where the next gap starts.
+        last = {
+            ch: begin + (end - begin) * (frames - 1) / frames for ch, (begin, end) in poses.items()
+        }
+        envelope = {
+            ch: (last[ch], last[ch])
+            if rng.random() < 0.6
+            else _span_around(rng, last[ch], windows[ch])
+            for ch in axes
+        }
+        if rng.random() < 0.3:
+            # Entered at the aim the predecessor left: only its unfinished motion is timed.
+            entry_pose = {ch: (last[ch], last[ch]) for ch in axes}
+        end_ms = t1
+
+    dimmer = rng.choice([0.0, 1.0]) if "dimmer" in profile.axes else None
+    dark = (profile.visibility.dimmer_zero_extinguishes and dimmer == 0) or (
+        states.get("shutter") in dark_states
+    )
+    initial = InitialFixtureState(
+        pan_deg=start.get(ChannelName.PAN, 0.0),
+        tilt_deg=start.get(ChannelName.TILT, 0.0),
+        dimmer=dimmer,
+        discrete_states=states,
+        settled=True,
+        dark=dark,
+    )
+    target_t0 = end_ms + 60_000
+    target_pose = {ch: uniform(span) for ch, span in entry_pose.items()}
+    target_wheels = {ch: rng.choice(sorted(options)) for ch, options in entry_wheels.items()}
+    cues.append(
+        cue(
+            "target",
+            target_t0,
+            target_t0 + 200,
+            {ch: (pose, pose) for ch, pose in target_pose.items()},
+            target_wheels,
+        )
+    )
+    return profile, initial, cues, entry_pose, entry_wheels, envelope
+
+
+def _span_around(rng: random.Random, value: float, window: _Range) -> _Range:
+    """A random range inside `window` that contains `value`."""
+    return rng.uniform(window[0], value), rng.uniform(value, window[1])
+
+
+def _shifted_value(
+    value: ContinuousTrajectory | DiscreteTrajectory, t0: int
+) -> ContinuousTrajectory | DiscreteTrajectory:
+    """A trajectory authored at time 0, moved to start at `t0`."""
+    if isinstance(value, ContinuousTrajectory):
+        points = tuple(p.model_copy(update={"t_ms": p.t_ms + t0}) for p in value.points)
+        return value.model_copy(update={"points": points})
+    events = tuple(e.model_copy(update={"t_ms": e.t_ms + t0}) for e in value.events)
+    return value.model_copy(update={"events": events})
+
+
+@pytest.mark.parametrize(
+    ("kind", "min_checked"),
+    [
+        pytest.param("static", 0.85, id="static-predecessor-in-an-envelope"),
+        pytest.param("moving", 0.8, id="predecessor-moving-at-the-rate-limit"),
+        pytest.param("short-wheel", 0.75, id="short-predecessor-with-a-wheel-change"),
+    ],
+)
+def test_worst_case_entry_bound_dominates_the_transaction(kind: str, min_checked: float) -> None:
+    """The time `worst_case_entry_ms` claims a section entry may need is never less than
+    what the transaction pass then requires; the entry window is sized from it.
+
+    A case whose predecessor itself cannot be planned (a shutter state too short for
+    its latency, say) has no entry to check; the floor keeps those from hollowing the
+    fuzz out.
+    """
+    checked = 0
+    for seed in range(BOUND_SEEDS):
+        profile, initial, cues, entry_pose, entry_wheels, envelope = _bound_case(seed, kind)
+        bound = worst_case_entry_ms(
+            profile,
+            entry_pose=entry_pose,
+            entry_wheels=entry_wheels,
+            pose_envelope=envelope,
+            frame_ms=_FRAME,
+        )
+        visibility, closer = profile.visibility, profile.discrete.get("shutter")
+        if bound is None:
+            # Every timing is declared, so only a missing darkness guarantee is unknown: a
+            # predecessor may hold an open shutter that no declared state replaces.
+            assert not visibility.dimmer_zero_extinguishes, (kind, seed)
+            assert closer is None or closer.closed_state not in (
+                visibility.extinguishing_shutter_states
+            ), (kind, seed)
+            continue
+        result = plan_prepositions(
+            cues,
+            {"MH1": profile},
+            initial_states={"MH1": initial},
+            locks=(),
+            frame_ms=_FRAME,
+            sequence_end_ms=cues[-1].t1_ms,
+        )
+        target = cues[-1].t0_ms
+        errors = [d for d in result.diagnostics if d.status == "error"]
+        if errors and all(d.cue_ms != target for d in errors):
+            continue  # the predecessor cannot be planned; there is no entry to check
+        entry = next(d for d in result.diagnostics if d.cue_ms == target)
+        assert entry.status == "feasible", (kind, seed, entry.reason)
+        assert entry.required_ms is not None and entry.required_ms <= bound, (
+            f"{kind} seed {seed}: the transaction needs {entry.required_ms} ms but the bound "
+            f"is {bound} ms ({entry.reason})"
+        )
+        checked += 1
+    assert checked >= min_checked * BOUND_SEEDS, f"{kind}: only {checked} entries checked"
+
+
+@pytest.mark.parametrize(
+    "unknown",
+    [
+        "pan.travel_speed_per_s",
+        "pan.latency_ms",
+        "tilt.settle_ms",
+        "visibility.close_latency_ms",
+        "color.red.settle_ms",
+        "shutter-only.closed.settle_ms",
+    ],
+)
+def test_worst_case_entry_bound_is_unknown_when_a_needed_term_is(unknown: str) -> None:
+    """Unknown is never treated as zero: the bound is None, which is never feasible."""
+    entry = {ChannelName.PAN: (0.0, 90.0), ChannelName.TILT: (0.0, 0.0)}
+    envelope = {ChannelName.PAN: (-90.0, -90.0), ChannelName.TILT: (10.0, 10.0)}
+    wheels = {ChannelName.COLOR: {"red"}}
+
+    def bound(payload: dict[str, Any]) -> int | None:
+        return worst_case_entry_ms(
+            FixtureCapabilities.model_validate(payload),
+            entry_pose=entry,
+            entry_wheels=wheels,
+            pose_envelope=envelope,
+            frame_ms=_FRAME,
+        )
+
+    payload = preposition_profile_payload()
+    if unknown.startswith("shutter-only"):
+        payload["visibility"]["dimmer_zero_extinguishes"] = False
+    assert bound(payload) is not None
+    owner, *path, key = unknown.split(".")
+    if owner in ("pan", "tilt"):
+        payload["axes"][owner][key] = None
+    elif owner == "visibility":
+        payload["visibility"][key] = None
+    elif owner == "color":
+        payload["discrete"]["color"]["states"][path[0]][key] = None
+    else:
+        payload["discrete"]["shutter"]["states"][path[0]][key] = None
+    assert bound(payload) is None
+
+
+# --- Non-monotonic predecessors on coarse axes (P2.4a review) ---------------------------
+
+COARSE_SEEDS = 800
+_COARSE_KINDS = ("wobble", "triangle", "turn", "random")
+
+
+def _coarse_profile(rng: random.Random) -> FixtureCapabilities:
+    """The discrete test profile with random 8- or 16-bit, inverted, slow or fast axes."""
+    payload = discrete_profile_payload()
+    for key in ("pan", "tilt"):
+        axis = payload["axes"][key]
+        if rng.random() < 0.5:
+            axis.pop("fine_offset")
+        axis["inverted"] = rng.random() < 0.5
+        if key == "pan" and rng.random() < 0.4:
+            axis["physical_min"], axis["physical_max"] = rng.choice(
+                [(0.0, 540.0), (-100.0, 440.0), (-30.0, 250.0)]
+            )
+        axis["travel_speed_per_s"] = rng.choice([45.0, 45.5, 30.0, 90.0, 180.0, 720.0, 13.0])
+        axis["latency_ms"] = rng.choice([0, 0, 7, 20, 40, 55])
+        axis["settle_ms"] = rng.choice([0, 0, 13, 33, 40])
+        capability = AxisCapability.model_validate(axis)
+        word = capability.dmx_word(sum(capability.operable_range) / 2)
+        if "fine_offset" in axis:
+            payload["defaults"][axis["coarse_offset"]] = word >> 8
+            payload["defaults"][axis["fine_offset"]] = word & 0xFF
+        else:
+            payload["defaults"][axis["coarse_offset"]] = word
+    visibility = payload["visibility"]
+    visibility["close_latency_ms"] = rng.choice([0, 0, 10, 30])
+    visibility["open_latency_ms"] = rng.choice([0, 10])
+    mode = rng.choice(["dimmer", "shutter", "both"])
+    visibility["dimmer_zero_extinguishes"] = mode != "shutter"
+    visibility["extinguishing_shutter_states"] = [] if mode == "dimmer" else ["closed"]
+    for state in payload["discrete"]["shutter"]["states"].values():
+        state["settle_ms"] = rng.choice([0, 0, 20, 30])
+    return FixtureCapabilities.model_validate(payload)
+
+
+def _coarse_path(
+    rng: random.Random, axis: AxisCapability, frames: int, kind: str, start: float | None = None
+) -> list[float]:
+    """Per-frame poses within the configured speed: straddling a word boundary every frame
+    (`wobble`), bouncing or reversing at full speed (`triangle`, `turn`), or random."""
+    low, high = axis.operable_range
+    assert axis.travel_speed_per_s is not None
+    step = axis.travel_speed_per_s * _FRAME / 1000
+    word = (axis.physical_max - axis.physical_min) / axis.full_word
+    x = rng.uniform(low, high) if start is None else start
+    xs = [x]
+    direction = rng.choice([-1, 1])
+    for index in range(frames):
+        if kind == "wobble":
+            amplitude = min(step * 0.49, word * 0.49)
+            nx = xs[0] + (amplitude if index % 2 == 0 else -amplitude)
+        elif kind == "triangle":
+            nx = x + direction * step
+            if not low <= nx <= high or rng.random() < 0.15:
+                direction = -direction
+                nx = x + direction * step
+        elif kind == "turn":
+            if index % rng.choice([2, 3, 5]) == 0:
+                direction = -direction
+            nx = x + direction * step
+        else:
+            nx = x + rng.uniform(-step, step)
+        x = min(max(nx, low), high)
+        xs.append(x)
+    return xs
+
+
+def _coarse_cue(
+    name: str,
+    t0: int,
+    poses: dict[ChannelName, list[float]],
+    wheels: dict[ChannelName, str],
+    *,
+    lit: bool = True,
+) -> FixtureSegment:
+    """A cue commanding `poses[ch][i]` at frame `i`, ending with a terminal point."""
+    frames = len(next(iter(poses.values()))) - 1
+    t1 = t0 + frames * _FRAME
+    channels: dict[ChannelName, ContinuousTrajectory | DiscreteTrajectory] = {
+        channel: ContinuousTrajectory(
+            unit="degree",
+            points=tuple(
+                PhysicalPoint(t_ms=t0 + index * _FRAME if index < frames else t1, value=x)
+                for index, x in enumerate(xs)
+            ),
+            interpolation="linear",
+        )
+        for channel, xs in poses.items()
+    }
+    channels[ChannelName.DIMMER] = ContinuousTrajectory(
+        unit="normalized",
+        points=(PhysicalPoint(t_ms=t0, value=1.0 if lit else 0.0),),
+        interpolation="hold",
+    )
+    channels[ChannelName.SHUTTER] = DiscreteTrajectory(
+        events=(DiscretePoint(t_ms=t0, state="open" if lit else "closed"),)
+    )
+    for channel, state in wheels.items():
+        channels[channel] = DiscreteTrajectory(events=(DiscretePoint(t_ms=t0, state=state),))
+    return FixtureSegment(
+        section_id=name,
+        segment_id=name,
+        step_id="step",
+        template_id="tpl",
+        fixture_id="MH1",
+        t0_ms=t0,
+        t1_ms=t1,
+        channels={c: ChannelValue(channel=c, physical=v) for c, v in channels.items()},
+    )
+
+
+def _coarse_case(
+    seed: int, chain: int
+) -> tuple[
+    FixtureCapabilities,
+    list[FixtureSegment],
+    FixtureSegment,
+    dict[ChannelName, float],
+    dict[ChannelName, str],
+]:
+    """`chain` back-to-back predecessor cues, the first a minute in, then a target cue a
+    minute after them; returns the profile, the predecessors, the target, the target's
+    pose and wheels."""
+    rng = random.Random(seed)
+    profile = _coarse_profile(rng)
+    axes = {ChannelName.PAN: profile.axes["pan"], ChannelName.TILT: profile.axes["tilt"]}
+    kind = _COARSE_KINDS[seed % len(_COARSE_KINDS)]
+    wheels = {
+        ChannelName.COLOR: rng.choice(["white", "red", "blue"]),
+        ChannelName.GOBO: rng.choice(["open", "dots", "star"]),
+    }
+    cues: list[FixtureSegment] = []
+    starts: dict[ChannelName, float | None] = dict.fromkeys(axes)
+    t = 60_000
+    for index in range(chain):
+        frames = rng.choice([2, 5, 20, 50, 150, 400])
+        poses = {c: _coarse_path(rng, a, frames, kind, starts[c]) for c, a in axes.items()}
+        cue = _coarse_cue(f"pred{index}", t, poses, wheels)
+        cues.append(cue)
+        # The next cue continues from this one's last commanded frame.
+        starts = {c: xs[-2] for c, xs in poses.items()}
+        t = cue.t1_ms
+    target_pose = {
+        c: rng.choice([*a.operable_range, rng.uniform(*a.operable_range)]) for c, a in axes.items()
+    }
+    target_wheels = {
+        ChannelName.COLOR: rng.choice(["white", "red", "blue"]),
+        ChannelName.GOBO: rng.choice(["open", "dots", "star"]),
+    }
+    target = _coarse_cue(
+        "target",
+        t + 60_000,
+        {c: [x] * 11 for c, x in target_pose.items()},
+        target_wheels,
+    )
+    return profile, cues, target, target_pose, target_wheels
+
+
+def _plan_entry(
+    profile: FixtureCapabilities, cues: list[FixtureSegment], target: FixtureSegment
+) -> TransitionDiagnostic | None:
+    """The target's transaction, or None when a predecessor itself cannot be planned."""
+    initial = InitialFixtureState(
+        pan_deg=sum(profile.axes["pan"].operable_range) / 2,
+        tilt_deg=sum(profile.axes["tilt"].operable_range) / 2,
+        dimmer=0.0,
+        discrete_states={"shutter": "closed", "color": "white", "gobo": "open"},
+        settled=True,
+        dark=True,
+    )
+    result = plan_prepositions(
+        [*cues, target],
+        {"MH1": profile},
+        initial_states={"MH1": initial},
+        locks=(),
+        frame_ms=_FRAME,
+        sequence_end_ms=target.t1_ms,
+    )
+    errors = [d for d in result.diagnostics if d.status == "error"]
+    if errors and all(d.cue_ms != target.t0_ms for d in errors):
+        return None
+    return next(d for d in result.diagnostics if d.cue_ms == target.t0_ms)
+
+
+def _last_frame_envelope(cue: FixtureSegment) -> dict[ChannelName, tuple[float, float]]:
+    """The pose a cue's last frame commands, as a degenerate envelope."""
+    pose = {}
+    for channel in (ChannelName.PAN, ChannelName.TILT):
+        trajectory = cue.channels[channel].physical
+        assert isinstance(trajectory, ContinuousTrajectory)
+        value = next(p.value for p in trajectory.points if p.t_ms == cue.t1_ms - _FRAME)
+        pose[channel] = (value, value)
+    return pose
+
+
+def test_entry_bound_dominates_after_any_cue_the_compile_admits() -> None:
+    """The envelope bound (no followed predecessor) holds after any one cue the physical
+    compile admits: within the configured speed (`_check_travel_rate`) and followable
+    by the head (`follow_lag`). Word-boundary wobble on a coarse axis, which once left
+    the head 20 s behind, is refused by the compile instead."""
+    checked = refused = 0
+    for seed in range(COARSE_SEEDS):
+        profile, (cue,), target, pose, wheels = _coarse_case(seed, chain=1)
+        try:
+            for channel in (ChannelName.PAN, ChannelName.TILT):
+                trajectory = cue.channels[channel].physical
+                assert isinstance(trajectory, ContinuousTrajectory)
+                _check_travel_rate("MH1", channel, trajectory, profile)
+        except PhysicalChannelError:
+            continue
+        if follow_lag(cue, profile, frame_ms=_FRAME) is not None:
+            refused += 1
+            continue
+        entry = _plan_entry(profile, [cue], target)
+        if entry is None:
+            continue
+        bound = worst_case_entry_ms(
+            profile,
+            entry_pose={c: (x, x) for c, x in pose.items()},
+            entry_wheels={c: {s} for c, s in wheels.items()},
+            pose_envelope=_last_frame_envelope(cue),
+            frame_ms=_FRAME,
+        )
+        assert bound is not None
+        assert entry.status == "feasible", (seed, entry.reason)
+        assert entry.required_ms is not None and entry.required_ms <= bound, (
+            f"seed {seed}: the transaction needs {entry.required_ms} ms but the bound is "
+            f"{bound} ms ({entry.reason})"
+        )
+        checked += 1
+    assert checked >= 0.5 * COARSE_SEEDS, f"only {checked} entries checked"
+    assert refused >= 0.05 * COARSE_SEEDS, f"only {refused} cues refused as unfollowable"
+
+
+def test_entry_bound_from_the_followed_predecessor_dominates() -> None:
+    """With the actual predecessor chain followed (`follow_cues`), the bound holds even
+    after motion the compile would refuse, across back-to-back cues and with the
+    predecessor's wheels known to be held."""
+    checked = 0
+    for seed in range(COARSE_SEEDS):
+        rng = random.Random(seed)
+        profile, cues, target, pose, wheels = _coarse_case(seed, chain=rng.randint(1, 3))
+        try:
+            for cue in cues:
+                for channel in (ChannelName.PAN, ChannelName.TILT):
+                    trajectory = cue.channels[channel].physical
+                    assert isinstance(trajectory, ContinuousTrajectory)
+                    _check_travel_rate("MH1", channel, trajectory, profile)
+        except PhysicalChannelError:
+            continue
+        entry = _plan_entry(profile, cues, target)
+        if entry is None:
+            continue
+        followed = follow_cues(cues, profile, frame_ms=_FRAME)[-1]
+        assert followed.settled_ms is not None
+        last = cues[-1]
+        held = {
+            channel: {value.physical.events[-1].state}
+            for channel, value in last.channels.items()
+            if channel in (ChannelName.COLOR, ChannelName.GOBO)
+            and isinstance(value.physical, DiscreteTrajectory)
+        }
+        bound = worst_case_entry_ms(
+            profile,
+            entry_pose={c: (x, x) for c, x in pose.items()},
+            entry_wheels={c: {s} for c, s in wheels.items()},
+            pose_envelope=_last_frame_envelope(last),
+            held_wheels=held,
+            residual_ms=max(0, followed.settled_ms - last.t1_ms),
+            frame_ms=_FRAME,
+        )
+        assert bound is not None
+        assert entry.status == "feasible", (seed, entry.reason)
+        assert entry.required_ms is not None and entry.required_ms <= bound, (
+            f"seed {seed}: the transaction needs {entry.required_ms} ms but the bound is "
+            f"{bound} ms ({entry.reason})"
+        )
+        checked += 1
+    assert checked >= 0.6 * COARSE_SEEDS, f"only {checked} entries checked"

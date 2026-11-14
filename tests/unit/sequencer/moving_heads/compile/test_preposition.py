@@ -34,6 +34,7 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
     TRANSACTION_METADATA_KEY,
     FailureMode,
     PrepositionResult,
+    follow_lag,
     plan_prepositions,
 )
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
@@ -653,6 +654,51 @@ def test_visible_cue_at_time_zero_needs_the_initial_state_to_already_match() -> 
     assert _at(_plan(dark_cue, profile, _initial()), 0).status == "feasible"
 
 
+@pytest.mark.parametrize("dark", [True, False])
+def test_a_lit_cue_at_time_zero_that_needs_a_move_is_dropped_under_drop_accent(
+    dark: bool,
+) -> None:
+    """Nothing is pre-rolled before time zero, so a lit cue there that must move first
+    cannot play; the reason says so, and dropping it keeps the head dark, which is safe."""
+    profile = _profile()
+    initial = _initial(dark=dark)
+    cues = [_opt_in(_cue("A", 0, 200, pan=45.0), "drop_accent"), _cue("B", 1200, 1400, pan=45.0)]
+
+    refused = _plan(cues, profile, initial)
+    assert _at(refused, 0).code == "infeasible_transition"
+    assert "time zero" in _at(refused, 0).reason
+    assert "darkness is never established" not in _at(refused, 0).reason
+
+    result = _plan(cues, profile, initial, mode="drop_accent")
+    assert _at(result, 0).status == "drop_accent"
+    assert _at(result, 1200).status == "feasible"
+    assert_honest_transactions(result, cues, profile, initial)
+
+
+@pytest.mark.parametrize(
+    "visibility",
+    [
+        pytest.param({"close_latency_ms": None}, id="unknown-close-latency"),
+        pytest.param(
+            {"dimmer_zero_extinguishes": False, "extinguishing_shutter_states": []},
+            id="no-darkness",
+        ),
+    ],
+)
+def test_a_lit_cue_at_time_zero_is_never_dropped_where_darkness_cannot_be_established(
+    visibility: dict[str, Any],
+) -> None:
+    """Dropping a time-zero cue is safe only when darkness can follow; without it the
+    failure stays the non-substitutable missing-darkness one."""
+    profile = _profile(visibility=visibility)
+    cues = [_opt_in(_cue("A", 0, 200, pan=45.0), "drop_accent")]
+
+    result = _plan(cues, profile, _initial(dark=False), mode="drop_accent")
+
+    assert _at(result, 0).status == "error"
+    assert "time zero" not in _at(result, 0).reason
+
+
 def test_unknown_initial_state_is_never_planned_around() -> None:
     profile = _profile()
     cue = _opt_in(_cue("A", 1000, 1200, pan=90.0), "drop_accent")
@@ -936,3 +982,57 @@ def test_a_cue_without_its_pose_is_rejected() -> None:
 
     with pytest.raises(ValueError, match="tilt"):
         _plan([cue], _profile(), _initial())
+
+
+def _coarse_pan(word_ms: float) -> FixtureCapabilities:
+    """`_profile` with an 8-bit pan whose one word takes `word_ms` to travel."""
+
+    def coarse(payload: dict[str, Any]) -> None:
+        pan = payload["axes"]["pan"]
+        pan.pop("fine_offset")
+        pan["travel_speed_per_s"] = 540 / 255 * 1000 / word_ms
+
+    return _profile(edit=coarse)
+
+
+def _pan_path(values: list[float]) -> FixtureSegment:
+    t1 = 20 * len(values)
+    points = (*(PhysicalPoint(t_ms=20 * i, value=v) for i, v in enumerate(values)),)
+    points += (PhysicalPoint(t_ms=t1, value=values[-1]),)
+    pan = ContinuousTrajectory(unit="degree", points=points, interpolation="linear")
+    return physical_segment({_PAN: pan, _TILT: _line(0.0, 0, t1)}, t0_ms=0, t1_ms=t1)
+
+
+@pytest.mark.parametrize(
+    ("word_ms", "shape", "refused"),
+    [
+        pytest.param(21.0, "wobble", True, id="wobble-word-just-over-a-frame"),
+        pytest.param(19.0, "wobble", False, id="wobble-word-just-under-a-frame"),
+        pytest.param(20.5, "jump", True, id="two-words-just-over-one-behind"),
+        pytest.param(19.0, "jump", False, id="two-words-just-under-one-behind"),
+    ],
+)
+def test_follow_lag_refuses_only_motion_the_head_falls_a_word_behind(
+    word_ms: float, shape: str, refused: bool
+) -> None:
+    """At the boundary: straddling a word edge every frame trails by one more millisecond
+    a frame when a word takes 21 ms and never when it takes 19 ms; a two-word step in one
+    frame leaves the head 21 ms behind the next frame (more than a 20.5 ms word) or 18 ms
+    (less than a 19 ms one)."""
+    profile = _coarse_pan(word_ms)
+    axis = profile.axes["pan"]
+    if shape == "wobble":
+        low, high = 0.0, 5.0  # the first word edge above 0 degrees
+        while high - low > 1e-9:
+            middle = (low + high) / 2
+            low, high = (
+                (middle, high) if axis.dmx_word(middle) == axis.dmx_word(0.0) else (low, middle)
+            )
+        values = [low - 0.01 if i % 2 else high + 0.01 for i in range(40)]
+    else:
+        values = [0.0] + [2 * 540 / 255] * 5  # one word apart from the next word
+        assert axis.dmx_word(values[1]) - axis.dmx_word(0.0) == 2
+    lag = follow_lag(_pan_path(values), profile, frame_ms=20)
+    assert (lag is not None) == refused, lag
+    if lag is not None:
+        assert lag[0] == _PAN and "words/s" in lag[2]

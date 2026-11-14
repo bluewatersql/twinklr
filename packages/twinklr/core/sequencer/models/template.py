@@ -427,6 +427,11 @@ class TemplateStep(BaseModel):
     )
     physical_color: StateName | None = Field(default=None, exclude_if=lambda value: value is None)
     physical_gobo: StateName | None = Field(default=None, exclude_if=lambda value: value is None)
+    # Physical renderer only; left out of dumps when absent. The step's cues opt into
+    # the run's `moving_heads.reposition_fallback` when it names the same mode.
+    physical_reposition_fallback: Literal["preserve_aim", "drop_accent"] | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
     @property
     def has_physical_data(self) -> bool:
@@ -438,6 +443,7 @@ class TemplateStep(BaseModel):
             or self.physical_shutter_state is not None
             or self.physical_color is not None
             or self.physical_gobo is not None
+            or self.physical_reposition_fallback is not None
         )
 
     @model_validator(mode="after")

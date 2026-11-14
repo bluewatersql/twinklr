@@ -4,15 +4,20 @@ This module provides the top-level compilation function that orchestrates
 all components to compile a complete template to IR segments.
 """
 
+from collections.abc import Collection, Mapping, Sequence
 import logging
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from twinklr.core.config.fixtures import FixtureCapabilities
 from twinklr.core.curves.models import CurvePoint, PointsCurve
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.models.context import FixtureContext, TemplateCompileContext
 from twinklr.core.sequencer.models.enum import ChannelName, ChaseOrder, TemplateRole
-from twinklr.core.sequencer.models.moving_heads.physical import PhysicalChannelError
+from twinklr.core.sequencer.models.moving_heads.physical import (
+    DiscreteTrajectory,
+    PhysicalChannelError,
+)
 from twinklr.core.sequencer.models.template import (
     RemainderPolicy,
     Template,
@@ -31,6 +36,11 @@ from twinklr.core.sequencer.moving_heads.compile.phase_offset import (
 from twinklr.core.sequencer.moving_heads.compile.physical import (
     PhysicalCompileError,
     compile_physical_step,
+    slice_physical_segment,
+)
+from twinklr.core.sequencer.moving_heads.compile.preposition import (
+    FALLBACK_METADATA_KEY,
+    follow_lag,
 )
 from twinklr.core.sequencer.moving_heads.compile.preset import apply_preset
 from twinklr.core.sequencer.moving_heads.compile.scheduler import schedule_repeats
@@ -283,9 +293,11 @@ def compile_physical_template(
     `start_limit_ms`, the first frame boundary inside the covered span, or at or after
     `end_limit_ms` is dropped per target fixture and listed in `dropped_steps`: its
     phase origin would lie outside the map. Section intent and phase offsets are not
-    applied (a physical step rejects non-default phase offsets).
+    applied (a physical step rejects non-default phase offsets). A cue whose pose
+    commands the head cannot follow within one encoded word (`follow_lag`) is refused.
     Each segment records its requested musical bounds in metadata `requested_t0_ms`
-    and `requested_t1_ms`.
+    and `requested_t1_ms`, and a step's `physical_reposition_fallback` under
+    `FALLBACK_METADATA_KEY`.
 
     Args:
         template: The template to compile.
@@ -301,6 +313,8 @@ def compile_physical_template(
     Raises:
         PhysicalCompileError: For a FADE_OUT remainder policy, which has no physical
             fade, or a step the physical compile rejects.
+        PhysicalChannelError: For a value, rate or state the profile cannot honor, or
+            pose motion the head cannot follow.
         UnsupportedRigShapeError: If a step's target group matches no fixture.
         ValueError: If a step starting inside the limits is zero-length on the grid.
     """
@@ -395,6 +409,16 @@ def compile_physical_template(
                 segment = compile_physical_step(
                     step, step_context, sample_times_ms=tuple(range(t0, t1, EFFECT_GRID_MS))
                 )
+                assert fixture.physical_profile is not None  # checked by the step compile
+                lag = follow_lag(segment, fixture.physical_profile, frame_ms=EFFECT_GRID_MS)
+                if lag is not None:
+                    channel, time_ms, reason = lag
+                    raise PhysicalChannelError(
+                        fixture_id=fixture.fixture_id,
+                        channel=channel,
+                        time_ms=time_ms,
+                        reason=reason,
+                    )
             except (PhysicalCompileError, PhysicalChannelError, ValueError) as error:
                 error.add_note(
                     f"template {template.template_id!r}, step {step.step_id!r}, "
@@ -403,6 +427,7 @@ def compile_physical_template(
                 raise
             segment.add_metadata("requested_t0_ms", requested_t0)
             segment.add_metadata("requested_t1_ms", requested_t1)
+            segment.add_metadata(FALLBACK_METADATA_KEY, step.physical_reposition_fallback)
             segments.append(segment)
 
     return TemplateCompileResult(
@@ -412,6 +437,90 @@ def compile_physical_template(
         provenance=provenance,
         dropped_steps=dropped,
     )
+
+
+def apply_entry_window(
+    segments: Sequence[FixtureSegment],
+    window_end_ms: int,
+    *,
+    profiles: Mapping[str, FixtureCapabilities],
+    skip_fixture_ids: Collection[str] = (),
+) -> tuple[list[FixtureSegment], list[dict[str, str | int]]]:
+    """Hold a section's opening dark until `window_end_ms`, the end of its entry window.
+
+    A cue running across the window end is cut to begin there with
+    `slice_physical_segment`, so its phase origin is kept; where the shutter state in
+    force there could not be held for the visibility latency plus settle it needs when
+    the cue reveals, the cut moves on to the cue's next shutter change, dropping the
+    partial state. A cue ending before a usable cut is dropped and recorded; later cues
+    are unchanged. The dark gap before each cut is the transaction pass's to fill. Cues
+    of a fixture in `skip_fixture_ids` are kept as compiled.
+
+    Args:
+        segments: A section's compiled physical cues, on the frame grid.
+        window_end_ms: The window's end, on the frame grid.
+        profiles: Each fixture's physical profile.
+        skip_fixture_ids: Fixtures whose entry plays as authored instead.
+
+    Returns:
+        The kept cues, in input order, and one record per dropped cue.
+    """
+    kept: list[FixtureSegment] = []
+    dropped: list[dict[str, str | int]] = []
+    for segment in segments:
+        if segment.fixture_id in skip_fixture_ids or segment.t0_ms >= window_end_ms:
+            kept.append(segment)
+            continue
+        cut = (
+            None
+            if segment.t1_ms <= window_end_ms
+            else _holdable_cut(segment, window_end_ms, profiles[segment.fixture_id])
+        )
+        if cut is not None:
+            kept.append(slice_physical_segment(segment, cut, segment.t1_ms))
+            continue
+        dropped.append(
+            {
+                "fixture_id": segment.fixture_id,
+                "section_id": segment.section_id,
+                "step_id": segment.step_id,
+                "requested_start_ms": int(segment.metadata["requested_t0_ms"]),
+                "requested_end_ms": int(segment.metadata["requested_t1_ms"]),
+                "entry_window_end_ms": window_end_ms,
+            }
+        )
+    return kept, dropped
+
+
+def _holdable_cut(
+    segment: FixtureSegment, start_ms: int, profile: FixtureCapabilities
+) -> int | None:
+    """The first time from `start_ms` at which the cue's shutter state can begin a reveal.
+
+    Entered from the transaction's dark state, a state must hold until the cue's next
+    shutter change (or its end) for the latency it may cross plus its settle, both
+    known; None when no state of the cue's remainder does.
+    """
+    value = segment.channels.get(ChannelName.SHUTTER)
+    capability = profile.discrete.get("shutter")
+    if value is None or capability is None or not isinstance(value.physical, DiscreteTrajectory):
+        return start_ms
+    events = value.physical.events
+    visibility = profile.visibility
+    cut = start_ms
+    while cut < segment.t1_ms:
+        state = [event.state for event in events if event.t_ms <= cut][-1]
+        following = next((event.t_ms for event in events if event.t_ms > cut), None)
+        dark = state in visibility.extinguishing_shutter_states
+        latency = visibility.close_latency_ms if dark else visibility.open_latency_ms
+        settle = capability.states[state].settle_ms
+        holds = (following or segment.t1_ms) - cut
+        if latency is not None and settle is not None and holds >= latency + settle:
+            return cut
+        if following is None:
+            return None
+        cut = following
+    return None
 
 
 def _resolve_target_fixtures(

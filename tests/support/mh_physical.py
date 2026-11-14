@@ -30,6 +30,7 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
     PhysicalValue,
     RenderLock,
 )
+from twinklr.core.sequencer.models.template import TemplateDoc
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.preposition import PrepositionResult
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
@@ -318,6 +319,124 @@ def physical_edge_grid(
             "sixteenth_boundaries": BeatGrid._calculate_sixteenth_boundaries(beats),
             "duration_ms": beats[-1] + tail_ms,
         }
+    )
+
+
+def physical_bars_grid(*beat_ms: float) -> BeatGrid:
+    """A 4/4 grid moved `GRID_SHIFT_MS` off the frame grid, whose nth bar has four beats of
+    `beat_ms[n]`; the song ends `GRID_SHIFT_MS` after its last beat."""
+    beats = [GRID_SHIFT_MS]
+    for interval in beat_ms:
+        beats += [beats[-1] + interval * (index + 1) for index in range(4)]
+    return BeatGrid(
+        bar_boundaries=beats[::4],
+        beat_boundaries=beats,
+        eighth_boundaries=BeatGrid._calculate_eighth_boundaries(beats),
+        sixteenth_boundaries=BeatGrid._calculate_sixteenth_boundaries(beats),
+        tempo_bpm=60_000 / beat_ms[0],
+        beats_per_bar=4,
+        duration_ms=beats[-1] + GRID_SHIFT_MS,
+    )
+
+
+def hold_step(
+    step_id: str,
+    pan: float,
+    *,
+    tilt: float = 0.0,
+    start: float = 0.0,
+    duration: float = 1.0,
+    **fields: Any,
+) -> dict[str, Any]:
+    """A lit physical step holding one aim over `duration` bars from `start` bars."""
+    return {
+        "step_id": step_id,
+        "timing": {"base_timing": {"start_offset_bars": start, "duration_bars": duration}},
+        "geometry": {},
+        "movement": {
+            "physical": {
+                "shape": "hold",
+                "mode": "periodic",
+                "start_pan_deg": pan,
+                "start_tilt_deg": tilt,
+            }
+        },
+        "dimmer": {"physical": {"period_beats": 4.0, "duty_cycle": 1.0, "low": 0.0, "high": 1.0}},
+        "physical_shutter_state": "open",
+        **fields,
+    }
+
+
+def sweep_step(
+    step_id: str, pan: float, extent: float, *, period_beats: float = 4.0, **fields: Any
+) -> dict[str, Any]:
+    """`hold_step` whose pan moves linearly by `extent` over `period_beats`, then holds."""
+    step = hold_step(step_id, pan, **fields)
+    step["movement"]["physical"].update(
+        shape="linear", mode="finite", pan_extent_deg=extent, period_beats=period_beats
+    )
+    return step
+
+
+def physical_template_doc(
+    template_id: str, steps: Sequence[dict[str, Any]], *, cycle_bars: float = 1.0
+) -> TemplateDoc:
+    """A JOINER physical template looping every step once per `cycle_bars`."""
+    return TemplateDoc.model_validate(
+        {
+            "template": {
+                "template_id": template_id,
+                "version": 1,
+                "name": template_id,
+                "category": "low_energy",
+                "repeat": {
+                    "mode": "JOINER",
+                    "cycle_bars": cycle_bars,
+                    "loop_step_ids": [step["step_id"] for step in steps],
+                    "remainder_policy": "HOLD_LAST_POSE",
+                },
+                "steps": list(steps),
+                "metadata": {
+                    "tags": ["test_only", "physical_v2"],
+                    "recommended_sections": ["verse"],
+                    "energy_range": [0, 100],
+                    "description": "Test-only physical template, never in the catalog.",
+                },
+            }
+        }
+    )
+
+
+@contextmanager
+def registered_templates(*documents: TemplateDoc) -> Iterator[None]:
+    """Register test-only template documents for one test, then remove them again."""
+    load_builtin_templates()
+    added: list[str] = []
+    try:
+        for document in documents:
+            if REGISTRY.register_document(document):
+                added.append(document.template.template_id)
+        yield
+    finally:
+        for template_id in added:
+            REGISTRY._remove_registration(template_id)
+
+
+def physical_sections(*sections: tuple[str, int, int]) -> ChoreographyPlan:
+    """A plan of `(template_id, start_bar, end_bar)` sections, no planner intent."""
+    return ChoreographyPlan(
+        sections=[
+            PlanSection.model_validate(
+                {
+                    "section_name": f"s{index}",
+                    "start_bar": start,
+                    "end_bar": end,
+                    "template_id": template_id,
+                    "preset_id": None,
+                }
+            )
+            for index, (template_id, start, end) in enumerate(sections, start=1)
+        ]
     )
 
 

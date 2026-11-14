@@ -305,7 +305,8 @@ class RenderPreflightStage:
     `legacy_v1` job passes through untouched. A `physical_v2` job is checked against
     the fixtures the render stage will load (`preflight_render_policy`), the templates
     the planner will be offered (`offered_template_ids`; every one must carry physical
-    data, and each must dry-compile on this rig: `check_physical_templates`), the
+    data, and each must dry-compile on this rig and plan the dark repositioning between
+    its own cues under the job's `reposition_fallback`: `check_physical_templates`), the
     song's musical phase map, built from the detected BeatGrid, which the renderer
     never infers (it holds every fixture dark outside the map's covered span, which
     is logged), and, when the run supplies an xLights layout (`layout_models` in
@@ -379,7 +380,13 @@ class RenderPreflightStage:
                 phase_map.covered_end_ms,
                 phase_map.duration_ms,
             )
-            check_physical_templates(offered, beat_grid=beat_grid, fixture_group=fixture_group)
+            check_physical_templates(
+                offered,
+                beat_grid=beat_grid,
+                fixture_group=fixture_group,
+                initial_states=job_config.moving_heads.initial_states,
+                failure_mode=job_config.moving_heads.reposition_fallback,
+            )
             layout_models = context.get_state("layout_models")
             if layout_models is not None:
                 check_physical_models(fixture_group.expand_fixtures(), layout_models)

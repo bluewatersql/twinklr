@@ -315,3 +315,22 @@ def test_absurd_period_raises_a_phase_error_not_overflow() -> None:
 
     with pytest.raises(MusicalPhaseError):
         musical_phase_at(phase_map, 500, origin_ms=0, period_beats=1e-310)
+
+
+def test_evaluation_caches_leave_equality_and_copies_alone() -> None:
+    """Exact values cached as a map is evaluated are not part of its value: two equal
+    maps stay equal once one is evaluated, and a copy with other knots computes afresh
+    instead of returning the original's cached phase."""
+    grid = _grid([0, 500, 1000, 1500], 1500)
+    first, second = build_musical_phase_map(grid), build_musical_phase_map(grid)
+    assert musical_phase_fraction(first, 750, origin_ms=0, period_beats=1.0) == Fraction(3, 2)
+    assert first == second
+
+    slower = first.model_copy(
+        update={
+            "knots": tuple(k.model_copy(update={"time_ms": k.time_ms * 2}) for k in first.knots)
+        }
+    )
+    assert slower.knot_times_ms == (0, 1000, 2000, 3000)
+    assert musical_phase_fraction(slower, 750, origin_ms=0, period_beats=1.0) == Fraction(3, 4)
+    assert musical_phase_fraction(first, 750, origin_ms=0, period_beats=1.0) == Fraction(3, 2)

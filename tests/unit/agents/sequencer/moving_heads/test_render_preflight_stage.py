@@ -17,10 +17,13 @@ from tests.support.mh_physical import (
     SUBSET_TEMPLATE_ID,
     TEMPLATE_DIR,
     TEMPLATE_ID,
+    hold_step,
     physical_grid,
     physical_job,
     physical_rig,
+    physical_template_doc,
     physical_test_templates,
+    registered_templates,
 )
 from twinklr.core.agents.audio.lyrics.stage import LyricsStage
 from twinklr.core.agents.audio.profile.stage import AudioProfileStage
@@ -333,6 +336,50 @@ async def test_template_the_rig_cannot_render_is_refused_before_planning(
         assert item in error, (item, error)
     for planner in planners.values():
         planner.assert_not_awaited()
+
+
+_JUMP_ID = "p24a_preflight_jump"
+
+
+def _jump_template(fallback: str | None) -> TemplateDoc:
+    """Two lit steps per cycle back to back at -90 and +90 degrees: the second cannot
+    continue the first, whatever the plan does around the template."""
+    extra = {} if fallback is None else {"physical_reposition_fallback": fallback}
+    return physical_template_doc(
+        _JUMP_ID,
+        [
+            hold_step("left", -90.0, duration=0.5, **extra),
+            hold_step("right", 90.0, start=0.5, duration=0.5, **extra),
+        ],
+    )
+
+
+@pytest.mark.parametrize(
+    ("declared", "policy", "admitted"),
+    [
+        pytest.param("drop_accent", None, False, id="error-policy-refuses"),
+        pytest.param(None, "drop_accent", False, id="undeclared-fallback-refuses"),
+        pytest.param("drop_accent", "drop_accent", True, id="declared-fallback-admits"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_template_whose_own_cycles_cannot_reposition_is_refused_before_planning(
+    declared: str | None, policy: str | None, admitted: bool
+) -> None:
+    """The gate plans the dark repositioning between a template's own cues: under the
+    default `error` a template that cannot reposition inside itself is refused before
+    any planner runs; under a fallback the template declares, it is admitted."""
+    job = physical_job(reposition_fallback=policy) if policy else physical_job()
+    with physical_test_templates(), registered_templates(_jump_template(declared)):
+        result, _ = await _run(
+            job, templates=[_JUMP_ID], rig=physical_rig(), beat_grid=physical_grid()
+        )
+
+    assert result.success is admitted, result.error
+    if not admitted:
+        error = result.error or ""
+        assert f"template {_JUMP_ID!r}" in error
+        assert "repositioning" in error and "jumps across the cue" in error
 
 
 @pytest.mark.asyncio

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
+from collections import defaultdict
+from collections.abc import Iterator, Mapping, Sequence
 from fractions import Fraction
 import hashlib
 from itertools import pairwise
 import json
 import logging
+import math
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -18,7 +20,7 @@ if TYPE_CHECKING:
 
 from twinklr.core.agents.sequencer.moving_heads import ChoreographyPlan
 from twinklr.core.agents.sequencer.moving_heads.models import PlanSection, flatten_plan_segment
-from twinklr.core.config.fixtures import FixtureGroup
+from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup, InitialFixtureState
 from twinklr.core.config.models import JobConfig
 from twinklr.core.config.render_policy import (
     UnsupportedRenderModeError,
@@ -36,9 +38,14 @@ from twinklr.core.sequencer.models.context import (
     TemplateCompileContext,
     TimedChannelIntent,
 )
-from twinklr.core.sequencer.models.enum import Intensity
+from twinklr.core.sequencer.models.enum import ChannelName, Intensity
 from twinklr.core.sequencer.models.moving_heads.physical import (
+    AXIS_KEYS,
+    DISCRETE_KEYS,
+    ContinuousTrajectory,
+    DiscreteTrajectory,
     PhysicalChannelError,
+    PhysicalPoint,
     RenderLock,
     TransitionDiagnostic,
 )
@@ -47,8 +54,17 @@ from twinklr.core.sequencer.models.transition import TransitionRegistry
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.channel_blender import ChannelBlender
 from twinklr.core.sequencer.moving_heads.compile.physical import is_physical_template
-from twinklr.core.sequencer.moving_heads.compile.preposition import plan_prepositions
+from twinklr.core.sequencer.moving_heads.compile.preposition import (
+    FALLBACK_METADATA_KEY,
+    FailureMode,
+    HeadFollow,
+    entry_feasible,
+    follow_cues,
+    plan_prepositions,
+    worst_case_entry_ms,
+)
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
+    apply_entry_window,
     compile_physical_template,
     compile_template,
 )
@@ -90,7 +106,13 @@ from twinklr.core.sequencer.moving_heads.templates import (
     load_builtin_templates,
 )
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
-from twinklr.core.sequencer.timing.musical_phase import MusicalPhaseMap, build_musical_phase_map
+from twinklr.core.sequencer.timing.musical_phase import (
+    MusicalPhaseError,
+    MusicalPhaseMap,
+    build_musical_phase_map,
+    musical_phase_fraction,
+    musical_time_at,
+)
 from twinklr.core.sequencer.vocabulary.visual import PaletteRole
 
 logger = logging.getLogger(__name__)
@@ -236,8 +258,267 @@ def physical_cue_limits(phase_map: MusicalPhaseMap, duration_ms: int) -> tuple[i
     return int(start), int(min(duration_ms // EFFECT_GRID_MS * EFFECT_GRID_MS, covered_end))
 
 
+_POSE = (ChannelName.PAN, ChannelName.TILT)
+_WHEELS = (ChannelName.COLOR, ChannelName.GOBO)
+
+
+def _enter_section(
+    cues: Sequence[FixtureSegment],
+    kept: Mapping[str, Sequence[HeadFollow]],
+    profiles: Mapping[str, FixtureCapabilities],
+    initial_states: Mapping[str, InitialFixtureState],
+    *,
+    section_start_ms: int,
+    phase_map: MusicalPhaseMap,
+    failure_mode: FailureMode,
+    locks: Sequence[RenderLock] = (),
+) -> tuple[list[FixtureSegment], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Keep a section's uncut entry where it plays as authored, else open it with a window.
+
+    `kept` holds, per fixture, the cues kept so far as `follow_cues` followed them. A
+    fixture whose cues `plan_prepositions` would play as authored after its last kept
+    cue, up to and including its first gap (in `error` mode: `_plays_as_authored`),
+    keeps its cues uncut (`skipped`); a last
+    kept cue that may be substituted under `failure_mode` leaves the head's state
+    unknown, so that fixture always enters through the window. For every other fixture
+    `worst_case_entry_ms` bounds the reposition into any pose and wheel state the
+    section's cues hold, from where the kept cues can have left the head
+    (`_predecessor`). The window is one per section: from the section start, the fewest
+    whole beats on the phase map whose end, rounded up to the frame grid, leaves each
+    such fixture its bound after its last kept cue; `apply_entry_window` cuts or drops
+    its cues there. A fixture with an unknown bound adds nothing to the window.
+
+    Returns:
+        The kept cues, one record per cue dropped inside the window, and one record per
+        fixture with cues: its bound, the window, its first kept cue and `skipped`, `cut`
+        or `none` (no window was needed).
+    """
+    if not cues:
+        return [], [], []
+    by_fixture: dict[str, list[FixtureSegment]] = defaultdict(list)
+    for cue in sorted(cues, key=lambda cue: cue.t0_ms):
+        by_fixture[cue.fixture_id].append(cue)
+    bounds: dict[str, int | None] = {}
+    skipped: set[str] = set()
+    required_ms: int | None = None
+    for fixture_id, own in by_fixture.items():
+        profile = profiles[fixture_id]
+        before = kept.get(fixture_id, ())
+        initial = initial_states.get(fixture_id)
+        last = before[-1] if before else None
+        if (last is None or not _substitutable(last.segment, failure_mode)) and _plays_as_authored(
+            own, profile, last, initial, locks
+        ):
+            skipped.add(fixture_id)
+            bounds[fixture_id] = None
+            continue
+        channels = [ch for ch in _POSE if AXIS_KEYS[ch] in profile.axes]
+        predecessor = _predecessor(before, initial, channels, profile, failure_mode)
+        bound = bounds[fixture_id] = (
+            None
+            if predecessor is None
+            else worst_case_entry_ms(
+                profile,
+                entry_pose={ch: _pose_range(own, ch) for ch in channels},
+                entry_wheels=_wheel_states(own, profile),
+                pose_envelope=predecessor[0],
+                held_wheels=predecessor[1],
+                residual_ms=predecessor[2],
+                frame_ms=EFFECT_GRID_MS,
+            )
+        )
+        if bound is not None:
+            needed = (last.segment.t1_ms if last else 0) + bound
+            required_ms = needed if required_ms is None else max(required_ms, needed)
+
+    window_end = (
+        None if required_ms is None else _window_end(phase_map, section_start_ms, required_ms)
+    )
+    entered: list[FixtureSegment] = list(cues)
+    dropped: list[dict[str, Any]] = []
+    if window_end is not None:
+        entered, dropped = apply_entry_window(
+            cues, window_end, profiles=profiles, skip_fixture_ids=skipped
+        )
+    first = {}
+    for cue in sorted(entered, key=lambda cue: -cue.t0_ms):
+        first[cue.fixture_id] = cue.t0_ms
+    records = [
+        {
+            "section_id": cues[0].section_id,
+            "fixture_id": fixture_id,
+            "bound_ms": bounds[fixture_id],
+            "section_start_ms": section_start_ms,
+            "window_end_ms": window_end,
+            "window_ms": None if window_end is None else window_end - section_start_ms,
+            "first_cue_ms": first.get(fixture_id),
+            "action": (
+                "skipped" if fixture_id in skipped else "none" if window_end is None else "cut"
+            ),
+        }
+        for fixture_id in sorted(by_fixture)
+    ]
+    return entered, dropped, records
+
+
+def _plays_as_authored(
+    own: Sequence[FixtureSegment],
+    profile: FixtureCapabilities,
+    last: HeadFollow | None,
+    initial: InitialFixtureState | None,
+    locks: Sequence[RenderLock],
+) -> bool:
+    """Whether a fixture's section cues play as authored after `last` up to its first gap.
+
+    An uncut entry may continue the previous cue's motion through the section's
+    back-to-back cues; the transaction at the first gap must still fit with that motion
+    under way. After it the head is settled, as wherever the gate placed the section.
+    """
+    if not entry_feasible(
+        own[0], profile, after=last, initial=initial, locks=locks, frame_ms=EFFECT_GRID_MS
+    ):
+        return False
+    chain = [own[0]]
+    for cue in own[1:]:
+        if cue.t0_ms != chain[-1].t1_ms:
+            followed = follow_cues(chain, profile, frame_ms=EFFECT_GRID_MS, after=last)[-1]
+            return entry_feasible(
+                cue, profile, after=followed, initial=initial, locks=locks, frame_ms=EFFECT_GRID_MS
+            )
+        chain.append(cue)
+    return True
+
+
+def _window_end(phase_map: MusicalPhaseMap, section_start_ms: int, required_ms: int) -> int | None:
+    """The first frame boundary at or after a whole beat from the section start that is
+    no earlier than `required_ms`; None when the section start already is."""
+    origin = min(max(section_start_ms, phase_map.covered_start_ms), phase_map.covered_end_ms)
+    if required_ms <= origin:
+        return None
+    try:
+        beats = math.ceil(
+            musical_phase_fraction(phase_map, required_ms, origin_ms=origin, period_beats=1.0)
+        )
+        end = musical_time_at(phase_map, Fraction(beats), origin_ms=origin, period_beats=1.0)
+    except MusicalPhaseError:
+        end = Fraction(required_ms)  # past the covered span, where every cue is dropped
+    return int(-(-end // EFFECT_GRID_MS) * EFFECT_GRID_MS)
+
+
+def _substitutable(cue: FixtureSegment, failure_mode: FailureMode) -> bool:
+    """Whether the transaction pass may play `cue` other than as authored."""
+    return failure_mode != "error" and cue.metadata.get(FALLBACK_METADATA_KEY) == failure_mode
+
+
+def _predecessor(
+    before: Sequence[HeadFollow],
+    initial: InitialFixtureState | None,
+    channels: Sequence[ChannelName],
+    profile: FixtureCapabilities,
+    failure_mode: FailureMode,
+) -> tuple[dict[ChannelName, tuple[float, float]], dict[ChannelName, set[str]], Fraction] | None:
+    """Where the kept cues can have left the head: `(pose envelope, wheel states held,
+    motion still under way after the last kept cue's end)`.
+
+    The last kept cue's last frame, followed with the planner's head model; under a
+    fallback, every kept cue back to the last one that cannot be substituted (or to the
+    initial state), since any of them may be where the head stopped. None when that
+    reaches an unknown initial state or motion whose timing is unknown.
+    """
+    end_ms = before[-1].segment.t1_ms if before else 0
+    poses: list[dict[ChannelName, tuple[float, float]]] = []
+    held: dict[ChannelName, set[str]] = defaultdict(set)
+    residual = Fraction(0)
+    for follow in reversed(before):
+        cue = follow.segment
+        fixed = not _substitutable(cue, failure_mode)
+        poses.append(
+            {
+                ch: _last_frame_pose(cue, ch) if fixed and not poses else _pose_range([cue], ch)
+                for ch in channels
+            }
+        )
+        for channel in _WHEELS:
+            capability = profile.discrete.get(DISCRETE_KEYS[channel])
+            if capability is not None:
+                last = cue.t1_ms - EFFECT_GRID_MS
+                held[channel].add(_wheel_state(cue, channel, last, capability.default_state))
+        if follow.settled_ms is None:
+            return None
+        residual = max(residual, follow.settled_ms - end_ms)
+        if fixed:
+            break
+    else:
+        if initial is None:
+            return None
+        pose = {ChannelName.PAN: initial.pan_deg, ChannelName.TILT: initial.tilt_deg}
+        poses.append({ch: (pose[ch], pose[ch]) for ch in channels})
+        for channel in _WHEELS:
+            key = DISCRETE_KEYS[channel]
+            if key in profile.discrete:
+                held[channel].add(initial.discrete_states[key])
+    envelope = {ch: (min(p[ch][0] for p in poses), max(p[ch][1] for p in poses)) for ch in channels}
+    return envelope, dict(held), residual
+
+
+def _pose_points(cue: FixtureSegment, channel: ChannelName) -> tuple[PhysicalPoint, ...]:
+    trajectory = cue.channels[channel].physical
+    assert isinstance(trajectory, ContinuousTrajectory)  # a physical cue authors its pose
+    return trajectory.points
+
+
+def _pose_range(cues: Sequence[FixtureSegment], channel: ChannelName) -> tuple[float, float]:
+    """Every pose the cues' linear trajectories pass through lies between their points."""
+    values = [point.value for cue in cues for point in _pose_points(cue, channel)]
+    return min(values), max(values)
+
+
+def _last_frame_pose(cue: FixtureSegment, channel: ChannelName) -> tuple[float, float]:
+    """The pose a cue's last frame commands: its point there, else the points around it."""
+    points = _pose_points(cue, channel)
+    last = cue.t1_ms - EFFECT_GRID_MS
+    exact = [point.value for point in points if point.t_ms == last]
+    if exact:
+        return exact[0], exact[0]
+    left = [point for point in points if point.t_ms < last][-1]
+    right = next((point for point in points if point.t_ms > last), left)
+    return min(left.value, right.value), max(left.value, right.value)
+
+
+def _wheel_state(cue: FixtureSegment, channel: ChannelName, time_ms: int, default: str) -> str:
+    value = cue.channels.get(channel)
+    if value is None or not isinstance(value.physical, DiscreteTrajectory):
+        return default
+    return [event.state for event in value.physical.events if event.t_ms <= time_ms][-1]
+
+
+def _wheel_states(
+    cues: Sequence[FixtureSegment], profile: FixtureCapabilities
+) -> dict[ChannelName, set[str]]:
+    """Every color and gobo state the cues select, the default where one is unauthored."""
+    states: dict[ChannelName, set[str]] = {}
+    for channel in _WHEELS:
+        capability = profile.discrete.get(DISCRETE_KEYS[channel])
+        if capability is None:
+            continue
+        selected: set[str] = set()
+        for cue in cues:
+            value = cue.channels.get(channel)
+            if value is None or not isinstance(value.physical, DiscreteTrajectory):
+                selected.add(capability.default_state)
+            else:
+                selected.update(event.state for event in value.physical.events)
+        states[channel] = selected
+    return states
+
+
 def check_physical_templates(
-    template_ids: Sequence[str], *, beat_grid: BeatGrid, fixture_group: FixtureGroup
+    template_ids: Sequence[str],
+    *,
+    beat_grid: BeatGrid,
+    fixture_group: FixtureGroup,
+    initial_states: Mapping[str, InitialFixtureState],
+    failure_mode: FailureMode,
 ) -> None:
     """Dry-compile templates on the rig, so a plan can only name ones that will render.
 
@@ -245,10 +526,14 @@ def check_physical_templates(
     only presets the physical renderer applies), as one section from bar 1 over every
     bar that starts in the song, on every fixture of the rig, through the render's own
     `compile_physical_template` against the song's phase map and within the render's
-    cue limits (`physical_cue_limits`). That checks target
-    groups against the rig's roles, legacy data a preset adds, every step's states and
-    channels against each profile, axis bounds, travel rate and pulse and shutter
-    timing for that placement.
+    cue limits (`physical_cue_limits`). That checks target groups against the rig's
+    roles, legacy data a preset adds, every step's states and channels against each
+    profile, axis bounds, travel rate, pose motion the head can follow, and pulse and
+    shutter timing for that placement. The section then enters as the render enters a
+    section (`_enter_section`) and `plan_prepositions` runs over it from the run's
+    `initial_states` under the run's `failure_mode`, so a template whose own cues
+    cannot be repositioned between is refused unless it declares the fallback the run
+    enables.
 
     Raises:
         UnsupportedRenderModeError: Naming each template, preset, step, fixture and
@@ -261,13 +546,23 @@ def check_physical_templates(
 
     registries = create_default_registries()
     fixtures = build_fixture_contexts(rig_profile_from_fixture_group(fixture_group), fixture_group)
+    profiles = {
+        fixture.fixture_id: fixture.config.physical_profile
+        for fixture in fixture_group.expand_fixtures()
+        if fixture.config.physical_profile is not None
+    }
     phase_map = build_musical_phase_map(beat_grid)
-    start_limit, end_limit = physical_cue_limits(phase_map, int(beat_grid.duration_ms))
+    duration_ms = int(beat_grid.duration_ms)
+    start_limit, end_limit = physical_cue_limits(phase_map, duration_ms)
+    sequence_end_ms = len(frame_times(duration_ms)) * EFFECT_GRID_MS
     bars = sum(1 for start in beat_grid.bar_boundaries if start < beat_grid.duration_ms)
     failures: list[str] = []
     for template_id in template_ids:
         document = get_template(template_id)
         for preset in (None, *document.presets):
+            where = f"template {template_id!r}" + (
+                f", preset {preset.preset_id!r}" if preset else ""
+            )
             context = TemplateCompileContext(
                 section_id="render_preflight",
                 template_id=document.template.template_id,
@@ -282,7 +577,7 @@ def check_physical_templates(
                 dimmer_registry=registries["dimmer"],
             )
             try:
-                compile_physical_template(
+                compiled = compile_physical_template(
                     document.template,
                     context,
                     preset,
@@ -297,15 +592,73 @@ def check_physical_templates(
                 ValueError,
             ) as error:
                 # A step's error carries a note naming its template, step and fixture.
-                where = "; ".join(getattr(error, "__notes__", ())) or f"template {template_id!r}"
-                if preset:
-                    where += f", preset {preset.preset_id!r}"
-                failures.append(f"{where}: {error}")
+                notes = "; ".join(getattr(error, "__notes__", ()))
+                if notes and preset:
+                    notes += f", preset {preset.preset_id!r}"
+                failures.append(f"{notes or where}: {error}")
+                continue
+            cues, _, _ = _enter_section(
+                compiled.segments,
+                {},
+                profiles,
+                initial_states,
+                section_start_ms=context.start_ms,
+                phase_map=phase_map,
+                failure_mode=failure_mode,
+            )
+            # Heads with the same profile, initial state and cues plan identically (the
+            # gate has no locks): plan one of each.
+            groups: dict[tuple[Any, ...], list[str]] = defaultdict(list)
+            for fixture_id, profile in profiles.items():
+                own = [cue for cue in cues if cue.fixture_id == fixture_id]
+                groups[_plan_key(own, profile, initial_states.get(fixture_id))].append(fixture_id)
+            members = {group[0]: group for group in groups.values()}
+            heads = set(members)
+            result = plan_prepositions(
+                [cue for cue in cues if cue.fixture_id in heads],
+                {fixture_id: profiles[fixture_id] for fixture_id in heads},
+                initial_states=initial_states,
+                locks=(),
+                frame_ms=EFFECT_GRID_MS,
+                sequence_end_ms=sequence_end_ms,
+                failure_mode=failure_mode,
+            )
+            errors = [d for d in result.diagnostics if d.status == "error"]
+            if errors:
+                failures.append(
+                    f"{where}: dark repositioning between its own cues cannot be planned: "
+                    + "; ".join(
+                        f"{'/'.join(members[d.fixture_id])} cue at {d.cue_ms} ms: "
+                        f"{d.code}: {d.reason}"
+                        for d in errors
+                    )
+                )
     if failures:
         raise UnsupportedRenderModeError(
             "moving_heads.mode 'physical_v2' would offer the planner templates this rig "
             "cannot render: " + "; ".join(failures)
         )
+
+
+def _plan_key(
+    cues: Sequence[FixtureSegment],
+    profile: FixtureCapabilities,
+    initial: InitialFixtureState | None,
+) -> tuple[Any, ...]:
+    """What `plan_prepositions` reads of one fixture without locks; identifiers aside."""
+    return (
+        profile.model_dump_json(),
+        None if initial is None else initial.model_dump_json(),
+        tuple(
+            (
+                cue.t0_ms,
+                cue.t1_ms,
+                tuple(sorted((ch.value, value.physical) for ch, value in cue.channels.items())),
+                tuple(sorted(cue.metadata.items())),
+            )
+            for cue in cues
+        ),
+    )
 
 
 def _physical_preset(
@@ -726,7 +1079,10 @@ class RenderingPipeline:
             )
 
         cues: list[FixtureSegment] = []
-        dropped: list[dict[str, str | int]] = []
+        kept: dict[str, list[HeadFollow]] = defaultdict(list)
+        dropped: list[dict[str, Any]] = []
+        in_window: list[dict[str, Any]] = []
+        entry_windows: list[dict[str, Any]] = []
         time_markers: list[TimeMarker] = []
         diagnostics: list[MHDiagnostic] = []
         fixture_contexts = self._build_fixture_contexts()
@@ -781,8 +1137,38 @@ class RenderingPipeline:
                 start_limit_ms=start_limit,
                 end_limit_ms=end_limit,
             )
-            cues.extend(compiled.segments)
             dropped.extend(compiled.dropped_steps)
+            entered, inside, windows = _enter_section(
+                compiled.segments,
+                kept,
+                profiles,
+                policy.initial_states,
+                section_start_ms=context.start_ms,
+                phase_map=phase_map,
+                failure_mode=policy.reposition_fallback,
+                locks=self.locks,
+            )
+            for fixture_id in sorted({cue.fixture_id for cue in entered}):
+                before = kept[fixture_id]
+                kept[fixture_id] += follow_cues(
+                    [cue for cue in entered if cue.fixture_id == fixture_id],
+                    profiles[fixture_id],
+                    frame_ms=EFFECT_GRID_MS,
+                    after=before[-1] if before else None,
+                )
+            cues.extend(entered)
+            in_window.extend(inside)
+            entry_windows.extend(windows)
+            window_end = windows[0]["window_end_ms"] if windows else None
+            if window_end is not None and window_end >= context.end_ms:
+                logger.warning(
+                    "physical_v2: section %r (%s-%s ms) is shorter than its entry window, "
+                    "which ends at %s ms; it renders dark",
+                    section.section_name,
+                    context.start_ms,
+                    context.end_ms,
+                    window_end,
+                )
         if dropped:
             logger.warning(
                 "physical_v2: %d cue(s) start outside the frames %s-%s ms that the covered "
@@ -792,6 +1178,12 @@ class RenderingPipeline:
                 start_limit,
                 end_limit,
             )
+        if in_window:
+            logger.warning(
+                "physical_v2: %d cue(s) lie inside their section's entry window and are "
+                "dropped (held dark); the trace's dropped_cues and entry_windows list them",
+                len(in_window),
+            )
 
         result = plan_prepositions(
             cues,
@@ -800,6 +1192,7 @@ class RenderingPipeline:
             locks=self.locks,
             frame_ms=EFFECT_GRID_MS,
             sequence_end_ms=len(times) * EFFECT_GRID_MS,
+            failure_mode=policy.reposition_fallback,
         )
         if result.has_errors:
             raise PhysicalRenderError(result.diagnostics)
@@ -856,7 +1249,20 @@ class RenderingPipeline:
             "layout_sha256": self.layout_sha256,
             "locks": [lock.model_dump(mode="json") for lock in self.locks],
             "quantized_cues": _cue_records(cues),
-            "dropped_cues": dropped,
+            "dropped_cues": [
+                {**record, "reason": "outside_cue_limits", "entry_window_end_ms": None}
+                for record in dropped
+            ]
+            + [
+                {
+                    **record,
+                    "reason": "entry_window",
+                    "start_limit_ms": start_limit,
+                    "end_limit_ms": end_limit,
+                }
+                for record in in_window
+            ],
+            "entry_windows": entry_windows,
             "transactions": [d.model_dump(mode="json") for d in result.diagnostics],
             "diagnostics": [d.model_dump(mode="json") for d in diagnostics],
         }
