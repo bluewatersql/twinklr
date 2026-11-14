@@ -10,12 +10,17 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from twinklr.core.curves.models import BaseCurve, CurvePoint
 from twinklr.core.sequencer.models.enum import BlendMode, ChannelName
+from twinklr.core.sequencer.models.moving_heads.physical import (
+    CONTINUOUS_UNITS,
+    ContinuousTrajectory,
+    PhysicalValue,
+)
 
 
 class ChannelValue(BaseModel):
     """Single channel's value specification.
 
-    Either static_dmx OR curve must be set (mutually exclusive).
+    Exactly one of static_dmx, curve or physical must be set.
 
     For offset-centered curves (movement), set offset_centered=True
     and provide base_dmx and amplitude_dmx. The final DMX value is
@@ -23,6 +28,9 @@ class ChannelValue(BaseModel):
 
     For absolute curves (dimmer), leave offset_centered=False.
     The final DMX value is computed as: lerp(clamp_min, clamp_max, curve_value)
+
+    A physical value is a typed trajectory in degrees, normalized units or named
+    states for the physical renderer. It takes none of the legacy composition fields.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -49,9 +57,15 @@ class ChannelValue(BaseModel):
     clamp_min: int = Field(default=0, ge=0, le=255)
     clamp_max: int = Field(default=255, ge=0, le=255)
 
+    # Option C: typed physical value (physical renderer only)
+    physical: PhysicalValue | None = Field(default=None)
+
     @model_validator(mode="after")
     def _validate_constraints(self) -> ChannelValue:
         """Validate channel value constraints."""
+        if self.physical is not None:
+            return self._validate_physical()
+
         # Must have exactly one of static_dmx or curve
         if self.static_dmx is None and self.curve is None:
             raise ValueError("ChannelValue must set either static_dmx or curve")
@@ -62,6 +76,37 @@ class ChannelValue(BaseModel):
         if self.clamp_max < self.clamp_min:
             raise ValueError("clamp_max must be >= clamp_min")
 
+        return self
+
+    def _validate_physical(self) -> ChannelValue:
+        if self.static_dmx is not None or self.curve is not None:
+            raise ValueError("ChannelValue cannot mix a physical value with static_dmx or curve")
+        legacy = [
+            name
+            for name, is_set in (
+                ("value_points", self.value_points is not None),
+                ("base_dmx", self.base_dmx is not None),
+                ("amplitude_dmx", self.amplitude_dmx is not None),
+                ("offset_centered", self.offset_centered),
+                ("clamp_min", self.clamp_min != 0),
+                ("clamp_max", self.clamp_max != 255),
+                ("blend_mode", self.blend_mode != BlendMode.OVERRIDE),
+            )
+            if is_set
+        ]
+        if legacy:
+            raise ValueError(f"a physical ChannelValue cannot set legacy fields {legacy}")
+
+        unit = CONTINUOUS_UNITS.get(self.channel)
+        if isinstance(self.physical, ContinuousTrajectory):
+            if self.physical.unit != unit:
+                raise ValueError(
+                    f"{self.channel.value} takes "
+                    f"{'discrete states' if unit is None else unit + ' values'}, "
+                    f"not {self.physical.unit} values"
+                )
+        elif unit is not None:
+            raise ValueError(f"{self.channel.value} takes {unit} values, not discrete states")
         return self
 
 

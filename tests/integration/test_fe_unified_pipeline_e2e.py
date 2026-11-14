@@ -939,7 +939,15 @@ class TestUnifiedPipelineDAG:
         )
 
         stage_ids = {s.id for s in pipeline.stages}
-        assert stage_ids == {"audio", "profile", "lyrics", "macro", "moving_heads", "render"}
+        assert stage_ids == {
+            "audio",
+            "render_preflight",
+            "profile",
+            "lyrics",
+            "macro",
+            "moving_heads",
+            "render",
+        }
 
         errors = pipeline.validate_pipeline()
         assert errors == [], f"Pipeline has validation errors: {errors}"
@@ -947,8 +955,10 @@ class TestUnifiedPipelineDAG:
         # Verify dependency wiring
         stage_map = {s.id: s for s in pipeline.stages}
         assert stage_map["audio"].inputs == []
-        assert "audio" in stage_map["profile"].inputs
-        assert "audio" in stage_map["lyrics"].inputs
+        # Every planner reads the audio through the render preflight (P1.6).
+        assert stage_map["render_preflight"].inputs == ["audio"]
+        assert "render_preflight" in stage_map["profile"].inputs
+        assert "render_preflight" in stage_map["lyrics"].inputs
         assert "profile" in stage_map["macro"].inputs
         assert "audio" in stage_map["moving_heads"].inputs
         assert "moving_heads" in stage_map["render"].inputs

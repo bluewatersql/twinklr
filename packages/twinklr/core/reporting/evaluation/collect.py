@@ -10,6 +10,7 @@ import subprocess
 from typing import Any
 
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+from twinklr.core.config.models import MHRenderPolicy
 from twinklr.core.reporting.evaluation.models import RunMetadata
 
 
@@ -38,6 +39,16 @@ def load_checkpoint(checkpoint_path: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError(f"Checkpoint data is not a dict: {type(data)}")
     return data
+
+
+def checkpoint_render_policy(checkpoint_data: dict) -> MHRenderPolicy:
+    """The render policy the checkpoint's job rendered under: its `render_mode`, or
+    `legacy_v1` when the checkpoint records none.
+
+    Raises:
+        ValidationError: If `render_mode` names no known mode.
+    """
+    return MHRenderPolicy.model_validate({"mode": checkpoint_data.get("render_mode", "legacy_v1")})
 
 
 def extract_plan(checkpoint_data: dict) -> ChoreographyPlan:

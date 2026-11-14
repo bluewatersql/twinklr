@@ -5,14 +5,14 @@ area: engineering
 change: 2026_11_12_mh_true_up
 owner: Christopher Price
 created: 2026-11-13
-updated: 2026-11-13
+updated: 2026-11-14
 ---
 
 # Moving-head true-up — implementation brief
 
-Branch/worktree: `feat/mh-true-up-p0` in worktree `twinklr-mh-true-up`, cut from `main`
-at `b498ed9` on 2026-11-13, after the display fixes (`885dba2`) merged. Tasks T3 and T4
-run in their own worktrees on `feat/mh-true-up-p0-t3` and `feat/mh-true-up-p0-t4`.
+Phase 0 ran on `feat/mh-true-up-p0` (cut from `main` at `b498ed9`) and merged to `main`
+as `bb78227` on 2026-11-13. Phase 1 runs on `feat/mh-true-up-p1` in worktree
+`twinklr-mh-true-up`, cut from `main` at `bb78227` on 2026-11-13.
 
 ## Goal
 
@@ -57,6 +57,18 @@ Phase 0 (met 2026-11-13; evidence in
 - [x] The dated evidence record described in the plan's exit section exists.
 - [x] Handoff and the `changes/ACTIVE.md` row reflect the result.
 
+Phase 1 (met from offline evidence 2026-11-14; evidence in
+[evidence/2026-11-14-p1-exit](evidence/2026-11-14-p1-exit/README.md)):
+
+- [x] P1.0–P1.6 merged to the phase branch, each test-first and each reviewed in a
+  context separate from its author.
+- [x] `make validate` passes on the phase branch after the last code commit.
+- [x] No golden or regression file changed; `legacy_v1` output is unchanged.
+- [x] Every added config field has a live inventory record and a documented row.
+- [x] The phase-exit conditions in the plan are met from offline evidence, with a dated
+  evidence record. xLights transport proof, hardware accuracy and changed-look
+  acceptance are recorded as `PENDING-OWNER`, not inferred.
+
 ## Constraints
 
 - [Execution guardrails](../shared/agent_guardrails.md) and the global requirements in
@@ -73,6 +85,16 @@ Phase 0 (met 2026-11-13; evidence in
 |---|---|
 | Start the change from `main` in a clean worktree after the display fixes | Owner direction, 2026-11-13 |
 | Begin Phase 0 implementation | Owner go-ahead, 2026-11-13 ("commit them on that branch and merge to main. then start phase 0"). Covers Phase 0 only |
+| Merge Phase 0 and the install fix to `main` | Owner direction, 2026-11-13 ("Merge phase 0 and install fix to main") |
+| Begin Phase 1 implementation | Owner go-ahead, 2026-11-13 ("Proceed with Phase 1"). Covers Phase 1's offline work only; its owner-gated steps (expendable-show xLights render, fixture observation, look acceptance) are not authorized by it |
+| Reject `physical_v2` at job load | Owner direction, 2026-11-13: added to Phase 1 as task P1.0 |
+| Paid/live provider (API) calls | Owner authorization, 2026-11-13 ("online/live api call approved as needed"). Covers provider requests this change needs; no cost cap was stated, so each use is kept to the minimum that answers the question and is logged with its purpose in the evidence record. Does not cover owner-local data, xLights mutation, hardware or taste verdicts |
+| Layout input for `twinklr run` | Owner direction, 2026-11-14 ("add --layout to run"): added to Phase 1 so the xLights model check can run for a physical job |
+| Silent song edges in the physical phase map | Owner direction, 2026-11-14 ("defer silent edges to phase 2"). Phase 1 exits with `physical_v2` refusing a grid with more than one beat of silence or fade at either end |
+| Merge Phase 1 to `main` and push | Owner direction, 2026-11-14 ("merge and push") |
+| xLights test of the Phase 1 physical output | Owner authorization, 2026-11-14 ("test in xlights as previous"): the expendable-show render in [the request](evidence/2026-11-13-p1-xlights-request/README.md), run the way earlier xLights checks in this repository were run. Expendable show folder or scratch sequence only |
+| Default `max_effects` of 1,000,000 | Owner approval, 2026-11-14 ("1,000,000 budget approved") |
+| Begin Phase 2 implementation | Owner go-ahead, 2026-11-14 ("then proceed to phase 2"). Covers Phase 2's offline work; its owner-gated steps need their own authorization |
 | Phase 0 keeps `identity.py` (render fingerprint) | Kept as planned. Its Phase 0 consumer is the evidence record; say so if it should move to Phase 1 instead |
 
 ## Kickoff checklist

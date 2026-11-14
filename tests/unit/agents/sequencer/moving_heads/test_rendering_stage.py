@@ -2,15 +2,25 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from tests.golden.harness import RIGS, build_beat_grid, build_fixture_group, build_plan
+from tests.support.mh_physical import (
+    PHYSICAL_INITIAL_STATE,
+    physical_grid,
+    physical_job,
+    physical_plan,
+    physical_rig,
+    physical_test_templates,
+)
 from twinklr.core.agents.sequencer.moving_heads.rendering_stage import MovingHeadRenderingStage
 from twinklr.core.audio.models.metadata import EmbeddedMetadata, MetadataBundle
 from twinklr.core.config.models import JobConfig
+from twinklr.core.formats.xlights.layout.models.rgb_effects import Model
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import UnsupportedRigShapeError
 
@@ -103,8 +113,9 @@ async def test_unsupported_rig_shape_is_reported_as_an_actionable_message(tmp_pa
 
 
 @pytest.mark.asyncio
-async def test_unsupported_render_mode_fails_the_stage(tmp_path: Path) -> None:
-    """A job selecting the unbuilt physical renderer fails the stage and delivers nothing."""
+async def test_physical_mode_without_profiles_fails_the_stage(tmp_path: Path) -> None:
+    """A physical job on a rig without physical profiles fails, naming each head and
+    the missing item, and delivers nothing."""
     stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
     context = _context_with_fixture_path("fixture_config.json")
     context.session.job_config = JobConfig.model_validate(
@@ -119,5 +130,92 @@ async def test_unsupported_render_mode_fails_the_stage(tmp_path: Path) -> None:
     assert not result.success
     assert result.error is not None
     assert "physical_v2" in result.error
+    for fixture_id in ("MH1", "MH2", "MH3", "MH4"):
+        assert f"{fixture_id}: physical_profile is missing" in result.error
+    assert list(tmp_path.iterdir()) == []
+    assert context.get_state("delivery_artifacts") is None
+
+
+def _physical_context() -> PipelineContext:
+    context = _context_with_fixture_path("fixture_config.json")
+    context.session.job_config = physical_job()
+    context.set_state("beat_grid", physical_grid())
+    return context
+
+
+@pytest.mark.asyncio
+async def test_physical_job_renders_and_delivers_through_the_stage(tmp_path: Path) -> None:
+    """The stage dispatches a physical job to the physical renderer and delivers it,
+    with the render identity in the trace beside the `.xsq`."""
+    stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
+    context = _physical_context()
+
+    with (
+        physical_test_templates(),
+        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=physical_rig()),
+    ):
+        result = await stage.execute({"moving_heads": physical_plan()}, context)
+
+    assert result.success, result.error
+    artifacts = context.get_state("delivery_artifacts")
+    assert artifacts is not None
+    assert artifacts.xsq_path == tmp_path / "out.xsq"
+    assert artifacts.model_names == ("Dmx MH1", "Dmx MH2")
+    trace = json.loads(artifacts.trace_path.read_text(encoding="utf-8"))
+    assert trace["render"]["renderer"] == "physical_v2"
+    assert len(trace["render"]["render_fingerprint"]) == 64
+    segments = context.get_state("rendered_segments")
+    assert all(
+        value.physical is not None for segment in segments for value in segment.channels.values()
+    )
+
+
+@pytest.mark.asyncio
+async def test_stage_hands_the_run_layout_to_the_physical_render(tmp_path: Path) -> None:
+    """The layout `twinklr run` loads reaches the model check, and the trace says so."""
+    stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
+    context = _physical_context()
+    models = tuple(
+        Model.model_validate(
+            {"name": f"Dmx MH{index}", "DisplayAs": "DmxMovingHeadAdv", "parm1": "18"}
+        )
+        for index in (1, 2)
+    )
+    context.set_state("layout_models", models)
+    context.set_state("layout_sha256", "ef" * 32)
+
+    with (
+        physical_test_templates(),
+        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=physical_rig()),
+    ):
+        result = await stage.execute({"moving_heads": physical_plan()}, context)
+
+    assert result.success, result.error
+    trace = json.loads(context.get_state("delivery_artifacts").trace_path.read_text())
+    assert (trace["render"]["layout_check"], trace["render"]["layout_sha256"]) == (
+        "performed",
+        "ef" * 32,
+    )
+
+
+@pytest.mark.asyncio
+async def test_physical_refusal_fails_the_stage_and_delivers_nothing(tmp_path: Path) -> None:
+    """A physical job whose heads are not known to be settled is refused, naming the
+    head and the item, and writes no file."""
+    stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
+    context = _physical_context()
+    initial = {**PHYSICAL_INITIAL_STATE, "settled": False}
+    context.session.job_config = physical_job(initial_states={"MH1": initial, "MH2": initial})
+    rig = physical_rig()
+
+    with (
+        physical_test_templates(),
+        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=rig),
+    ):
+        result = await stage.execute({"moving_heads": physical_plan()}, context)
+
+    assert not result.success
+    assert result.error is not None
+    assert "MH1: moving_heads.initial_states['MH1']: initial state is not settled" in result.error
     assert list(tmp_path.iterdir()) == []
     assert context.get_state("delivery_artifacts") is None

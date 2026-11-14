@@ -28,9 +28,18 @@ Twinklr currently supports:
   and gobo when the fixture maps those channels. In the 37 Python builtins, every
   template declares dimmer behavior and one template each declares color, shutter, or
   gobo directly; pan/tilt come from geometry and movement handlers, while schema-v2
-  section intent can override color and add timed shutter/gobo events. See
+  section intent can override color and add timed shutter/gobo events; that intent
+  reaches a mapped channel only within channels 1-16. See
   `packages/twinklr/core/sequencer/moving_heads/templates/builtins/` and
   `packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py`.
+  An opt-in `physical_v2` renderer (job schema 3.1) renders templates that carry
+  explicit physical data onto fixtures that declare a `physical_profile`: complete
+  20 ms frames as constant DMX effects over model-relative channels 1-48 (the xLights
+  DMX effect's limit), 16-bit pan/tilt as coarse/fine byte pairs, and dark
+  repositioning planned between cues. None of the 37 builtins carries physical data
+  yet, and planner intent is not applied on that path in Phase 1. See
+  `packages/twinklr/core/sequencer/moving_heads/compile/physical.py` and
+  `packages/twinklr/core/sequencer/moving_heads/compile/preposition.py`.
 - **Display sequencer** — RGB/pixel effects for outline, tree, and other display elements (`packages/twinklr/core/sequencer/display/`).
 - **Feature engineering pipeline** — audio profiling, feature extraction, and feature store for offline analysis (`packages/twinklr/core/feature_engineering/`, `packages/twinklr/core/feature_store/`).
 - **Catalog and curation tooling** — layout-aware coverage reports, corpus quality evidence, coverage-targeted recipe generation, explicit human admission logs, and style/propensity artifacts. Real author-layout/corpus curation remains an owner-driven phase exit, not a bundled catalog claim.
@@ -166,7 +175,7 @@ Pydantic V2 models with a `ConfigBase` class providing `load_or_default()` for f
 | `AppConfig` | `config.json` | App-level settings: LLM provider, API key, cache dirs, audio processing, logging |
 | `JobConfig` | `job_config.json` | Job-specific: agent orchestration, fixture config path, asset policy, transitions, timing tracks, and final-plan checkpoint writing |
 
-Schema version 3.0 is the default and 3.1 is also accepted (`JobConfig.schema_version`); 3.1 is required to select the not-yet-shipped `physical_v2` moving-head render mode, which is rejected before rendering. Config files are not committed to the repo — create them from the documented field defaults in `packages/twinklr/core/config/models.py`.
+Schema version 3.0 is the default and 3.1 is also accepted (`JobConfig.schema_version`); 3.1 is required to select the opt-in `physical_v2` moving-head render mode, which needs a `physical_profile` on every fixture and a usable `moving_heads.initial_states` entry for each, and is refused when the fixtures load, before any analysis, when they are missing. Config files are not committed to the repo — create them from the documented field defaults in `packages/twinklr/core/config/models.py`.
 
 ### Session Coordinator
 

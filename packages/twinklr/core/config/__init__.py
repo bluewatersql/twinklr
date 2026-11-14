@@ -30,6 +30,10 @@ from twinklr.core.config.models import (
     RhythmSourceName,
     StructureSourceName,
 )
+from twinklr.core.config.render_policy import (
+    UnsupportedRenderModeError,
+    preflight_render_policy,
+)
 
 __all__ = [
     # App-level config
@@ -54,10 +58,12 @@ __all__ = [
     "RhythmSourceName",
     "ShutterMap",
     "StructureSourceName",
+    "UnsupportedRenderModeError",
     "load_app_config",
     # Loaders
     "load_config",
     "load_fixture_group",
     "load_full_config",
     "load_job_config",
+    "preflight_render_policy",
 ]

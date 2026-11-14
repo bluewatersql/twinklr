@@ -1,0 +1,43 @@
+{
+  "template": {
+    "template_id": "p1_linear_reveal",
+    "version": 1,
+    "name": "P1 Linear Reveal",
+    "category": "low_energy",
+    "repeat": {
+      "mode": "JOINER",
+      "cycle_bars": 1.0,
+      "loop_step_ids": ["reveal"],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "reveal",
+        "target": "ALL",
+        "timing": {"base_timing": {"start_offset_bars": 0.5, "duration_bars": 0.5}},
+        "geometry": {},
+        "movement": {
+          "physical": {
+            "shape": "linear",
+            "mode": "finite",
+            "start_pan_deg": -45.0,
+            "start_tilt_deg": 10.0,
+            "pan_extent_deg": 90.0,
+            "tilt_extent_deg": 0.0,
+            "period_beats": 2.0
+          }
+        },
+        "dimmer": {
+          "physical": {"period_beats": 2.0, "duty_cycle": 1.0, "low": 0.0, "high": 1.0}
+        },
+        "physical_shutter_state": "open"
+      }
+    ],
+    "metadata": {
+      "tags": ["test_only", "physical_v2"],
+      "recommended_sections": ["verse"],
+      "energy_range": [0, 100],
+      "description": "P1.6 integration-test template, not in the production catalog: each bar is dark for two beats, then the heads reveal at full dimmer with the shutter open and pan 90 degrees linearly over two beats, from -45 to 45."
+    }
+  }
+}

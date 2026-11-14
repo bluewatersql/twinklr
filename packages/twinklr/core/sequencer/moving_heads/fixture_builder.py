@@ -79,6 +79,7 @@ def build_fixture_contexts(
     For each fixture in the rig, constructs a :class:`FixtureContext` with:
     - Calibration data from the fixture definition
     - Full :class:`FixtureConfig` for degree→DMX conversion
+    - The fixture's explicit physical profile, when it declares one
     - Spatial role inferred from position within the fixture group
 
     Args:
@@ -124,11 +125,15 @@ def build_fixture_contexts(
                 )
                 break
 
+        fixture_config = fixture_configs.get(fixture_def.fixture_id)
         contexts.append(
             FixtureContext(
                 fixture_id=fixture_def.fixture_id,
                 role=role,
                 calibration=calibration,
+                physical_profile=(
+                    fixture_config.physical_profile if fixture_config is not None else None
+                ),
             )
         )
 

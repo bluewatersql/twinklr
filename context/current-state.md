@@ -2,7 +2,7 @@
 type: context
 status: active
 area: overview
-updated: 2026-11-12
+updated: 2026-11-14
 ---
 
 # Twinklr — Current State
@@ -44,6 +44,10 @@ See [product/overview.md](product/overview.md).
   Moving-head pan, tilt and dimmer output is held to the look the owner accepted before
   the 2026-08 clean-up; seven clean-up render changes were reverted on 2026-11-12
   ([decision](../memories/decisions/mh-render-matches-pre-cleanup-look.md)).
+  An opt-in `physical_v2` moving-head mode (job schema `3.1`) renders calibrated
+  fixture profiles to complete DMX frames with dark repositioning; it has no production
+  templates, refuses most real audio, and has no xLights or hardware result yet
+  ([evidence](../changes/2026_11_12_mh_true_up/evidence/2026-11-14-p1-exit/README.md)).
   Display output keeps every section lit: a brightness floor, a beat grid extended to the
   end of the song, and a foundation-coverage rule in the group planner
   ([decision](../memories/decisions/display-stays-lit.md)).

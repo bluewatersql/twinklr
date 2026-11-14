@@ -39,6 +39,58 @@ Pinned xLights [`DMXEffect.h`](https://github.com/xLightsSequencer/xLights/blob/
 
 The implementing workstream owns the files listed in these tasks; shared changes to `config/models.py`, `models/template.py`, `models/context.py`, `pipeline.py`, and export adapters are serialized by the integrator. No parallel edit ownership is implied.
 
+### P1.0 — Reject an unrenderable physical job at job load
+
+Added 2026-11-13 by owner direction at Phase 1 kickoff ("Add physical_v2 at job load
+to phase 1 work"). After Phase 0 a `physical_v2` job validates and is refused only when
+`RenderingPipeline` is constructed, after audio analysis and planning have already
+spent provider calls.
+
+**Files:** Modify `packages/twinklr/core/config/loader.py`, `config/models.py` and
+`sequencer/moving_heads/pipeline.py`; modify whichever entry points build a `JobConfig`
+without the loader, as found by the task. Test `tests/unit/config/test_mh_render_policy.py`
+(extend) and the loader's existing test module.
+
+**Interfaces:** `preflight_render_policy(job_config: JobConfig, fixture_group: FixtureGroup | None = None) -> None`
+in the `config` package raises `UnsupportedRenderModeError` when the job selects a mode
+the installed renderer cannot honor. `UnsupportedRenderModeError` moves to the `config`
+package (it must not import the sequencer) and stays importable from
+`sequencer.moving_heads.pipeline`. `load_job_config` and `load_full_config` call the
+preflight, so every CLI path that loads a job fails before audio analysis or any
+provider request. `JobConfig` itself still validates a `3.1`/`physical_v2` document:
+construction in tests and tools stays possible; the refusal belongs to loading a job
+for execution. The pipeline constructor keeps its own check as the last line of defense
+for callers that build a `JobConfig` in code.
+
+P1.6 does not delete this preflight when real dispatch lands; it narrows it. From P1.6
+on, `physical_v2` at load is refused when a prerequisite the renderer needs is absent
+and knowable from configuration alone: a fixture without `physical_profile`, a profile
+the backend cannot address (footprint or offset above 48), or an unsupported model
+mode. Missing initial state stays a render-time diagnostic because a cue at time zero
+is what makes it an error. The message names each failing fixture and field.
+
+Found in the P1.0 review, for P1.6: the load-time call runs inside `load_job_config`,
+before fixtures are read, and the CLI commands load the job and the fixtures
+separately. No load-time caller holds a fixture group, so P1.6's fixture-dependent
+refusals need a new call site (after `load_fixture_group` in `load_full_config`, and in
+the CLI commands and `TwinklrSession` where fixtures are resolved). Also for P1.6:
+`twinklr display` loads the same job file and so refuses `physical_v2` too; decide
+there whether a display-only run should.
+
+- [ ] Write `test_loading_physical_job_is_rejected_before_execution` (a `3.1`
+  `physical_v2` file fails in `load_job_config` and `load_full_config` with
+  `UnsupportedRenderModeError` naming the mode and the remedy),
+  `test_physical_job_model_still_validates` and
+  `test_legacy_and_omitted_policy_load_unchanged`. Add one test per entry point found
+  that builds a job without the loader.
+- [ ] Run `uv run pytest tests/unit/config -q`; expect the new tests to fail.
+- [ ] Implement; repoint the `job.moving_heads.mode` registry record if its evidence
+  node moves; correct the `mode` field description and the `docs/user-guide.md` row
+  that says where the rejection happens.
+- [ ] Rerun `uv run pytest tests/unit/config tests/unit/agents/sequencer/moving_heads/test_rendering_stage.py -q`.
+
+- [ ] After independent task review, integrator commits `feat(mh): reject an unrenderable physical job at load, before planning`.
+
 ### P1.1 — Capability and typed physical-value contracts
 
 **Files:** Create `packages/twinklr/core/config/fixtures/capabilities.py` and `packages/twinklr/core/sequencer/models/moving_heads/physical.py`. Modify `config/models.py`, `config/fixtures/instances.py`, `sequencer/moving_heads/channels/state.py`, `sequencer/models/context.py`, `sequencer/moving_heads/fixture_builder.py`. Test `tests/unit/config/test_mh_capabilities.py` and `tests/unit/sequencer/moving_heads/test_physical_values.py` (new).
@@ -190,6 +242,201 @@ Added 2026-11-13 from a recheck at `f067a56`; see the
   set only and does not mention the legacy 1–16 shutter-intent ceiling. Add the opt-in
   physical path and its 1–48 model-relative range there, keeping verbatim the two
   sentences `test_documented_channel_scope.py` pins.
+
+## Decisions and carry-forwards recorded during execution
+
+P1.0 and P1.1, 2026-11-13 (each reviewed separately from its author; gate on `879097f`:
+6023 passed, 39 skipped):
+
+- **How physical-only fields are evidenced (P1.1's decision).** Not added to
+  `PROTECTED_EXACT_EFFECT_PATHS`, which is pinned exactly. Each path is an
+  `EFFECT_TEST` record pointing at a parameterized case in
+  `tests/unit/config/test_mh_capabilities.py` that names the one component its change
+  must alter: `rejected`, `words` (the encoded DMX word), `check` (the initial-state
+  check) or `fingerprint`. Paths nothing consumes yet carry the note "identity only;
+  consumer lands in P1.3–P1.5". **Each later task repoints the identity-only paths it
+  starts consuming** to a test of that consumption.
+- **Profile placement.** `physical_profile` is accepted on a fixture's `config` and on a
+  group's `base_config` (propagated to every expanded fixture; a
+  `config_overrides.physical_profile` wins and is typed). An invalid profile fails at
+  group validation naming the fixture.
+- **Stricter than the plan text.** Overlapping discrete-state ranges are rejected;
+  contradictory darkness claims are rejected (open state listed as extinguishing,
+  dimmer-zero darkness without a dimmer calibrated from 0, a normalized axis outside
+  0..1); a physical `ChannelValue` rejects a non-default blend mode; the legacy
+  exporter and transition compiler raise on a physical value instead of dropping it.
+- **Exact encoding.** `AxisCapability.dmx_word()` computes in exact rational arithmetic
+  and rounds half up. P1.3 reuses it and does not reimplement the mapping.
+- **Dependency floor.** `pydantic>=2.12`: the new fields use `exclude_if` to stay out
+  of legacy dumps, and older versions ignore it, which would change every legacy
+  fingerprint.
+- **Unknowns.** Axis `latency_ms`/`settle_ms` and visibility latencies are `None` when
+  unknown, never zero. `InitialFixtureState` needs a full pose; a fixture with a
+  partly known state is left out of `initial_states` and is therefore unknown.
+- **Carried to P1.5.** An initial state that declares `dark=True` alongside a nonzero
+  dimmer or an open shutter is accepted today; P1.5 decides and tests it.
+- **Carried to P1.6.** `docs/overview.md` update; fixture-aware load-time preflight
+  call site; whether `twinklr display` should refuse a physical job.
+- **Open, low.** The `rejected` evidence cases assert only that validation fails, not
+  that it fails on the mutated field. Frozen capability models hold mutable dicts.
+
+P1.2, P1.3 and P1.4, 2026-11-13 (each reviewed separately from its author, each with
+one fix round and a re-review):
+
+- **The frame grid is the only source of sample times.** P1.2 sampled the raw step and
+  P1.3 the grid-rounded span, so cues at off-grid step bounds were rejected when the two
+  were joined. Decision: `compile_physical_step` refuses a step start, step end or
+  sample time that is not a multiple of 20 ms (`OffGridTimeError`); the caller quantizes
+  step bounds with the encoder's `quantize_cue` first. **P1.6 does that quantization
+  and records the requested start in the trace**, because phase is now measured from
+  the quantized start (up to 10 ms from the beat) and `phase_origin_ms` no longer holds
+  the requested time.
+- **Terminal point.** Every compiled pan/tilt trajectory ends with an explicit point at
+  the step end, so a finite move finishes at its target. The encoder samples frame
+  starts in `[start, end)` and uses that point only to interpolate.
+- **Sub-frame content is rejected, not dropped.** A pulse whose high or low interval is
+  shorter than one frame, a sample gap wider than one frame, a cue at or after its
+  segment's end frame, and two cues on one frame all raise.
+- **Effect budget default raised to 1,000,000** (integrator's call, flagged to the
+  owner). Measured: 8 heads × 4 min of continuous 16-bit motion is about 95,000 effects
+  and 9.5 MiB, so the planned 100,000 would reject ordinary shows while the 128 MiB
+  byte limit sat far from binding. How xLights handles a sequence that size is
+  unverified and belongs to the owner-authorized xLights test.
+- **Profile defaults must agree with the profile.** A discrete channel's default byte
+  must be its default state's byte; an axis default must be a word an allowed value
+  encodes to. `wheel_changes` and `shutter_changes` rely on this: unauthored spans and
+  gaps are the default state, exactly what the encoder emits there.
+- **One state-to-byte lookup**, `DiscreteCapability.resolve`, used by the compile and
+  the encoder.
+- **Placement of physical template fields.** `Movement.physical`, `Dimmer.physical`,
+  and step-level `physical_shutter` (pulse), `physical_shutter_state`, `physical_color`,
+  `physical_gobo`, because the legacy shutter, color and gobo models require legacy
+  values. A physical step rejects any non-default legacy knob.
+- **Not implemented, by decision.** The optional qualitative reach/rate override table
+  and any plan-intensity mapping: nothing passes planner intent to the physical compile
+  in Phase 1. Owner: the phase that binds planner intent (P2/P3). A declared-optional
+  alternative for a missing capability: always fails instead. Portable state names
+  across profiles: templates name a profile's states directly; Phase 2.
+- **Carried to P1.5.** Timing of a step's first shutter state and of shutter changes
+  across steps (use `shutter_changes`); replacement segments must be on the frame grid
+  (the change lists use times as given); state must be authored without gaps, because
+  an unauthored channel returns to its default byte; never infer darkness from default
+  bytes (an inverted dimmer's default 0 is full on and is valid); the last shutter
+  state of a step must currently fit latency plus settle inside the step.
+- **Carried to P1.6.** Layout-aware model check (`DisplayAs`/`StringType` in the
+  xLights layout) so an RGB-node model is not sent through this mapping; serialization
+  time measurement; a segment running past the last requested frame is truncated
+  without error; a phase map reloaded from JSON loses its exact edge values, so rebuild
+  from the grid instead of persisting and comparing maps; cue timing records
+  (`quantized_cues`) into the trace.
+
+P1.5, 2026-11-13 (reviewed separately from its author over five rounds; the reviewer's
+last gate run: 6292 passed, 39 skipped):
+
+- **Interface.** `plan_prepositions(segments, capabilities, *, initial_states, locks,
+  frame_ms, sequence_end_ms, failure_mode="error")` in `compile/preposition.py`.
+  `sequence_end_ms` was added to the planned signature: the head parks dark at the last
+  cue's aim through the sequence end, because the song can outlast the last cue.
+- **Every gap is dark.** The planner authors every frame between cues; it never leaves
+  a gap to default bytes.
+- **Head-follow model.** Arrival is `max(prior arrival, command + latency) + word
+  distance / speed`, then settle, timed on encoded words and accumulated across
+  commands, so a previous cue's unfinished motion is waited out. Acceleration and
+  overshoot are not modelled. The model is unverified against hardware: PENDING-OWNER.
+- **Darkness is per mechanism.** Initial darkness is credited only to the mechanism the
+  initial state evidences (dimmer zero, or its own extinguishing shutter state) and
+  only while that mechanism is held; otherwise the close latency (plus the shutter
+  state's settle) applies, and an unknown latency never establishes darkness. This
+  settles the P1.1 carry: `dark=True` alone proves nothing about a mechanism.
+- **Wheels.** A wheel change needs at least one dark frame even when its settle is
+  zero, and never lands on the reveal frame.
+- **Continuation.** A cue with no gap may continue its predecessor only if that cue was
+  played as authored. After a `preserve_aim` substitution, a pose or wheel change at
+  the boundary is a substitutable error.
+- **Fallbacks.** `preserve_aim` and `drop_accent` are opt-in per cue through
+  `metadata["preposition_fallback"]` and apply to substitutable causes only.
+- **Regression guard.** The in-repo fuzz has four arms with asserted feasible-fraction
+  floors. Seven deliberate planner mutations each fail the default run.
+- **Identity-only registry paths still without a consumer:** `profile_id`,
+  `discrete.states.range_min`/`range_max`, `discrete.open_state`.
+- **Open, low.** A lit cue at time zero that needs a move fails closed with the
+  non-substitutable "darkness is never established" although dropping it would be
+  safe. A cue with an unauthored dimmer whose default byte is dark is treated as lit.
+- **Lightly tested.** Multi-fixture interaction through shared locks; locks on channels
+  a profile does not declare; mid-cue wheel changes (the compile never emits them);
+  planner time on very long dense sequences (0.13 s measured early, not re-measured).
+  P1.6's integration test covers the two-head case.
+
+P1.6, 2026-11-13 (reviewed separately from its author; three review rounds):
+
+- **Refusal before paid planning is the rule on every route.** Job-only loads
+  (`load_job_config`, `JobConfig.load_or_default`, `TwinklrSession`) accept a
+  `physical_v2` job because they never see the fixtures; this replaces P1.0's
+  unconditional refusal there. The checks run where job and rig meet:
+  `load_full_config`, `twinklr run` before audio analysis, and a new
+  `render_preflight` stage between audio analysis and every planner. Only audio
+  analysis runs before that stage, and it makes no LLM call.
+- **What the gate checks.** Every fixture has a `physical_profile` and a settled,
+  usable initial state (required at load, since P1.5 fails any fixture without one
+  whatever its first cue); the planner is offered only templates whose steps all carry
+  physical data, and the run is refused when there are none; the musical phase map
+  builds from the detected grid; and every offered template, with no preset and with
+  each declared preset, dry-compiles on every head through the real compile path.
+- **What the gate cannot check.** Anything that depends on the plan: sections that
+  start at other bars (travel rate and pulse width are exercised at the bar-1
+  alignment only), truncation at section ends, and whether dark repositioning fits
+  between the cues the planner chooses. These can still fail at render, after planning.
+- **Commands that emit legacy output only refuse a physical job at load:** `show`,
+  `inject`/`regenerate`, `eval-report`. `twinklr display` accepts one, because it never
+  renders DMX models. The checkpoint records `render_mode` only when it is not legacy,
+  so legacy checkpoint bytes are unchanged; `eval-report` reads it.
+- **Planner cache.** `initial_states`, `max_effects` and `max_xsq_bytes` no longer feed
+  the session id, so a render-only edit does not re-spend provider calls. `mode` still
+  does.
+- **Not applied on the physical path.** Planner intensity (a trace warning records it),
+  the job's `transitions` config, and the `FADE_OUT` remainder policy (refused). A
+  preset id the template does not declare applies no preset, with a warning, instead of
+  an inferred energy preset that would add legacy data. No fallback can be enabled from
+  config, so the reposition pass always runs in `error` mode. `locks` is a pipeline
+  parameter with no producer yet.
+- **End of song.** A cue's end is cut at the last whole frame inside the song without
+  error; a step that starts in the final partial frame is dropped and listed in the
+  trace as `dropped_cues`; the final partial frame is parked dark. The trace records
+  requested and actual cue times.
+- **Delivery.** Files are staged, measured and budget-checked, then published
+  all-or-nothing with the `.xsq` last; a failed publish restores any earlier
+  deliverable; if a restore itself fails the staging directory is kept and named.
+- **Identity.** The physical render identity covers profiles, initial states, template
+  content, phase map, locks (order-independent), renderer and encoder revision. It
+  ignores the `transitions` config. Legacy fingerprints are unchanged.
+- **Visible legacy change.** A legacy run reports one more completed stage. Output,
+  session ids, planner cache keys and checkpoints are identical (40 renders compared
+  against the previous commit by the reviewer).
+
+Owner decisions, 2026-11-14: silent song edges are deferred to Phase 2; `twinklr run`
+gains a `--layout` input in Phase 1.
+
+- **Silent song edges (deferred to Phase 2).** The phase map refuses a grid with more than one beat of
+  silence or fade at either end, because average-tempo inference is forbidden. A
+  synthetic sweep at 120 BPM (lead-ins 0–3 s, tails 0–6 s) accepted 18 of 961 grids.
+  `physical_v2` therefore refuses most real audio until there is a policy for the
+  edges (explicit boundary knots, or holding dark outside the detected beats).
+- **Layout input for `twinklr run` (added 2026-11-14, reviewed separately).** `run`
+  takes an optional `--layout`. Under `physical_v2` each fixture's model must be in
+  the layout, have a `DisplayAs` starting with `Dmx`, a `StringType` absent or starting
+  with "Single Color", and a `parm1` (channel count) of at least the profile
+  footprint; the check runs before analysis, in the gate and in the renderer, and the
+  trace records `layout_check: performed` with the layout's SHA-256. Without a layout
+  the run warns and records `not_performed`. A legacy run ignores the file. The layout
+  is in no identity or cache key. The physical preflight also refuses a blank or shared
+  `xlights_model_name`. The three layout field values come from this repo's parser and
+  are unverified against a layout xLights wrote for a DMX model: PENDING-OWNER.
+- **Gate cost (carried to Phase 2).** The dry-compile took 1.66 s for 8 heads and 2
+  template-and-preset combinations on a 4-minute synthetic song, about 0.8 s per
+  combination, so a Phase 2 catalog of around 100 combinations would take over a
+  minute before planning.
+- **Unmeasured.** Emission's per-model overlap scan grows quadratically with effect
+  count; xLights behaviour near the 1,000,000-effect budget is unknown.
 
 ## Phase exit
 

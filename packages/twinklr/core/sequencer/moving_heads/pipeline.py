@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
+import hashlib
+import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from pydantic import BaseModel
+
+    from twinklr.core.formats.xlights.layout.models.rgb_effects import Model
     from twinklr.core.sequencer.models.context import FixtureContext
     from twinklr.core.sequencer.models.template import TemplateDoc, TemplatePreset
 
@@ -13,9 +18,13 @@ from twinklr.core.agents.sequencer.moving_heads import ChoreographyPlan
 from twinklr.core.agents.sequencer.moving_heads.models import PlanSection, flatten_plan_segment
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import JobConfig
+from twinklr.core.config.render_policy import (
+    UnsupportedRenderModeError,
+    preflight_render_policy,
+)
 from twinklr.core.curves.generator import CurveGenerator
 from twinklr.core.curves.registry import CurveRegistry
-from twinklr.core.formats.xlights.sequence.fresh import resolve_media_file
+from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS, resolve_media_file
 from twinklr.core.formats.xlights.sequence.models.xsq import (
     TimeMarker,
     TimingTrack,
@@ -26,11 +35,19 @@ from twinklr.core.sequencer.models.context import (
     TimedChannelIntent,
 )
 from twinklr.core.sequencer.models.enum import Intensity
+from twinklr.core.sequencer.models.moving_heads.physical import (
+    PhysicalChannelError,
+    RenderLock,
+    TransitionDiagnostic,
+)
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
 from twinklr.core.sequencer.models.transition import TransitionRegistry
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.channel_blender import ChannelBlender
+from twinklr.core.sequencer.moving_heads.compile.physical import is_physical_template
+from twinklr.core.sequencer.moving_heads.compile.preposition import plan_prepositions
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
+    compile_physical_template,
     compile_template,
 )
 from twinklr.core.sequencer.moving_heads.compile.transition_detector import TransitionDetector
@@ -38,13 +55,31 @@ from twinklr.core.sequencer.moving_heads.compile.transition_planner import Trans
 from twinklr.core.sequencer.moving_heads.compile.transition_segment_compiler import (
     TransitionSegmentCompiler,
 )
-from twinklr.core.sequencer.moving_heads.delivery import DeliveryArtifacts, export_delivery
+from twinklr.core.sequencer.moving_heads.delivery import (
+    DeliveryArtifacts,
+    build_physical_sequence,
+    export_delivery,
+    export_physical_delivery,
+)
 from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic, audit_legacy_controls
+from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
+    ENCODER_VERSION,
+    EncodedFixtureFrame,
+    coalesce_frames,
+    encode_fixture_frames,
+    frame_times,
+    quantized_cues,
+)
+from twinklr.core.sequencer.moving_heads.export.xsq_adapter import (
+    check_physical_models,
+    physical_run_requests,
+)
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
 from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
 from twinklr.core.sequencer.moving_heads.identity import (
     LEGACY_BACKEND_ID,
     LEGACY_RENDERER_REVISION,
+    PHYSICAL_RENDERER_REVISION,
     render_fingerprint,
 )
 from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
@@ -53,6 +88,7 @@ from twinklr.core.sequencer.moving_heads.templates import (
     load_builtin_templates,
 )
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.timing.musical_phase import MusicalPhaseMap, build_musical_phase_map
 from twinklr.core.sequencer.vocabulary.visual import PaletteRole
 
 logger = logging.getLogger(__name__)
@@ -159,12 +195,207 @@ def _compute_section_duration_ms(start_bar: int, end_bar: int, beat_grid: BeatGr
     return int(beat_grid.get_bar_start_ms(end_bar) - beat_grid.get_bar_start_ms(start_bar - 1))
 
 
-class UnsupportedRenderModeError(ValueError):
-    """The job selects a moving-head render mode this renderer does not implement.
+def offered_template_ids(job_config: JobConfig, template_ids: Sequence[str]) -> list[str]:
+    """The templates the planner may be offered under the job's render mode.
 
-    Raised before any template load or output write, instead of falling back to the
-    legacy renderer in silence.
+    `legacy_v1` offers every template. `physical_v2` offers only templates the physical
+    renderer can compile as authored (`is_physical_template`), so a plan never names a
+    template that fails at render after paid planning.
+
+    Raises:
+        UnsupportedRenderModeError: Under `physical_v2`, when no template qualifies.
     """
+    if job_config.moving_heads.mode == "legacy_v1":
+        return list(template_ids)
+    offered = [
+        template_id
+        for template_id in template_ids
+        if is_physical_template(get_template(template_id).template)
+    ]
+    if not offered:
+        raise UnsupportedRenderModeError(
+            f"moving_heads.mode 'physical_v2' has no template with physical data to offer the "
+            f"planner: none of the {len(template_ids)} loaded templates carries "
+            "movement.physical, without legacy data, on every step. Load physical templates "
+            "(--template-dir) or set moving_heads.mode to 'legacy_v1'"
+        )
+    return offered
+
+
+def check_physical_templates(
+    template_ids: Sequence[str], *, beat_grid: BeatGrid, fixture_group: FixtureGroup
+) -> None:
+    """Dry-compile templates on the rig, so a plan can only name ones that will render.
+
+    Each template is compiled with no preset and with each preset it declares (the
+    only presets the physical renderer applies), as one section from bar 1 over every
+    bar that starts in the song, on every fixture of the rig, through the render's own
+    `compile_physical_template` against the song's phase map. That checks target
+    groups against the rig's roles, legacy data a preset adds, every step's states and
+    channels against each profile, axis bounds, travel rate and pulse and shutter
+    timing for that placement.
+
+    Raises:
+        UnsupportedRenderModeError: Naming each template, preset, step, fixture and
+            item that fails.
+    """
+    from twinklr.core.sequencer.moving_heads.compile.physical import PhysicalCompileError
+    from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
+        UnsupportedRigShapeError,
+    )
+
+    registries = create_default_registries()
+    fixtures = build_fixture_contexts(rig_profile_from_fixture_group(fixture_group), fixture_group)
+    phase_map = build_musical_phase_map(beat_grid)
+    duration_ms = int(beat_grid.duration_ms)
+    bars = sum(1 for start in beat_grid.bar_boundaries if start < beat_grid.duration_ms)
+    failures: list[str] = []
+    for template_id in template_ids:
+        document = get_template(template_id)
+        for preset in (None, *document.presets):
+            context = TemplateCompileContext(
+                section_id="render_preflight",
+                template_id=document.template.template_id,
+                preset_id=preset.preset_id if preset else None,
+                fixtures=fixtures,
+                beat_grid=beat_grid,
+                start_bar=1,
+                duration_bars=max(bars, 1),
+                curve_registry=CurveRegistry(),
+                geometry_registry=registries["geometry"],
+                movement_registry=registries["movement"],
+                dimmer_registry=registries["dimmer"],
+            )
+            try:
+                compile_physical_template(
+                    document.template,
+                    context,
+                    preset,
+                    phase_map=phase_map,
+                    end_limit_ms=duration_ms // EFFECT_GRID_MS * EFFECT_GRID_MS,
+                )
+            except (
+                PhysicalCompileError,
+                PhysicalChannelError,
+                UnsupportedRigShapeError,
+                ValueError,
+            ) as error:
+                # A step's error carries a note naming its template, step and fixture.
+                where = "; ".join(getattr(error, "__notes__", ())) or f"template {template_id!r}"
+                if preset:
+                    where += f", preset {preset.preset_id!r}"
+                failures.append(f"{where}: {error}")
+    if failures:
+        raise UnsupportedRenderModeError(
+            "moving_heads.mode 'physical_v2' would offer the planner templates this rig "
+            "cannot render: " + "; ".join(failures)
+        )
+
+
+def _physical_preset(
+    section: PlanSection, template_doc: TemplateDoc, diagnostics: list[MHDiagnostic]
+) -> TemplatePreset | None:
+    """The preset the template declares under the section's id, or none.
+
+    An undeclared id is not turned into an energy preset under `physical_v2`: that is
+    planner intent, which Phase 1 does not apply, and it would add legacy data.
+    """
+    if not section.preset_id:
+        return None
+    for preset in template_doc.presets:
+        if preset.preset_id == section.preset_id:
+            return preset
+    diagnostics.append(
+        MHDiagnostic(
+            code="unsupported_attribute",
+            severity="warning",
+            message=(
+                f"section {section.section_name!r}: preset {section.preset_id!r} is not "
+                f"declared by template {template_doc.template.template_id!r}; physical_v2 "
+                "applies no preset"
+            ),
+            section_id=section.section_name,
+            action="unchanged",
+        )
+    )
+    return None
+
+
+class PhysicalRenderError(ValueError):
+    """The transaction pass refused a physical render; nothing was delivered."""
+
+    def __init__(self, diagnostics: Sequence[TransitionDiagnostic]) -> None:
+        self.diagnostics = tuple(diagnostics)
+        errors = [diagnostic for diagnostic in diagnostics if diagnostic.status == "error"]
+        super().__init__(
+            "Physical render refused: "
+            + "; ".join(
+                f"{diagnostic.fixture_id} cue at {diagnostic.cue_ms} ms: "
+                f"{diagnostic.code}: {diagnostic.reason}"
+                for diagnostic in errors
+            )
+        )
+
+
+def _sha256(model: BaseModel) -> str:
+    canonical = json.dumps(
+        model.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), allow_nan=False
+    )
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def _phase_boundaries(phase_map: MusicalPhaseMap) -> list[dict[str, Any]]:
+    """The phase map's knots that are not observed beats, with their provenance."""
+    return [
+        knot.model_dump(mode="json") for knot in phase_map.knots if knot.provenance != "observed"
+    ]
+
+
+def _cue_records(cues: Sequence[FixtureSegment]) -> list[dict[str, Any]]:
+    """Requested and actual timing of every compiled cue, for the trace.
+
+    A cue's start and end were requested at musical times and quantized (an end also
+    cut at the song's last whole frame) before compiling. Its hold and discrete cues
+    are authored on the frame grid, so only one a quantization moved is listed.
+    """
+    records: list[dict[str, Any]] = []
+    for cue in cues:
+        identity = {
+            "fixture_id": cue.fixture_id,
+            "section_id": cue.section_id,
+            "segment_id": cue.segment_id,
+            "step_id": cue.step_id,
+        }
+        records.append(
+            identity
+            | {
+                "channel": None,
+                "kind": "segment_start",
+                "requested_ms": int(cue.metadata["requested_t0_ms"]),
+                "actual_ms": cue.t0_ms,
+            }
+        )
+        records.append(
+            identity
+            | {
+                "channel": None,
+                "kind": "segment_end",
+                "requested_ms": int(cue.metadata["requested_t1_ms"]),
+                "actual_ms": cue.t1_ms,
+            }
+        )
+        records.extend(
+            identity
+            | {
+                "channel": timing.channel.value if timing.channel is not None else None,
+                "kind": timing.kind,
+                "requested_ms": timing.requested_ms,
+                "actual_ms": timing.actual_ms,
+            }
+            for timing in quantized_cues([cue])
+            if timing.kind == "cue" and timing.requested_ms != timing.actual_ms
+        )
+    return records
 
 
 class RenderingPipeline:
@@ -182,6 +413,9 @@ class RenderingPipeline:
         media_file: str | None = None,
         song: str = "",
         artist: str = "",
+        locks: Sequence[RenderLock] = (),
+        layout_models: Sequence[Model] | None = None,
+        layout_sha256: str | None = None,
     ):
         """Initialize rendering pipeline.
 
@@ -197,17 +431,24 @@ class RenderingPipeline:
                 placeholder name, since an empty mediaFile makes the file unopenable.
             song: Song title for the sequence head
             artist: Artist for the sequence head
+            locks: Frames a `physical_v2` render must leave as the cues alone make them.
+            layout_models: The xLights layout's models, when known. A `physical_v2`
+                render then refuses any fixture whose model is not a single-color DMX
+                model with enough channels (`check_physical_models`); without them the
+                check is recorded as not performed. A `legacy_v1` render ignores them.
+            layout_sha256: Content hash of the layout file, recorded in the physical
+                trace as evidence. Not render identity: the check passes or refuses
+                and never changes a byte.
 
         Raises:
-            UnsupportedRenderModeError: The job selects a render mode other than
-                `legacy_v1`, which is the only one implemented.
+            UnsupportedRenderModeError: The job's render mode cannot render this rig
+                (see `preflight_render_policy`).
+            ValueError: If locks are given to a `legacy_v1` render, which cannot honor
+                them.
         """
-        mode = job_config.moving_heads.mode
-        if mode != "legacy_v1":
-            raise UnsupportedRenderModeError(
-                f"moving_heads.mode {mode!r} is not implemented yet; "
-                "set it to 'legacy_v1' or omit it"
-            )
+        preflight_render_policy(job_config, fixture_group)
+        if locks and job_config.moving_heads.mode == "legacy_v1":
+            raise ValueError("render locks apply only to moving_heads.mode 'physical_v2'")
 
         self.choreography_plan = choreography_plan
         self.fixture_group = fixture_group
@@ -218,8 +459,15 @@ class RenderingPipeline:
         self.media_file = resolve_media_file(media_file)
         self.song = song
         self.artist = artist
+        self.locks = tuple(locks)
+        self.layout_models = layout_models
+        self.layout_sha256 = layout_sha256
         self.artifacts: DeliveryArtifacts | None = None
         """Set by `render()` when `output_path` is given."""
+        self.frames: tuple[EncodedFixtureFrame, ...] = ()
+        """Set by a `physical_v2` `render()`: every fixture's encoded frames, rig order."""
+        self.render_record: dict[str, Any] | None = None
+        """Set by a `physical_v2` `render()`: the identity and evidence the trace carries."""
 
         # Create shared infrastructure
         self.curve_generator = CurveGenerator()
@@ -273,6 +521,8 @@ class RenderingPipeline:
             ValueError: If template not found or compilation fails.
         """
         logger.debug("Starting plan rendering...")
+        if self.job_config.moving_heads.mode == "physical_v2":
+            return self._render_physical()
 
         # Step 1: Detect and plan transitions (if enabled)
         transition_registry = TransitionRegistry()
@@ -387,17 +637,202 @@ class RenderingPipeline:
         )
 
     def fingerprint(self) -> str:
-        """Functional identity of this legacy render; the output path is not part of it."""
+        """Functional identity of this render; the output path is not part of it.
+
+        A `physical_v2` render also hashes its renderer and encoder revisions, the
+        musical phase map built from the detected grid, and any render locks, and leaves
+        out the transition settings it does not apply.
+        """
+        physical = self.job_config.moving_heads.mode == "physical_v2"
         return render_fingerprint(
             plan=self.choreography_plan,
             beat_grid=self.beat_grid,
             fixtures=self.fixture_group,
             templates=self._plan_templates(),
             policy=self.job_config.moving_heads,
-            transitions=self.job_config.transitions,
+            # The physical path plans its own dark repositioning and ignores transitions.
+            transitions=None if physical else self.job_config.transitions,
             backend_id=LEGACY_BACKEND_ID,
-            renderer_revision=LEGACY_RENDERER_REVISION,
+            renderer_revision=(
+                f"physical_v2.{PHYSICAL_RENDERER_REVISION}+encoder.{ENCODER_VERSION}"
+                if physical
+                else LEGACY_RENDERER_REVISION
+            ),
+            phase_map=build_musical_phase_map(self.beat_grid) if physical else None,
+            locks=self.locks,
         )
+
+    def _render_physical(self) -> list[FixtureSegment]:
+        """Render through the opt-in physical path and, with an output path, deliver it.
+
+        Each section's template compiles on the frame grid against the musical phase
+        of the detected grid; the transaction pass authors every fixture of the rig over
+        the whole sequence; each fixture's complete frames are encoded in rig order and
+        merged into constant DMX runs. Any refusal raises before anything is written,
+        and the delivery itself is published only once its size fits the budgets.
+
+        Returns:
+            The planned segments: the cues with their transactions and parks.
+
+        Raises:
+            PhysicalRenderError: If the transaction pass reports an error.
+            PhysicalCompileError, PhysicalChannelError, PhysicalOutputError,
+                ValueError: For a step, value, model or output the path refuses.
+        """
+        policy = self.job_config.moving_heads
+        phase_map = build_musical_phase_map(self.beat_grid)
+        duration_ms = int(self.beat_grid.duration_ms)
+        times = frame_times(duration_ms)
+        fixtures = self.fixture_group.expand_fixtures()
+        profiles = {}
+        for fixture in fixtures:
+            profile = fixture.config.physical_profile
+            assert profile is not None  # required by preflight_render_policy
+            profiles[fixture.fixture_id] = profile
+        targets = {fixture.fixture_id: fixture.xlights_model_name for fixture in fixtures}
+        if self.layout_models is not None:
+            check_physical_models(fixtures, self.layout_models)
+        else:
+            logger.warning(
+                "physical_v2: the xLights model check was not performed (no layout given); "
+                "each fixture's model must be a single-color DMX model of at least its "
+                "profile's footprint, which nothing has verified"
+            )
+
+        cues: list[FixtureSegment] = []
+        dropped: list[dict[str, str | int]] = []
+        time_markers: list[TimeMarker] = []
+        diagnostics: list[MHDiagnostic] = []
+        fixture_contexts = self._build_fixture_contexts()
+        for section in self.iterate_plan_sections(self.choreography_plan):
+            if not section.template_id:
+                raise ValueError(f"Section '{section.section_name}' has no template_id")
+            try:
+                template_doc = get_template(section.template_id)
+            except Exception as e:
+                raise ValueError(f"Template not found: {section.template_id}") from e
+            preset = _physical_preset(section, template_doc, diagnostics)
+            context = TemplateCompileContext(
+                section_id=section.section_name,
+                template_id=template_doc.template.template_id,
+                preset_id=preset.preset_id if preset else None,
+                fixtures=fixture_contexts,
+                beat_grid=self.beat_grid,
+                start_bar=section.start_bar,
+                duration_bars=section.end_bar - section.start_bar + 1,
+                curve_registry=self.curve_registry,
+                geometry_registry=self.geometry_registry,
+                movement_registry=self.movement_registry,
+                dimmer_registry=self.dimmer_registry,
+                color_registry=self.color_registry,
+                shutter_registry=self.shutter_registry,
+                gobo_registry=self.gobo_registry,
+            )
+            time_markers.append(
+                TimeMarker(
+                    name=section.section_name, time_ms=context.start_ms, end_time_ms=context.end_ms
+                )
+            )
+            if not section.legacy_intent_omitted:
+                diagnostics.append(
+                    MHDiagnostic(
+                        code="unsupported_attribute",
+                        severity="warning",
+                        message=(
+                            f"section {section.section_name!r}: planner intent (intensity, "
+                            "color, shutter and gobo events) is not applied by physical_v2 "
+                            "in Phase 1; the template's physical data renders as authored"
+                        ),
+                        section_id=section.section_name,
+                        action="unchanged",
+                    )
+                )
+            compiled = compile_physical_template(
+                template_doc.template,
+                context,
+                preset,
+                phase_map=phase_map,
+                end_limit_ms=duration_ms // EFFECT_GRID_MS * EFFECT_GRID_MS,
+            )
+            cues.extend(compiled.segments)
+            dropped.extend(compiled.dropped_steps)
+
+        result = plan_prepositions(
+            cues,
+            profiles,
+            initial_states=policy.initial_states,
+            locks=self.locks,
+            frame_ms=EFFECT_GRID_MS,
+            sequence_end_ms=len(times) * EFFECT_GRID_MS,
+        )
+        if result.has_errors:
+            raise PhysicalRenderError(result.diagnostics)
+
+        frames: list[EncodedFixtureFrame] = []
+        for fixture in fixtures:
+            frames.extend(
+                encode_fixture_frames(
+                    [s for s in result.segments if s.fixture_id == fixture.fixture_id],
+                    profiles[fixture.fixture_id],
+                    frame_times_ms=times,
+                )
+            )
+        runs = coalesce_frames(frames)
+        requests = physical_run_requests(runs, result.segments, targets)
+
+        self.frames = tuple(frames)
+        self.render_record = {
+            "renderer": "physical_v2",
+            "render_fingerprint": self.fingerprint(),
+            "renderer_revision": PHYSICAL_RENDERER_REVISION,
+            "encoder_version": ENCODER_VERSION,
+            "backend_id": LEGACY_BACKEND_ID,
+            "policy": policy.model_dump(mode="json"),
+            "initial_states": {
+                fixture_id: state.model_dump(mode="json")
+                for fixture_id, state in sorted(policy.initial_states.items())
+            },
+            "fixtures": [
+                {
+                    "fixture_id": fixture.fixture_id,
+                    "xlights_model_name": fixture.xlights_model_name,
+                    "profile_sha256": _sha256(profiles[fixture.fixture_id]),
+                }
+                for fixture in fixtures
+            ],
+            "template_sha256": {
+                doc.template.template_id: _sha256(doc) for doc in self._plan_templates()
+            },
+            "beat_grid_sha256": _sha256(self.beat_grid),
+            "phase_boundaries": _phase_boundaries(phase_map),
+            "frame_grid": {
+                "frame_ms": EFFECT_GRID_MS,
+                "frame_count": len(times),
+                "song_duration_ms": duration_ms,
+                "sequence_end_ms": len(times) * EFFECT_GRID_MS,
+            },
+            "layout_check": "performed" if self.layout_models is not None else "not_performed",
+            "layout_sha256": self.layout_sha256,
+            "locks": [lock.model_dump(mode="json") for lock in self.locks],
+            "quantized_cues": _cue_records(cues),
+            "dropped_cues": dropped,
+            "transactions": [d.model_dump(mode="json") for d in result.diagnostics],
+            "diagnostics": [d.model_dump(mode="json") for d in diagnostics],
+        }
+        if self.output_path:
+            xsq = build_physical_sequence(
+                requests,
+                time_markers,
+                media_file=self.media_file,
+                duration_ms=duration_ms,
+                song=self.song,
+                artist=self.artist,
+                timeline_tracks=self.timeline_tracks,
+            )
+            self.artifacts = export_physical_delivery(
+                xsq, runs, output_path=self.output_path, policy=policy, render=self.render_record
+            )
+        return list(result.segments)
 
     def _plan_templates(self) -> list[TemplateDoc]:
         """The template documents the plan's sections name, once each.

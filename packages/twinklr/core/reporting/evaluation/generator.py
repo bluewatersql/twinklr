@@ -11,6 +11,7 @@ from pathlib import Path
 from twinklr.core.reporting.evaluation.analyze import analyze_curve, check_loop_continuity
 from twinklr.core.reporting.evaluation.collect import (
     build_run_metadata,
+    checkpoint_render_policy,
     extract_plan,
     load_checkpoint,
 )
@@ -147,6 +148,9 @@ async def generate_evaluation_report(
         plan=plan,
         audio_path=audio_path,
         fixture_config_path=fixture_config_path,
+        # The job's render mode, as the checkpoint records it; a non-legacy mode is
+        # refused before any audio is analyzed.
+        render_policy=checkpoint_render_policy(checkpoint_data),
     )
 
     logger.debug(f"Re-rendered {len(render_data.segments)} segments")

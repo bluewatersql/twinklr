@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
+from twinklr.core.config.fixtures.capabilities import InitialFixtureState
 from twinklr.core.curves.library import CurveLibrary
 from twinklr.core.formats.xlights.sequence.timeline import TimelineTracksConfig
 from twinklr.core.sequencer.models.enum import TransitionMode
@@ -268,6 +269,8 @@ class ConfigBase(BaseModel):
         Raises:
             FileNotFoundError: If config file doesn't exist
             ValidationError: If config is invalid
+            UnsupportedRenderModeError: If a job selects a render mode the installed
+                renderer cannot honor
         """
         # AppConfig needs environment variable loading for API keys
         if cls.__name__ == "AppConfig":
@@ -276,10 +279,15 @@ class ConfigBase(BaseModel):
             return load_app_config(path)  # type: ignore[return-value]
 
         # Other config types use simple loader
-        from twinklr.core.config.loader import load_config
+        from twinklr.core.config.loader import load_config, load_job_config
 
         if path is None:
             path = cls.default_path()
+
+        # A job loaded from a path is being loaded for execution
+        if cls.__name__ == "JobConfig":
+            return load_job_config(path)  # type: ignore[return-value]
+
         raw = load_config(path)
         return cls.model_validate(raw)
 
@@ -629,6 +637,14 @@ class TransitionConfig(BaseModel):
     )
 
 
+DEFAULT_MAX_EFFECTS = 1_000_000
+"""Default physical effect budget. Eight heads in four minutes of continuous 16-bit
+motion emit about 95,000 effects, so the byte budget is the one that binds."""
+
+DEFAULT_MAX_XSQ_BYTES = 134_217_728
+"""Default physical `.xsq` size budget: 128 MiB."""
+
+
 class MHRenderPolicy(BaseModel):
     """Versioned moving-head render policy.
 
@@ -641,8 +657,40 @@ class MHRenderPolicy(BaseModel):
     mode: Literal["legacy_v1", "physical_v2"] = Field(
         default="legacy_v1",
         description=(
-            "Moving-head renderer. `physical_v2` requires schema_version 3.1 and is "
-            "rejected until the physical renderer ships."
+            "Moving-head renderer. `physical_v2` requires schema_version 3.1, a "
+            "physical_profile on every fixture and a usable initial state for each; "
+            "a job missing them is rejected when its fixtures load, before planning."
+        ),
+    )
+    # Left out of dumps when empty so legacy render fingerprints are unchanged.
+    initial_states: dict[str, InitialFixtureState] = Field(
+        default_factory=dict,
+        exclude_if=lambda value: not value,
+        description=(
+            "Run-supplied time-zero state per fixture id for the physical renderer. A "
+            "fixture without an entry has an unknown initial state."
+        ),
+    )
+    # Left out of dumps at their defaults so legacy render fingerprints are unchanged.
+    # A non-default budget is dumped and so enters render identity.
+    max_effects: int = Field(
+        default=DEFAULT_MAX_EFFECTS,
+        gt=0,
+        exclude_if=lambda value: value == DEFAULT_MAX_EFFECTS,
+        description=(
+            "Most coalesced DMX effects one physical render may emit; more fails with "
+            "output_budget_exceeded instead of dropping frames. Physical output only. "
+            "A non-default value is part of render identity."
+        ),
+    )
+    max_xsq_bytes: int = Field(
+        default=DEFAULT_MAX_XSQ_BYTES,
+        gt=0,
+        exclude_if=lambda value: value == DEFAULT_MAX_XSQ_BYTES,
+        description=(
+            "Largest serialized .xsq, in UTF-8 bytes, one physical render may write; "
+            "larger fails with output_budget_exceeded instead of dropping frames. "
+            "Physical output only. A non-default value is part of render identity."
         ),
     )
 

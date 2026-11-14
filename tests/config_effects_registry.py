@@ -272,13 +272,15 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "job.moving_heads": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_mh_render_policy.py::test_unimplemented_physical_mode_is_rejected",
-        "selected render policy is rejected by the pipeline before any output",
+        "tests/unit/config/test_mh_render_policy.py::"
+        "test_loading_physical_job_without_profiles_is_rejected_before_execution",
+        "selected render policy decides which fixture prerequisites loading the job checks",
     ),
     "job.moving_heads.mode": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_mh_render_policy.py::test_unimplemented_physical_mode_is_rejected",
-        "selected render mode is rejected by the pipeline before any output",
+        "tests/unit/config/test_mh_render_policy.py::test_physical_mode_without_profiles_is_rejected",
+        "physical mode refuses a rig without physical profiles, naming each fixture; legacy "
+        "mode renders it",
     ),
     "job.fixture_config_path": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
@@ -2566,6 +2568,94 @@ for _fixture_path, _fixture_disposition in tuple(CONFIG_EFFECTS.items()):
             "exact path changes expansion, rig, conversion, wheel-handler, or DMX export behavior",
         )
 
+# Physical-profile and run initial-state fields feed only the opt-in physical renderer,
+# so by design they cannot change the legacy-output snapshot above. Registered after
+# that loop, each exact path mutates its field and must change the one component of
+# the physical contract its note names. "Identity only" paths have no consumer
+# beyond the render fingerprint; the task that adds one repoints them.
+_PHYSICAL_REJECTED = "exact path's alternative values are rejected by validation"
+_PHYSICAL_WORDS = "exact path changes the encoded DMX word"
+_PHYSICAL_CHECK = "exact path changes the initial-state check"
+_PHYSICAL_IDENTITY_ONLY = "identity only; no physical consumer yet"
+_PHYSICAL_PREPOSITION = "exact path changes the planned preposition transactions"
+_PHYSICAL_DARKNESS = "exact path changes which planned cues start dark"
+_PHYSICAL_FRAMES = "exact path changes the encoded fixture frames"
+_PHYSICAL_CHANGES = "exact path changes the listed wheel state changes"
+_PHYSICAL_PROFILE_FIELDS = {
+    "": _PHYSICAL_WORDS,
+    "schema_version": _PHYSICAL_REJECTED,
+    "profile_id": _PHYSICAL_IDENTITY_ONLY,
+    "provenance": _PHYSICAL_PREPOSITION,
+    "footprint": _PHYSICAL_FRAMES,
+    "defaults": _PHYSICAL_FRAMES,
+    "axes": _PHYSICAL_WORDS,
+    "axes.unit": _PHYSICAL_REJECTED,
+    "axes.physical_min": _PHYSICAL_WORDS,
+    "axes.physical_max": _PHYSICAL_WORDS,
+    "axes.allowed_min": _PHYSICAL_WORDS,
+    "axes.allowed_max": _PHYSICAL_WORDS,
+    "axes.coarse_offset": _PHYSICAL_FRAMES,
+    "axes.fine_offset": _PHYSICAL_WORDS,
+    "axes.inverted": _PHYSICAL_WORDS,
+    "axes.travel_speed_per_s": _PHYSICAL_PREPOSITION,
+    "axes.latency_ms": _PHYSICAL_PREPOSITION,
+    "axes.settle_ms": _PHYSICAL_PREPOSITION,
+    "discrete": _PHYSICAL_CHECK,
+    "discrete.offset": _PHYSICAL_FRAMES,
+    "discrete.states": _PHYSICAL_CHECK,
+    "discrete.states.range_min": _PHYSICAL_IDENTITY_ONLY,
+    "discrete.states.range_max": _PHYSICAL_IDENTITY_ONLY,
+    "discrete.states.value": _PHYSICAL_FRAMES,
+    "discrete.states.settle_ms": _PHYSICAL_CHANGES,
+    "discrete.default_state": _PHYSICAL_CHANGES,
+    "discrete.closed_state": _PHYSICAL_PREPOSITION,
+    "discrete.open_state": _PHYSICAL_IDENTITY_ONLY,
+    "visibility": _PHYSICAL_PREPOSITION,
+    "visibility.dimmer_zero_extinguishes": _PHYSICAL_DARKNESS,
+    "visibility.extinguishing_shutter_states": _PHYSICAL_DARKNESS,
+    "visibility.close_latency_ms": _PHYSICAL_PREPOSITION,
+    "visibility.open_latency_ms": _PHYSICAL_PREPOSITION,
+}
+for _profile_root in (
+    "fixture.fixtures[FixtureInstance].config.physical_profile",
+    "fixture.base_config.physical_profile",
+):
+    for _field, _note in _PHYSICAL_PROFILE_FIELDS.items():
+        _physical_path = f"{_profile_root}.{_field}" if _field else _profile_root
+        CONFIG_EFFECTS[_physical_path] = ConfigDisposition(
+            ConfigDispositionKind.EFFECT_TEST,
+            "tests/unit/config/test_mh_capabilities.py::"
+            f"test_physical_profile_field_changes_contract[{_physical_path}]",
+            _note,
+        )
+for _field, _note in {
+    "": _PHYSICAL_CHECK,
+    "pan_deg": _PHYSICAL_CHECK,
+    "tilt_deg": _PHYSICAL_CHECK,
+    "dimmer": _PHYSICAL_CHECK,
+    "discrete_states": _PHYSICAL_CHECK,
+    "settled": _PHYSICAL_PREPOSITION,
+    "dark": _PHYSICAL_PREPOSITION,
+}.items():
+    _initial_state_path = "job.moving_heads.initial_states" + (f".{_field}" if _field else "")
+    CONFIG_EFFECTS[_initial_state_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/config/test_mh_capabilities.py::"
+        f"test_initial_state_field_changes_contract[{_initial_state_path}]",
+        _note,
+    )
+
+# P1.3 physical output budgets. They bound only physical output, so each exact path is
+# evidenced by a fixed physical render that its limit accepts at the measured size and
+# rejects one below it.
+for _budget_path in ("job.moving_heads.max_effects", "job.moving_heads.max_xsq_bytes"):
+    CONFIG_EFFECTS[_budget_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/export/test_frame_encoder.py::"
+        f"test_budget_field_changes_accept_reject[{_budget_path}]",
+        "exact path changes whether a fixed physical output is accepted or rejected",
+    )
+
 _TEMPLATE_REGISTRATION_PATHS = {
     "template.enabled",
     "template.template",
@@ -2609,6 +2699,64 @@ for _template_path, _template_disposition in tuple(CONFIG_EFFECTS.items()):
         "tests/unit/config/test_template_effect_discriminators.py::"
         f"{_template_test}[{_template_path}]",
         "exact path changes a shipped registry, planner, preset, or compiled-output seam",
+    )
+
+# P1.2 physical template fields. They feed only the opt-in physical compile, so by
+# design they cannot change the legacy snapshot above; registered after that loop,
+# each exact path mutates its field and must either change `compile_physical_step`'s
+# result or be rejected by physical validation/compile. `shape` is coupled to `mode`,
+# extents and period, so no single-field alternative is valid; its evidence is the
+# kernel test, which fails if the compiler ignored it.
+_PHYSICAL_TEMPLATE_REJECTED = (
+    "exact path's alternative is rejected by physical validation or compile"
+)
+_PHYSICAL_TEMPLATE_COMPILED = "exact path changes the physical compile result"
+for _field, _note in {
+    "movement.physical": _PHYSICAL_TEMPLATE_REJECTED,
+    "movement.physical.mode": _PHYSICAL_TEMPLATE_REJECTED,
+    "movement.physical.start_pan_deg": _PHYSICAL_TEMPLATE_COMPILED,
+    "movement.physical.start_tilt_deg": _PHYSICAL_TEMPLATE_COMPILED,
+    "movement.physical.pan_extent_deg": _PHYSICAL_TEMPLATE_COMPILED,
+    "movement.physical.tilt_extent_deg": _PHYSICAL_TEMPLATE_COMPILED,
+    "movement.physical.period_beats": _PHYSICAL_TEMPLATE_COMPILED,
+    "dimmer.physical": _PHYSICAL_TEMPLATE_COMPILED,
+    "dimmer.physical.period_beats": _PHYSICAL_TEMPLATE_COMPILED,
+    "dimmer.physical.duty_cycle": _PHYSICAL_TEMPLATE_COMPILED,
+    "dimmer.physical.phase_cycles": _PHYSICAL_TEMPLATE_COMPILED,
+    "dimmer.physical.low": _PHYSICAL_TEMPLATE_COMPILED,
+    "dimmer.physical.high": _PHYSICAL_TEMPLATE_COMPILED,
+    "physical_shutter": _PHYSICAL_TEMPLATE_COMPILED,
+    "physical_shutter.period_beats": _PHYSICAL_TEMPLATE_COMPILED,
+    "physical_shutter.duty_cycle": _PHYSICAL_TEMPLATE_COMPILED,
+    "physical_shutter.phase_cycles": _PHYSICAL_TEMPLATE_COMPILED,
+    "physical_shutter.low_state": _PHYSICAL_TEMPLATE_COMPILED,
+    "physical_shutter.high_state": _PHYSICAL_TEMPLATE_COMPILED,
+}.items():
+    _physical_template_path = f"template.template.steps.{_field}"
+    CONFIG_EFFECTS[_physical_template_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/compile/test_physical.py::"
+        f"test_physical_template_field_changes_compile[{_physical_template_path}]",
+        _note,
+    )
+CONFIG_EFFECTS["template.template.steps.movement.physical.shape"] = ConfigDisposition(
+    ConfigDispositionKind.EFFECT_TEST,
+    "tests/unit/sequencer/moving_heads/compile/test_physical.py::"
+    "test_each_kernel_shapes_the_compiled_path[sine_tilt]",
+    "each kernel shapes the compiled path",
+)
+
+# P1.4 physical discrete template fields: named shutter, color and gobo states held
+# for a step. Like P1.2's, they feed only the opt-in physical compile; each exact
+# path selects another declared state and must change `compile_physical_step`'s
+# result, so a compile that ignored the field fails its case.
+for _field in ("physical_shutter_state", "physical_color", "physical_gobo"):
+    _physical_template_path = f"template.template.steps.{_field}"
+    CONFIG_EFFECTS[_physical_template_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/compile/test_physical_discrete.py::"
+        f"test_physical_discrete_field_changes_compile[{_physical_template_path}]",
+        _PHYSICAL_TEMPLATE_COMPILED,
     )
 
 # Exact App/Job discriminators. These overrides prevent stale generic smoke-test

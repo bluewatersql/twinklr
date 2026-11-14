@@ -376,3 +376,21 @@ def test_display_focus_partition_does_not_expose_mh_group_to_display_planner() -
     assert stage._resolve_focus_targets([PlanTarget(type=TargetType.GROUP, id="MEGA_TREE")]) == [
         "MEGA_TREE"
     ]
+
+
+def test_show_wiring_refuses_a_physical_job_before_reading_anything(tmp_path: Path) -> None:
+    """A programmatic show is refused too: the combined show exports legacy segments only."""
+    from twinklr.core.config.render_policy import UnsupportedRenderModeError
+
+    physical = JobConfig.model_validate(
+        {"schema_version": "3.1", "moving_heads": {"mode": "physical_v2"}}
+    )
+    with pytest.raises(UnsupportedRenderModeError, match="twinklr show"):
+        prepare_combined_show_pipeline(
+            layout_path=tmp_path / "missing.xml",
+            fixture_group=MagicMock(),
+            job_config=physical,
+            available_templates=[],
+            song_name="song",
+            catalog_dir=tmp_path / "missing",
+        )

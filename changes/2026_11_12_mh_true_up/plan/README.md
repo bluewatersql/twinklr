@@ -55,14 +55,14 @@ supported by P5 results, not a byproduct of merging the code.
 
 ## Prioritized implementation slices
 
-There are **31 planned tasks**, including the optional experiments. The report's
+There are **32 planned tasks** (P1.0 was added at Phase 1 kickoff), including the optional experiments. The report's
 relative phase sizes still apply; these are dependency/priority decisions, not
 calendar or staffing estimates.
 
 | Order | Tasks | Reviewable outcome | Main dependency/risk |
 |---|---|---|---|
 | 1 — preserve the baseline | P0-T1–T4 | Explicit policy, diagnostics, identity, synthetic cases and reference arm | Do not alter old rendering or frozen experiment meanings |
-| 2 — establish physical output | P1.1–P1.6; P5-T1–T2 after P1 frame types stabilize | Correct complete fixture bytes, exact interior phase and feasible dark transitions | Profiles, initial state, optical latency and output size |
+| 2 — establish physical output | P1.0–P1.6; P5-T1–T2 after P1 frame types stabilize | Correct complete fixture bytes, exact interior phase and feasible dark transitions | Profiles, initial state, optical latency and output size |
 | 3 — useful composition | P2.1–P2.4 | Named aims, topology and six concrete expressive families | Stable phase/geometry and visibility composition |
 | 4A — arrange music | P3-T1–T5 | Categorical motif/variation, restraint and MH/pixel attention | Versioned planner schema and capability admission |
 | 4B — preserve good work | P4-T1–T4 | Offline locked refinements and exact differences; guarded application where supported | Boundary dependencies and whole-output isolation |

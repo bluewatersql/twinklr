@@ -34,6 +34,8 @@ class MovingHeadRenderingStage:
     State consumed:
         - "beat_grid": BeatGrid (set by MovingHeadStage)
         - "choreography_plan": ChoreographyPlan (set by MovingHeadStage)
+        - "layout_models", "layout_sha256": the xLights layout `twinklr run --layout`
+          loaded, if any; only a physical render uses them
 
     State stored:
         - "xsq_output_path": Path to generated XSQ file
@@ -143,6 +145,8 @@ class MovingHeadRenderingStage:
                 media_file=media_file,
                 song=song,
                 artist=artist,
+                layout_models=context.get_state("layout_models"),
+                layout_sha256=context.get_state("layout_sha256"),
             )
 
             # Render to segments and write the delivery
@@ -232,55 +236,146 @@ class MovingHeadRenderingStage:
         )
 
     def _load_fixture_config(self, context: PipelineContext) -> FixtureGroup | None:
-        """Load fixture configuration.
+        """Load fixture configuration; see `load_render_fixture_group`."""
+        return load_render_fixture_group(context, self.fixture_config_path)
 
-        Tries in order:
-        1. fixture_config_path (from constructor)
-        2. job_config.fixture_config_path
 
-        Args:
-            context: Pipeline context with job_config
+def load_render_fixture_group(
+    context: PipelineContext, fixture_config_path: Path | None
+) -> FixtureGroup | None:
+    """Load the fixtures a moving-head render targets.
 
-        Returns:
-            FixtureGroup or None if loading fails
-        """
-        from twinklr.core.config.fixtures import FixtureGroup
-        from twinklr.core.config.loader import load_fixture_group
+    Tries in order:
+    1. the live layout's reconciled rig in state (`live_fixture_group`)
+    2. `fixture_config_path`
+    3. job_config.fixture_config_path, relative to `job_config_dir` in state
 
-        live_fixture_group = context.get_state("live_fixture_group")
-        if isinstance(live_fixture_group, FixtureGroup):
-            return live_fixture_group
+    Args:
+        context: Pipeline context with job_config
+        fixture_config_path: Fixture config given to the stage, if any
 
-        # Try constructor path first
-        if self.fixture_config_path and self.fixture_config_path.exists():
-            try:
-                return load_fixture_group(self.fixture_config_path)
-            except Exception as e:
-                logger.warning(
-                    f"Failed to load fixture config from {self.fixture_config_path}: {e}"
+    Returns:
+        FixtureGroup or None if loading fails
+    """
+    from twinklr.core.config.fixtures import FixtureGroup
+    from twinklr.core.config.loader import load_fixture_group
+
+    live_fixture_group = context.get_state("live_fixture_group")
+    if isinstance(live_fixture_group, FixtureGroup):
+        return live_fixture_group
+
+    # Try constructor path first
+    if fixture_config_path and fixture_config_path.exists():
+        try:
+            return load_fixture_group(fixture_config_path)
+        except Exception as e:
+            logger.warning(f"Failed to load fixture config from {fixture_config_path}: {e}")
+
+    # Try job_config path
+    if hasattr(context.job_config, "fixture_config_path"):
+        fixture_path = getattr(context.job_config, "fixture_config_path", None)
+        if fixture_path:
+            candidate_path = Path(fixture_path)
+            if not candidate_path.is_absolute():
+                job_config_dir = context.get_state("job_config_dir")
+                if isinstance(job_config_dir, Path):
+                    candidate_path = job_config_dir / candidate_path
+
+            if candidate_path.exists():
+                try:
+                    return load_fixture_group(candidate_path)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to load fixture config from %s: %s",
+                        candidate_path,
+                        e,
+                    )
+            else:
+                logger.warning("Fixture config does not exist at %s", candidate_path)
+
+    logger.error("No fixture configuration provided - fixture_config_path required")
+    return None
+
+
+class RenderPreflightStage:
+    """Refuse a job the moving-head renderer cannot render, before any planning.
+
+    Runs right after audio analysis; every planner (profile, lyrics, macro, moving
+    heads) reads the audio through it, so a refusal spends no provider request. A
+    `legacy_v1` job passes through untouched. A `physical_v2` job is checked against
+    the fixtures the render stage will load (`preflight_render_policy`), the templates
+    the planner will be offered (`offered_template_ids`; every one must carry physical
+    data, and each must dry-compile on this rig: `check_physical_templates`), the
+    song's musical phase map, built from the detected BeatGrid, which the renderer
+    needs over the whole song and never infers, and, when the run supplies an xLights
+    layout (`layout_models` in state), every fixture's model (`check_physical_models`).
+
+    Input and output: the audio stage's SongBundle, unchanged.
+    """
+
+    def __init__(
+        self, available_templates: list[str], fixture_config_path: str | Path | None = None
+    ) -> None:
+        self.available_templates = list(available_templates)
+        self.fixture_config_path = Path(fixture_config_path) if fixture_config_path else None
+
+    @property
+    def name(self) -> str:
+        """Stage name for logging."""
+        return "render_preflight"
+
+    async def execute(self, input: Any, context: PipelineContext) -> StageResult[Any]:
+        """Pass the audio through, or fail with the reason the job cannot render."""
+        from twinklr.core.agents.sequencer.moving_heads.stage import resolve_beat_grid
+        from twinklr.core.config.render_policy import (
+            UnsupportedRenderModeError,
+            preflight_render_policy,
+        )
+        from twinklr.core.pipeline.result import failure_result, success_result
+        from twinklr.core.sequencer.moving_heads.export.frame_encoder import PhysicalOutputError
+        from twinklr.core.sequencer.moving_heads.export.xsq_adapter import check_physical_models
+        from twinklr.core.sequencer.moving_heads.pipeline import (
+            check_physical_templates,
+            offered_template_ids,
+        )
+        from twinklr.core.sequencer.timing.musical_phase import (
+            MusicalPhaseError,
+            build_musical_phase_map,
+        )
+
+        job_config = context.job_config
+        if job_config.moving_heads.mode == "legacy_v1":
+            return success_result(input, stage_name=self.name)
+
+        fixture_group = load_render_fixture_group(context, self.fixture_config_path)
+        if fixture_group is None:
+            return failure_result(
+                "physical_v2 needs the rig's fixtures before planning; none could be loaded",
+                stage_name=self.name,
+            )
+        try:
+            preflight_render_policy(job_config, fixture_group)
+            offered = offered_template_ids(job_config, self.available_templates)
+            unrenderable = [t for t in self.available_templates if t not in offered]
+            if unrenderable:
+                raise UnsupportedRenderModeError(
+                    "moving_heads.mode 'physical_v2' would offer the planner templates "
+                    f"without physical data, which cannot render: {sorted(unrenderable)}"
                 )
-
-        # Try job_config path
-        if hasattr(context.job_config, "fixture_config_path"):
-            fixture_path = getattr(context.job_config, "fixture_config_path", None)
-            if fixture_path:
-                candidate_path = Path(fixture_path)
-                if not candidate_path.is_absolute():
-                    job_config_dir = context.get_state("job_config_dir")
-                    if isinstance(job_config_dir, Path):
-                        candidate_path = job_config_dir / candidate_path
-
-                if candidate_path.exists():
-                    try:
-                        return load_fixture_group(candidate_path)
-                    except Exception as e:
-                        logger.warning(
-                            "Failed to load fixture config from %s: %s",
-                            candidate_path,
-                            e,
-                        )
-                else:
-                    logger.warning("Fixture config does not exist at %s", candidate_path)
-
-        logger.error("No fixture configuration provided - fixture_config_path required")
-        return None
+            beat_grid = resolve_beat_grid(context, input)
+            try:
+                build_musical_phase_map(beat_grid)
+            except MusicalPhaseError as error:
+                raise UnsupportedRenderModeError(
+                    "moving_heads.mode 'physical_v2' needs the song's musical phase from "
+                    f"its first to its last millisecond, and this beat grid leaves it "
+                    f"undefined: {error}. The renderer does not infer tempo there"
+                ) from error
+            check_physical_templates(offered, beat_grid=beat_grid, fixture_group=fixture_group)
+            layout_models = context.get_state("layout_models")
+            if layout_models is not None:
+                check_physical_models(fixture_group.expand_fixtures(), layout_models)
+        except (UnsupportedRenderModeError, PhysicalOutputError) as error:
+            logger.error("Render preflight refused the job: %s", error)
+            return failure_result(str(error), stage_name=self.name)
+        return success_result(input, stage_name=self.name)

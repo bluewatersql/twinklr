@@ -7,8 +7,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
+from twinklr.core.config.fixtures.capabilities import FixtureCapabilities
 from twinklr.core.config.fixtures.dmx import ChannelInversions, DmxMapping
 from twinklr.core.config.fixtures.instances import FixtureConfig, FixtureInstance, FixturePosition
 from twinklr.core.config.fixtures.physical import (
@@ -48,6 +49,17 @@ class BaseFixtureConfig(BaseModel):
         default_factory=MovementLimits, description="Safety movement limits"
     )
 
+    # Shared physical renderer profile; a fixture's config_overrides entry replaces it.
+    # Left out of dumps when absent so legacy render fingerprints are unchanged.
+    physical_profile: FixtureCapabilities | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description=(
+            "Explicit capabilities for the physical_v2 renderer, shared by every fixture; "
+            "nothing renders from it until that renderer ships"
+        ),
+    )
+
     @model_validator(mode="before")
     @classmethod
     def drop_removed_fields(cls, value: object) -> object:
@@ -56,6 +68,20 @@ class BaseFixtureConfig(BaseModel):
             frozenset({"dmx_universe", "channel_count", "capabilities", "movement_speed"}),
             "fixture",
         )
+
+
+def _validated_profile(fixture_id: object, profile: object) -> FixtureCapabilities:
+    """Validate a fixture's physical profile, naming the fixture on failure."""
+    try:
+        return FixtureCapabilities.model_validate(profile)
+    except ValidationError as error:
+        problems = "; ".join(
+            f"{'.'.join(str(part) for part in item['loc']) or 'profile'}: {item['msg']}"
+            for item in error.errors()
+        )
+        raise ValueError(
+            f"fixture {fixture_id!r} has an invalid physical_profile: {problems}"
+        ) from None
 
 
 class SimplifiedFixtureInstance(BaseModel):
@@ -85,6 +111,16 @@ class SimplifiedFixtureInstance(BaseModel):
     @classmethod
     def drop_removed_fields(cls, value: object) -> object:
         return drop_retired_fields(value, frozenset({"dmx_start_address"}), "fixture")
+
+    @field_validator("config_overrides")
+    @classmethod
+    def type_profile_override(cls, value: dict[str, Any], info: Any) -> dict[str, Any]:
+        """Validate a per-fixture physical_profile override rather than pass it untyped."""
+        profile = value.get("physical_profile")
+        if profile is None:
+            return value
+        fixture_id = info.data.get("fixture_id")
+        return {**value, "physical_profile": _validated_profile(fixture_id, profile)}
 
 
 class FixtureGroup(BaseModel):
@@ -119,6 +155,25 @@ class FixtureGroup(BaseModel):
         default_factory=dict,
         description="Semantic group name -> xLights group model name (e.g., 'LEFT': 'GROUP - MH LEFT')",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def surface_invalid_physical_profiles(cls, value: object) -> object:
+        """Fail on an invalid fixture physical_profile here, naming the fixture.
+
+        The `fixtures` union would otherwise fall back to the simplified form, which
+        drops `config`, and the error would surface later as a missing base_config.
+        Other invalid fields keep their existing behavior.
+        """
+        if not isinstance(value, dict):
+            return value
+        for fixture in value.get("fixtures") or ():
+            if not isinstance(fixture, dict):
+                continue
+            for holder in (fixture.get("config"), fixture.get("config_overrides")):
+                if isinstance(holder, dict) and holder.get("physical_profile") is not None:
+                    _validated_profile(fixture.get("fixture_id"), holder["physical_profile"])
+        return value
 
     def is_semantic(self) -> bool:
         """Check if this is a semantic group (no xLights mapping).

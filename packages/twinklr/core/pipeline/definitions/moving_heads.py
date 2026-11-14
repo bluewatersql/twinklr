@@ -1,7 +1,7 @@
 """Moving-head pipeline definition factory.
 
 Builds the complete moving-head sequencer pipeline:
-    audio → profile + lyrics → macro → moving_heads → render
+    audio → render_preflight → profile + lyrics → macro → moving_heads → render
 
 This pipeline generates DMX choreography for moving head fixtures,
 rendering to an xLights .xsq sequence file.
@@ -14,6 +14,7 @@ from typing import Any
 
 from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
     MovingHeadRenderingStage,
+    RenderPreflightStage,
 )
 from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
 from twinklr.core.pipeline import PipelineDefinition, StageDefinition
@@ -37,7 +38,7 @@ def build_moving_heads_pipeline(
     """Build the moving-head sequencer pipeline.
 
     Stages:
-        audio → profile + lyrics → macro → moving_heads → render
+        audio → render_preflight → profile + lyrics → macro → moving_heads → render
 
     Args:
         display_groups: Display group configs for MacroPlannerStage.
@@ -62,10 +63,16 @@ def build_moving_heads_pipeline(
         ... )
         >>> result = await PipelineExecutor().execute(pipeline, audio_path, context)
     """
+    # Every planner reads the audio through the render preflight, so a job the
+    # renderer cannot render is refused before any planning.
     common = build_common_stages(
         display_groups=display_groups,
         include_macro=include_macro,
         regeneration_nonce=regeneration_nonce,
+        audio_gate=RenderPreflightStage(
+            available_templates=available_templates,
+            fixture_config_path=fixture_config_path,
+        ),
     )
     moving_head_inputs = ["audio", "profile", "lyrics"]
     if include_macro:

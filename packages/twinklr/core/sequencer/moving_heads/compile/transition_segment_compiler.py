@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 
 from twinklr.core.sequencer.models.enum import ChannelName
+from twinklr.core.sequencer.models.moving_heads.physical import PhysicalChannelError
 from twinklr.core.sequencer.models.transition import TransitionPlan
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.channel_blender import ChannelBlender
@@ -124,6 +125,13 @@ class TransitionSegmentCompiler:
         for channel_name in all_channels:
             source_value = source_state.get(channel_name)
             target_value = target_state.get(channel_name)
+            if any(v is not None and v.physical is not None for v in (source_value, target_value)):
+                raise PhysicalChannelError(
+                    fixture_id=fixture_id,
+                    channel=channel_name,
+                    time_ms=transition_plan.overlap_start_ms,
+                    reason="the legacy transition blender cannot blend a physical value",
+                )
 
             # Blend channel
             blended_channel = self._blend_channel_for_segment(

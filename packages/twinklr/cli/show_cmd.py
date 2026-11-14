@@ -12,6 +12,7 @@ from twinklr.cli.display_cmd import export_display_artifacts, load_display_fe_bu
 from twinklr.core.agents.providers.factory import validate_llm_provider_config
 from twinklr.core.caching import derive_session_id
 from twinklr.core.config.loader import load_app_config, load_fixture_group, load_job_config
+from twinklr.core.config.render_policy import require_legacy_render
 from twinklr.core.pipeline import PipelineContext, PipelineExecutor
 from twinklr.core.pipeline.display_wiring import (
     default_local_catalog_dir,
@@ -73,6 +74,8 @@ async def run_show_pipeline_async(
         app_config = load_app_config(app_config_path)
         validate_llm_provider_config(app_config)
         job_config = load_job_config(job_config_path)
+        # The combined show coordinates and exports legacy moving-head segments only.
+        require_legacy_render(job_config.moving_heads, command="show")
         fixture_group = load_fixture_group(fixture_config_path)
         fe_bundle = load_display_fe_bundle(fe_output_dir, style_name=style_name)
         load_builtin_templates()
