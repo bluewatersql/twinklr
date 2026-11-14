@@ -367,6 +367,71 @@ last gate run: 6292 passed, 39 skipped):
   planner time on very long dense sequences (0.13 s measured early, not re-measured).
   P1.6's integration test covers the two-head case.
 
+P1.6, 2026-11-13 (reviewed separately from its author; three review rounds):
+
+- **Refusal before paid planning is the rule on every route.** Job-only loads
+  (`load_job_config`, `JobConfig.load_or_default`, `TwinklrSession`) accept a
+  `physical_v2` job because they never see the fixtures; this replaces P1.0's
+  unconditional refusal there. The checks run where job and rig meet:
+  `load_full_config`, `twinklr run` before audio analysis, and a new
+  `render_preflight` stage between audio analysis and every planner. Only audio
+  analysis runs before that stage, and it makes no LLM call.
+- **What the gate checks.** Every fixture has a `physical_profile` and a settled,
+  usable initial state (required at load, since P1.5 fails any fixture without one
+  whatever its first cue); the planner is offered only templates whose steps all carry
+  physical data, and the run is refused when there are none; the musical phase map
+  builds from the detected grid; and every offered template, with no preset and with
+  each declared preset, dry-compiles on every head through the real compile path.
+- **What the gate cannot check.** Anything that depends on the plan: sections that
+  start at other bars (travel rate and pulse width are exercised at the bar-1
+  alignment only), truncation at section ends, and whether dark repositioning fits
+  between the cues the planner chooses. These can still fail at render, after planning.
+- **Commands that emit legacy output only refuse a physical job at load:** `show`,
+  `inject`/`regenerate`, `eval-report`. `twinklr display` accepts one, because it never
+  renders DMX models. The checkpoint records `render_mode` only when it is not legacy,
+  so legacy checkpoint bytes are unchanged; `eval-report` reads it.
+- **Planner cache.** `initial_states`, `max_effects` and `max_xsq_bytes` no longer feed
+  the session id, so a render-only edit does not re-spend provider calls. `mode` still
+  does.
+- **Not applied on the physical path.** Planner intensity (a trace warning records it),
+  the job's `transitions` config, and the `FADE_OUT` remainder policy (refused). A
+  preset id the template does not declare applies no preset, with a warning, instead of
+  an inferred energy preset that would add legacy data. No fallback can be enabled from
+  config, so the reposition pass always runs in `error` mode. `locks` is a pipeline
+  parameter with no producer yet.
+- **End of song.** A cue's end is cut at the last whole frame inside the song without
+  error; a step that starts in the final partial frame is dropped and listed in the
+  trace as `dropped_cues`; the final partial frame is parked dark. The trace records
+  requested and actual cue times.
+- **Delivery.** Files are staged, measured and budget-checked, then published
+  all-or-nothing with the `.xsq` last; a failed publish restores any earlier
+  deliverable; if a restore itself fails the staging directory is kept and named.
+- **Identity.** The physical render identity covers profiles, initial states, template
+  content, phase map, locks (order-independent), renderer and encoder revision. It
+  ignores the `transitions` config. Legacy fingerprints are unchanged.
+- **Visible legacy change.** A legacy run reports one more completed stage. Output,
+  session ids, planner cache keys and checkpoints are identical (40 renders compared
+  against the previous commit by the reviewer).
+
+Owner decisions, 2026-11-14: silent song edges are deferred to Phase 2; `twinklr run`
+gains a `--layout` input in Phase 1.
+
+- **Silent song edges (deferred to Phase 2).** The phase map refuses a grid with more than one beat of
+  silence or fade at either end, because average-tempo inference is forbidden. A
+  synthetic sweep at 120 BPM (lead-ins 0–3 s, tails 0–6 s) accepted 18 of 961 grids.
+  `physical_v2` therefore refuses most real audio until there is a policy for the
+  edges (explicit boundary knots, or holding dark outside the detected beats).
+- **Layout input for `twinklr run`.** The `DisplayAs`/`StringType` model check and a
+  channel-count check against the profile footprint run only when a caller supplies
+  layout models, and `run` has no layout input. A run prints a warning and the trace
+  records `layout_check: not_performed`.
+- **Gate cost (carried to Phase 2).** The dry-compile took 1.66 s for 8 heads and 2
+  template-and-preset combinations on a 4-minute synthetic song, about 0.8 s per
+  combination, so a Phase 2 catalog of around 100 combinations would take over a
+  minute before planning.
+- **Unmeasured.** Emission's per-model overlap scan grows quadratically with effect
+  count; xLights behaviour near the 1,000,000-effect budget is unknown.
+
 ## Phase exit
 
 All task tests and `make validate` pass; 16-bit frames reconstruct correctly across carries; supported offsets are 1–48; v2 limits/discrete values/phase/initial state work as declared; insufficient or unknown travel never reports feasible; optical darkness covers travel and settle; legacy regression output is unchanged. Source/offline proof and authorized xLights proof are recorded separately. Hardware accuracy and aesthetic acceptance remain pending until observed, not inferred from the profile's provenance.

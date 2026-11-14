@@ -89,6 +89,8 @@ Phase 1 (in progress; tasks P1.0–P1.6 in
 | Begin Phase 1 implementation | Owner go-ahead, 2026-11-13 ("Proceed with Phase 1"). Covers Phase 1's offline work only; its owner-gated steps (expendable-show xLights render, fixture observation, look acceptance) are not authorized by it |
 | Reject `physical_v2` at job load | Owner direction, 2026-11-13: added to Phase 1 as task P1.0 |
 | Paid/live provider (API) calls | Owner authorization, 2026-11-13 ("online/live api call approved as needed"). Covers provider requests this change needs; no cost cap was stated, so each use is kept to the minimum that answers the question and is logged with its purpose in the evidence record. Does not cover owner-local data, xLights mutation, hardware or taste verdicts |
+| Layout input for `twinklr run` | Owner direction, 2026-11-14 ("add --layout to run"): added to Phase 1 so the xLights model check can run for a physical job |
+| Silent song edges in the physical phase map | Owner direction, 2026-11-14 ("defer silent edges to phase 2"). Phase 1 exits with `physical_v2` refusing a grid with more than one beat of silence or fade at either end |
 | Phase 0 keeps `identity.py` (render fingerprint) | Kept as planned. Its Phase 0 consumer is the evidence record; say so if it should move to Phase 1 instead |
 
 ## Kickoff checklist
