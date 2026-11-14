@@ -123,3 +123,12 @@ both fingerprints and every table value.
 
 - Live provider requests: authorized on 2026-11-13; **none were made** in Phase 1.
 - Owner-local data, xLights mutation, hardware, taste verdicts: none performed.
+
+## Addendum — 2026-11-14
+
+After this record was written the owner authorized the xLights test. xLights 2026.19
+reproduced every encoded byte; the
+[result](../2026-11-14-p1-xlights-result/README.md) replaces the first two entries under
+"Not verified" for a headless render, and corrects the layout attribute to
+`DmxChannelCount`. The owner also approved the 1,000,000-effect default. Hardware
+accuracy and look acceptance remain `PENDING-OWNER`.

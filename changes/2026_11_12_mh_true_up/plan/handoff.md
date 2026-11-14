@@ -293,3 +293,23 @@ its limits. No decision is promoted to `memories/`: the physical path has no emp
 acceptance yet, and its design decisions live in the phase plan until it does.
 
 Next action: owner go-ahead for the merge, the xLights test, and Phase 2.
+
+## After Phase 1 — 2026-11-14
+
+- Phase 1 merged to `main` as `52191b15` and pushed, on owner direction. `make validate`
+  on the merged tree: 6355 passed, 39 skipped.
+- xLights transport test run on owner authorization: xLights 2026.19 reproduced every
+  encoded byte ([result](../evidence/2026-11-14-p1-xlights-result/README.md)). It found
+  that xLights writes a DMX model's channel count as `DmxChannelCount`, not `parm1`, so
+  `twinklr run --layout` refused every real model. Fixed on
+  `fix/mh-layout-dmx-channel-count`, reviewed separately; the layout profiler's DMX
+  channel count had the same defect and is fixed with it.
+- Owner approved the 1,000,000-effect default and gave the go-ahead for Phase 2.
+- Still `PENDING-OWNER`: hardware accuracy, look acceptance, xLights UI behaviour and
+  scale near the effect budget.
+- Noted, not fixed: `ModelProfile.channel_count` in the layout profiler infers from
+  `parm1 × parm2` and misreports a DMX model that has no `parm1`; it feeds the profiling
+  report only.
+
+Next action: Phase 2 kickoff recheck, then P2 tasks.
+

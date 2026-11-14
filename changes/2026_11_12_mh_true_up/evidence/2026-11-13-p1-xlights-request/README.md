@@ -9,7 +9,12 @@ updated: 2026-11-13
 
 # P1 expendable-show xLights render request — 2026-11-13
 
-**Outcome: PENDING-OWNER.** Nothing here has been opened in xLights. This is a request
+**Outcome (2026-11-14): transport passed in xLights 2026.19; see the
+[result](../2026-11-14-p1-xlights-result/README.md).** The text below is the request as
+written on 2026-11-13, when the outcome was PENDING-OWNER. Its layout section predates
+the result: xLights writes the channel count as `DmxChannelCount`, not `parm1`.
+
+Original status: Outcome PENDING-OWNER. Nothing here has been opened in xLights. This is a request
 for an owner-authorized render in an expendable show folder (never a running or
 production show), to check that xLights carries the physical renderer's output as
 Twinklr encodes it. It is not a transport acceptance, a physical arrival/settle check

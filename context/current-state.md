@@ -46,8 +46,10 @@ See [product/overview.md](product/overview.md).
   ([decision](../memories/decisions/mh-render-matches-pre-cleanup-look.md)).
   An opt-in `physical_v2` moving-head mode (job schema `3.1`) renders calibrated
   fixture profiles to complete DMX frames with dark repositioning; it has no production
-  templates, refuses most real audio, and has no xLights or hardware result yet
-  ([evidence](../changes/2026_11_12_mh_true_up/evidence/2026-11-14-p1-exit/README.md)).
+  templates and refuses most real audio. xLights 2026.19 reproduces its bytes in a
+  headless render; no hardware or look result exists yet
+  ([evidence](../changes/2026_11_12_mh_true_up/evidence/2026-11-14-p1-exit/README.md),
+  [xLights result](../changes/2026_11_12_mh_true_up/evidence/2026-11-14-p1-xlights-result/README.md)).
   Display output keeps every section lit: a brightness floor, a beat grid extended to the
   end of the song, and a foundation-coverage rule in the group planner
   ([decision](../memories/decisions/display-stays-lit.md)).
