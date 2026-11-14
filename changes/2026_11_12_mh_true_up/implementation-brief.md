@@ -11,8 +11,10 @@ updated: 2026-11-14
 # Moving-head true-up — implementation brief
 
 Phase 0 ran on `feat/mh-true-up-p0` (cut from `main` at `b498ed9`) and merged to `main`
-as `bb78227` on 2026-11-13. Phase 1 runs on `feat/mh-true-up-p1` in worktree
-`twinklr-mh-true-up`, cut from `main` at `bb78227` on 2026-11-13.
+as `bb78227` on 2026-11-13. Phase 1 ran on `feat/mh-true-up-p1` in worktree
+`twinklr-mh-true-up`, cut from `main` at `bb78227`, and merged to `main` as `52191b15`
+on 2026-11-14. Phase 2 runs on `feat/mh-true-up-p2` in the same worktree, cut from
+`main` at `d6096254` on 2026-11-14.
 
 ## Goal
 
@@ -68,6 +70,33 @@ Phase 1 (met from offline evidence 2026-11-14; evidence in
 - [x] The phase-exit conditions in the plan are met from offline evidence, with a dated
   evidence record. xLights transport proof, hardware accuracy and changed-look
   acceptance are recorded as `PENDING-OWNER`, not inferred.
+
+Phase 2 (tasks and order in [plan/phase-2-composition.md](plan/phase-2-composition.md)):
+
+- [ ] P2.0, P2.1–P2.3, P2.4a–c and P2.5 merged to the phase branch, each test-first and each reviewed in a
+  context separate from its author.
+- [ ] `make validate` passes on the phase branch after the last code commit.
+- [ ] No golden or regression file changed; `legacy_v1` output, legacy planner session
+  ids, the 16 Phase 0 render fingerprints and the two Phase 1 request fingerprints are
+  unchanged, and a beat grid Phase 1 accepted renders the same physical frames (its trace
+  gains only the keys P2.0 lists).
+- [ ] `physical_v2` accepts the 961-grid silent-edge sweep with the covered span
+  reported, holds every fixture dark outside it and never infers tempo.
+- [ ] The six physical families compile deterministically on the synthetic rig matrix,
+  are offered only under `physical_v2` and only on a rig that can render them (a rig
+  lacking what one family needs still gets the others), and the 37-entry registry
+  assertions are unchanged.
+- [ ] Each section's entry window is sized from a bound the fuzz shows dominates the
+  transaction pass, the dip is skipped where eligible, and the plan-dependent failures
+  the plan lists are documented, not claimed solved. Whether the remaining dips look
+  acceptable is `PENDING-OWNER`.
+- [ ] Every added config field has a live inventory record and a documented row.
+- [ ] Each Phase 1 carry-forward is closed in the P2 task the plan names, or remains
+  deferred to the later phase it names.
+- [ ] The phase-exit conditions in the plan are met from offline evidence, with a dated
+  evidence record that includes the measured pre-planning gate time. xLights transport
+  of the families, hardware accuracy, the zoom pilot's real-profile result and
+  changed-look acceptance are recorded as `PENDING-OWNER`, not inferred.
 
 ## Constraints
 

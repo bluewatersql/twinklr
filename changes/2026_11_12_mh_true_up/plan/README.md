@@ -1,9 +1,16 @@
 # Moving-head true-up technical plans
 
-Status: **proposed designs; implementation has not begun**. Prepared November 12, 2026
+Status: **Phases 0 and 1 implemented; Phase 2 in progress; later phases are proposed
+designs**. Prepared November 12, 2026
 against Twinklr `9c55c2e72c4bfea30a5ab7ae197579e4feb74485`. This continues the
 [research report](../report.md) under the owner's instruction to develop technical
 design and implementation plans only. All current-session deliverables live here.
+
+Status update, November 14, 2026: Phases 0 and 1 are implemented and merged to `main`
+(see the [implementation brief](../implementation-brief.md)). The Phase 2 plan was
+rechecked against `d6096254` at its kickoff and corrected to the Phase 1 code; it gained
+task P2.0 (silent song edges), split P2.4 into P2.4a–c after independent review, and
+places every Phase 1 carry-forward.
 
 Kickoff preparation, November 13, 2026: the plans were rechecked against `f067a56`
 and amended for documentation, inventory-registry and existing-test obligations, plus
@@ -55,7 +62,7 @@ supported by P5 results, not a byproduct of merging the code.
 
 ## Prioritized implementation slices
 
-There are **32 planned tasks** (P1.0 was added at Phase 1 kickoff), including the optional experiments. The report's
+There are **35 planned tasks** (P1.0 was added at Phase 1 kickoff; P2.0 was added and P2.4 split into P2.4a–c at Phase 2 kickoff), including the optional experiments. The report's
 relative phase sizes still apply; these are dependency/priority decisions, not
 calendar or staffing estimates.
 
@@ -63,7 +70,7 @@ calendar or staffing estimates.
 |---|---|---|---|
 | 1 — preserve the baseline | P0-T1–T4 | Explicit policy, diagnostics, identity, synthetic cases and reference arm | Do not alter old rendering or frozen experiment meanings |
 | 2 — establish physical output | P1.0–P1.6; P5-T1–T2 after P1 frame types stabilize | Correct complete fixture bytes, exact interior phase and feasible dark transitions | Profiles, initial state, optical latency and output size |
-| 3 — useful composition | P2.1–P2.4 | Named aims, topology and six concrete expressive families | Stable phase/geometry and visibility composition |
+| 3 — useful composition | P2.0–P2.4c | Real audio accepted with dark silent edges; named aims, topology and six concrete expressive families | Stable phase/geometry and visibility composition; boundary feasibility before planning |
 | 4A — arrange music | P3-T1–T5 | Categorical motif/variation, restraint and MH/pixel attention | Versioned planner schema and capability admission |
 | 4B — preserve good work | P4-T1–T4 | Offline locked refinements and exact differences; guarded application where supported | Boundary dependencies and whole-output isolation |
 | 5 — optional pilots | P2.5; P4-T5–T7 | Bounded zoom/import/native/visualization decisions | Concrete fixture evidence and measured workflow value |

@@ -71,6 +71,8 @@ P4 owner creates `packages/twinklr/core/sequencer/moving_heads/refinement/{model
 
 ### P4-T2 — Dependency-aware offline patching
 
+Carried from Phase 2 kickoff, 2026-11-14 ([P2 carry-forwards](phase-2-composition.md#phase-1-carry-forwards)): `RenderingPipeline` takes `locks` but nothing produces them (Phase 1); refinement requests here are their first producer. No Phase 2 task needs one.
+
 **Files:** create `packages/twinklr/core/sequencer/moving_heads/refinement/prepare.py`; test `tests/unit/sequencer/moving_heads/refinement/test_prepare.py`.
 
 **Interfaces:** `prepare_refinement` above calls P1 `plan_prepositions(...,initial_states=...,locks=...,frame_ms=...,failure_mode='error')`, consumes its replacement segments/dependencies, then `encode_fixture_frames(segments,capabilities,frame_times_ms=...)` per fixture.
@@ -109,6 +111,8 @@ Define `PhysicalIsolationEvidence(sequence_identity, patch_hash, full_effect_inv
 - [ ] Integrator commits `feat: add cue-level refinement and preset review artifacts`; reviewer checks warning visibility and no hidden catalog admission.
 
 ### P4-T5 — Bounded GDTF import pilot
+
+Carried from Phase 2 kickoff, 2026-11-14 ([P2 carry-forwards](phase-2-composition.md#phase-1-carry-forwards)): the profile paths `profile_id` and `discrete.states.range_min`/`range_max` remain identity-only in the config registry (`tests/config_effects_registry.py:2584-2618`) because a range never chooses a byte; imported manufacturer ranges are their natural consumer. Repoint those records if this task consumes them.
 
 **Decision:** choose GDTF 1.2 first because it has physical endpoints and motion timing semantics; defer OFL runtime ingestion. OFL remains a future export-plugin option, not a second parser in this phase. Source: [GDTF DMX mode specification](https://www.gdtf.eu/gdtf/file-spec/dmx-mode-collect/), [OFL format stability warning](https://github.com/OpenLightingProject/open-fixture-library/blob/master/docs/fixture-format.md).
 
