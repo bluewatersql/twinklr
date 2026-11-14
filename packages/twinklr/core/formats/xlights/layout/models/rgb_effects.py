@@ -6,6 +6,13 @@ from twinklr.core.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+DMX_CHANNEL_COUNT_ATTRIBUTES = ("DmxChannelCount", "parm1")
+"""Model attributes that carry a DMX model's channel count, in the order read.
+
+`DmxChannelCount` is what xLights 2026.19 writes on DMX models (observed 2026-11-14,
+with no `parm1`). `parm1` is kept only as a fallback for layouts without it; that it
+holds a DMX channel count is unverified."""
+
 
 class Alias(BaseModel):
     """Alias for a model or modelGroup."""
@@ -83,6 +90,19 @@ class Model(BaseModel):
     def get_string(self, num: int) -> str | None:
         """Get a string by number."""
         return self.strings.get(num)
+
+    def dmx_channel_count(self) -> tuple[str, str] | None:
+        """The first non-empty `DMX_CHANNEL_COUNT_ATTRIBUTES` entry and its raw value.
+
+        Returns:
+            `(attribute, raw value)`, or None when the model declares neither.
+        """
+        extra = self.model_extra or {}
+        for attribute in DMX_CHANNEL_COUNT_ATTRIBUTES:
+            value = extra.get(attribute)
+            if value is not None and str(value).strip():
+                return attribute, str(value).strip()
+        return None
 
 
 class SubModel(BaseModel):

@@ -341,7 +341,7 @@ uv run twinklr run \
 | `--app-config` | No | `config.json` | Path to app config JSON |
 | `--template-dir` | No | — | Load strict JSON moving-head templates from this directory after Python builtins |
 | `--allow-template-overrides` | No | `false` | Explicitly permit a data template to replace a colliding Python builtin ID |
-| `--layout` | No | — | Path to your `xlights_rgbeffects.xml`. Used only by `moving_heads.mode` `"physical_v2"`: before any analysis, every fixture's model must be in the layout, a DMX model (`DisplayAs` starting `Dmx`), single color when it records a `StringType`, and declare a channel count (`parm1`) of at least its profile's `footprint`; otherwise the run is refused, naming fixture, model and item. Without it the check is skipped with a warning. A `legacy_v1` run ignores it entirely |
+| `--layout` | No | — | Path to your `xlights_rgbeffects.xml`. Used only by `moving_heads.mode` `"physical_v2"`: before any analysis, every fixture's model must be in the layout, a DMX model (`DisplayAs` starting `Dmx`), single color when it records a `StringType`, and declare a channel count of at least its profile's `footprint` (read from `DmxChannelCount`, which xLights 2026.19 writes on DMX models, else from `parm1` as an unverified fallback; a model declaring neither is refused); otherwise the run is refused, naming fixture, model and item. Without it the check is skipped with a warning. A `legacy_v1` run ignores it entirely |
 
 Twinklr takes **no input sequence**. It used to require `--xsq` and rewrite the sequence you
 gave it, which cost you your jukebox state, your per-element display state, anything in the

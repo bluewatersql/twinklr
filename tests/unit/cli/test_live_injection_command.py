@@ -344,7 +344,7 @@ async def test_run_refuses_a_physical_model_the_layout_says_cannot_take_the_mapp
     tmp_path, monkeypatch, capsys
 ) -> None:
     layout = tmp_path / "xlights_rgbeffects.xml"
-    layout.write_text(physical_layout_xml({"Dmx MH2": {"parm1": "16"}}), encoding="utf-8")
+    layout.write_text(physical_layout_xml({"Dmx MH2": {"DmxChannelCount": "16"}}), encoding="utf-8")
     captured = _captured_run(monkeypatch, physical_job(), physical_rig())
 
     with physical_test_templates():
@@ -353,7 +353,7 @@ async def test_run_refuses_a_physical_model_the_layout_says_cannot_take_the_mapp
     output = " ".join(capsys.readouterr().out.split())
     assert exit_code == 1
     assert captured["build_calls"] == 0
-    assert "MH2: model 'Dmx MH2' has 16 channels" in output
+    assert "MH2: model 'Dmx MH2' has 16 channels by DmxChannelCount" in output
 
 
 @pytest.mark.anyio

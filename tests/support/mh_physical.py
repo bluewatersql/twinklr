@@ -357,11 +357,18 @@ def physical_plan(template_id: str = TEMPLATE_ID) -> ChoreographyPlan:
 def physical_layout_xml(models: dict[str, dict[str, str]] | None = None) -> str:
     """A synthetic `xlights_rgbeffects.xml` with the physical rig's two DMX models.
 
-    Each model is an 18-channel single-color DMX moving head unless `models` overrides
-    its attributes (an attribute set to "" is left out).
+    Each model carries the attributes xLights 2026.19 writes for an 18-channel DMX
+    moving head (`DmxChannelCount`, no `parm1`) unless `models` overrides them (an
+    attribute set to "" is left out).
     """
     attributes = {
-        name: {"DisplayAs": "DmxMovingHeadAdv", "StringType": "Single Color White", "parm1": "18"}
+        name: {
+            "DisplayAs": "DmxMovingHeadAdv",
+            "StringType": "Single Color White",
+            "DmxChannelCount": "18",
+            "versionNumber": "8",
+            "SourceVersion": "2026.19",
+        }
         for name in ("Dmx MH1", "Dmx MH2")
     }
     for name, override in (models or {}).items():

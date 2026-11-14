@@ -319,7 +319,7 @@ async def test_layout_models_in_state_are_checked_before_planning() -> None:
         "layout_models",
         (
             Model.model_validate(
-                {"name": "Dmx MH1", "DisplayAs": "DmxMovingHeadAdv", "parm1": "18"}
+                {"name": "Dmx MH1", "DisplayAs": "DmxMovingHeadAdv", "DmxChannelCount": "18"}
             ),
             Model.model_validate(
                 {"name": "Dmx MH2", "DisplayAs": "DmxMovingHead", "StringType": "RGB Nodes"}

@@ -494,7 +494,11 @@ def test_unchecked_models_are_reported(
             id="legacy-template",
         ),
         pytest.param(
-            {"layout_models": [Model(name="Dmx MH1", DisplayAs="DmxMovingHeadAdv", parm1="18")]},
+            {
+                "layout_models": [
+                    Model(name="Dmx MH1", DisplayAs="DmxMovingHeadAdv", DmxChannelCount="18")
+                ]
+            },
             PhysicalOutputError,
             "MH2: model 'Dmx MH2' is not in the xLights layout",
             id="model-missing-from-layout",
@@ -516,8 +520,10 @@ def test_failure_delivers_nothing(
 
 
 def _dmx(name: str, **attributes: str) -> Model:
+    """An xLights-2026.19-shaped DMX model; an attribute given as "" is left out."""
+    merged = {"DisplayAs": "DmxMovingHeadAdv", "DmxChannelCount": "18", **attributes}
     return Model.model_validate(
-        {"name": name, "DisplayAs": "DmxMovingHeadAdv", "parm1": "18", **attributes}
+        {"name": name, **{key: value for key, value in merged.items() if value}}
     )
 
 
@@ -535,14 +541,30 @@ def _dmx(name: str, **attributes: str) -> Model:
             id="rgb-nodes",
         ),
         pytest.param(
-            {"parm1": "17"},
-            "MH2: model 'Dmx MH2' has 17 channels; profile 'synthetic_spot' writes channels 1-18",
+            {"DmxChannelCount": "17"},
+            "MH2: model 'Dmx MH2' has 17 channels by DmxChannelCount; profile "
+            "'synthetic_spot' writes channels 1-18",
             id="too-few-channels",
         ),
         pytest.param(
-            {"parm1": ""},
-            "MH2: model 'Dmx MH2' declares no channel count (parm1)",
+            {"DmxChannelCount": ""},
+            "MH2: model 'Dmx MH2' declares no channel count (DmxChannelCount or parm1)",
             id="channel-count-unknown",
+        ),
+        pytest.param(
+            {"DmxChannelCount": "sixteen"},
+            "MH2: model 'Dmx MH2' has DmxChannelCount='sixteen', not a channel count",
+            id="channel-count-not-a-number",
+        ),
+        pytest.param(
+            {"DmxChannelCount": "", "parm1": "17"},
+            "MH2: model 'Dmx MH2' has 17 channels by parm1",
+            id="parm1-fallback-too-few",
+        ),
+        pytest.param(
+            {"DmxChannelCount": "17", "parm1": "48"},
+            "MH2: model 'Dmx MH2' has 17 channels by DmxChannelCount",
+            id="dmx-channel-count-wins-over-parm1",
         ),
     ],
 )
@@ -551,13 +573,7 @@ def test_layout_check_refuses_a_model_the_mapping_cannot_drive(
 ) -> None:
     """A model that is not a single-color DMX model wide enough for its profile's whole
     footprint never receives the physical channel mapping."""
-    attributes = {"DisplayAs": "DmxMovingHeadAdv", "parm1": "18", **mh2}
-    layout = [
-        _dmx("Dmx MH1", StringType="Single Color White"),
-        Model.model_validate(
-            {"name": "Dmx MH2", **{key: value for key, value in attributes.items() if value}}
-        ),
-    ]
+    layout = [_dmx("Dmx MH1", StringType="Single Color White"), _dmx("Dmx MH2", **mh2)]
     with pytest.raises(PhysicalOutputError) as raised:
         _pipeline(tmp_path / "show.xsq", layout_models=layout).render()
 
@@ -571,8 +587,12 @@ def test_layout_check_passes_and_records_the_layout(
     tmp_path: Path, physical_templates: None
 ) -> None:
     """A layout whose models fit is checked and its content hash recorded, as evidence;
-    it is not render identity, because it cannot change a byte."""
-    layout = [_dmx("Dmx MH1"), _dmx("Dmx MH2", StringType="Single Color White", parm1="48")]
+    it is not render identity, because it cannot change a byte. MH1 declares only the
+    `parm1` fallback; MH2 declares both, and its `DmxChannelCount` wins over `parm1`."""
+    layout = [
+        _dmx("Dmx MH1", DmxChannelCount="", parm1="18"),
+        _dmx("Dmx MH2", StringType="Single Color White", DmxChannelCount="48", parm1="4"),
+    ]
     output = tmp_path / "show.xsq"
     pipeline = _pipeline(output, layout_models=layout, layout_sha256="ab" * 32)
     pipeline.render()

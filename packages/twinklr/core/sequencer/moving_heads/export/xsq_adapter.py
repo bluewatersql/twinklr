@@ -46,13 +46,15 @@ logger = logging.getLogger(__name__)
 
 DMX_DISPLAY_AS_PREFIX = "dmx"
 """Lower-cased `DisplayAs` prefix of an xLights DMX model; the display pipeline treats
-the same prefix as DMX (`formats/xlights/layout/choreography.py::_dmx_model_names`)."""
+the same prefix as DMX (`formats/xlights/layout/choreography.py::_dmx_model_names`).
+xLights 2026.19 writes `DmxMovingHeadAdv` and `DmxGeneral` (observed 2026-11-14)."""
 
 SINGLE_COLOR_STRING_TYPE_PREFIX = "single color"
 """Lower-cased `StringType` prefix accepted for the physical mapping: one channel per
 node, as the layout profiler reads it
-(`profiling/layout/profiler.py::_infer_channels_per_node`). Which `StringType`, if any,
-xLights writes for a DMX model is unverified offline; a model without one is accepted."""
+(`profiling/layout/profiler.py::_infer_channels_per_node`). xLights 2026.19 writes
+`Single Color White` on DMX models (observed 2026-11-14); other single-color spellings
+are accepted but unobserved, and a model without a `StringType` is accepted."""
 
 
 def check_physical_models(fixtures: Sequence[FixtureInstance], models: Sequence[Model]) -> None:
@@ -61,9 +63,10 @@ def check_physical_models(fixtures: Sequence[FixtureInstance], models: Sequence[
     The mapping writes model-relative DMX channels 1..footprint on every frame, so the
     fixture's model must be in the layout, a DMX model (`DisplayAs` prefix
     `DMX_DISPLAY_AS_PREFIX`), single color when the layout records a `StringType`
-    (`SINGLE_COLOR_STRING_TYPE_PREFIX`), and declare a channel count (`parm1`, as the
-    layout profiler reads a DMX model's channel count) of at least the profile's
-    footprint. An unknown channel count is refused, never assumed.
+    (`SINGLE_COLOR_STRING_TYPE_PREFIX`), and declare a channel count of at least the
+    profile's footprint: `DmxChannelCount`, as xLights 2026.19 writes it, else the
+    unverified `parm1` fallback (`Model.dmx_channel_count`). A missing or non-numeric
+    channel count is refused, never assumed; diagnostics name the attribute read.
 
     Args:
         fixtures: The rig's fixtures, each with a physical profile.
@@ -84,18 +87,20 @@ def check_physical_models(fixtures: Sequence[FixtureInstance], models: Sequence[
             continue
         display_as = model.DisplayAs or ""
         string_type = model.StringType
-        channels = str((model.model_extra or {}).get("parm1", ""))
+        declared = model.dmx_channel_count()
         if not display_as.lower().startswith(DMX_DISPLAY_AS_PREFIX):
             reason = f"model {name!r} is DisplayAs={display_as!r}, not DMX"
         elif string_type is not None and not string_type.lower().startswith(
             SINGLE_COLOR_STRING_TYPE_PREFIX
         ):
             reason = f"model {name!r} has StringType={string_type!r}, not single color"
-        elif not channels.isdigit():
-            reason = f"model {name!r} declares no channel count (parm1)"
-        elif profile is not None and int(channels) < profile.footprint:
+        elif declared is None:
+            reason = f"model {name!r} declares no channel count (DmxChannelCount or parm1)"
+        elif not declared[1].isdigit():
+            reason = f"model {name!r} has {declared[0]}={declared[1]!r}, not a channel count"
+        elif profile is not None and int(declared[1]) < profile.footprint:
             reason = (
-                f"model {name!r} has {int(channels)} channels; profile "
+                f"model {name!r} has {int(declared[1])} channels by {declared[0]}; profile "
                 f"{profile.profile_id!r} writes channels 1-{profile.footprint}"
             )
         else:

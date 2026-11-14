@@ -248,7 +248,9 @@ class LayoutProfiler:
 
         return DmxFixtureProfile(
             fixture_type=attrs.get("DisplayAs", ""),
-            channel_count=self._safe_int(attrs.get("parm1", "0")),
+            channel_count=self._safe_int(declared[1])
+            if (declared := model.dmx_channel_count())
+            else 0,
             color_type=attrs.get("DmxColorType") or None,
             color_wheel=tuple(color_wheel),
             pan=_motor(pan_raw),

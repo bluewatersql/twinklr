@@ -177,7 +177,7 @@ async def test_stage_hands_the_run_layout_to_the_physical_render(tmp_path: Path)
     context = _physical_context()
     models = tuple(
         Model.model_validate(
-            {"name": f"Dmx MH{index}", "DisplayAs": "DmxMovingHeadAdv", "parm1": "18"}
+            {"name": f"Dmx MH{index}", "DisplayAs": "DmxMovingHeadAdv", "DmxChannelCount": "18"}
         )
         for index in (1, 2)
     )
