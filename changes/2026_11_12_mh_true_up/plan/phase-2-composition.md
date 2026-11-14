@@ -443,6 +443,34 @@ before any family exists. P2.1 before P2.2 and P2.3, because named positions sup
 base aim both use. P2.4b needs P2.2's phase offsets and P2.3's kernels; P2.4c needs
 everything before it. P2.5 is the optional pilot and last.
 
+## Decisions and carry-forwards recorded during execution
+
+P2.0, 2026-11-14 (reviewed separately from its author; one review and a fix round for
+four low findings):
+
+- **Result.** All 961 grids of the sweep build (18 before). The covered start is the
+  song start when the lead-in is at most one beat interval, otherwise one interval
+  before the first beat; the end follows the same rule. `physical_cue_limits` gives the
+  gate and the render the same limits.
+- **Invariance anchors at `d6096254`,** unchanged after P2.0: request fingerprints
+  `4bd67b39cc934912847c07d2c109a01c2fd36257d211c34c612e6e2db07f00fc` and
+  `458826581adea7e742598c113a6576ac1f9873caac9e035eded7e1d7834aa2d8`, with byte-identical
+  `.xsq` files; the 16 Phase 0 fingerprints.
+- **Reviewer's probes.** Twelve hand-built edge grids and 961 grids placed 7.3 ms off
+  the frame grid: no frame outside the limits has an open shutter or a nonzero dimmer,
+  and the gate never accepted a grid the render then refused.
+- **Edge knot arithmetic.** A silent-edge knot's beat is derived from its stored float
+  time, so time and beat agree exactly; the docstring states the rounding bound. Phase 1
+  maps never take that path.
+- **Park pose.** After the last cue the head parks at that cue's last frame, as
+  `plan_prepositions` already did.
+- **Trace.** `covered_span` holds the unrounded knot times; `longest_beat_interval_ms`
+  is recorded; a render logs one warning with the dropped-cue count and the limits.
+- **Not covered by the plan, left as Phase 1 behaved:** one observed beat plus an
+  explicit knot on the other side still raises.
+- **Unverified.** Real-audio beat grids; any physical template other than the test one.
+  How the dark edges look is `PENDING-OWNER`.
+
 ## Phase exit
 
 `physical_v2` accepts grids with silent edges, reports the covered span and holds every fixture dark outside it without inferring tempo; a grid Phase 1 accepted renders the same frames and fingerprint. Legacy session ids, the 16 Phase 0 fingerprints and the Phase 1 request fingerprints are unchanged. Six core families compile deterministically on the synthetic rig matrix and are offered only under `physical_v2`, each only on a rig that can render it; independent phase domains work; missing heads preserve canonical ranks; preset overrides have explicit scope; a `ONCE` hold stays one cue per fixture and holds its terminal pose to the section end; fly-in/out lit directions and dark returns are frame-proven; flicks settle while dark and resume the current base. Each section's entry window is sized at render from a bound the fuzz shows dominates the transaction pass, so section-entry repositioning fits by construction; the dip is skipped where the predecessor ends where the successor begins, and the plan-dependent failures P2.4c lists still surface at render. The zoom pilot is source/synthetic proven with any real-profile acceptance explicitly pending. Legacy regression and clean-tree `make validate` pass. Owner visual acceptance, including whether the remaining section-entry dips look acceptable, is a separate `PENDING-OWNER` record, not a consequence of a new effect name or passing bytes.
