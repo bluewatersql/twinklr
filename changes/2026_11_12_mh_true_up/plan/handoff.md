@@ -245,3 +245,51 @@ Knowledge promotion: checked. Phase 0 changes no accepted behavior beyond the th
 documents T1 corrected, so nothing is promoted to `context/` or `memories/`.
 
 Next action: owner go-ahead for Phase 1, then its kickoff recheck.
+
+## Phase 1 implementation — 2026-11-14
+
+Status: **Phase 1 complete on `feat/mh-true-up-p1`; not merged to `main`, not pushed.**
+Worktree `twinklr-mh-true-up`, cut from `main` at `bb78227`. The owner's go-ahead covered
+Phase 1 only; Phase 2 needs its own.
+
+Delivered: an opt-in `physical_v2` moving-head renderer (job schema `3.1`). A physical
+job compiles against an exact musical phase map, plans dark reposition transactions,
+encodes complete fixture frames on a 20 ms grid and delivers an `.xsq` whose trace
+carries the render identity. Default `legacy_v1` output is byte-identical. Tasks,
+commits and review rounds are in the
+[exit evidence](../evidence/2026-11-14-p1-exit/README.md); decisions made during
+execution are in
+[phase-1-fixture-fidelity.md](phase-1-fixture-fidelity.md#decisions-and-carry-forwards-recorded-during-execution).
+
+Validation: `make validate` on `b4ed49d0` passed, 6355 passed and 39 skipped, tree clean
+before and after; no golden or regression file changed. The closeout documents were
+committed after that gate run and are documentation only.
+
+Owner decisions taken during the phase: reject an unrenderable physical job before
+planning (P1.0, later generalized); live provider calls authorized (none made);
+`twinklr run` gains `--layout`; silent song edges deferred to Phase 2.
+
+Open items:
+
+- **Owner: merge `feat/mh-true-up-p1` to `main`, and push.** Not done; no instruction.
+  `main` is also still ahead of `origin/main` from the Phase 0 merge.
+- **Owner: xLights render on an expendable show.** The
+  [request](../evidence/2026-11-13-p1-xlights-request/README.md) lists the profiles, the
+  command and the frames to check. Outcome `PENDING-OWNER`.
+- **Owner: hardware accuracy and changed-look acceptance.** `PENDING-OWNER`.
+- **Owner, no objection recorded:** the default `max_effects` is 1,000,000, raised from
+  the planned 100,000 by the integrator.
+- **Phase 2 carries:** a policy for silent song edges (physical mode refuses most real
+  audio until then); physical template families (no production template is physical);
+  gate dry-compile cost at catalog size; binding planner intensity; reposition
+  fallbacks selectable from config; a producer for `locks`.
+- **Low, left as is:** a lit cue at time zero that needs a move fails with a misleading
+  reason; a cue with an unauthored dimmer whose default byte is dark is treated as lit;
+  any `Dmx*` model passes the layout check; emission's overlap scan is quadratic in
+  effect count and unmeasured on long shows.
+
+Knowledge promotion: `context/current-state.md` now names the opt-in physical path and
+its limits. No decision is promoted to `memories/`: the physical path has no empirical
+acceptance yet, and its design decisions live in the phase plan until it does.
+
+Next action: owner go-ahead for the merge, the xLights test, and Phase 2.

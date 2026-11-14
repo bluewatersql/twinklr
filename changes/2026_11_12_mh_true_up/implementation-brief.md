@@ -5,7 +5,7 @@ area: engineering
 change: 2026_11_12_mh_true_up
 owner: Christopher Price
 created: 2026-11-13
-updated: 2026-11-13
+updated: 2026-11-14
 ---
 
 # Moving-head true-up — implementation brief
@@ -57,15 +57,15 @@ Phase 0 (met 2026-11-13; evidence in
 - [x] The dated evidence record described in the plan's exit section exists.
 - [x] Handoff and the `changes/ACTIVE.md` row reflect the result.
 
-Phase 1 (in progress; tasks P1.0–P1.6 in
-[plan/phase-1-fixture-fidelity.md](plan/phase-1-fixture-fidelity.md)):
+Phase 1 (met from offline evidence 2026-11-14; evidence in
+[evidence/2026-11-14-p1-exit](evidence/2026-11-14-p1-exit/README.md)):
 
-- [ ] P1.0–P1.6 merged to the phase branch, each test-first and each reviewed in a
+- [x] P1.0–P1.6 merged to the phase branch, each test-first and each reviewed in a
   context separate from its author.
-- [ ] `make validate` passes on the phase branch after the last commit.
-- [ ] No golden or regression file changed; `legacy_v1` output is unchanged.
-- [ ] Every added config field has a live inventory record and a documented row.
-- [ ] The phase-exit conditions in the plan are met from offline evidence, with a dated
+- [x] `make validate` passes on the phase branch after the last code commit.
+- [x] No golden or regression file changed; `legacy_v1` output is unchanged.
+- [x] Every added config field has a live inventory record and a documented row.
+- [x] The phase-exit conditions in the plan are met from offline evidence, with a dated
   evidence record. xLights transport proof, hardware accuracy and changed-look
   acceptance are recorded as `PENDING-OWNER`, not inferred.
 
