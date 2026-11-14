@@ -421,10 +421,16 @@ gains a `--layout` input in Phase 1.
   synthetic sweep at 120 BPM (lead-ins 0–3 s, tails 0–6 s) accepted 18 of 961 grids.
   `physical_v2` therefore refuses most real audio until there is a policy for the
   edges (explicit boundary knots, or holding dark outside the detected beats).
-- **Layout input for `twinklr run`.** The `DisplayAs`/`StringType` model check and a
-  channel-count check against the profile footprint run only when a caller supplies
-  layout models, and `run` has no layout input. A run prints a warning and the trace
-  records `layout_check: not_performed`.
+- **Layout input for `twinklr run` (added 2026-11-14, reviewed separately).** `run`
+  takes an optional `--layout`. Under `physical_v2` each fixture's model must be in
+  the layout, have a `DisplayAs` starting with `Dmx`, a `StringType` absent or starting
+  with "Single Color", and a `parm1` (channel count) of at least the profile
+  footprint; the check runs before analysis, in the gate and in the renderer, and the
+  trace records `layout_check: performed` with the layout's SHA-256. Without a layout
+  the run warns and records `not_performed`. A legacy run ignores the file. The layout
+  is in no identity or cache key. The physical preflight also refuses a blank or shared
+  `xlights_model_name`. The three layout field values come from this repo's parser and
+  are unverified against a layout xLights wrote for a DMX model: PENDING-OWNER.
 - **Gate cost (carried to Phase 2).** The dry-compile took 1.66 s for 8 heads and 2
   template-and-preset combinations on a 4-minute synthetic song, about 0.8 s per
   combination, so a Phase 2 catalog of around 100 combinations would take over a

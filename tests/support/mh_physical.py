@@ -354,6 +354,29 @@ def physical_plan(template_id: str = TEMPLATE_ID) -> ChoreographyPlan:
     )
 
 
+def physical_layout_xml(models: dict[str, dict[str, str]] | None = None) -> str:
+    """A synthetic `xlights_rgbeffects.xml` with the physical rig's two DMX models.
+
+    Each model is an 18-channel single-color DMX moving head unless `models` overrides
+    its attributes (an attribute set to "" is left out).
+    """
+    attributes = {
+        name: {"DisplayAs": "DmxMovingHeadAdv", "StringType": "Single Color White", "parm1": "18"}
+        for name in ("Dmx MH1", "Dmx MH2")
+    }
+    for name, override in (models or {}).items():
+        attributes[name] = {**attributes.get(name, {}), **override}
+    rows = "".join(
+        f'    <model name="{name}" '
+        + " ".join(f'{key}="{value}"' for key, value in attrs.items() if value)
+        + " />\n"
+        for name, attrs in attributes.items()
+    )
+    return (
+        f'<?xml version="1.0" encoding="UTF-8"?>\n<xrgb>\n  <models>\n{rows}  </models>\n</xrgb>\n'
+    )
+
+
 def assert_honest_transactions(
     result: PrepositionResult,
     inputs: Sequence[FixtureSegment],

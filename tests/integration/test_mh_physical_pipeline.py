@@ -17,6 +17,7 @@ from typing import Any
 
 import pytest
 
+from tests.golden.harness import RIGS, build_beat_grid, build_fixture_group, build_plan
 from tests.support.mh_physical import (
     BUILTIN_TEMPLATE_COUNT,
     PHYSICAL_INITIAL_STATE,
@@ -493,7 +494,7 @@ def test_unchecked_models_are_reported(
             id="legacy-template",
         ),
         pytest.param(
-            {"layout_models": [Model(name="Dmx MH1", DisplayAs="DmxMovingHeadAdv")]},
+            {"layout_models": [Model(name="Dmx MH1", DisplayAs="DmxMovingHeadAdv", parm1="18")]},
             PhysicalOutputError,
             "MH2: model 'Dmx MH2' is not in the xLights layout",
             id="model-missing-from-layout",
@@ -514,27 +515,135 @@ def test_failure_delivers_nothing(
     assert list(tmp_path.iterdir()) == []
 
 
-def test_layout_check_refuses_an_rgb_node_model(tmp_path: Path, physical_templates: None) -> None:
-    """A model the layout says is RGB nodes never receives the physical channel mapping."""
+def _dmx(name: str, **attributes: str) -> Model:
+    return Model.model_validate(
+        {"name": name, "DisplayAs": "DmxMovingHeadAdv", "parm1": "18", **attributes}
+    )
+
+
+@pytest.mark.parametrize(
+    ("mh2", "message"),
+    [
+        pytest.param(
+            {"DisplayAs": "Single Line", "StringType": "RGB Nodes"},
+            "MH2: model 'Dmx MH2' is DisplayAs='Single Line', not DMX",
+            id="not-dmx",
+        ),
+        pytest.param(
+            {"StringType": "RGB Nodes"},
+            "MH2: model 'Dmx MH2' has StringType='RGB Nodes', not single color",
+            id="rgb-nodes",
+        ),
+        pytest.param(
+            {"parm1": "17"},
+            "MH2: model 'Dmx MH2' has 17 channels; profile 'synthetic_spot' writes channels 1-18",
+            id="too-few-channels",
+        ),
+        pytest.param(
+            {"parm1": ""},
+            "MH2: model 'Dmx MH2' declares no channel count (parm1)",
+            id="channel-count-unknown",
+        ),
+    ],
+)
+def test_layout_check_refuses_a_model_the_mapping_cannot_drive(
+    tmp_path: Path, physical_templates: None, mh2: dict[str, str], message: str
+) -> None:
+    """A model that is not a single-color DMX model wide enough for its profile's whole
+    footprint never receives the physical channel mapping."""
+    attributes = {"DisplayAs": "DmxMovingHeadAdv", "parm1": "18", **mh2}
     layout = [
-        Model(name="Dmx MH1", DisplayAs="DmxMovingHeadAdv", StringType="Single Color White"),
-        Model(name="Dmx MH2", DisplayAs="Single Line", StringType="RGB Nodes"),
+        _dmx("Dmx MH1", StringType="Single Color White"),
+        Model.model_validate(
+            {"name": "Dmx MH2", **{key: value for key, value in attributes.items() if value}}
+        ),
     ]
-    with pytest.raises(PhysicalOutputError, match=r"MH2: model 'Dmx MH2' is DisplayAs") as raised:
+    with pytest.raises(PhysicalOutputError) as raised:
         _pipeline(tmp_path / "show.xsq", layout_models=layout).render()
+
+    assert message in str(raised.value)
     assert raised.value.diagnostic.code == "unsupported_backend_channel"
     assert raised.value.diagnostic.fixture_id == "MH2"
     assert list(tmp_path.iterdir()) == []
 
-    layout[1] = Model(name="Dmx MH2", DisplayAs="DmxMovingHead", StringType="RGB Nodes")
-    with pytest.raises(PhysicalOutputError, match="StringType='RGB Nodes'"):
-        _pipeline(None, layout_models=layout).render()
 
-    layout[1] = Model(name="Dmx MH2", DisplayAs="DmxMovingHead")
-    pipeline = _pipeline(tmp_path / "show.xsq", layout_models=layout)
+def test_layout_check_passes_and_records_the_layout(
+    tmp_path: Path, physical_templates: None
+) -> None:
+    """A layout whose models fit is checked and its content hash recorded, as evidence;
+    it is not render identity, because it cannot change a byte."""
+    layout = [_dmx("Dmx MH1"), _dmx("Dmx MH2", StringType="Single Color White", parm1="48")]
+    output = tmp_path / "show.xsq"
+    pipeline = _pipeline(output, layout_models=layout, layout_sha256="ab" * 32)
     pipeline.render()
-    assert pipeline.render_record is not None
-    assert pipeline.render_record["layout_check"] == "passed"
+
+    trace = json.loads(Path(f"{output}.trace.json").read_text(encoding="utf-8"))["render"]
+    assert (trace["layout_check"], trace["layout_sha256"]) == ("performed", "ab" * 32)
+    assert pipeline.fingerprint() == _pipeline(None).fingerprint()
+    plain = tmp_path / "plain" / "show.xsq"
+    _pipeline(plain).render()
+    assert output.read_bytes() == plain.read_bytes()
+
+
+def test_a_layout_changes_nothing_in_a_legacy_render(tmp_path: Path) -> None:
+    """Legacy renders ignore the layout: the same bytes, trace and identity."""
+    rig = build_fixture_group(RIGS["mh4_minimal"])
+    layout = [_dmx(f"Dmx MH{index}", DisplayAs="Single Line") for index in range(1, 5)]
+
+    def render(output: Path, **kwargs: Any) -> str:
+        pipeline = RenderingPipeline(
+            choreography_plan=build_plan(),
+            beat_grid=build_beat_grid(),
+            fixture_group=rig,
+            job_config=JobConfig(),
+            output_path=output,
+            media_file="song.wav",
+            **kwargs,
+        )
+        pipeline.render()
+        return pipeline.fingerprint()
+
+    with_layout = render(tmp_path / "a" / "show.xsq", layout_models=layout, layout_sha256="cd" * 32)
+    without = render(tmp_path / "b" / "show.xsq")
+
+    assert with_layout == without
+    for name in ("show.xsq", "show.xsq.trace.json", "show.xmap"):
+        assert (tmp_path / "a" / name).read_bytes() == (tmp_path / "b" / name).read_bytes()
+
+
+def test_failed_removal_during_rollback_keeps_the_staging_directory(
+    tmp_path: Path, physical_templates: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If a newly placed file cannot be removed while rolling back, the earlier files
+    are still put back, the staging directory is kept and the error names it."""
+    output = tmp_path / "show.xsq"
+    _pipeline(output).render()
+    before = {path.name: path.read_bytes() for path in tmp_path.iterdir()}
+
+    original_replace, original_unlink = Path.replace, Path.unlink
+
+    def replace_failing(self: Path, target: Any) -> Path:
+        if Path(target) == output and ".replaced" not in self.parts:
+            raise OSError("injected failure moving the new .xsq")
+        return original_replace(self, target)
+
+    def unlink_failing(self: Path, missing_ok: bool = False) -> None:
+        if self == Path(f"{output}.trace.json"):
+            raise OSError("injected failure removing the new trace")
+        original_unlink(self, missing_ok=missing_ok)
+
+    monkeypatch.setattr(Path, "replace", replace_failing)
+    monkeypatch.setattr(Path, "unlink", unlink_failing)
+    with pytest.raises(DeliveryRollbackError) as raised:
+        _pipeline(output, job=physical_job(max_effects=999_999)).render()
+    monkeypatch.undo()
+
+    assert raised.value.kept_dir.is_dir()
+    assert str(raised.value.kept_dir) in str(raised.value)
+    assert "show.xsq.trace.json" in str(raised.value)
+    after = {path.name: path.read_bytes() for path in tmp_path.iterdir() if path.is_file()}
+    assert after == before
+    assert raised.value.kept_dir.parent.parent == tmp_path
 
 
 def test_calibration_change_changes_render_identity_not_plan_identity(

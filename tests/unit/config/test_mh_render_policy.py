@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 from pydantic import ValidationError
 import pytest
@@ -10,6 +11,7 @@ import yaml
 
 from tests.golden.harness import RIGS, build_beat_grid, build_fixture_group, build_plan
 from tests.support.mh_physical import PHYSICAL_INITIAL_STATE, physical_job, physical_rig
+from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.loader import load_full_config, load_job_config
 from twinklr.core.config.models import JobConfig
 from twinklr.core.config.render_policy import preflight_render_policy
@@ -157,3 +159,34 @@ def test_legacy_and_omitted_policy_load_unchanged(tmp_path: Path) -> None:
     for document in (omitted, legacy):
         path = _write_job(tmp_path, document)
         assert load_job_config(path) == JobConfig.model_validate(document)
+
+
+def _renamed(*names: str) -> FixtureGroup:
+    """`physical_rig` with its two heads' xLights model names replaced."""
+    payload = physical_rig().model_dump(mode="json")
+    for fixture, name in zip(payload["fixtures"], names, strict=True):
+        fixture["xlights_model_name"] = name
+    return FixtureGroup.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("names", "message"),
+    [
+        pytest.param(
+            ("Dmx MH1", "Dmx MH1"),
+            "MH1 and MH2: both map to xLights model 'Dmx MH1'",
+            id="shared-model",
+        ),
+        pytest.param(("Dmx MH1", "  "), "MH2: xlights_model_name is blank", id="blank-model"),
+    ],
+)
+def test_physical_preflight_refuses_unusable_model_names(
+    names: tuple[str, str], message: str
+) -> None:
+    """Physical frames go to each fixture's own model, so a shared or blank model name is
+    refused before planning; a legacy job on the same rig is checked exactly as before."""
+    rig = _renamed(*names)
+
+    with pytest.raises(UnsupportedRenderModeError, match=re.escape(message)):
+        preflight_render_policy(physical_job(), rig)
+    preflight_render_policy(JobConfig(), rig)

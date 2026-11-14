@@ -415,6 +415,7 @@ class RenderingPipeline:
         artist: str = "",
         locks: Sequence[RenderLock] = (),
         layout_models: Sequence[Model] | None = None,
+        layout_sha256: str | None = None,
     ):
         """Initialize rendering pipeline.
 
@@ -433,7 +434,11 @@ class RenderingPipeline:
             locks: Frames a `physical_v2` render must leave as the cues alone make them.
             layout_models: The xLights layout's models, when known. A `physical_v2`
                 render then refuses any fixture whose model is not a single-color DMX
-                model; without them the check is recorded as not performed.
+                model with enough channels (`check_physical_models`); without them the
+                check is recorded as not performed. A `legacy_v1` render ignores them.
+            layout_sha256: Content hash of the layout file, recorded in the physical
+                trace as evidence. Not render identity: the check passes or refuses
+                and never changes a byte.
 
         Raises:
             UnsupportedRenderModeError: The job's render mode cannot render this rig
@@ -456,6 +461,7 @@ class RenderingPipeline:
         self.artist = artist
         self.locks = tuple(locks)
         self.layout_models = layout_models
+        self.layout_sha256 = layout_sha256
         self.artifacts: DeliveryArtifacts | None = None
         """Set by `render()` when `output_path` is given."""
         self.frames: tuple[EncodedFixtureFrame, ...] = ()
@@ -685,7 +691,7 @@ class RenderingPipeline:
             profiles[fixture.fixture_id] = profile
         targets = {fixture.fixture_id: fixture.xlights_model_name for fixture in fixtures}
         if self.layout_models is not None:
-            check_physical_models(targets, self.layout_models)
+            check_physical_models(fixtures, self.layout_models)
         else:
             logger.warning(
                 "physical_v2: the xLights model check was not performed (no layout given); "
@@ -805,7 +811,8 @@ class RenderingPipeline:
                 "song_duration_ms": duration_ms,
                 "sequence_end_ms": len(times) * EFFECT_GRID_MS,
             },
-            "layout_check": "passed" if self.layout_models is not None else "not_performed",
+            "layout_check": "performed" if self.layout_models is not None else "not_performed",
+            "layout_sha256": self.layout_sha256,
             "locks": [lock.model_dump(mode="json") for lock in self.locks],
             "quantized_cues": _cue_records(cues),
             "dropped_cues": dropped,

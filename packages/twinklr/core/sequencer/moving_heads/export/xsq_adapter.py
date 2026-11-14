@@ -44,41 +44,70 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def check_physical_models(targets: Mapping[str, str], models: Sequence[Model]) -> None:
+DMX_DISPLAY_AS_PREFIX = "dmx"
+"""Lower-cased `DisplayAs` prefix of an xLights DMX model; the display pipeline treats
+the same prefix as DMX (`formats/xlights/layout/choreography.py::_dmx_model_names`)."""
+
+SINGLE_COLOR_STRING_TYPE_PREFIX = "single color"
+"""Lower-cased `StringType` prefix accepted for the physical mapping: one channel per
+node, as the layout profiler reads it
+(`profiling/layout/profiler.py::_infer_channels_per_node`). Which `StringType`, if any,
+xLights writes for a DMX model is unverified offline; a model without one is accepted."""
+
+
+def check_physical_models(fixtures: Sequence[FixtureInstance], models: Sequence[Model]) -> None:
     """Refuse a fixture whose xLights model the physical channel mapping cannot drive.
 
-    The mapping writes model-relative DMX channels, so the model must be a DMX model
-    (`DisplayAs` starting `Dmx`) whose `StringType`, when the layout records one, is a
-    single-color type. An RGB-node model, any other model type, or a model the layout
-    does not contain is refused rather than sent bytes it would read as pixels.
+    The mapping writes model-relative DMX channels 1..footprint on every frame, so the
+    fixture's model must be in the layout, a DMX model (`DisplayAs` prefix
+    `DMX_DISPLAY_AS_PREFIX`), single color when the layout records a `StringType`
+    (`SINGLE_COLOR_STRING_TYPE_PREFIX`), and declare a channel count (`parm1`, as the
+    layout profiler reads a DMX model's channel count) of at least the profile's
+    footprint. An unknown channel count is refused, never assumed.
 
     Args:
-        targets: Fixture id to xLights model name.
+        fixtures: The rig's fixtures, each with a physical profile.
         models: The xLights layout's models.
 
     Raises:
         PhysicalOutputError: With code `unsupported_backend_channel`, naming each
-            refused fixture and model.
+            refused fixture, model and item.
     """
     by_name = {model.name: model for model in models}
     refused: dict[str, str] = {}
-    for fixture_id, name in targets.items():
+    for fixture in fixtures:
+        name = fixture.xlights_model_name
         model = by_name.get(name)
+        profile = fixture.config.physical_profile
         if model is None:
-            refused[fixture_id] = f"model {name!r} is not in the xLights layout"
+            refused[fixture.fixture_id] = f"model {name!r} is not in the xLights layout"
             continue
         display_as = model.DisplayAs or ""
         string_type = model.StringType
-        if not display_as.lower().startswith("dmx"):
-            refused[fixture_id] = f"model {name!r} is DisplayAs={display_as!r}, not DMX"
-        elif string_type is not None and not string_type.lower().startswith("single color"):
-            refused[fixture_id] = f"model {name!r} has StringType={string_type!r}, not single color"
+        channels = str((model.model_extra or {}).get("parm1", ""))
+        if not display_as.lower().startswith(DMX_DISPLAY_AS_PREFIX):
+            reason = f"model {name!r} is DisplayAs={display_as!r}, not DMX"
+        elif string_type is not None and not string_type.lower().startswith(
+            SINGLE_COLOR_STRING_TYPE_PREFIX
+        ):
+            reason = f"model {name!r} has StringType={string_type!r}, not single color"
+        elif not channels.isdigit():
+            reason = f"model {name!r} declares no channel count (parm1)"
+        elif profile is not None and int(channels) < profile.footprint:
+            reason = (
+                f"model {name!r} has {int(channels)} channels; profile "
+                f"{profile.profile_id!r} writes channels 1-{profile.footprint}"
+            )
+        else:
+            continue
+        refused[fixture.fixture_id] = reason
     if refused:
         raise PhysicalOutputError(
             MHDiagnostic(
                 code="unsupported_backend_channel",
                 severity="error",
-                message="Physical output needs single-color DMX models: "
+                message="Physical output needs single-color DMX models wide enough for their "
+                "profiles: "
                 + "; ".join(f"{fixture_id}: {reason}" for fixture_id, reason in refused.items()),
                 fixture_id=next(iter(refused)) if len(refused) == 1 else None,
                 action="rejected",

@@ -32,6 +32,16 @@ or a look judgment; those stay `PENDING-OWNER` until observed.
    per run of identical 20 ms frames. A different count means xLights merged, split or
    dropped effects on import.
 
+## Unverified layout values (PENDING-OWNER)
+
+The model check accepts a `DisplayAs` starting `Dmx` (the display pipeline's DMX test,
+`formats/xlights/layout/choreography.py`), a `StringType` that is absent or starts with
+`Single Color` (the layout profiler's one-channel-per-node reading,
+`profiling/layout/profiler.py`), and reads the channel count from `parm1` (the profiler's
+DMX `channel_count`). None of these has been checked against a layout xLights wrote for a
+DMX model. Record what the expendable show's layout actually contains for `Dmx MH1`/`Dmx
+MH2` (`DisplayAs`, `StringType`, `parm1`) with the result.
+
 ## Setup the owner provides
 
 - An expendable show folder with two DMX models named exactly `Dmx MH1` and `Dmx MH2`,
@@ -48,8 +58,15 @@ outside the repository (it imports the in-repo test support, as P0's collection 
 did):
 
 ```bash
-PYTHONPATH=. uv run python <script> <out_dir>
+PYTHONPATH=. uv run python <script> <out_dir> <expendable show>/xlights_rgbeffects.xml
 ```
+
+The layout argument is the expendable show's own layout. With it, the render first runs
+the same model check `twinklr run --layout` runs (each `Dmx MHn` model present, DMX,
+single color when it records a `StringType`, at least 48 channels by `parm1`) and the
+traces record `layout_check: performed` with the layout's SHA-256; a model that fails is
+refused before anything is written. Omit it to render without the check
+(`layout_check: not_performed`); the bytes are the same either way.
 
 It writes `p1_linear_reveal.xsq` (18-channel footprint) and `p1_linear_reveal_48ch.xsq`
 (48-channel footprint), each with its `.xsq.trace.json`, `.xmap`, `.xtiming` and the
@@ -278,10 +295,15 @@ from pathlib import Path
 from tests.support.mh_physical import (
     physical_grid, physical_job, physical_plan, physical_rig, physical_test_templates,
 )
+from twinklr.core.caching.identity import hash_file_content
 from twinklr.core.config.fixtures import FixtureGroup
+from twinklr.core.formats.xlights.layout.parser import load_layout
 from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
 
 out_dir = Path(sys.argv[1])
+layout_path = Path(sys.argv[2]) if len(sys.argv) > 2 else None
+layout_models = tuple(load_layout(layout_path).models.model) if layout_path else None
+layout_sha256 = hash_file_content(layout_path) if layout_path else None
 out_dir.mkdir(parents=True, exist_ok=True)
 
 
@@ -301,6 +323,7 @@ with physical_test_templates():
         pipeline = RenderingPipeline(
             choreography_plan=physical_plan(), beat_grid=physical_grid(), fixture_group=rig,
             job_config=physical_job(), output_path=out_dir / f"{name}.xsq", media_file="silence.wav",
+            layout_models=layout_models, layout_sha256=layout_sha256,
         )
         pipeline.render()
         render = json.loads((out_dir / f"{name}.xsq.trace.json").read_text())["render"]

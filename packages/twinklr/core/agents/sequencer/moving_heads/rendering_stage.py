@@ -34,6 +34,8 @@ class MovingHeadRenderingStage:
     State consumed:
         - "beat_grid": BeatGrid (set by MovingHeadStage)
         - "choreography_plan": ChoreographyPlan (set by MovingHeadStage)
+        - "layout_models", "layout_sha256": the xLights layout `twinklr run --layout`
+          loaded, if any; only a physical render uses them
 
     State stored:
         - "xsq_output_path": Path to generated XSQ file
@@ -143,6 +145,8 @@ class MovingHeadRenderingStage:
                 media_file=media_file,
                 song=song,
                 artist=artist,
+                layout_models=context.get_state("layout_models"),
+                layout_sha256=context.get_state("layout_sha256"),
             )
 
             # Render to segments and write the delivery
@@ -301,9 +305,10 @@ class RenderPreflightStage:
     `legacy_v1` job passes through untouched. A `physical_v2` job is checked against
     the fixtures the render stage will load (`preflight_render_policy`), the templates
     the planner will be offered (`offered_template_ids`; every one must carry physical
-    data, and each must dry-compile on this rig: `check_physical_templates`) and the
+    data, and each must dry-compile on this rig: `check_physical_templates`), the
     song's musical phase map, built from the detected BeatGrid, which the renderer
-    needs over the whole song and never infers.
+    needs over the whole song and never infers, and, when the run supplies an xLights
+    layout (`layout_models` in state), every fixture's model (`check_physical_models`).
 
     Input and output: the audio stage's SongBundle, unchanged.
     """
@@ -327,6 +332,8 @@ class RenderPreflightStage:
             preflight_render_policy,
         )
         from twinklr.core.pipeline.result import failure_result, success_result
+        from twinklr.core.sequencer.moving_heads.export.frame_encoder import PhysicalOutputError
+        from twinklr.core.sequencer.moving_heads.export.xsq_adapter import check_physical_models
         from twinklr.core.sequencer.moving_heads.pipeline import (
             check_physical_templates,
             offered_template_ids,
@@ -365,7 +372,10 @@ class RenderPreflightStage:
                     f"undefined: {error}. The renderer does not infer tempo there"
                 ) from error
             check_physical_templates(offered, beat_grid=beat_grid, fixture_group=fixture_group)
-        except UnsupportedRenderModeError as error:
+            layout_models = context.get_state("layout_models")
+            if layout_models is not None:
+                check_physical_models(fixture_group.expand_fixtures(), layout_models)
+        except (UnsupportedRenderModeError, PhysicalOutputError) as error:
             logger.error("Render preflight refused the job: %s", error)
             return failure_result(str(error), stage_name=self.name)
         return success_result(input, stage_name=self.name)

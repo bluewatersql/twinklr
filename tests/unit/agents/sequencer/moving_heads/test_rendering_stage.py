@@ -20,6 +20,7 @@ from tests.support.mh_physical import (
 from twinklr.core.agents.sequencer.moving_heads.rendering_stage import MovingHeadRenderingStage
 from twinklr.core.audio.models.metadata import EmbeddedMetadata, MetadataBundle
 from twinklr.core.config.models import JobConfig
+from twinklr.core.formats.xlights.layout.models.rgb_effects import Model
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import UnsupportedRigShapeError
 
@@ -166,6 +167,34 @@ async def test_physical_job_renders_and_delivers_through_the_stage(tmp_path: Pat
     segments = context.get_state("rendered_segments")
     assert all(
         value.physical is not None for segment in segments for value in segment.channels.values()
+    )
+
+
+@pytest.mark.asyncio
+async def test_stage_hands_the_run_layout_to_the_physical_render(tmp_path: Path) -> None:
+    """The layout `twinklr run` loads reaches the model check, and the trace says so."""
+    stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
+    context = _physical_context()
+    models = tuple(
+        Model.model_validate(
+            {"name": f"Dmx MH{index}", "DisplayAs": "DmxMovingHeadAdv", "parm1": "18"}
+        )
+        for index in (1, 2)
+    )
+    context.set_state("layout_models", models)
+    context.set_state("layout_sha256", "ef" * 32)
+
+    with (
+        physical_test_templates(),
+        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=physical_rig()),
+    ):
+        result = await stage.execute({"moving_heads": physical_plan()}, context)
+
+    assert result.success, result.error
+    trace = json.loads(context.get_state("delivery_artifacts").trace_path.read_text())
+    assert (trace["render"]["layout_check"], trace["render"]["layout_sha256"]) == (
+        "performed",
+        "ef" * 32,
     )
 
 

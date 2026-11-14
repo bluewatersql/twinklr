@@ -30,6 +30,7 @@ from twinklr.core.agents.sequencer.moving_heads.rendering_stage import RenderPre
 from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import JobConfig
+from twinklr.core.formats.xlights.layout.models.rgb_effects import Model
 from twinklr.core.pipeline import PipelineExecutor
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.pipeline.definitions.moving_heads import build_moving_heads_pipeline
@@ -307,3 +308,32 @@ async def test_template_the_rig_cannot_render_is_refused_before_planning(
         assert item in error, (item, error)
     for planner in planners.values():
         planner.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_layout_models_in_state_are_checked_before_planning() -> None:
+    """A caller that hands the run a layout gets the model check at the gate too."""
+    stage = RenderPreflightStage(available_templates=[TEMPLATE_ID])
+    context = _context(physical_job(), physical_grid())
+    context.set_state(
+        "layout_models",
+        (
+            Model.model_validate(
+                {"name": "Dmx MH1", "DisplayAs": "DmxMovingHeadAdv", "parm1": "18"}
+            ),
+            Model.model_validate(
+                {"name": "Dmx MH2", "DisplayAs": "DmxMovingHead", "StringType": "RGB Nodes"}
+            ),
+        ),
+    )
+    with (
+        physical_test_templates(),
+        patch(
+            "twinklr.core.agents.sequencer.moving_heads.rendering_stage.load_render_fixture_group",
+            return_value=physical_rig(),
+        ),
+    ):
+        result = await stage.execute(_BUNDLE, context)
+
+    assert not result.success
+    assert "MH2: model 'Dmx MH2' has StringType='RGB Nodes'" in (result.error or "")

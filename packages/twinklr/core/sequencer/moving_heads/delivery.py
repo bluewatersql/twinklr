@@ -52,16 +52,17 @@ SECTIONS_TRACK_NAME = "Twinklr AudioSections"
 
 
 class DeliveryRollbackError(OSError):
-    """Publishing failed and earlier files could not be put back.
+    """Publishing failed and its rollback could not finish.
 
-    They are kept in `kept_dir`, which is not deleted.
+    A new file could not be removed or an earlier one could not be put back. The
+    earlier files set aside are kept in `kept_dir`, which is not deleted.
     """
 
     def __init__(self, kept_dir: Path, unrestored: Sequence[str]) -> None:
         self.kept_dir = kept_dir
         super().__init__(
-            f"publishing the delivery failed and {', '.join(unrestored)} could not be put "
-            f"back; the earlier files are kept in {kept_dir}"
+            f"publishing the delivery failed and rolling it back did not finish: "
+            f"{', '.join(unrestored)}; the earlier files are kept in {kept_dir}"
         )
 
 
@@ -280,8 +281,9 @@ def _publish(files: Sequence[Path], destination: Path, *, backup_dir: Path) -> N
     every file placed so far is removed and every set-aside file is put back.
 
     Raises:
-        DeliveryRollbackError: If a set-aside file cannot be put back; it stays in
-            `backup_dir`.
+        DeliveryRollbackError: If a placed file cannot be removed or a set-aside file
+            cannot be put back; every other step of the rollback still runs, and the
+            set-aside files stay in `backup_dir`.
     """
     backup_dir.mkdir()
     placed: list[Path] = []
@@ -296,9 +298,12 @@ def _publish(files: Sequence[Path], destination: Path, *, backup_dir: Path) -> N
             path.replace(target)
             placed.append(target)
     except BaseException as error:
-        for target in placed:
-            target.unlink(missing_ok=True)
         unrestored: list[str] = []
+        for target in placed:
+            try:
+                target.unlink(missing_ok=True)
+            except OSError as remove_error:
+                unrestored.append(f"new {target.name} ({remove_error})")
         for backup, target in replaced:
             try:
                 backup.replace(target)

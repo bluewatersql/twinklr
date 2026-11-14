@@ -46,6 +46,7 @@ from twinklr.core.api.xlights import (
     reconcile_live_layout,
 )
 from twinklr.core.caching import derive_session_id
+from twinklr.core.caching.identity import hash_file_content
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.loader import load_app_config, load_fixture_group, load_job_config
 from twinklr.core.config.models import JobConfig
@@ -54,6 +55,8 @@ from twinklr.core.config.render_policy import (
     preflight_render_policy,
     require_legacy_render,
 )
+from twinklr.core.formats.xlights.layout.models.rgb_effects import Model
+from twinklr.core.formats.xlights.layout.parser import load_layout
 from twinklr.core.pipeline import PipelineContext, PipelineExecutor
 from twinklr.core.pipeline.definition import PipelineDefinition
 from twinklr.core.pipeline.definitions import build_moving_heads_pipeline
@@ -65,6 +68,8 @@ from twinklr.core.sequencer.display.xlights_mapping import (
     XLightsGroupMapping,
     XLightsMapping,
 )
+from twinklr.core.sequencer.moving_heads.export.frame_encoder import PhysicalOutputError
+from twinklr.core.sequencer.moving_heads.export.xsq_adapter import check_physical_models
 from twinklr.core.sequencer.moving_heads.pipeline import offered_template_ids
 from twinklr.core.sequencer.moving_heads.templates import (
     load_builtin_templates,
@@ -258,6 +263,7 @@ async def run_pipeline_async(
     live_injection: bool = False,
     dry_run: bool = False,
     section_id: str | None = None,
+    layout_path: Path | None = None,
 ) -> int:
     """Run normally or hold one stateful xLights client across live planning/injection."""
     if live_injection:
@@ -282,6 +288,7 @@ async def run_pipeline_async(
         session_id,
         template_dir,
         allow_template_overrides,
+        layout_path=layout_path,
     )
 
 
@@ -297,6 +304,7 @@ async def _run_pipeline_async(
     live_client: XLightsAutomationClient | None = None,
     dry_run: bool = False,
     section_id: str | None = None,
+    layout_path: Path | None = None,
 ) -> int:
     """Run the pipeline using the Pipeline Framework.
 
@@ -311,6 +319,8 @@ async def _run_pipeline_async(
         template_dir: Optional directory of strict JSON moving-head templates.
         allow_template_overrides: Whether data documents may explicitly shadow
             colliding Python builtin IDs.
+        layout_path: Optional xLights layout; a physical_v2 job's fixture models are
+            checked against it before analysis. Legacy jobs ignore it.
 
     Returns:
         Exit code (0 for success, 1 for failure)
@@ -416,12 +426,27 @@ async def _run_pipeline_async(
     except UnsupportedRenderModeError as error:
         console.print(f"[red]ERROR: {error}[/red]")
         return 1
+    layout_models: tuple[Model, ...] | None = None
     if job_config.moving_heads.mode == "physical_v2":
+        console.print(f"[green]🎛️  Physical templates offered:[/green] {len(available_templates)}")
+        if layout_path is None:
+            console.print(
+                "[yellow]WARNING: the xLights model check was not performed: no --layout "
+                "was given, so nothing verifies that each fixture's model is a "
+                "single-color DMX model with enough channels for its profile.[/yellow]"
+            )
+        else:
+            try:
+                layout = load_layout(layout_path)
+                layout_models = tuple(layout.models.model if layout.models else ())
+                check_physical_models(fixture_group.expand_fixtures(), layout_models)
+            except (OSError, ValueError, PhysicalOutputError) as error:
+                console.print(f"[red]ERROR: xLights layout {layout_path.name}: {error}[/red]")
+                return 1
+            console.print(f"[green]✅ xLights models checked against[/green] {layout_path.name}")
+    elif layout_path is not None:
         console.print(
-            f"[green]🎛️  Physical templates offered:[/green] {len(available_templates)}\n"
-            "[yellow]WARNING: the xLights model check was not performed: `twinklr run` "
-            "has no layout input, so nothing verifies that each fixture's model is a "
-            "single-color DMX model with enough channels for its profile.[/yellow]"
+            f"[dim]--layout is used only by physical_v2; ignored for {job_config.moving_heads.mode}[/dim]"
         )
 
     # Define pipeline via pipeline definitions module
@@ -478,6 +503,9 @@ async def _run_pipeline_async(
     pipeline_context.set_state("xlights_mapping", xlights_mapping)
     if live_client is not None:
         pipeline_context.set_state("live_fixture_group", fixture_group)
+    if layout_models is not None and layout_path is not None:
+        pipeline_context.set_state("layout_models", layout_models)
+        pipeline_context.set_state("layout_sha256", hash_file_content(layout_path))
 
     # Execute pipeline
     console.print(f"\n[bold]🎵 Processing:[/bold] {audio_path.name}")
@@ -590,6 +618,12 @@ def run_pipeline(args: argparse.Namespace) -> None:
         console.print(f"[red]ERROR: Job config not found: {job_config_path}[/red]")
         sys.exit(1)
 
+    layout = getattr(args, "layout", None)
+    layout_path = Path(layout).resolve() if layout else None
+    if layout_path is not None and not layout_path.is_file():
+        console.print(f"[red]ERROR: xLights layout not found: {layout_path}[/red]")
+        sys.exit(1)
+
     # Run async pipeline
     exit_code = asyncio.run(
         run_pipeline_async(
@@ -601,6 +635,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
             template_dir=args.template_dir.resolve() if args.template_dir else None,
             allow_template_overrides=args.allow_template_overrides,
             live_injection=args.cmd in {"inject", "regenerate"},
+            layout_path=layout_path,
             dry_run=getattr(args, "dry_run", False),
             section_id=getattr(args, "section", None),
         )
@@ -629,6 +664,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
     # used to decide what the output was built from is its own failure class.
     run = sub.add_parser("run", help="Run the full pipeline")
     _add_pipeline_arguments(run)
+    run.add_argument(
+        "--layout",
+        default=None,
+        help=(
+            "Optional path to the user's xlights_rgbeffects.xml layout. Used only by "
+            "moving_heads.mode physical_v2, to check before analysis that every fixture's "
+            "model is a single-color DMX model with enough channels; without it that check "
+            "is skipped with a warning. Ignored by legacy_v1"
+        ),
+    )
 
     inject = sub.add_parser(
         "inject",

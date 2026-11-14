@@ -810,6 +810,8 @@ refuses a song whose beats leave its start or end uncovered by more
 than one beat interval. `twinklr show`,
 `inject` and `regenerate` render legacy output only and refuse it; `eval-report` refuses a
 checkpoint that records a physical render mode.
+With `twinklr run --layout`, a physical job's fixture models are checked against
+the xLights layout before analysis; without it that check is skipped with a warning.
 `twinklr display` renders no moving heads and ignores the mode. Do not reuse the
 removed version-2 examples from this guide's history.
 

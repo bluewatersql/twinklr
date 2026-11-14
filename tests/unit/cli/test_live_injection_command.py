@@ -13,6 +13,7 @@ from tests.support.mh_physical import (
     SUBSET_TEMPLATE_ID,
     TEMPLATE_ID,
     physical_job,
+    physical_layout_xml,
     physical_rig,
     physical_test_templates,
 )
@@ -22,6 +23,8 @@ from twinklr.core.api.xlights.injection import (
     InjectionResult,
     LiveEffect,
 )
+from twinklr.core.caching.identity import hash_file_content
+from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.pipeline.result import PipelineResult
 
@@ -282,3 +285,162 @@ async def test_run_offers_the_planner_only_physical_templates(tmp_path, monkeypa
 
     (call,) = calls
     assert sorted(call["available_templates"]) == sorted([TEMPLATE_ID, SUBSET_TEMPLATE_ID])
+
+
+def test_run_accepts_an_optional_layout() -> None:
+    parser = cli_main.build_arg_parser()
+    with_layout = parser.parse_args(
+        ["run", "--audio", "song.mp3", "--config", "job.json", "--layout", "layout.xml"]
+    )
+    without = parser.parse_args(["run", "--audio", "song.mp3", "--config", "job.json"])
+
+    assert (with_layout.layout, without.layout) == ("layout.xml", None)
+
+
+def _captured_run(monkeypatch, job, rig) -> dict:
+    """Patch `twinklr run` around planning; capture the session id and pipeline state."""
+    captured: dict = {"build_calls": 0}
+    pipeline = MagicMock()
+    pipeline.validate_pipeline.return_value = []
+    pipeline.stages = []
+
+    def build(**kwargs):
+        captured["build_calls"] += 1
+        return pipeline, SimpleNamespace(groups=[]), MagicMock()
+
+    def session(**kwargs):
+        captured["session_id"] = kwargs["session_id"]
+        return SimpleNamespace(app_config=kwargs["app_config"], job_config=kwargs["job_config"])
+
+    class CapturingExecutor:
+        async def execute(self, *, pipeline, initial_input, context):
+            captured["state"] = dict(context.state)
+            return PipelineResult(success=False)
+
+    monkeypatch.setenv("OPENAI_API_KEY", "offline-test-key")
+    monkeypatch.setattr(cli_main, "load_app_config", lambda _: AppConfig(llm_api_key="k"))
+    monkeypatch.setattr(cli_main, "load_job_config", lambda _: job)
+    monkeypatch.setattr(cli_main, "load_fixture_group", lambda _: rig)
+    monkeypatch.setattr(cli_main, "build_run_pipeline", build)
+    monkeypatch.setattr(cli_main, "TwinklrSession", session)
+    monkeypatch.setattr(cli_main, "PipelineExecutor", CapturingExecutor)
+    return captured
+
+
+async def _run_with(tmp_path, layout: Path | None) -> int:
+    audio = tmp_path / "song.wav"
+    audio.write_bytes(b"synthetic audio")
+    return await cli_main.run_pipeline_async(
+        audio_path=audio,
+        output_dir=tmp_path / "out",
+        app_config_path=tmp_path / "config.json",
+        job_config_path=tmp_path / "job.json",
+        layout_path=layout,
+    )
+
+
+@pytest.mark.anyio
+async def test_run_refuses_a_physical_model_the_layout_says_cannot_take_the_mapping(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    layout = tmp_path / "xlights_rgbeffects.xml"
+    layout.write_text(physical_layout_xml({"Dmx MH2": {"parm1": "16"}}), encoding="utf-8")
+    captured = _captured_run(monkeypatch, physical_job(), physical_rig())
+
+    with physical_test_templates():
+        exit_code = await _run_with(tmp_path, layout)
+
+    output = " ".join(capsys.readouterr().out.split())
+    assert exit_code == 1
+    assert captured["build_calls"] == 0
+    assert "MH2: model 'Dmx MH2' has 16 channels" in output
+
+
+@pytest.mark.anyio
+async def test_run_checks_a_physical_rig_against_its_layout_and_hands_it_on(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    layout = tmp_path / "xlights_rgbeffects.xml"
+    layout.write_text(physical_layout_xml(), encoding="utf-8")
+    captured = _captured_run(monkeypatch, physical_job(), physical_rig())
+
+    with physical_test_templates():
+        await _run_with(tmp_path, layout)
+
+    output = " ".join(capsys.readouterr().out.split())
+    assert "model check was not performed" not in output
+    state = captured["state"]
+    assert [model.name for model in state["layout_models"]] == ["Dmx MH1", "Dmx MH2"]
+    assert state["layout_sha256"] == hash_file_content(layout)
+
+
+@pytest.mark.anyio
+async def test_a_layout_changes_nothing_for_a_legacy_run(tmp_path, monkeypatch) -> None:
+    """Legacy runs accept the option and ignore it: same session, same pipeline state."""
+    layout = tmp_path / "xlights_rgbeffects.xml"
+    layout.write_text(physical_layout_xml({"Dmx MH1": {"DisplayAs": "Arches"}}), "utf-8")
+    runs = []
+    for path in (layout, None):
+        captured = _captured_run(monkeypatch, JobConfig(), build_fixture_group(RIGS["mh4_minimal"]))
+        await _run_with(tmp_path, path)
+        runs.append(captured)
+
+    assert runs[0]["session_id"] == runs[1]["session_id"]
+    assert runs[0]["state"].keys() == runs[1]["state"].keys()
+    assert "layout_models" not in runs[0]["state"]
+
+
+def test_run_refuses_a_missing_layout_file(tmp_path, monkeypatch) -> None:
+    audio = tmp_path / "song.wav"
+    audio.write_bytes(b"synthetic audio")
+    job = tmp_path / "job.json"
+    job.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(cli_main, "run_pipeline_async", MagicMock())
+    args = cli_main.build_arg_parser().parse_args(
+        [
+            "run",
+            "--audio",
+            str(audio),
+            "--config",
+            str(job),
+            "--app-config",
+            str(tmp_path / "config.json"),
+            "--layout",
+            str(tmp_path / "missing.xml"),
+        ]
+    )
+
+    with pytest.raises(SystemExit) as error:
+        cli_main.run_pipeline(args)
+
+    assert error.value.code == 1
+    cli_main.run_pipeline_async.assert_not_called()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("names", "message"),
+    [
+        (("Dmx MH1", "Dmx MH1"), "MH1 and MH2: both map to xLights model 'Dmx MH1'"),
+        (("Dmx MH1", ""), "MH2: xlights_model_name is blank"),
+    ],
+)
+async def test_run_refuses_unusable_model_names_before_planning(
+    tmp_path, monkeypatch, capsys, names, message
+) -> None:
+    """A physical job on a rig with a shared or blank model name stops before analysis;
+    the same rig under legacy_v1 still reaches the pipeline build as before."""
+    payload = physical_rig().model_dump(mode="json")
+    for fixture, name in zip(payload["fixtures"], names, strict=True):
+        fixture["xlights_model_name"] = name
+    rig = FixtureGroup.model_validate(payload)
+
+    captured = _captured_run(monkeypatch, physical_job(), rig)
+    with physical_test_templates():
+        assert await _run_with(tmp_path, None) == 1
+    assert captured["build_calls"] == 0
+    assert message in " ".join(capsys.readouterr().out.split())
+
+    captured = _captured_run(monkeypatch, JobConfig(), rig)
+    await _run_with(tmp_path, None)
+    assert captured["build_calls"] == 1
