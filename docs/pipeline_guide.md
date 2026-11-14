@@ -806,8 +806,12 @@ its fixtures load, before any analysis, unless every fixture declares a
 planner is offered only templates with physical data. The moving-head pipeline's
 `render_preflight` stage repeats those checks right after audio analysis, before any
 planner, dry-compiles every offered template (and each declared preset) on the rig, and
-refuses a song whose beats leave its start or end uncovered by more
-than one beat interval. `twinklr show`,
+refuses a song whose detected beats cannot establish a musical phase (fewer than two,
+or beats outside the song). A song with silence or a fade at
+either end renders only its covered span, the detected beats plus one beat interval
+beyond the first and last (or up to the song's edge when nearer); every fixture is held
+dark outside it and no tempo is inferred there. The gate logs that span, and the trace
+records it with each dropped cue. `twinklr show`,
 `inject` and `regenerate` render legacy output only and refuse it; `eval-report` refuses a
 checkpoint that records a physical render mode.
 With `twinklr run --layout`, a physical job's fixture models are checked against

@@ -303,6 +303,24 @@ def physical_grid() -> BeatGrid:
     )
 
 
+def physical_edge_grid(
+    *, lead_in_ms: float, tail_ms: float, grid: BeatGrid | None = None
+) -> BeatGrid:
+    """`grid` (default `physical_grid()`) with silent song edges: its beats and bars move
+    `lead_in_ms` later and the song ends `tail_ms` after its last beat."""
+    grid = grid or physical_grid()
+    beats = [beat + lead_in_ms for beat in grid.beat_boundaries]
+    return grid.model_copy(
+        update={
+            "bar_boundaries": [bar + lead_in_ms for bar in grid.bar_boundaries],
+            "beat_boundaries": beats,
+            "eighth_boundaries": BeatGrid._calculate_eighth_boundaries(beats),
+            "sixteenth_boundaries": BeatGrid._calculate_sixteenth_boundaries(beats),
+            "duration_ms": beats[-1] + tail_ms,
+        }
+    )
+
+
 def physical_head_profile(*, inverted: bool, pan_max: float = 270.0) -> dict[str, Any]:
     """Channel-17 shutter, 16-bit pan/tilt, 720°/s travel and 40 ms settle."""
     payload = discrete_profile_payload()

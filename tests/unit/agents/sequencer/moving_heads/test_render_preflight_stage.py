@@ -109,10 +109,13 @@ async def test_physical_job_offered_a_template_without_physical_data_is_refused(
 
 
 @pytest.mark.asyncio
-async def test_physical_job_whose_song_has_an_uncovered_tail_is_refused() -> None:
-    """Two silent seconds after the last beat leave the phase undefined there; the
-    renderer never infers tempo, so the job is refused before planning."""
-    with physical_test_templates():
+async def test_physical_job_whose_song_has_an_uncovered_tail_is_accepted(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Two silent seconds after the last beat are outside the covered span: the render
+    holds the heads dark there instead of inferring tempo, so the job passes and the
+    gate logs the span it will cover."""
+    with physical_test_templates(), caplog.at_level("INFO"):
         result, _ = await _run(
             physical_job(),
             templates=[TEMPLATE_ID],
@@ -120,9 +123,31 @@ async def test_physical_job_whose_song_has_an_uncovered_tail_is_refused() -> Non
             beat_grid=_long_tail_grid(),
         )
 
+    assert result.success, result.error
+    # One 400 ms interval past the last beat at 3615 ms; the song runs to 5615 ms.
+    assert "covered span [0.0, 4015.0] ms of the song's [0, 5615.0] ms" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_physical_job_whose_grid_has_one_beat_is_refused() -> None:
+    """One observed beat gives no interval to measure phase by; nothing is inferred."""
+    grid = physical_grid()
+    one_beat = grid.model_copy(
+        update={
+            "bar_boundaries": grid.bar_boundaries[:1],
+            "beat_boundaries": grid.beat_boundaries[:1],
+            "eighth_boundaries": grid.eighth_boundaries[:1],
+            "sixteenth_boundaries": grid.sixteenth_boundaries[:1],
+        }
+    )
+    with physical_test_templates():
+        result, _ = await _run(
+            physical_job(), templates=[TEMPLATE_ID], rig=physical_rig(), beat_grid=one_beat
+        )
+
     assert not result.success
     assert "musical phase" in (result.error or "")
-    assert "tail" in (result.error or "")
+    assert "no adjacent observed interval" in (result.error or "")
 
 
 @pytest.mark.asyncio

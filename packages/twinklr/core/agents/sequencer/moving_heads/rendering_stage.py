@@ -307,8 +307,9 @@ class RenderPreflightStage:
     the planner will be offered (`offered_template_ids`; every one must carry physical
     data, and each must dry-compile on this rig: `check_physical_templates`), the
     song's musical phase map, built from the detected BeatGrid, which the renderer
-    needs over the whole song and never infers, and, when the run supplies an xLights
-    layout (`layout_models` in state), every fixture's model (`check_physical_models`).
+    never infers (it holds every fixture dark outside the map's covered span, which
+    is logged), and, when the run supplies an xLights layout (`layout_models` in
+    state), every fixture's model (`check_physical_models`).
 
     Input and output: the audio stage's SongBundle, unchanged.
     """
@@ -364,13 +365,20 @@ class RenderPreflightStage:
                 )
             beat_grid = resolve_beat_grid(context, input)
             try:
-                build_musical_phase_map(beat_grid)
+                phase_map = build_musical_phase_map(beat_grid)
             except MusicalPhaseError as error:
                 raise UnsupportedRenderModeError(
-                    "moving_heads.mode 'physical_v2' needs the song's musical phase from "
-                    f"its first to its last millisecond, and this beat grid leaves it "
-                    f"undefined: {error}. The renderer does not infer tempo there"
+                    "moving_heads.mode 'physical_v2' needs a musical phase over the song's "
+                    f"detected beats, and this beat grid gives none: {error}. The renderer "
+                    "does not infer tempo"
                 ) from error
+            logger.info(
+                "physical_v2 renders the covered span [%s, %s] ms of the song's [0, %s] ms; "
+                "every fixture is held dark outside it",
+                phase_map.covered_start_ms,
+                phase_map.covered_end_ms,
+                phase_map.duration_ms,
+            )
             check_physical_templates(offered, beat_grid=beat_grid, fixture_group=fixture_group)
             layout_models = context.get_state("layout_models")
             if layout_models is not None:

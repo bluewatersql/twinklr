@@ -78,8 +78,8 @@ class TemplateCompileResult(BaseModel):
     provenance: list[str] = Field(default_factory=list)
     dropped_steps: list[dict[str, str | int]] = Field(
         default_factory=list,
-        description="Physical compile only: step instances starting at or after the song's "
-        "last whole frame, which have no frame to play",
+        description="Physical compile only: step instances starting outside the covered "
+        "phase span or at or after the song's last whole frame, which have no frame to play",
     )
 
     def segments_by_fixture(self, fixture_id: str) -> list[FixtureSegment]:
@@ -269,6 +269,7 @@ def compile_physical_template(
     preset: TemplatePreset | None = None,
     *,
     phase_map: MusicalPhaseMap,
+    start_limit_ms: int = 0,
     end_limit_ms: int,
 ) -> TemplateCompileResult:
     """Compile a template's scheduled steps for the physical renderer.
@@ -277,10 +278,12 @@ def compile_physical_template(
     and target resolution, then every step instance is compiled by
     `compile_physical_step` on the frame grid. Its musical bounds are cut at the
     section end, quantized with the encoder's `quantize_cue`, and its end is cut at
-    `end_limit_ms`, the last frame boundary inside the song, so a step running past
-    the song's last whole frame is truncated there without error, and a step starting
-    at or after it is dropped per target fixture and listed in `dropped_steps`. Section intent and
-    phase offsets are not applied (a physical step rejects non-default phase offsets).
+    `end_limit_ms`, the last frame boundary inside the song and the covered phase span,
+    so a step running past it is truncated there without error. A step starting before
+    `start_limit_ms`, the first frame boundary inside the covered span, or at or after
+    `end_limit_ms` is dropped per target fixture and listed in `dropped_steps`: its
+    phase origin would lie outside the map. Section intent and phase offsets are not
+    applied (a physical step rejects non-default phase offsets).
     Each segment records its requested musical bounds in metadata `requested_t0_ms`
     and `requested_t1_ms`.
 
@@ -289,6 +292,7 @@ def compile_physical_template(
         context: Compilation context; its fixtures carry their physical profiles.
         preset: Optional preset to apply.
         phase_map: The song's musical phase map, built from the detected grid.
+        start_limit_ms: Frame-grid time no step may start before.
         end_limit_ms: Frame-grid time no step may end after.
 
     Returns:
@@ -298,7 +302,7 @@ def compile_physical_template(
         PhysicalCompileError: For a FADE_OUT remainder policy, which has no physical
             fade, or a step the physical compile rejects.
         UnsupportedRigShapeError: If a step's target group matches no fixture.
-        ValueError: If a step starting before `end_limit_ms` is zero-length on the grid.
+        ValueError: If a step starting inside the limits is zero-length on the grid.
     """
     provenance: list[str] = [f"template:{template.template_id}"]
     working_template = template
@@ -346,7 +350,7 @@ def compile_physical_template(
         )
         t0 = quantize_cue(requested_t0).actual_ms
         t1 = min(quantize_cue(requested_t1).actual_ms, end_limit_ms)
-        if t0 >= end_limit_ms:
+        if t0 < start_limit_ms or t0 >= end_limit_ms:
             dropped.extend(
                 {
                     "fixture_id": fixture.fixture_id,
@@ -354,6 +358,7 @@ def compile_physical_template(
                     "step_id": step.step_id,
                     "requested_start_ms": requested_t0,
                     "requested_end_ms": requested_t1,
+                    "start_limit_ms": start_limit_ms,
                     "end_limit_ms": end_limit_ms,
                 }
                 for fixture in _resolve_target_fixtures(step, template, context)

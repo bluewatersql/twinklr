@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
+from fractions import Fraction
 import hashlib
+from itertools import pairwise
 import json
 import logging
 from pathlib import Path
@@ -222,6 +224,18 @@ def offered_template_ids(job_config: JobConfig, template_ids: Sequence[str]) -> 
     return offered
 
 
+def physical_cue_limits(phase_map: MusicalPhaseMap, duration_ms: int) -> tuple[int, int]:
+    """The frame-grid span a physical cue may occupy: `(start_limit_ms, end_limit_ms)`.
+
+    The start is the covered phase span's start rounded up to the frame grid; the end
+    is the earlier of the song's last whole frame and the covered end rounded down.
+    Outside it every fixture is held dark.
+    """
+    start = -(-Fraction(phase_map.covered_start_ms) // EFFECT_GRID_MS) * EFFECT_GRID_MS
+    covered_end = Fraction(phase_map.covered_end_ms) // EFFECT_GRID_MS * EFFECT_GRID_MS
+    return int(start), int(min(duration_ms // EFFECT_GRID_MS * EFFECT_GRID_MS, covered_end))
+
+
 def check_physical_templates(
     template_ids: Sequence[str], *, beat_grid: BeatGrid, fixture_group: FixtureGroup
 ) -> None:
@@ -230,7 +244,8 @@ def check_physical_templates(
     Each template is compiled with no preset and with each preset it declares (the
     only presets the physical renderer applies), as one section from bar 1 over every
     bar that starts in the song, on every fixture of the rig, through the render's own
-    `compile_physical_template` against the song's phase map. That checks target
+    `compile_physical_template` against the song's phase map and within the render's
+    cue limits (`physical_cue_limits`). That checks target
     groups against the rig's roles, legacy data a preset adds, every step's states and
     channels against each profile, axis bounds, travel rate and pulse and shutter
     timing for that placement.
@@ -247,7 +262,7 @@ def check_physical_templates(
     registries = create_default_registries()
     fixtures = build_fixture_contexts(rig_profile_from_fixture_group(fixture_group), fixture_group)
     phase_map = build_musical_phase_map(beat_grid)
-    duration_ms = int(beat_grid.duration_ms)
+    start_limit, end_limit = physical_cue_limits(phase_map, int(beat_grid.duration_ms))
     bars = sum(1 for start in beat_grid.bar_boundaries if start < beat_grid.duration_ms)
     failures: list[str] = []
     for template_id in template_ids:
@@ -272,7 +287,8 @@ def check_physical_templates(
                     context,
                     preset,
                     phase_map=phase_map,
-                    end_limit_ms=duration_ms // EFFECT_GRID_MS * EFFECT_GRID_MS,
+                    start_limit_ms=start_limit,
+                    end_limit_ms=end_limit,
                 )
             except (
                 PhysicalCompileError,
@@ -351,12 +367,19 @@ def _phase_boundaries(phase_map: MusicalPhaseMap) -> list[dict[str, Any]]:
     ]
 
 
+def _longest_beat_interval_ms(phase_map: MusicalPhaseMap) -> float | None:
+    """The longest interval between consecutive observed beats, if there are two."""
+    beats = [knot.time_ms for knot in phase_map.knots if knot.provenance == "observed"]
+    return max((later - earlier for earlier, later in pairwise(beats)), default=None)
+
+
 def _cue_records(cues: Sequence[FixtureSegment]) -> list[dict[str, Any]]:
     """Requested and actual timing of every compiled cue, for the trace.
 
     A cue's start and end were requested at musical times and quantized (an end also
-    cut at the song's last whole frame) before compiling. Its hold and discrete cues
-    are authored on the frame grid, so only one a quantization moved is listed.
+    cut at the song's last whole frame or the covered end) before compiling. Its hold
+    and discrete cues are authored on the frame grid, so only one a quantization moved
+    is listed.
     """
     records: list[dict[str, Any]] = []
     for cue in cues:
@@ -666,9 +689,11 @@ class RenderingPipeline:
         """Render through the opt-in physical path and, with an output path, deliver it.
 
         Each section's template compiles on the frame grid against the musical phase
-        of the detected grid; the transaction pass authors every fixture of the rig over
-        the whole sequence; each fixture's complete frames are encoded in rig order and
-        merged into constant DMX runs. Any refusal raises before anything is written,
+        of the detected grid, within its covered span (`physical_cue_limits`); the
+        transaction pass authors every fixture of the rig over the whole sequence,
+        holding it dark outside every cue and so outside the covered span; each
+        fixture's complete frames are encoded in rig order and merged into constant DMX
+        runs. Any refusal raises before anything is written,
         and the delivery itself is published only once its size fits the budgets.
 
         Returns:
@@ -682,6 +707,7 @@ class RenderingPipeline:
         policy = self.job_config.moving_heads
         phase_map = build_musical_phase_map(self.beat_grid)
         duration_ms = int(self.beat_grid.duration_ms)
+        start_limit, end_limit = physical_cue_limits(phase_map, duration_ms)
         times = frame_times(duration_ms)
         fixtures = self.fixture_group.expand_fixtures()
         profiles = {}
@@ -752,10 +778,20 @@ class RenderingPipeline:
                 context,
                 preset,
                 phase_map=phase_map,
-                end_limit_ms=duration_ms // EFFECT_GRID_MS * EFFECT_GRID_MS,
+                start_limit_ms=start_limit,
+                end_limit_ms=end_limit,
             )
             cues.extend(compiled.segments)
             dropped.extend(compiled.dropped_steps)
+        if dropped:
+            logger.warning(
+                "physical_v2: %d cue(s) start outside the frames %s-%s ms that the covered "
+                "phase span and the song allow and are dropped (held dark); the trace's "
+                "dropped_cues lists them",
+                len(dropped),
+                start_limit,
+                end_limit,
+            )
 
         result = plan_prepositions(
             cues,
@@ -805,6 +841,11 @@ class RenderingPipeline:
             },
             "beat_grid_sha256": _sha256(self.beat_grid),
             "phase_boundaries": _phase_boundaries(phase_map),
+            "covered_span": {
+                "start_ms": phase_map.covered_start_ms,
+                "end_ms": phase_map.covered_end_ms,
+            },
+            "longest_beat_interval_ms": _longest_beat_interval_ms(phase_map),
             "frame_grid": {
                 "frame_ms": EFFECT_GRID_MS,
                 "frame_count": len(times),

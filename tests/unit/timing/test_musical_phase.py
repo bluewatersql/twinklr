@@ -85,11 +85,17 @@ def test_observed_beat_at_zero_needs_no_inferred_head() -> None:
     assert all(knot.provenance == "observed" for knot in phase_map.knots)
 
 
-def test_unsupported_tail_is_rejected_without_explicit_knots() -> None:
+def test_long_tail_is_covered_one_interval_past_the_last_beat() -> None:
     grid = _grid([0, 500, 1000, 1500], 3500)
 
-    with pytest.raises(MusicalPhaseError, match="tail"):
-        build_musical_phase_map(grid)
+    phase_map = build_musical_phase_map(grid)
+    assert (phase_map.covered_start_ms, phase_map.covered_end_ms) == (0, 2000)
+    assert phase_map.knots[-1] == PhaseKnot(
+        time_ms=2000.0, beat_index=4.0, provenance="adjacent_interval"
+    )
+    assert musical_phase_at(phase_map, 2000, origin_ms=0, period_beats=1) == 4
+    with pytest.raises(MusicalPhaseError, match=r"\[0\.0, 2000\.0\]"):
+        musical_phase_at(phase_map, 2500, origin_ms=0, period_beats=1)
 
     phase_map = build_musical_phase_map(
         grid, boundary_knots=(PhaseKnot(time_ms=3500, beat_index=7, provenance="explicit"),)
@@ -98,9 +104,93 @@ def test_unsupported_tail_is_rejected_without_explicit_knots() -> None:
     assert phase_map.knots[-1].provenance == "explicit"
 
 
-def test_unsupported_head_is_rejected_without_explicit_knots() -> None:
-    with pytest.raises(MusicalPhaseError, match="head"):
-        build_musical_phase_map(_grid([700, 1200, 1700], 1700))
+def test_long_head_is_covered_one_interval_before_the_first_beat() -> None:
+    phase_map = build_musical_phase_map(_grid([700, 1200, 1700], 1700))
+
+    assert (phase_map.covered_start_ms, phase_map.covered_end_ms) == (200, 1700)
+    assert phase_map.knots[0] == PhaseKnot(
+        time_ms=200.0, beat_index=-1.0, provenance="adjacent_interval"
+    )
+    with pytest.raises(MusicalPhaseError, match=r"\[200\.0, 1700\.0\]"):
+        musical_phase_at(phase_map, 100, origin_ms=700, period_beats=1)
+
+
+def test_silent_lead_in_is_covered_from_one_interval_before_the_first_beat() -> None:
+    beats = [3000.0 + 500 * index for index in range(8)]
+    phase_map = build_musical_phase_map(_grid(beats, beats[-1]))
+
+    assert phase_map.covered_start_ms == 2500
+    assert phase_map.knots[0] == PhaseKnot(
+        time_ms=2500.0, beat_index=-1.0, provenance="adjacent_interval"
+    )
+    assert musical_phase_at(phase_map, 2500, origin_ms=3000, period_beats=1) == -1
+    with pytest.raises(MusicalPhaseError, match=r"2000 ms lies outside .*\[2500\.0, 6500\.0\]"):
+        musical_phase_at(phase_map, 2000, origin_ms=3000, period_beats=1)
+
+
+def test_silent_edge_knot_keeps_the_adjacent_slope_exactly() -> None:
+    """One interval past 2031.1 ms is not a float; the stored knot time is the nearest one,
+    and phase up to it follows the adjacent observed interval's slope exactly."""
+    phase_map = build_musical_phase_map(_grid([1596.3, 2031.1], 4000))
+
+    interval = Fraction(2031.1) - Fraction(1596.3)
+    end = Fraction(phase_map.covered_end_ms)
+    assert end != Fraction(2031.1) + interval
+    assert (
+        musical_phase_fraction(
+            phase_map, phase_map.covered_end_ms, origin_ms=2031.1, period_beats=1
+        )
+        == (end - Fraction(2031.1)) / interval
+    )
+
+
+def test_edges_within_one_interval_keep_the_phase1_knots() -> None:
+    phase_map = build_musical_phase_map(_grid([100, 600, 1100], 1600))
+
+    assert phase_map.model_dump() == {
+        "knots": (
+            {"time_ms": 0.0, "beat_index": -0.2, "provenance": "adjacent_interval"},
+            {"time_ms": 100.0, "beat_index": 0.0, "provenance": "observed"},
+            {"time_ms": 600.0, "beat_index": 1.0, "provenance": "observed"},
+            {"time_ms": 1100.0, "beat_index": 2.0, "provenance": "observed"},
+            {"time_ms": 1600.0, "beat_index": 3.0, "provenance": "adjacent_interval"},
+        ),
+        "duration_ms": 1600.0,
+    }
+    assert (phase_map.covered_start_ms, phase_map.covered_end_ms) == (0, 1600)
+
+
+def test_mid_song_gap_is_one_long_beat() -> None:
+    """Far-apart detected beats are one beat: no knot is added and nothing is held dark."""
+    beats = [0.0, 500.0, 1000.0, 1500.0, 2000.0, 5000.0, 5500.0, 6000.0]
+    phase_map = build_musical_phase_map(_grid(beats, 6000))
+
+    assert musical_phase_at(phase_map, 3500, origin_ms=0, period_beats=1) == 4.5
+    assert [knot.time_ms for knot in phase_map.knots] == beats
+    assert all(knot.provenance == "observed" for knot in phase_map.knots)
+
+
+def test_silent_edge_sweep_builds_every_grid() -> None:
+    """961 grids at 120 BPM, lead-ins 0-3 s by 100 ms and tails 0-6 s by 200 ms, all build;
+    each covered edge is the song edge or one interval beyond the outermost beat."""
+    built = 0
+    for lead_in in range(0, 3001, 100):
+        for tail in range(0, 6001, 200):
+            beats = [float(lead_in + 500 * index) for index in range(16)]
+            grid = _grid(beats, beats[-1] + tail)
+            phase_map = build_musical_phase_map(grid)
+
+            first, last = grid.beat_boundaries[0], grid.beat_boundaries[-1]
+            head = grid.beat_boundaries[1] - first
+            tail_interval = last - grid.beat_boundaries[-2]
+            assert phase_map.covered_start_ms == (0 if first <= head else first - head)
+            assert phase_map.covered_end_ms == (
+                grid.duration_ms
+                if grid.duration_ms - last <= tail_interval
+                else last + tail_interval
+            )
+            built += 1
+    assert built == 961
 
 
 @pytest.mark.parametrize("beats", [[], [500.0]])
@@ -126,7 +216,6 @@ def test_fewer_than_two_observed_beats_need_explicit_knots(beats: list[float]) -
         (PhaseKnot(time_ms=3500, beat_index=2, provenance="explicit"), "monoton"),
         (PhaseKnot(time_ms=3500, beat_index=7, provenance="observed"), "explicit"),
         (PhaseKnot(time_ms=3600, beat_index=7, provenance="explicit"), "domain"),
-        (PhaseKnot(time_ms=2500, beat_index=5, provenance="explicit"), "tail"),
     ],
 )
 def test_explicit_knots_cannot_overwrite_beats_or_break_monotonicity(
@@ -134,6 +223,16 @@ def test_explicit_knots_cannot_overwrite_beats_or_break_monotonicity(
 ) -> None:
     with pytest.raises(MusicalPhaseError, match=match):
         build_musical_phase_map(_grid([0, 500, 1000, 1500], 3500), boundary_knots=(knot,))
+
+
+def test_explicit_tail_knot_inside_the_song_bounds_the_covered_span() -> None:
+    phase_map = build_musical_phase_map(
+        _grid([0, 500, 1000, 1500], 3500),
+        boundary_knots=(PhaseKnot(time_ms=2500, beat_index=5, provenance="explicit"),),
+    )
+
+    assert phase_map.covered_end_ms == 2500
+    assert phase_map.knots[-1] == PhaseKnot(time_ms=2500, beat_index=5, provenance="explicit")
 
 
 def test_phase_is_evaluated_only_inside_the_domain() -> None:
@@ -153,19 +252,28 @@ def test_observed_beats_outside_the_duration_are_rejected() -> None:
 
 
 def test_phase_map_requires_a_covered_monotonic_domain() -> None:
-    with pytest.raises(ValueError):
-        MusicalPhaseMap(
-            knots=(
-                PhaseKnot(time_ms=0, beat_index=0, provenance="observed"),
-                PhaseKnot(time_ms=500, beat_index=1, provenance="observed"),
-            ),
-            duration_ms=1000,
-        )
+    partial = MusicalPhaseMap(
+        knots=(
+            PhaseKnot(time_ms=0, beat_index=0, provenance="observed"),
+            PhaseKnot(time_ms=500, beat_index=1, provenance="observed"),
+        ),
+        duration_ms=1000,
+    )
+    assert (partial.covered_start_ms, partial.covered_end_ms) == (0, 500)
+    assert "covered_start_ms" not in partial.model_dump()
     with pytest.raises(ValueError):
         MusicalPhaseMap(
             knots=(
                 PhaseKnot(time_ms=0, beat_index=1, provenance="observed"),
                 PhaseKnot(time_ms=1000, beat_index=1, provenance="observed"),
+            ),
+            duration_ms=1000,
+        )
+    with pytest.raises(ValueError, match="within"):
+        MusicalPhaseMap(
+            knots=(
+                PhaseKnot(time_ms=500, beat_index=0, provenance="observed"),
+                PhaseKnot(time_ms=1500, beat_index=1, provenance="observed"),
             ),
             duration_ms=1000,
         )
