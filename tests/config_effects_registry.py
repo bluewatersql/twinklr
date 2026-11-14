@@ -272,13 +272,15 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "job.moving_heads": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_mh_render_policy.py::test_unimplemented_physical_mode_is_rejected",
-        "selected render policy is rejected by the pipeline before any output",
+        "tests/unit/config/test_mh_render_policy.py::"
+        "test_loading_physical_job_without_profiles_is_rejected_before_execution",
+        "selected render policy decides which fixture prerequisites loading the job checks",
     ),
     "job.moving_heads.mode": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_mh_render_policy.py::test_loading_physical_job_is_rejected_before_execution",
-        "selected render mode is rejected at job load, before any analysis or provider request",
+        "tests/unit/config/test_mh_render_policy.py::test_physical_mode_without_profiles_is_rejected",
+        "physical mode refuses a rig without physical profiles, naming each fixture; legacy "
+        "mode renders it",
     ),
     "job.fixture_config_path": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,

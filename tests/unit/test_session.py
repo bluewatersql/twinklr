@@ -9,7 +9,9 @@ from unittest.mock import patch
 from pydantic import SecretStr
 import pytest
 
+from tests.golden.harness import RIGS, build_fixture_group
 from twinklr.core.agents.providers.factory import create_llm_provider
+from twinklr.core.config.loader import load_full_config, load_job_config
 from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.config.render_policy import UnsupportedRenderModeError
 from twinklr.core.session import TwinklrSession
@@ -134,25 +136,34 @@ def _write_job_dir(directory: Path, job: dict) -> None:
 _PHYSICAL_JOB = {"schema_version": "3.1", "moving_heads": {"mode": "physical_v2"}}
 
 
-def test_session_rejects_physical_job_file_at_load(tmp_path: Path) -> None:
-    """A physical job path fails when the session resolves it, before any analysis."""
+def test_session_loads_physical_job_file_like_the_loader(tmp_path: Path) -> None:
+    """A session resolves no fixtures, so a physical job file loads exactly as
+    `load_job_config` and `JobConfig.load_or_default` load it; the fixture
+    prerequisites are refused where the fixtures load, before any analysis."""
     _write_job_dir(tmp_path, _PHYSICAL_JOB)
+    path = tmp_path / "job_config.json"
 
-    with pytest.raises(UnsupportedRenderModeError, match="physical_v2"):
-        TwinklrSession.from_directory(tmp_path)
-    with pytest.raises(UnsupportedRenderModeError, match="physical_v2"):
-        TwinklrSession(app_config=_make_app_config(), job_config=tmp_path / "job_config.json")
+    expected = load_job_config(path)
+    assert expected.moving_heads.mode == "physical_v2"
+    assert JobConfig.load_or_default(path) == expected
+    assert TwinklrSession.from_directory(tmp_path).job_config == expected
+    assert TwinklrSession(app_config=_make_app_config(), job_config=path).job_config == expected
+    (tmp_path / "fixture_config.json").write_text(
+        build_fixture_group(RIGS["mh4_minimal"]).model_dump_json(), encoding="utf-8"
+    )
+    with pytest.raises(UnsupportedRenderModeError, match="MH1: physical_profile is missing"):
+        load_full_config(path)
 
 
-def test_session_default_job_path_rejects_physical_job(
+def test_session_default_job_path_loads_physical_job(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The implicit ./job_config.json goes through the same preflight."""
+    """The implicit ./job_config.json goes through the same loader."""
     _write_job_dir(tmp_path, _PHYSICAL_JOB)
     monkeypatch.chdir(tmp_path)
 
-    with pytest.raises(UnsupportedRenderModeError, match="physical_v2"):
-        TwinklrSession(app_config=_make_app_config(), job_config=None)
+    session = TwinklrSession(app_config=_make_app_config(), job_config=None)
+    assert session.job_config == load_job_config(tmp_path / "job_config.json")
 
 
 def test_session_loads_legacy_job_file_and_accepts_instances(tmp_path: Path) -> None:

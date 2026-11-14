@@ -49,6 +49,11 @@ from twinklr.core.caching import derive_session_id
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.loader import load_app_config, load_fixture_group, load_job_config
 from twinklr.core.config.models import JobConfig
+from twinklr.core.config.render_policy import (
+    UnsupportedRenderModeError,
+    preflight_render_policy,
+    require_legacy_render,
+)
 from twinklr.core.pipeline import PipelineContext, PipelineExecutor
 from twinklr.core.pipeline.definition import PipelineDefinition
 from twinklr.core.pipeline.definitions import build_moving_heads_pipeline
@@ -60,6 +65,7 @@ from twinklr.core.sequencer.display.xlights_mapping import (
     XLightsGroupMapping,
     XLightsMapping,
 )
+from twinklr.core.sequencer.moving_heads.pipeline import offered_template_ids
 from twinklr.core.sequencer.moving_heads.templates import (
     load_builtin_templates,
     load_templates_from_directory,
@@ -315,6 +321,12 @@ async def _run_pipeline_async(
         app_config = load_app_config(app_config_path)
         validate_llm_provider_config(app_config)
         job_config = load_job_config(job_config_path)
+        if live_client is not None:
+            # Live injection serializes through the legacy exporter only.
+            require_legacy_render(
+                job_config.moving_heads,
+                command="regenerate" if section_id is not None else "inject",
+            )
         console.print("[green]✅ Configuration loaded[/green]")
         console.print(f"   Provider: {app_config.llm_provider}")
         console.print(f"   Model: {job_config.agent.plan_agent.model}")
@@ -394,6 +406,23 @@ async def _run_pipeline_async(
                 "Twinklr will not guess DMX channel mappings.[/red]"
             )
             return 1
+
+    # The rig is final here, so a physical job's fixture prerequisites, and the
+    # templates the planner may be offered, are checked before any analysis or
+    # provider request.
+    try:
+        preflight_render_policy(job_config, fixture_group)
+        available_templates = offered_template_ids(job_config, available_templates)
+    except UnsupportedRenderModeError as error:
+        console.print(f"[red]ERROR: {error}[/red]")
+        return 1
+    if job_config.moving_heads.mode == "physical_v2":
+        console.print(
+            f"[green]🎛️  Physical templates offered:[/green] {len(available_templates)}\n"
+            "[yellow]WARNING: the xLights model check was not performed: `twinklr run` "
+            "has no layout input, so nothing verifies that each fixture's model is a "
+            "single-color DMX model with enough channels for its profile.[/yellow]"
+        )
 
     # Define pipeline via pipeline definitions module
     console.print("\n[bold]Defining pipeline...[/bold]")

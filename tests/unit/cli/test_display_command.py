@@ -300,3 +300,37 @@ async def test_async_command_reports_invalid_render_payload(
             job_config_path=tmp_path / "job.json",
         )
     assert exit_code == 1
+
+
+@pytest.mark.asyncio
+async def test_display_accepts_a_physical_job_because_it_renders_no_moving_heads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Decision (P1.6): `twinklr display` never renders a DMX model, so a job's
+    moving-head render mode has no effect on it; a physical job file loads through the
+    real loader and the command proceeds to its display wiring."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-only")
+    job_path = tmp_path / "job.json"
+    job_path.write_text(
+        json.dumps({"schema_version": "3.1", "moving_heads": {"mode": "physical_v2"}}),
+        encoding="utf-8",
+    )
+    with (
+        patch("twinklr.cli.display_cmd.load_app_config", return_value=AppConfig()),
+        patch(
+            "twinklr.cli.display_cmd.prepare_display_pipeline",
+            side_effect=ValueError("stop after config"),
+        ) as prepare,
+    ):
+        exit_code = await run_display_pipeline_async(
+            audio_path=tmp_path / "song.wav",
+            layout_path=tmp_path / "layout.xml",
+            output_dir=tmp_path / "out",
+            app_config_path=None,
+            job_config_path=job_path,
+        )
+
+    assert exit_code == 1
+    prepare.assert_called_once()
+    assert prepare.call_args.kwargs["job_config"].moving_heads.mode == "physical_v2"

@@ -14,12 +14,31 @@ if TYPE_CHECKING:
     from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
     from twinklr.core.pipeline.context import PipelineContext
     from twinklr.core.pipeline.result import StageResult
+    from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 logger = logging.getLogger(__name__)
 
 # T4 canonicalizes section identities and binds lyric cues to the authoritative
 # BeatGrid before validation/judging. Version 1 plans were cached before that seam.
 MOVING_HEAD_CACHE_VERSION = "2"
+
+
+def resolve_beat_grid(context: PipelineContext, audio_bundle: Any) -> BeatGrid:
+    """The run's BeatGrid: the one in state, else built from the audio bundle and stored.
+
+    The render preflight and the moving-head planner both read it here, so they see
+    the same grid the renderer places effects on.
+    """
+    from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+
+    beat_grid = context.get_state("beat_grid")
+    if beat_grid is None:
+        beat_grid = BeatGrid.from_song_features(
+            audio_bundle.features,
+            duration_ms=getattr(getattr(audio_bundle, "timing", None), "duration_ms", None),
+        )
+        context.set_state("beat_grid", beat_grid)
+    return cast("BeatGrid", beat_grid)
 
 
 class MovingHeadStage:
@@ -160,15 +179,7 @@ class MovingHeadStage:
                 )
 
             # Build BeatGrid from audio bundle for downstream rendering
-            from twinklr.core.sequencer.timing.beat_grid import BeatGrid
-
-            beat_grid = context.get_state("beat_grid")
-            if beat_grid is None:
-                beat_grid = BeatGrid.from_song_features(
-                    audio_bundle.features,
-                    duration_ms=getattr(getattr(audio_bundle, "timing", None), "duration_ms", None),
-                )
-                context.set_state("beat_grid", beat_grid)
+            beat_grid = resolve_beat_grid(context, audio_bundle)
             logger.debug(
                 f"Built beat_grid: tempo={beat_grid.tempo_bpm} BPM, "
                 f"total_bars={beat_grid.total_bars}"
@@ -370,7 +381,8 @@ class MovingHeadStage:
 
         Historical checkpoints used a `templates:[...]` list shape that today's
         `PlanSection` model no longer has; this writes `plan.model_dump()` directly,
-        which is exactly what `collect.extract_plan` already validates against.
+        which is exactly what `collect.extract_plan` already validates against. A job
+        that renders under a mode other than `legacy_v1` also records `render_mode`.
         """
         if not context.job_config.write_checkpoint or context.output_dir is None:
             return
@@ -380,6 +392,11 @@ class MovingHeadStage:
             "run_id": context.session.session_id,
             "plan": plan.model_dump(mode="json"),
         }
+        # Only a non-legacy mode is written, so legacy checkpoints keep their bytes and a
+        # checkpoint without the key reads as legacy.
+        mode = context.job_config.moving_heads.mode
+        if mode != "legacy_v1":
+            checkpoint_data["render_mode"] = mode
         checkpoint_path.write_text(json.dumps(checkpoint_data, indent=2), encoding="utf-8")
 
     def _handle_metrics(self, result: Any, context: PipelineContext) -> None:

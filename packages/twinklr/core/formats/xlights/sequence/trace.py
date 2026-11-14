@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 import json
 from pathlib import Path
 from typing import Any, Literal, NotRequired, TypedDict
@@ -63,15 +63,23 @@ def build_xsq_trace_payload(
     entries: Iterable[EmissionTraceEntry],
     *,
     fallback_substitutions: int = 0,
+    render: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Build the stable trace-v2 document shared by MH, display, and combined shows."""
+    """Build the stable trace-v2 document shared by MH, display, and combined shows.
+
+    `render` is the physical moving-head render record (identity, inputs, cue timing,
+    transaction diagnostics, output measure); the document carries it only when given.
+    """
     rows = [dict(entry) for entry in entries]
-    return {
+    payload: dict[str, Any] = {
         "schema_version": "twinklr-xsq-trace.v2",
         "entry_count": len(rows),
         "fallback_substitutions": fallback_substitutions,
         "entries": rows,
     }
+    if render is not None:
+        payload["render"] = dict(render)
+    return payload
 
 
 def write_xsq_trace_sidecar(
@@ -79,6 +87,7 @@ def write_xsq_trace_sidecar(
     entries: Iterable[EmissionTraceEntry],
     *,
     fallback_substitutions: int = 0,
+    render: Mapping[str, Any] | None = None,
 ) -> Path:
     """Write one trace-v2 document next to an XSQ artifact."""
     path = Path(f"{xsq_path}.trace.json")
@@ -88,6 +97,7 @@ def write_xsq_trace_sidecar(
             build_xsq_trace_payload(
                 entries,
                 fallback_substitutions=fallback_substitutions,
+                render=render,
             ),
             indent=2,
         ),

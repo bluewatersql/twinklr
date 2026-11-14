@@ -29,6 +29,16 @@ ENVIRONMENT_CONFIG_KEYS = ("project_root", "output_dir", "cache_dir", "llm_api_k
 produces. Excluded from the derived ID so relocating a checkout or rotating a
 key does not orphan the cache."""
 
+RENDER_ONLY_CONFIG_KEYS = (
+    "moving_heads.initial_states",
+    "moving_heads.max_effects",
+    "moving_heads.max_xsq_bytes",
+)
+"""Job keys that change only the moving-head render, never the plan. Excluded from
+the derived ID so moving a head's start pose or an output budget does not re-key the
+planner's cache. ``moving_heads.mode`` stays in: it changes what the planner is
+offered. A legacy job's dump carries none of them, so its ID is unchanged."""
+
 
 def hash_file_content(path: Path | str) -> str:
     """Return the SHA256 of a file's bytes, read in chunks.
@@ -61,7 +71,8 @@ def config_fingerprint(
 
     Args:
         *configs: Config models or plain dicts (``None`` entries are skipped)
-        exclude: Top-level keys dropped from every config before hashing
+        exclude: Keys dropped from every config before hashing; a dotted key such as
+            ``"moving_heads.max_effects"`` drops that nested key
 
     Returns:
         Hex digest over the canonical encoding of all configs
@@ -72,7 +83,7 @@ def config_fingerprint(
         if config is None:
             continue
         dumped = config.model_dump(mode="json") if isinstance(config, BaseModel) else dict(config)
-        payload.append({k: v for k, v in dumped.items() if k not in excluded})
+        payload.append(_without(dumped, excluded))
 
     canonical = json.dumps(
         payload,
@@ -82,6 +93,17 @@ def config_fingerprint(
         default=str,
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _without(dumped: dict[str, Any], excluded: set[str]) -> dict[str, Any]:
+    """`dumped` without the excluded keys, descending into dicts for dotted keys."""
+    kept: dict[str, Any] = {}
+    for key, value in dumped.items():
+        if key in excluded:
+            continue
+        nested = {path.split(".", 1)[1] for path in excluded if path.startswith(f"{key}.")}
+        kept[key] = _without(value, nested) if nested and isinstance(value, dict) else value
+    return kept
 
 
 def derive_session_id(
@@ -96,7 +118,8 @@ def derive_session_id(
     ID, in this process or any other; changing either changes it.
 
     Keys in :data:`ENVIRONMENT_CONFIG_KEYS` are excluded, so moving the checkout
-    or rotating an API key does not orphan previously cached work.
+    or rotating an API key does not orphan previously cached work, and so are the
+    render-only keys in :data:`RENDER_ONLY_CONFIG_KEYS`, so they never re-key a plan.
 
     Args:
         audio_path: Audio file whose *content* identifies the job
@@ -112,6 +135,7 @@ def derive_session_id(
     digest = hashlib.sha256()
     digest.update(hash_file_content(audio_path).encode("utf-8"))
     digest.update(b"\x00")
-    digest.update(config_fingerprint(*configs, exclude=ENVIRONMENT_CONFIG_KEYS).encode("utf-8"))
+    excluded = ENVIRONMENT_CONFIG_KEYS + RENDER_ONLY_CONFIG_KEYS
+    digest.update(config_fingerprint(*configs, exclude=excluded).encode("utf-8"))
 
     return f"{prefix}_{digest.hexdigest()[:SESSION_ID_LENGTH]}"

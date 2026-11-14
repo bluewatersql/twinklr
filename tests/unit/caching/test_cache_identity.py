@@ -15,6 +15,7 @@ import pytest
 from twinklr.core.caching import CacheKey, config_fingerprint, derive_session_id
 from twinklr.core.caching.backends.fs import FSCache
 from twinklr.core.caching.backends.null import NullCache
+from twinklr.core.caching.identity import ENVIRONMENT_CONFIG_KEYS, RENDER_ONLY_CONFIG_KEYS
 from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.config.paths import PROJECT_ROOT_ENV_VAR, resolve_project_root
 from twinklr.core.io import absolute_path, anchored_path
@@ -148,6 +149,43 @@ class TestDerivedSessionId:
         assert derive_session_id(audio_path=audio_file, configs=first) == derive_session_id(
             audio_path=audio_file, configs=second
         )
+
+    def test_session_id_ignores_render_only_policy_fields(self, audio_file: Path) -> None:
+        """A start pose or an output budget changes only the render, never the plan,
+        so editing one must not re-key the planner's cache; the mode still does."""
+        physical = {"schema_version": "3.1", "moving_heads": {"mode": "physical_v2"}}
+        state = {
+            "pan_deg": 0.0,
+            "tilt_deg": 0.0,
+            "dimmer": 0.0,
+            "discrete_states": {"shutter": "closed"},
+            "settled": True,
+            "dark": True,
+        }
+        base = derive_session_id(
+            audio_path=audio_file, configs=(_app_config(), _job_config(**physical))
+        )
+        for render_only in (
+            {"initial_states": {"MH1": state}},
+            {"max_effects": 10},
+            {"max_xsq_bytes": 10},
+        ):
+            edited = _job_config(
+                schema_version="3.1", moving_heads={"mode": "physical_v2", **render_only}
+            )
+            assert derive_session_id(audio_path=audio_file, configs=(_app_config(), edited)) == (
+                base
+            )
+        legacy = derive_session_id(audio_path=audio_file, configs=(_app_config(), _job_config()))
+        assert legacy != base
+
+    def test_legacy_session_ids_are_unchanged_by_render_only_exclusion(self) -> None:
+        """Legacy job dumps carry no render-only field, so their fingerprint is the one
+        environment-only exclusion always gave."""
+        for job in (_job_config(), JobConfig(), _job_config(agent={"max_iterations": 7})):
+            assert config_fingerprint(
+                _app_config(), job, exclude=ENVIRONMENT_CONFIG_KEYS + RENDER_ONLY_CONFIG_KEYS
+            ) == config_fingerprint(_app_config(), job, exclude=ENVIRONMENT_CONFIG_KEYS)
 
     def test_config_fingerprint_masks_secrets(self) -> None:
         fingerprint = config_fingerprint(_app_config(llm_api_key="super-secret"))

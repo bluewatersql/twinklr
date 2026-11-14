@@ -9,8 +9,10 @@ import logging
 from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.curves.models import CurvePoint, PointsCurve
+from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.models.context import FixtureContext, TemplateCompileContext
 from twinklr.core.sequencer.models.enum import ChannelName, ChaseOrder, TemplateRole
+from twinklr.core.sequencer.models.moving_heads.physical import PhysicalChannelError
 from twinklr.core.sequencer.models.template import (
     RemainderPolicy,
     Template,
@@ -26,13 +28,20 @@ from twinklr.core.sequencer.moving_heads.compile.phase_offset import (
     PhaseOffsetResult,
     calculate_fixture_offsets,
 )
+from twinklr.core.sequencer.moving_heads.compile.physical import (
+    PhysicalCompileError,
+    compile_physical_step,
+)
 from twinklr.core.sequencer.moving_heads.compile.preset import apply_preset
 from twinklr.core.sequencer.moving_heads.compile.scheduler import schedule_repeats
 from twinklr.core.sequencer.moving_heads.compile.step_compiler import (
     StepCompileContext,
     compile_step,
 )
+from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
+from twinklr.core.sequencer.moving_heads.export.frame_encoder import quantize_cue
 from twinklr.core.sequencer.moving_heads.utils import resolve_semantic_group
+from twinklr.core.sequencer.timing.musical_phase import MusicalPhaseMap
 from twinklr.core.utils.logging import get_renderer_logger, log_performance
 
 logger = logging.getLogger(__name__)
@@ -67,6 +76,11 @@ class TemplateCompileResult(BaseModel):
     segments: list[FixtureSegment] = Field(default_factory=list)
     num_complete_cycles: int = Field(default=0)
     provenance: list[str] = Field(default_factory=list)
+    dropped_steps: list[dict[str, str | int]] = Field(
+        default_factory=list,
+        description="Physical compile only: step instances starting at or after the song's "
+        "last whole frame, which have no frame to play",
+    )
 
     def segments_by_fixture(self, fixture_id: str) -> list[FixtureSegment]:
         """Get segments for a specific fixture."""
@@ -246,6 +260,152 @@ def compile_template(
         segments=all_segments,
         num_complete_cycles=schedule_result.num_complete_cycles,
         provenance=provenance,
+    )
+
+
+def compile_physical_template(
+    template: Template,
+    context: TemplateCompileContext,
+    preset: TemplatePreset | None = None,
+    *,
+    phase_map: MusicalPhaseMap,
+    end_limit_ms: int,
+) -> TemplateCompileResult:
+    """Compile a template's scheduled steps for the physical renderer.
+
+    The physical counterpart of `compile_template`: the same preset, repeat schedule
+    and target resolution, then every step instance is compiled by
+    `compile_physical_step` on the frame grid. Its musical bounds are cut at the
+    section end, quantized with the encoder's `quantize_cue`, and its end is cut at
+    `end_limit_ms`, the last frame boundary inside the song, so a step running past
+    the song's last whole frame is truncated there without error, and a step starting
+    at or after it is dropped per target fixture and listed in `dropped_steps`. Section intent and
+    phase offsets are not applied (a physical step rejects non-default phase offsets).
+    Each segment records its requested musical bounds in metadata `requested_t0_ms`
+    and `requested_t1_ms`.
+
+    Args:
+        template: The template to compile.
+        context: Compilation context; its fixtures carry their physical profiles.
+        preset: Optional preset to apply.
+        phase_map: The song's musical phase map, built from the detected grid.
+        end_limit_ms: Frame-grid time no step may end after.
+
+    Returns:
+        TemplateCompileResult with the physical segments.
+
+    Raises:
+        PhysicalCompileError: For a FADE_OUT remainder policy, which has no physical
+            fade, or a step the physical compile rejects.
+        UnsupportedRigShapeError: If a step's target group matches no fixture.
+        ValueError: If a step starting before `end_limit_ms` is zero-length on the grid.
+    """
+    provenance: list[str] = [f"template:{template.template_id}"]
+    working_template = template
+    if preset:
+        working_template = apply_preset(template, preset)
+        provenance.append(f"preset:{preset.preset_id}")
+    if working_template.repeat.remainder_policy == RemainderPolicy.FADE_OUT:
+        raise PhysicalCompileError(
+            MHDiagnostic(
+                code="unsupported_attribute",
+                severity="error",
+                message=(
+                    f"template {template.template_id!r} uses remainder_policy FADE_OUT, "
+                    "which the physical renderer does not implement"
+                ),
+                section_id=context.section_id,
+                action="rejected",
+            )
+        )
+
+    step_map = {step.step_id: step for step in working_template.steps}
+    schedule_result = schedule_repeats(
+        working_template.repeat,
+        context.duration_bars,
+        step_durations={
+            step.step_id: step.timing.base_timing.duration_bars for step in working_template.steps
+        },
+        step_offsets={
+            step.step_id: step.timing.base_timing.start_offset_bars
+            for step in working_template.steps
+        },
+    )
+    section_segment = context.section_id.split("|")
+    section_id = section_segment[0]
+    segment_id = section_segment[1] if len(section_segment) > 1 else "A"
+
+    segments: list[FixtureSegment] = []
+    dropped: list[dict[str, str | int]] = []
+    for instance in schedule_result.instances:
+        step = step_map[instance.step_id]
+        requested_t0 = context.bar_offset_to_ms(instance.start_bars)
+        requested_t1 = min(
+            context.bar_offset_to_ms(instance.start_bars + instance.duration_bars),
+            context.end_ms,
+        )
+        t0 = quantize_cue(requested_t0).actual_ms
+        t1 = min(quantize_cue(requested_t1).actual_ms, end_limit_ms)
+        if t0 >= end_limit_ms:
+            dropped.extend(
+                {
+                    "fixture_id": fixture.fixture_id,
+                    "section_id": section_id,
+                    "step_id": step.step_id,
+                    "requested_start_ms": requested_t0,
+                    "requested_end_ms": requested_t1,
+                    "end_limit_ms": end_limit_ms,
+                }
+                for fixture in _resolve_target_fixtures(step, template, context)
+            )
+            continue
+        if t1 <= t0:
+            raise ValueError(
+                f"step {step.step_id!r} of template {template.template_id!r} in section "
+                f"{context.section_id!r} ({requested_t0}-{requested_t1} ms) leaves no "
+                f"frame once quantized and cut at {end_limit_ms} ms"
+            )
+        for fixture in _resolve_target_fixtures(step, template, context):
+            step_context = StepCompileContext(
+                section_id=section_id,
+                segment_id=segment_id,
+                template_id=context.template_id,
+                preset_id=context.preset_id,
+                fixture_id=fixture.fixture_id,
+                role=fixture.role,
+                calibration=fixture.calibration,
+                template_defaults=working_template.defaults,
+                start_ms=t0,
+                duration_ms=t1 - t0,
+                n_samples=context.n_samples,
+                beat_grid=context.beat_grid,
+                curve_registry=context.curve_registry,
+                geometry_registry=context.geometry_registry,
+                movement_registry=context.movement_registry,
+                dimmer_registry=context.dimmer_registry,
+                physical_profile=fixture.physical_profile,
+                phase_map=phase_map,
+            )
+            try:
+                segment = compile_physical_step(
+                    step, step_context, sample_times_ms=tuple(range(t0, t1, EFFECT_GRID_MS))
+                )
+            except (PhysicalCompileError, PhysicalChannelError, ValueError) as error:
+                error.add_note(
+                    f"template {template.template_id!r}, step {step.step_id!r}, "
+                    f"fixture {fixture.fixture_id!r}"
+                )
+                raise
+            segment.add_metadata("requested_t0_ms", requested_t0)
+            segment.add_metadata("requested_t1_ms", requested_t1)
+            segments.append(segment)
+
+    return TemplateCompileResult(
+        template_id=working_template.template_id,
+        segments=segments,
+        num_complete_cycles=schedule_result.num_complete_cycles,
+        provenance=provenance,
+        dropped_steps=dropped,
     )
 
 

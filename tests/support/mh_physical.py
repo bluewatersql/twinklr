@@ -1,18 +1,29 @@
-"""Synthetic physical-renderer inputs: a fixture profile, a known initial state and
-physical fixture segments.
+"""Synthetic physical-renderer inputs: a fixture profile, a known initial state,
+physical fixture segments, and the P1.6 pipeline case (rig, grid, job, plan and the
+test-only template).
 
 In-memory payloads only; no owner profile or measured data.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from fractions import Fraction
+from pathlib import Path
 from typing import Any
 
-from twinklr.core.config.fixtures import AxisCapability, FixtureCapabilities, InitialFixtureState
+from tests.support.mh_true_up import synthetic_case
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
+from twinklr.core.config.fixtures import (
+    AxisCapability,
+    FixtureCapabilities,
+    FixtureGroup,
+    InitialFixtureState,
+)
+from twinklr.core.config.models import JobConfig
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
-from twinklr.core.sequencer.models.enum import ChannelName
+from twinklr.core.sequencer.models.enum import ChannelName, SemanticGroupType
 from twinklr.core.sequencer.models.moving_heads.physical import (
     AXIS_KEYS,
     DISCRETE_KEYS,
@@ -25,6 +36,13 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     encode_fixture_frames,
     frame_times,
 )
+from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
+from twinklr.core.sequencer.moving_heads.templates.data_loader import (
+    load_template_document,
+    load_templates_from_directory,
+)
+from twinklr.core.sequencer.moving_heads.templates.library import REGISTRY
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 
 def physical_segment(
@@ -229,6 +247,111 @@ def physical_step_payload() -> dict[str, Any]:
             "high_state": "open",
         },
     }
+
+
+TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "moving_heads" / "physical_v2"
+"""Test-only physical templates, loaded by the data loader and never shipped."""
+TEMPLATE_ID = "p1_linear_reveal"
+SUBSET_TEMPLATE_ID = "p1_linear_reveal_right"
+BUILTIN_TEMPLATE_COUNT = 37
+GRID_SHIFT_MS = 15.0
+PHYSICAL_INITIAL_STATE = {
+    "pan_deg": 0.0,
+    "tilt_deg": 0.0,
+    "dimmer": 0.0,
+    "discrete_states": {"shutter": "closed", "color": "white", "gobo": "open"},
+    "settled": True,
+    "dark": True,
+}
+
+
+@contextmanager
+def physical_test_templates() -> Iterator[None]:
+    """Register the test template (and a variant targeting only RIGHT) for one test.
+
+    They are never admitted to the production catalog: the process-wide registry,
+    which the pipeline and the deterministic selector read, is restored on exit.
+    """
+    load_builtin_templates()
+    loaded = load_templates_from_directory(TEMPLATE_DIR)
+    try:
+        document = load_template_document(TEMPLATE_DIR / f"{TEMPLATE_ID}.json")
+        template = document.template.model_copy(
+            update={"template_id": SUBSET_TEMPLATE_ID, "name": "P1 Linear Reveal Right"}
+        )
+        template.steps[0].target = SemanticGroupType.RIGHT
+        if REGISTRY.register_document(document.model_copy(update={"template": template})):
+            loaded.append(SUBSET_TEMPLATE_ID)
+        yield
+    finally:
+        for template_id in loaded:
+            REGISTRY._remove_registration(template_id)
+
+
+def physical_grid() -> BeatGrid:
+    """P0's variable-tempo grid (500 ms beats, then 400 ms), moved off the frame grid."""
+    tempo = synthetic_case("tempo").beat_grid
+    beats = [beat + GRID_SHIFT_MS for beat in tempo.beat_boundaries]
+    return BeatGrid(
+        bar_boundaries=[bar + GRID_SHIFT_MS for bar in tempo.bar_boundaries],
+        beat_boundaries=beats,
+        eighth_boundaries=BeatGrid._calculate_eighth_boundaries(beats),
+        sixteenth_boundaries=BeatGrid._calculate_sixteenth_boundaries(beats),
+        tempo_bpm=tempo.tempo_bpm,
+        beats_per_bar=tempo.beats_per_bar,
+        duration_ms=tempo.duration_ms + GRID_SHIFT_MS,
+    )
+
+
+def physical_head_profile(*, inverted: bool, pan_max: float = 270.0) -> dict[str, Any]:
+    """Channel-17 shutter, 16-bit pan/tilt, 720°/s travel and 40 ms settle."""
+    payload = discrete_profile_payload()
+    for axis in ("pan", "tilt"):
+        payload["axes"][axis].update(latency_ms=0, settle_ms=40, inverted=inverted)
+    payload["axes"]["pan"]["physical_max"] = pan_max
+    return payload
+
+
+def physical_rig(*, mh1_pan_max: float = 270.0) -> FixtureGroup:
+    """P0's two-head 16-bit rig with a synthetic physical profile per head."""
+    payload = synthetic_case("fine_carry").fixture_groups[0].model_dump(mode="python")
+    for fixture in payload["fixtures"]:
+        mh1 = fixture["fixture_id"] == "MH1"
+        fixture["config"]["physical_profile"] = physical_head_profile(
+            inverted=not mh1, pan_max=mh1_pan_max if mh1 else 270.0
+        )
+    return FixtureGroup.model_validate(payload)
+
+
+def physical_job(**policy: Any) -> JobConfig:
+    """A schema-3.1 `physical_v2` job with both heads' known dark initial state."""
+    return JobConfig.model_validate(
+        {
+            "schema_version": "3.1",
+            "moving_heads": {
+                "mode": "physical_v2",
+                "initial_states": {"MH1": PHYSICAL_INITIAL_STATE, "MH2": PHYSICAL_INITIAL_STATE},
+                **policy,
+            },
+        }
+    )
+
+
+def physical_plan(template_id: str = TEMPLATE_ID) -> ChoreographyPlan:
+    """One two-bar section, no planner intent, naming `template_id`."""
+    return ChoreographyPlan(
+        sections=[
+            PlanSection.model_validate(
+                {
+                    "section_name": "verse",
+                    "start_bar": 1,
+                    "end_bar": 2,
+                    "template_id": template_id,
+                    "preset_id": None,
+                }
+            )
+        ]
+    )
 
 
 def assert_honest_transactions(

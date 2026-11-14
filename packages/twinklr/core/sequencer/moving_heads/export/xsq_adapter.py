@@ -23,20 +23,67 @@ from twinklr.core.formats.xlights.sequence.trace import (
     MovingHeadEmissionTrace,
     MovingHeadSource,
 )
+from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
 from twinklr.core.sequencer.moving_heads.export.dmx_settings_builder import (
     DmxSettingsBuilder,
 )
-from twinklr.core.sequencer.moving_heads.export.frame_encoder import segment_frame_span
+from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
+    PhysicalOutputError,
+    segment_frame_span,
+)
 from twinklr.core.utils.fixtures import build_semantic_groups
 
 if TYPE_CHECKING:
     from twinklr.core.config.fixtures.groups import FixtureGroup
     from twinklr.core.config.fixtures.instances import FixtureInstance
+    from twinklr.core.formats.xlights.layout.models.rgb_effects import Model
     from twinklr.core.formats.xlights.sequence.models.xsq import XSequence
     from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
     from twinklr.core.sequencer.moving_heads.export.frame_encoder import FrameRun
 
 logger = logging.getLogger(__name__)
+
+
+def check_physical_models(targets: Mapping[str, str], models: Sequence[Model]) -> None:
+    """Refuse a fixture whose xLights model the physical channel mapping cannot drive.
+
+    The mapping writes model-relative DMX channels, so the model must be a DMX model
+    (`DisplayAs` starting `Dmx`) whose `StringType`, when the layout records one, is a
+    single-color type. An RGB-node model, any other model type, or a model the layout
+    does not contain is refused rather than sent bytes it would read as pixels.
+
+    Args:
+        targets: Fixture id to xLights model name.
+        models: The xLights layout's models.
+
+    Raises:
+        PhysicalOutputError: With code `unsupported_backend_channel`, naming each
+            refused fixture and model.
+    """
+    by_name = {model.name: model for model in models}
+    refused: dict[str, str] = {}
+    for fixture_id, name in targets.items():
+        model = by_name.get(name)
+        if model is None:
+            refused[fixture_id] = f"model {name!r} is not in the xLights layout"
+            continue
+        display_as = model.DisplayAs or ""
+        string_type = model.StringType
+        if not display_as.lower().startswith("dmx"):
+            refused[fixture_id] = f"model {name!r} is DisplayAs={display_as!r}, not DMX"
+        elif string_type is not None and not string_type.lower().startswith("single color"):
+            refused[fixture_id] = f"model {name!r} has StringType={string_type!r}, not single color"
+    if refused:
+        raise PhysicalOutputError(
+            MHDiagnostic(
+                code="unsupported_backend_channel",
+                severity="error",
+                message="Physical output needs single-color DMX models: "
+                + "; ".join(f"{fixture_id}: {reason}" for fixture_id, reason in refused.items()),
+                fixture_id=next(iter(refused)) if len(refused) == 1 else None,
+                action="rejected",
+            )
+        )
 
 
 def physical_run_requests(

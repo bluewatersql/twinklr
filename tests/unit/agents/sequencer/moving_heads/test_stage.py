@@ -499,6 +499,29 @@ class TestMovingHeadStageCheckpointWriter:
             has_segments = bool(section.get("segments"))
             assert has_template_id != has_segments  # exactly one of the two
 
+    def test_checkpoint_records_only_a_non_legacy_render_mode(
+        self, stage: MovingHeadStage, tmp_path
+    ) -> None:
+        """A legacy checkpoint keeps its exact bytes; a physical one names its mode, so
+        `eval-report` never re-renders it as legacy."""
+        from twinklr.core.config.models import JobConfig
+
+        context = self._real_context(tmp_path)
+        stage._handle_state(self._dict_result(), context)
+        checkpoint_path = tmp_path / "artifacts" / "checkpoints" / "plans" / "final.json"
+        plan = ChoreographyPlan.model_validate(self._dict_result()["plan"])
+        assert checkpoint_path.read_text(encoding="utf-8") == json.dumps(
+            {"run_id": "stage-test-session", "plan": plan.model_dump(mode="json")}, indent=2
+        )
+
+        context.session.job_config = JobConfig.model_validate(
+            {"schema_version": "3.1", "moving_heads": {"mode": "physical_v2"}}
+        )
+        stage._handle_state(self._dict_result(), context)
+        written = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+        assert written["render_mode"] == "physical_v2"
+        assert set(written) == {"run_id", "plan", "render_mode"}
+
     def test_checkpoint_disabled_by_config(self, stage: MovingHeadStage, tmp_path) -> None:
         """`JobConfig.write_checkpoint = False` is a real, read control field."""
         context = self._real_context(tmp_path, write_checkpoint=False)

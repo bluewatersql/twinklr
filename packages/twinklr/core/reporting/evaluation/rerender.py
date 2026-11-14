@@ -12,6 +12,8 @@ from typing import Any
 
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.config.loader import load_fixture_group
+from twinklr.core.config.models import JobConfig, MHRenderPolicy
+from twinklr.core.config.render_policy import require_legacy_render
 from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
@@ -53,6 +55,7 @@ async def rerender_plan(
     plan: ChoreographyPlan,
     audio_path: Path,
     fixture_config_path: Path,
+    render_policy: MHRenderPolicy,
 ) -> RerenderResult:
     """Re-render a choreography plan through the sequencing pipeline.
 
@@ -69,11 +72,16 @@ async def rerender_plan(
         plan: ChoreographyPlan to render
         audio_path: Path to audio file (for tempo/structure)
         fixture_config_path: Path to fixture configuration
+        render_policy: The render policy of the job the plan came from. The report
+            analyzes legacy DMX curves, so only `legacy_v1` is re-rendered; a plan is
+            never re-rendered under a policy other than its job's.
 
     Returns:
         RerenderResult with segments, audio features, and fixture contexts
 
     Raises:
+        UnsupportedRenderModeError: If `render_policy` is not `legacy_v1`; raised
+            before any file is read or audio analyzed
         FileNotFoundError: If any input file doesn't exist
         ValueError: If plan cannot be rendered
 
@@ -82,10 +90,14 @@ async def rerender_plan(
         ...     plan=plan,
         ...     audio_path=Path("song.mp3"),
         ...     fixture_config_path=Path("fixtures.json"),
+        ...     render_policy=MHRenderPolicy(),
         ... )
         >>> len(result.segments) > 0
         True
     """
+    require_legacy_render(render_policy, command="eval-report")
+    job_config = JobConfig(fixture_config_path=str(fixture_config_path), moving_heads=render_policy)
+
     # Validate input files exist
     if not audio_path.exists():
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
@@ -101,10 +113,7 @@ async def rerender_plan(
     # Analyze audio (async)
     logger.debug(f"Analyzing audio: {audio_path.name}")
     from twinklr.core.audio.analyzer import AudioAnalyzer
-    from twinklr.core.config.models import AppConfig, JobConfig
-
-    # Create job_config first
-    job_config = JobConfig(fixture_config_path=str(fixture_config_path))
+    from twinklr.core.config.models import AppConfig
 
     # Create minimal configs for audio analysis
     app_config = AppConfig.load_or_default()

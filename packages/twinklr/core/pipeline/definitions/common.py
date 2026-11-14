@@ -8,6 +8,8 @@ can compose them without duplication.
 
 from __future__ import annotations
 
+from typing import Any
+
 from twinklr.core.agents.audio.lyrics.stage import LyricsStage
 from twinklr.core.agents.audio.profile.stage import AudioProfileStage
 from twinklr.core.agents.audio.stages.analysis import AudioAnalysisStage
@@ -20,6 +22,7 @@ def build_common_stages(
     *,
     include_macro: bool = True,
     regeneration_nonce: str | None = None,
+    audio_gate: Any | None = None,
 ) -> list[StageDefinition]:
     """Build the shared pipeline prefix stages.
 
@@ -35,6 +38,10 @@ def build_common_stages(
     Args:
         display_groups: Display group configurations for the MacroPlannerStage.
             Each dict must include concrete ``id`` (plus planner metadata fields).
+        audio_gate: Optional stage that passes the SongBundle through or fails. When
+            given, it runs as ``render_preflight`` right after ``audio`` and the
+            profile and lyrics planners read the audio through it, so a refusal comes
+            before any planning.
 
     Returns:
         List of 4 StageDefinitions in dependency order.
@@ -54,10 +61,25 @@ def build_common_stages(
             output_type="SongBundle",
             description="Analyze audio file for tempo, structure, features",
         ),
+    ]
+    audio_source = "audio"
+    if audio_gate is not None:
+        audio_source = "render_preflight"
+        stages.append(
+            StageDefinition(
+                id="render_preflight",
+                stage=audio_gate,
+                inputs=["audio"],
+                input_type="SongBundle",
+                output_type="SongBundle",
+                description="Refuse a job the renderer cannot render, before any planning",
+            )
+        )
+    stages += [
         StageDefinition(
             id="profile",
             stage=AudioProfileStage(),
-            inputs=["audio"],
+            inputs=[audio_source],
             input_type="SongBundle",
             output_type="AudioProfileModel",
             description="Generate musical analysis and creative guidance",
@@ -65,7 +87,7 @@ def build_common_stages(
         StageDefinition(
             id="lyrics",
             stage=LyricsStage(),
-            inputs=["audio"],
+            inputs=[audio_source],
             condition=lambda ctx: ctx.get_state("has_lyrics", False),
             input_type="SongBundle",
             output_type="LyricContextModel",

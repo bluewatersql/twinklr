@@ -34,6 +34,9 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
 from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
 
+ENCODER_VERSION = "1"
+"""Bumped by hand in the commit that intentionally changes encoded physical bytes."""
+
 
 @dataclass(frozen=True)
 class EncodedFixtureFrame:

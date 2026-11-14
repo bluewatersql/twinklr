@@ -657,9 +657,9 @@ class MHRenderPolicy(BaseModel):
     mode: Literal["legacy_v1", "physical_v2"] = Field(
         default="legacy_v1",
         description=(
-            "Moving-head renderer. `physical_v2` requires schema_version 3.1 and is "
-            "rejected when the job is loaded for execution until the physical "
-            "renderer ships."
+            "Moving-head renderer. `physical_v2` requires schema_version 3.1, a "
+            "physical_profile on every fixture and a usable initial state for each; "
+            "a job missing them is rejected when its fixtures load, before planning."
         ),
     )
     # Left out of dumps when empty so legacy render fingerprints are unchanged.

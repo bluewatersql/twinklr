@@ -136,7 +136,7 @@ async def test_show_fe_bundle_and_default_catalog_layers_are_forwarded(
     bundle = FEArtifactBundle()
     with (
         patch("twinklr.cli.show_cmd.load_app_config"),
-        patch("twinklr.cli.show_cmd.load_job_config"),
+        patch("twinklr.cli.show_cmd.load_job_config", return_value=JobConfig()),
         patch("twinklr.cli.show_cmd.load_fixture_group"),
         patch("twinklr.cli.show_cmd.load_display_fe_bundle", return_value=bundle) as loader,
         patch("twinklr.cli.show_cmd.load_builtin_templates"),
@@ -162,3 +162,35 @@ async def test_show_fe_bundle_and_default_catalog_layers_are_forwarded(
     assert prepare.call_args.kwargs["fe_bundle"] is bundle
     assert prepare.call_args.kwargs["catalog_dir"].name == "templates"
     assert prepare.call_args.kwargs["local_catalog_dir"].parts[-2:] == ("data", "templates")
+
+
+@pytest.mark.asyncio
+async def test_show_refuses_a_physical_job_before_any_analysis(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The combined show coordinates and exports legacy moving-head segments only, so a
+    physical job is refused at load instead of failing after planning."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-only")
+    job_path = tmp_path / "job.json"
+    job_path.write_text(
+        '{"schema_version": "3.1", "moving_heads": {"mode": "physical_v2"}}', encoding="utf-8"
+    )
+    with (
+        patch("twinklr.cli.show_cmd.load_app_config", return_value=AppConfig()),
+        patch("twinklr.cli.show_cmd.load_fixture_group") as load_fixtures,
+        patch("twinklr.cli.show_cmd.prepare_combined_show_pipeline") as prepare,
+    ):
+        exit_code = await run_show_pipeline_async(
+            audio_path=tmp_path / "song.wav",
+            layout_path=tmp_path / "layout.xml",
+            fixture_config_path=tmp_path / "fixtures.json",
+            output_dir=tmp_path / "out",
+            app_config_path=None,
+            job_config_path=job_path,
+        )
+
+    assert exit_code == 1
+    output = " ".join(capsys.readouterr().out.split())
+    assert "`twinklr show` does not support moving_heads.mode 'physical_v2'" in output
+    load_fixtures.assert_not_called()
+    prepare.assert_not_called()

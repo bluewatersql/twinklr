@@ -47,6 +47,7 @@ from twinklr.core.sequencer.models.template import (
     PhysicalMovementSpec,
     PhysicalPulseSpec,
     PhysicalShutterPulse,
+    Template,
     TemplateStep,
 )
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
@@ -383,13 +384,7 @@ def _require_physical_step(step: TemplateStep, context: StepCompileContext) -> F
             "angles: migrate the template with explicit physical data to render it under "
             "physical_v2"
         )
-    legacy = [
-        *_non_default_fields("geometry", step.geometry),
-        *_non_default_fields("movement", step.movement, keep="physical"),
-        *_non_default_fields("dimmer", step.dimmer, keep="physical"),
-        *(name for name in ("color", "shutter", "gobo") if getattr(step, name) is not None),
-        *(["timing.phase_offset"] if step.timing.phase_offset != PhaseOffset() else []),
-    ]
+    legacy = _legacy_fields(step)
     if legacy:
         raise reject(
             f"step {step.step_id!r} of template {context.template_id!r} sets legacy "
@@ -398,6 +393,28 @@ def _require_physical_step(step: TemplateStep, context: StepCompileContext) -> F
     if context.physical_profile is None:
         raise reject(f"fixture {context.fixture_id!r} has no physical_profile")
     return context.physical_profile
+
+
+def is_physical_template(template: Template) -> bool:
+    """Whether the physical renderer can compile every step of `template` as authored.
+
+    Each step needs `movement.physical` and no legacy data, which the physical compile
+    refuses. A preset applied at render time can still add legacy data.
+    """
+    return bool(template.steps) and all(
+        step.movement.physical is not None and not _legacy_fields(step) for step in template.steps
+    )
+
+
+def _legacy_fields(step: TemplateStep) -> list[str]:
+    """The legacy data a step sets, which the physical renderer does not apply."""
+    return [
+        *_non_default_fields("geometry", step.geometry),
+        *_non_default_fields("movement", step.movement, keep="physical"),
+        *_non_default_fields("dimmer", step.dimmer, keep="physical"),
+        *(name for name in ("color", "shutter", "gobo") if getattr(step, name) is not None),
+        *(["timing.phase_offset"] if step.timing.phase_offset != PhaseOffset() else []),
+    ]
 
 
 def _non_default_fields(prefix: str, component: BaseModel, *, keep: str = "") -> list[str]:

@@ -156,7 +156,8 @@ def load_job_config(path: str | Path) -> JobConfig:
     Raises:
         ValidationError: If config is invalid
         UnsupportedRenderModeError: If the job selects a render mode the installed
-            renderer cannot honor
+            renderer cannot honor. Fixture prerequisites are checked where the
+            fixtures load (`load_full_config`, the CLI commands)
 
     Example:
         >>> config = load_job_config("job_config.json")
@@ -205,7 +206,7 @@ def load_full_config(job_config_path: str | Path) -> tuple[JobConfig, FixtureGro
     Raises:
         ValidationError: If either config is invalid
         UnsupportedRenderModeError: If the job selects a render mode the installed
-            renderer cannot honor
+            renderer cannot honor for these fixtures
         FileNotFoundError: If either config file does not exist
 
     Example:
@@ -219,6 +220,7 @@ def load_full_config(job_config_path: str | Path) -> tuple[JobConfig, FixtureGro
     job_dir = Path(job_config_path).parent
     fixture_path = job_dir / job_cfg.fixture_config_path
     fixtures = load_fixture_group(fixture_path)
+    preflight_render_policy(job_cfg, fixtures)
 
     return (job_cfg, fixtures)
 

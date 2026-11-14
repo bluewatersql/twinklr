@@ -8,6 +8,7 @@ from pathlib import Path
 
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import JobConfig
+from twinklr.core.config.render_policy import require_legacy_render
 from twinklr.core.feature_engineering.loader import FEArtifactBundle
 from twinklr.core.formats.xlights.layout import layout_to_choreography, load_layout
 from twinklr.core.pipeline.definition import PipelineDefinition
@@ -132,7 +133,13 @@ def prepare_combined_show_pipeline(
     local_catalog_dir: Path | None = None,
     fe_bundle: FEArtifactBundle | None = None,
 ) -> CombinedShowWiring:
-    """Parse the layout once, reconcile MH ownership, then partition by backend."""
+    """Parse the layout once, reconcile MH ownership, then partition by backend.
+
+    Raises:
+        UnsupportedRenderModeError: The job selects `physical_v2`; the combined show
+            coordinates and exports legacy moving-head segments only.
+    """
+    require_legacy_render(job_config.moving_heads, command="show")
 
     resolved_catalog = catalog_dir or tracked_catalog_dir()
     expected_index = resolved_catalog / "index.json"
