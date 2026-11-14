@@ -471,6 +471,52 @@ four low findings):
 - **Unverified.** Real-audio beat grids; any physical template other than the test one.
   How the dark edges look is `PENDING-OWNER`.
 
+P2.4a, 2026-11-14 (reviewed separately from its author; one review with four high
+findings, a fix round, a re-review and a final confirmation):
+
+- **Entry kept as authored when it already works.** A section's first cues stay uncut
+  whenever `plan_prepositions` accepts the entry, and the transaction after the
+  section's first gap, from the actual head state. The window applies only otherwise.
+  This replaces the plan's one-frame, no-wheel skip rule and leaves every Phase 1
+  output byte-identical, so `PHYSICAL_RENDERER_REVISION` was not bumped.
+- **Window sizing follows the kept cues.** At render the predecessor term comes from
+  the planner's own head model run over the cues actually kept (`follow_cues`), not
+  from a fixed term. The plan's formula was unsound: on an 8-bit axis, in-limit motion
+  that keeps crossing word boundaries leaves the model's head arbitrarily far behind
+  (the reviewer found 20,420 ms needed against a 3,300 ms bound). The envelope form of
+  `worst_case_entry_ms` remains only where the predecessor is unknown.
+- **New refusal: motion an axis cannot follow.** The compile, and so the gate, refuses a
+  cue that leaves the head more than one encoded word behind its commands
+  (`follow_lag`), naming fixture, axis and rates. The reviewer found no false refusal
+  on linear and sine motion at 30–100% of the speed limit, on 8-bit and 16-bit rigs
+  from 45 to 720°/s. It could refuse an input Phase 1 rendered if one contained such
+  motion; none is known.
+- **Shutter-aware cut.** A cut moves to the next shutter change until the first state
+  can take effect (`_holdable_cut`); the gate applies the same cut.
+- **The gate compiles the whole song.** The plan's reduced window (the shortest bars)
+  missed an isolated faster bar, and no window agrees exactly with the whole song
+  because frame quantization makes instances at one tempo differ by a frame. A
+  differential fuzz pins the agreement. Cost was cut by caching exact phase on the map
+  and planning heads with identical inputs once.
+- **Gate time, measured (8 heads, 4-minute synthetic song, 18 combinations):** 7.83 s
+  for the Phase 1 test template, 19.7 s for dense fully lit sweeps (author); 0.63 s and
+  1.34 s per combination (reviewer, loaded machine). The dense figure is about twice
+  the 10 s target of [decision 3](#decisions-on-the-kickoff-open-questions). The
+  target is not met and is not enforced; the gate runs before any paid call. P2.4c
+  re-measures with the real families.
+- **Fallbacks.** `TemplateStep.physical_reposition_fallback` and
+  `MHRenderPolicy.reposition_fallback` (render-only, out of dumps at `"error"`).
+- **Time zero.** A lit cue at time zero that needs a move is a substitutable
+  `infeasible_transition` when darkness can be established at all.
+- **Evidence at the final round.** Reviewer: 3,000 bound cases with the predecessor
+  followed, 0 failures; 800 random multi-section renders across four rigs and three
+  policies, 482 rendered and passed the byte-level check on every fixture, 318 refused
+  at the gate, 0 failed after admission; 39 of 40 mutations caught, the survivor only
+  lengthens the window.
+- **Carried to P2.4b.** A wheel change inside a cue is covered by the render-time
+  sizing but not by the envelope form used before planning.
+- **Unverified.** Real fixtures; how the remaining dark dips look (`PENDING-OWNER`).
+
 ## Phase exit
 
 `physical_v2` accepts grids with silent edges, reports the covered span and holds every fixture dark outside it without inferring tempo; a grid Phase 1 accepted renders the same frames and fingerprint. Legacy session ids, the 16 Phase 0 fingerprints and the Phase 1 request fingerprints are unchanged. Six core families compile deterministically on the synthetic rig matrix and are offered only under `physical_v2`, each only on a rig that can render it; independent phase domains work; missing heads preserve canonical ranks; preset overrides have explicit scope; a `ONCE` hold stays one cue per fixture and holds its terminal pose to the section end; fly-in/out lit directions and dark returns are frame-proven; flicks settle while dark and resume the current base. Each section's entry window is sized at render from a bound the fuzz shows dominates the transaction pass, so section-entry repositioning fits by construction; the dip is skipped where the predecessor ends where the successor begins, and the plan-dependent failures P2.4c lists still surface at render. The zoom pilot is source/synthetic proven with any real-profile acceptance explicitly pending. Legacy regression and clean-tree `make validate` pass. Owner visual acceptance, including whether the remaining section-entry dips look acceptable, is a separate `PENDING-OWNER` record, not a consequence of a new effect name or passing bytes.
