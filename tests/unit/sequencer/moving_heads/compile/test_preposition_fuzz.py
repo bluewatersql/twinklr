@@ -5,12 +5,17 @@ both darkness, latencies and speeds including unknown), cue sequences with sweep
 pulses, locks, fallbacks and initial states. Every result must either carry an error
 and no segments, or pass `assert_honest_transactions` for every fixture. The generator
 follows the P1.5 reviewer's draw order, so their seeds reproduce the same cases.
+
+The P2.4a arms (the section-entry bound) run the seeds known to catch each mutation
+they guard against plus a short random sweep; set `TWINKLR_P24A_FUZZ=full` to sweep
+900 and 800 seeds as at review. The P1.5 arms always run in full.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from itertools import pairwise
+import os
 import random
 from typing import Any
 
@@ -799,7 +804,18 @@ def test_every_feasible_plan_passes_the_byte_oracle(
 
 # --- The section-entry bound (P2.4a) ------------------------------------------------------
 
-BOUND_SEEDS = 900
+_FULL_FUZZ = os.environ.get("TWINKLR_P24A_FUZZ") == "full"
+"""`TWINKLR_P24A_FUZZ=full` runs the P2.4a fuzz at the counts it was reviewed at."""
+BOUND_SEEDS = 900 if _FULL_FUZZ else 150
+_BOUND_KNOWN: dict[str, tuple[int, ...]] = {
+    # Seeds the default run keeps because they catch a dropped bound term: darkness
+    # (static 44, 249; moving 49, 132; short-wheel 234, 272) and predecessor motion
+    # (moving 120, 187; short-wheel 120, 359). Wheel and travel terms are caught by
+    # dozens of seeds in every sweep.
+    "static": (44, 249),
+    "moving": (49, 132, 120, 187),
+    "short-wheel": (234, 272, 120, 359),
+}
 _POSE_KEYS = (("pan", ChannelName.PAN), ("tilt", ChannelName.TILT))
 _WHEEL_KEYS = (("color", ChannelName.COLOR), ("gobo", ChannelName.GOBO))
 
@@ -1009,60 +1025,79 @@ def _shifted_value(
     return value.model_copy(update={"events": events})
 
 
+def _check_bound(kind: str, seed: int) -> bool:
+    """Check one bound case; return whether it had an entry to check.
+
+    A case whose predecessor itself cannot be planned (a shutter state too short for its
+    latency, say) has no entry to check.
+    """
+    profile, initial, cues, entry_pose, entry_wheels, envelope = _bound_case(seed, kind)
+    bound = worst_case_entry_ms(
+        profile,
+        entry_pose=entry_pose,
+        entry_wheels=entry_wheels,
+        pose_envelope=envelope,
+        frame_ms=_FRAME,
+    )
+    visibility, closer = profile.visibility, profile.discrete.get("shutter")
+    if bound is None:
+        # Every timing is declared, so only a missing darkness guarantee is unknown: a
+        # predecessor may hold an open shutter that no declared state replaces.
+        assert not visibility.dimmer_zero_extinguishes, (kind, seed)
+        assert closer is None or closer.closed_state not in (
+            visibility.extinguishing_shutter_states
+        ), (kind, seed)
+        return False
+    result = plan_prepositions(
+        cues,
+        {"MH1": profile},
+        initial_states={"MH1": initial},
+        locks=(),
+        frame_ms=_FRAME,
+        sequence_end_ms=cues[-1].t1_ms,
+    )
+    target = cues[-1].t0_ms
+    errors = [d for d in result.diagnostics if d.status == "error"]
+    if errors and all(d.cue_ms != target for d in errors):
+        return False  # the predecessor cannot be planned; there is no entry to check
+    entry = next(d for d in result.diagnostics if d.cue_ms == target)
+    assert entry.status == "feasible", (kind, seed, entry.reason)
+    assert entry.required_ms is not None and entry.required_ms <= bound, (
+        f"{kind} seed {seed}: the transaction needs {entry.required_ms} ms but the bound "
+        f"is {bound} ms ({entry.reason})"
+    )
+    return True
+
+
 @pytest.mark.parametrize(
-    ("kind", "min_checked"),
+    ("kind", "known", "min_checked"),
     [
-        pytest.param("static", 0.85, id="static-predecessor-in-an-envelope"),
-        pytest.param("moving", 0.8, id="predecessor-moving-at-the-rate-limit"),
-        pytest.param("short-wheel", 0.75, id="short-predecessor-with-a-wheel-change"),
+        pytest.param(
+            "static", _BOUND_KNOWN["static"], 0.85, id="static-predecessor-in-an-envelope"
+        ),
+        pytest.param(
+            "moving", _BOUND_KNOWN["moving"], 0.8, id="predecessor-moving-at-the-rate-limit"
+        ),
+        pytest.param(
+            "short-wheel",
+            _BOUND_KNOWN["short-wheel"],
+            0.75,
+            id="short-predecessor-with-a-wheel-change",
+        ),
     ],
 )
-def test_worst_case_entry_bound_dominates_the_transaction(kind: str, min_checked: float) -> None:
+def test_worst_case_entry_bound_dominates_the_transaction(
+    kind: str, known: tuple[int, ...], min_checked: float
+) -> None:
     """The time `worst_case_entry_ms` claims a section entry may need is never less than
     what the transaction pass then requires; the entry window is sized from it.
 
-    A case whose predecessor itself cannot be planned (a shutter state too short for
-    its latency, say) has no entry to check; the floor keeps those from hollowing the
-    fuzz out.
+    Runs the seeds known to catch each dropped bound term, then a random sweep whose
+    checked fraction is floored so skipped cases cannot hollow the fuzz out.
     """
-    checked = 0
-    for seed in range(BOUND_SEEDS):
-        profile, initial, cues, entry_pose, entry_wheels, envelope = _bound_case(seed, kind)
-        bound = worst_case_entry_ms(
-            profile,
-            entry_pose=entry_pose,
-            entry_wheels=entry_wheels,
-            pose_envelope=envelope,
-            frame_ms=_FRAME,
-        )
-        visibility, closer = profile.visibility, profile.discrete.get("shutter")
-        if bound is None:
-            # Every timing is declared, so only a missing darkness guarantee is unknown: a
-            # predecessor may hold an open shutter that no declared state replaces.
-            assert not visibility.dimmer_zero_extinguishes, (kind, seed)
-            assert closer is None or closer.closed_state not in (
-                visibility.extinguishing_shutter_states
-            ), (kind, seed)
-            continue
-        result = plan_prepositions(
-            cues,
-            {"MH1": profile},
-            initial_states={"MH1": initial},
-            locks=(),
-            frame_ms=_FRAME,
-            sequence_end_ms=cues[-1].t1_ms,
-        )
-        target = cues[-1].t0_ms
-        errors = [d for d in result.diagnostics if d.status == "error"]
-        if errors and all(d.cue_ms != target for d in errors):
-            continue  # the predecessor cannot be planned; there is no entry to check
-        entry = next(d for d in result.diagnostics if d.cue_ms == target)
-        assert entry.status == "feasible", (kind, seed, entry.reason)
-        assert entry.required_ms is not None and entry.required_ms <= bound, (
-            f"{kind} seed {seed}: the transaction needs {entry.required_ms} ms but the bound "
-            f"is {bound} ms ({entry.reason})"
-        )
-        checked += 1
+    for seed in known:
+        assert _check_bound(kind, seed), (kind, seed)
+    checked = sum(_check_bound(kind, seed) for seed in range(BOUND_SEEDS))
     assert checked >= min_checked * BOUND_SEEDS, f"{kind}: only {checked} entries checked"
 
 
@@ -1110,7 +1145,14 @@ def test_worst_case_entry_bound_is_unknown_when_a_needed_term_is(unknown: str) -
 
 # --- Non-monotonic predecessors on coarse axes (P2.4a review) ---------------------------
 
-COARSE_SEEDS = 800
+COARSE_SEEDS = 800 if _FULL_FUZZ else 100
+_ADMITTED_KNOWN: dict[int, str] = {44: "refused", 52: "refused", 198: "checked", 313: "checked"}
+"""Seeds whose outcome catches a mutation: 44 and 52 are wobbles only `follow_lag`
+refuses; 198 and 313 need the darkness term."""
+FOLLOWED_SEEDS = 800 if _FULL_FUZZ else 60
+_FOLLOWED_KNOWN = (0, 4, 8, 12, 20, 28)
+"""Seeds that catch ignoring `residual_ms` (0, 8), dropping the predecessor (0, 4),
+follow (12, 20) or darkness (20, 28) term."""
 _COARSE_KINDS = ("wobble", "triangle", "turn", "random")
 
 
@@ -1307,87 +1349,99 @@ def _last_frame_envelope(cue: FixtureSegment) -> dict[ChannelName, tuple[float, 
     return pose
 
 
+def _check_admitted(seed: int) -> str:
+    """Check one compile-admitted predecessor case: `checked`, `refused` (unfollowable)
+    or `skipped` (over the speed limit, or a predecessor that cannot be planned)."""
+    profile, (cue,), target, pose, wheels = _coarse_case(seed, chain=1)
+    try:
+        for channel in (ChannelName.PAN, ChannelName.TILT):
+            trajectory = cue.channels[channel].physical
+            assert isinstance(trajectory, ContinuousTrajectory)
+            _check_travel_rate("MH1", channel, trajectory, profile)
+    except PhysicalChannelError:
+        return "skipped"
+    if follow_lag(cue, profile, frame_ms=_FRAME) is not None:
+        return "refused"
+    entry = _plan_entry(profile, [cue], target)
+    if entry is None:
+        return "skipped"
+    bound = worst_case_entry_ms(
+        profile,
+        entry_pose={c: (x, x) for c, x in pose.items()},
+        entry_wheels={c: {s} for c, s in wheels.items()},
+        pose_envelope=_last_frame_envelope(cue),
+        frame_ms=_FRAME,
+    )
+    assert bound is not None
+    assert entry.status == "feasible", (seed, entry.reason)
+    assert entry.required_ms is not None and entry.required_ms <= bound, (
+        f"seed {seed}: the transaction needs {entry.required_ms} ms but the bound is "
+        f"{bound} ms ({entry.reason})"
+    )
+    return "checked"
+
+
 def test_entry_bound_dominates_after_any_cue_the_compile_admits() -> None:
     """The envelope bound (no followed predecessor) holds after any one cue the physical
     compile admits: within the configured speed (`_check_travel_rate`) and followable
     by the head (`follow_lag`). Word-boundary wobble on a coarse axis, which once left
-    the head 20 s behind, is refused by the compile instead."""
-    checked = refused = 0
-    for seed in range(COARSE_SEEDS):
-        profile, (cue,), target, pose, wheels = _coarse_case(seed, chain=1)
-        try:
+    the head 20 s behind, is refused by the compile instead. Known catching seeds first,
+    then a random sweep."""
+    for seed, outcome in _ADMITTED_KNOWN.items():
+        assert _check_admitted(seed) == outcome, seed
+    outcomes = [_check_admitted(seed) for seed in range(COARSE_SEEDS)]
+    assert outcomes.count("checked") >= 0.5 * COARSE_SEEDS, outcomes.count("checked")
+    assert outcomes.count("refused") >= 0.4 * COARSE_SEEDS, outcomes.count("refused")
+
+
+def _check_followed(seed: int) -> bool:
+    """Check one followed-chain case; return whether it had an entry to check."""
+    rng = random.Random(seed)
+    profile, cues, target, pose, wheels = _coarse_case(seed, chain=rng.randint(1, 3))
+    try:
+        for cue in cues:
             for channel in (ChannelName.PAN, ChannelName.TILT):
                 trajectory = cue.channels[channel].physical
                 assert isinstance(trajectory, ContinuousTrajectory)
                 _check_travel_rate("MH1", channel, trajectory, profile)
-        except PhysicalChannelError:
-            continue
-        if follow_lag(cue, profile, frame_ms=_FRAME) is not None:
-            refused += 1
-            continue
-        entry = _plan_entry(profile, [cue], target)
-        if entry is None:
-            continue
-        bound = worst_case_entry_ms(
-            profile,
-            entry_pose={c: (x, x) for c, x in pose.items()},
-            entry_wheels={c: {s} for c, s in wheels.items()},
-            pose_envelope=_last_frame_envelope(cue),
-            frame_ms=_FRAME,
-        )
-        assert bound is not None
-        assert entry.status == "feasible", (seed, entry.reason)
-        assert entry.required_ms is not None and entry.required_ms <= bound, (
-            f"seed {seed}: the transaction needs {entry.required_ms} ms but the bound is "
-            f"{bound} ms ({entry.reason})"
-        )
-        checked += 1
-    assert checked >= 0.5 * COARSE_SEEDS, f"only {checked} entries checked"
-    assert refused >= 0.05 * COARSE_SEEDS, f"only {refused} cues refused as unfollowable"
+    except PhysicalChannelError:
+        return False
+    entry = _plan_entry(profile, cues, target)
+    if entry is None:
+        return False
+    followed = follow_cues(cues, profile, frame_ms=_FRAME)[-1]
+    assert followed.settled_ms is not None
+    last = cues[-1]
+    held = {
+        channel: {value.physical.events[-1].state}
+        for channel, value in last.channels.items()
+        if channel in (ChannelName.COLOR, ChannelName.GOBO)
+        and isinstance(value.physical, DiscreteTrajectory)
+    }
+    bound = worst_case_entry_ms(
+        profile,
+        entry_pose={c: (x, x) for c, x in pose.items()},
+        entry_wheels={c: {s} for c, s in wheels.items()},
+        pose_envelope=_last_frame_envelope(last),
+        held_wheels=held,
+        residual_ms=max(0, followed.settled_ms - last.t1_ms),
+        frame_ms=_FRAME,
+    )
+    assert bound is not None
+    assert entry.status == "feasible", (seed, entry.reason)
+    assert entry.required_ms is not None and entry.required_ms <= bound, (
+        f"seed {seed}: the transaction needs {entry.required_ms} ms but the bound is "
+        f"{bound} ms ({entry.reason})"
+    )
+    return True
 
 
 def test_entry_bound_from_the_followed_predecessor_dominates() -> None:
     """With the actual predecessor chain followed (`follow_cues`), the bound holds even
     after motion the compile would refuse, across back-to-back cues and with the
-    predecessor's wheels known to be held."""
-    checked = 0
-    for seed in range(COARSE_SEEDS):
-        rng = random.Random(seed)
-        profile, cues, target, pose, wheels = _coarse_case(seed, chain=rng.randint(1, 3))
-        try:
-            for cue in cues:
-                for channel in (ChannelName.PAN, ChannelName.TILT):
-                    trajectory = cue.channels[channel].physical
-                    assert isinstance(trajectory, ContinuousTrajectory)
-                    _check_travel_rate("MH1", channel, trajectory, profile)
-        except PhysicalChannelError:
-            continue
-        entry = _plan_entry(profile, cues, target)
-        if entry is None:
-            continue
-        followed = follow_cues(cues, profile, frame_ms=_FRAME)[-1]
-        assert followed.settled_ms is not None
-        last = cues[-1]
-        held = {
-            channel: {value.physical.events[-1].state}
-            for channel, value in last.channels.items()
-            if channel in (ChannelName.COLOR, ChannelName.GOBO)
-            and isinstance(value.physical, DiscreteTrajectory)
-        }
-        bound = worst_case_entry_ms(
-            profile,
-            entry_pose={c: (x, x) for c, x in pose.items()},
-            entry_wheels={c: {s} for c, s in wheels.items()},
-            pose_envelope=_last_frame_envelope(last),
-            held_wheels=held,
-            residual_ms=max(0, followed.settled_ms - last.t1_ms),
-            frame_ms=_FRAME,
-        )
-        assert bound is not None
-        assert entry.status == "feasible", (seed, entry.reason)
-        assert entry.required_ms is not None and entry.required_ms <= bound, (
-            f"seed {seed}: the transaction needs {entry.required_ms} ms but the bound is "
-            f"{bound} ms ({entry.reason})"
-        )
-        checked += 1
-    assert checked >= 0.6 * COARSE_SEEDS, f"only {checked} entries checked"
+    predecessor's wheels known to be held. Known catching seeds first, then a random
+    sweep."""
+    for seed in _FOLLOWED_KNOWN:
+        assert _check_followed(seed), seed
+    checked = sum(_check_followed(seed) for seed in range(FOLLOWED_SEEDS))
+    assert checked >= 0.9 * FOLLOWED_SEEDS, f"only {checked} entries checked"

@@ -5,11 +5,15 @@ enough for any reposition into it; an entry that plays as authored is kept uncut
 Every render below is gated first (the gate must admit it), then replanned from its cues
 and checked from its bytes (`assert_honest_transactions`) on every fixture: no head is
 lit while it moves.
+
+The gate's differential fuzz runs the grids known to catch a reduced gate plus 6 random
+ones; set `TWINKLR_P24A_FUZZ=full` to sweep 60 random grids as at review.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
+import os
 import random
 from typing import Any
 
@@ -891,7 +895,10 @@ def test_dropped_cues_share_one_record_shape() -> None:
     }
 
 
-_DIFFERENTIAL_GRIDS = 60
+_DIFFERENTIAL_GRIDS = 60 if os.environ.get("TWINKLR_P24A_FUZZ") == "full" else 6
+_DIFFERENTIAL_KNOWN = (34, 148, 187)
+"""Grids on which a gate compiling only the first four bars disagrees with the
+reference; found by sweeping 400 grids."""
 
 
 def _random_grid(rng: random.Random) -> BeatGrid:
@@ -980,15 +987,19 @@ def _whole_song_verdict(
     return True
 
 
-def test_the_gate_agrees_with_a_whole_song_reference_on_variable_tempo() -> None:
-    """Differential fuzz (review H2): on random variable-tempo grids, rigs and fallback
-    policies, the gate admits a template exactly when the whole-song reference does.
-    A gate that checks less of the song than the render can reach fails here."""
-    rigs = {
-        "base": physical_rig,
-        "slow": lambda: _rig(_slow()),
-        "coarse": lambda: _rig(_coarse(90.0)),
-    }
+_DIFFERENTIAL_TEMPLATES = (
+    "p1_linear_reveal",
+    "p24a_sweep",
+    "p24a_jump",
+    "p24a_osc",
+    "p24a_sine",
+    "p24a_pulse",
+    "p24a_short_hit",
+    "p24a_center",
+)
+
+
+def _differential_docs() -> tuple[TemplateDoc, ...]:
     osc = physical_template_doc(
         "p24a_osc",
         [
@@ -997,31 +1008,50 @@ def test_the_gate_agrees_with_a_whole_song_reference_on_variable_tempo() -> None
         ],
     )
     sine = physical_template_doc("p24a_sine", [_sine_step("s", 0.0, 30.0, 2.0)])
-    templates = ["p1_linear_reveal", "p24a_sweep", "p24a_jump", "p24a_osc", "p24a_sine"]
-    templates += ["p24a_pulse", "p24a_short_hit", "p24a_center"]
+    return (*_DOCS, osc, sine, _pulse_doc())
+
+
+def _check_gate_agrees(seed: int) -> set[bool]:
+    """Gate three templates on one random grid, rig and policy against the reference;
+    return the verdicts seen. Templates must be registered."""
+    rigs = {
+        "base": physical_rig,
+        "slow": lambda: _rig(_slow()),
+        "coarse": lambda: _rig(_coarse(90.0)),
+    }
+    rng = random.Random(seed)
+    grid = _random_grid(rng)
+    rig = rigs[rng.choice(sorted(rigs))]()
+    policy = rng.choice(["error", "drop_accent"])
+    job = physical_job() if policy == "error" else physical_job(reposition_fallback=policy)
     verdicts: set[bool] = set()
-    with physical_test_templates(), registered_templates(*_DOCS, osc, sine, _pulse_doc()):
-        for seed in range(_DIFFERENTIAL_GRIDS):
-            rng = random.Random(seed)
-            grid = _random_grid(rng)
-            rig = rigs[rng.choice(sorted(rigs))]()
-            policy = rng.choice(["error", "drop_accent"])
-            job = physical_job() if policy == "error" else physical_job(reposition_fallback=policy)
-            for template_id in rng.sample(templates, 3):
-                try:
-                    check_physical_templates(
-                        [template_id],
-                        beat_grid=grid,
-                        fixture_group=rig,
-                        initial_states=job.moving_heads.initial_states,
-                        failure_mode=job.moving_heads.reposition_fallback,
-                    )
-                    admitted = True
-                except UnsupportedRenderModeError:
-                    admitted = False
-                expected = _whole_song_verdict(template_id, grid, rig, job)
-                assert admitted == expected, (seed, template_id, policy)
-                verdicts.add(admitted)
+    for template_id in rng.sample(_DIFFERENTIAL_TEMPLATES, 3):
+        try:
+            check_physical_templates(
+                [template_id],
+                beat_grid=grid,
+                fixture_group=rig,
+                initial_states=job.moving_heads.initial_states,
+                failure_mode=job.moving_heads.reposition_fallback,
+            )
+            admitted = True
+        except UnsupportedRenderModeError:
+            admitted = False
+        expected = _whole_song_verdict(template_id, grid, rig, job)
+        assert admitted == expected, (seed, template_id, policy)
+        verdicts.add(admitted)
+    return verdicts
+
+
+def test_the_gate_agrees_with_a_whole_song_reference_on_variable_tempo() -> None:
+    """Differential fuzz (review H2): on random variable-tempo grids, rigs and fallback
+    policies, the gate admits a template exactly when the whole-song reference does.
+    A gate that checks less of the song than the render can reach fails here: the known
+    grids catch one compiling only the first four bars; then a random sweep."""
+    verdicts: set[bool] = set()
+    with physical_test_templates(), registered_templates(*_differential_docs()):
+        for seed in (*_DIFFERENTIAL_KNOWN, *range(_DIFFERENTIAL_GRIDS)):
+            verdicts |= _check_gate_agrees(seed)
     assert verdicts == {True, False}
 
 
