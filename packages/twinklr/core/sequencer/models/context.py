@@ -1,11 +1,13 @@
-from typing import Any
+from fractions import Fraction
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.config.fixtures.capabilities import FixtureCapabilities
 from twinklr.core.config.fixtures.presets import PoseDegrees, RigPresetLibrary
 from twinklr.core.curves.registry import CurveRegistry
-from twinklr.core.sequencer.models.enum import Intensity
+from twinklr.core.sequencer.models.enum import ChannelName, Intensity
+from twinklr.core.sequencer.models.moving_heads.topology import FixtureTopology
 from twinklr.core.sequencer.moving_heads.handlers.registry import (
     ColorRegistry,
     DimmerRegistry,
@@ -121,6 +123,10 @@ class StepCompileContext(BaseModel):
         resolved_components: The step's component references resolved for this
             fixture: its start aim, and held channels that replace the step's own;
             physical compile only, None for a step without references.
+        phase_offset_by_channel: Cycles each phase domain lags the step phase, from
+            the step's distribution over the rig topology; physical compile only.
+        pan_sign: Multiplies the pan displacement (not the start aim): -1 or +1 for a
+            mirrored wing, 0 at an odd center; physical compile only.
     """
 
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
@@ -149,6 +155,8 @@ class StepCompileContext(BaseModel):
     physical_profile: FixtureCapabilities | None = None
     phase_map: MusicalPhaseMap | None = None
     resolved_components: ResolvedStepComponents | None = None
+    phase_offset_by_channel: dict[ChannelName, Fraction] = Field(default_factory=dict)
+    pan_sign: Literal[-1, 0, 1] = 1
 
 
 class TemplateCompileContext(BaseModel):
@@ -180,6 +188,10 @@ class TemplateCompileContext(BaseModel):
     intent: SectionRenderIntent = Field(default_factory=SectionRenderIntent)
     # The fixture group's named components; physical compile only.
     presets: RigPresetLibrary = Field(default_factory=RigPresetLibrary)
+    # The rig's canonical topology (declared or derived), and the fixture group a
+    # distribution that finds none is reported against; physical compile only.
+    topology: FixtureTopology | None = None
+    fixture_group_id: str | None = None
 
     @property
     def bpm(self) -> float:

@@ -2802,6 +2802,32 @@ for _component_path, _note in {
         _note,
     )
 
+# P2.2 rig topology and phase distribution: a fixture group's canonical rig and the step
+# distributions that spread phase over it. They feed only the opt-in physical compile;
+# each exact path mutates its field and must either change the compiled pan, tilt,
+# dimmer or shutter values or be refused (a distribution on a rig left without topology).
+for _topology_path, _note in {
+    "fixture.topology": _PHYSICAL_TEMPLATE_REJECTED,
+    "fixture.topology.members": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.topology.members.fixture_id": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.topology.members.row": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.topology.members.column": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.topology.members.ordinal": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_distribution": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_distribution.domains": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_distribution.block_size": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_distribution.group_count": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_distribution.wings": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_distribution.spread_cycles": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_distribution.direction": _PHYSICAL_TEMPLATE_COMPILED,
+}.items():
+    CONFIG_EFFECTS[_topology_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/compile/test_topology_phase.py::"
+        f"test_topology_field_changes_compile[{_topology_path}]",
+        _note,
+    )
+
 # Exact App/Job discriminators. These overrides prevent stale generic smoke-test
 # pointers from re-entering the accountable ledger.
 for _root_path in ("app.project_root", "app.cache_dir"):

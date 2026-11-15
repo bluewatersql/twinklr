@@ -1,6 +1,7 @@
 """Synthetic physical-renderer inputs: a fixture profile, a known initial state,
 physical fixture segments, the P1.6 pipeline case (rig, grid, job, plan and the
-test-only template), and rig presets with steps that reference them.
+test-only template), rig presets with steps that reference them, and multi-head rigs
+with a topology.
 
 In-memory payloads only; no owner profile or measured data.
 """
@@ -9,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+import copy
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
@@ -532,6 +534,71 @@ def referencing_step(
         },
         **fields,
     }
+
+
+def topology_payload(
+    fixture_ids: Sequence[str], *, rows: Sequence[int] | None = None
+) -> dict[str, Any]:
+    """A topology listing `fixture_ids` in canonical order: column and ordinal are each
+    head's index, row is 0 or `rows[index]`."""
+    return {
+        "members": [
+            {
+                "fixture_id": fixture_id,
+                "row": 0 if rows is None else rows[index],
+                "column": index,
+                "ordinal": index,
+            }
+            for index, fixture_id in enumerate(fixture_ids)
+        ]
+    }
+
+
+def topology_rig(
+    fixture_ids: Sequence[str],
+    *,
+    topology: dict[str, Any] | None = None,
+    position_indexes: Sequence[int] | None = None,
+    presets: dict[str, Any] | None = None,
+) -> FixtureGroup:
+    """A rig of `fixture_ids` heads, each `physical_rig`'s MH1 (one non-inverted profile),
+    with an optional declared `topology`, `position.position_index` per head and presets."""
+    payload = physical_rig().model_dump(mode="python")
+    head = payload["fixtures"][0]
+    fixtures = []
+    for index, fixture_id in enumerate(fixture_ids):
+        fixture = copy.deepcopy(head)
+        fixture["fixture_id"] = fixture["config"]["fixture_id"] = fixture_id
+        fixture["xlights_model_name"] = f"Dmx {fixture_id}"
+        if position_indexes is not None:
+            fixture["config"]["position"] = {"position_index": position_indexes[index]}
+        fixtures.append(fixture)
+    payload["fixtures"] = fixtures
+    if topology is not None:
+        payload["topology"] = topology
+    if presets is not None:
+        payload["presets"] = presets
+    return FixtureGroup.model_validate(payload)
+
+
+def sine_step(
+    step_id: str,
+    pan: float,
+    extent: float,
+    *,
+    period_beats: float = 4.0,
+    distribution: Sequence[dict[str, Any]] = (),
+    **fields: Any,
+) -> dict[str, Any]:
+    """`hold_step` whose pan swings `extent * sin(2*pi*phase)` over `period_beats`, with
+    an optional `physical_distribution`."""
+    step = hold_step(step_id, pan, **fields)
+    step["movement"]["physical"].update(
+        shape="sine_pan", mode="periodic", pan_extent_deg=extent, period_beats=period_beats
+    )
+    if distribution:
+        step["physical_distribution"] = list(distribution)
+    return step
 
 
 def physical_job(**policy: Any) -> JobConfig:

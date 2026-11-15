@@ -22,6 +22,10 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
     DiscreteTrajectory,
     PhysicalChannelError,
 )
+from twinklr.core.sequencer.models.moving_heads.topology import (
+    ResolvedFixturePhase,
+    resolve_distribution,
+)
 from twinklr.core.sequencer.models.template import (
     RemainderPolicy,
     Template,
@@ -300,14 +304,17 @@ def compile_physical_template(
     so a step running past it is truncated there without error. A step starting before
     `start_limit_ms`, the first frame boundary inside the covered span, or at or after
     `end_limit_ms` is dropped per target fixture and listed in `dropped_steps`: its
-    phase origin would lie outside the map. Section intent and phase offsets are not
-    applied (a physical step rejects non-default phase offsets). A cue whose pose
+    phase origin would lie outside the map. Section intent and legacy phase offsets are
+    not applied (a physical step rejects a non-default `timing.phase_offset`). A cue whose pose
     commands the head cannot follow within one encoded word (`follow_lag`) is refused.
     Each segment records its requested musical bounds in metadata `requested_t0_ms`
     and `requested_t1_ms`, and a step's `physical_reposition_fallback` under
     `FALLBACK_METADATA_KEY`. A step's `component_refs` are resolved per target
     fixture against `context.presets`, after the preset patch, and each such segment
-    records `component_provenance`.
+    records `component_provenance`. A step's `physical_distribution` is resolved over
+    `context.topology`, the canonical full rig, so each target fixture's phase offsets
+    and pan sign depend on its rank there alone; each such segment records them, with
+    the rank, as `phase_distribution`.
 
     Args:
         template: The template to compile.
@@ -322,8 +329,10 @@ def compile_physical_template(
 
     Raises:
         PhysicalCompileError: For a FADE_OUT remainder policy, which has no physical
-            fade, a step the physical compile rejects, or a component reference that
-            does not resolve on this rig (naming template, step, preset and fixture).
+            fade, a step the physical compile rejects, a component reference that
+            does not resolve on this rig (naming template, step, preset and fixture),
+            or a distribution on a rig without a topology (naming the fixture group)
+            or over a fixture the topology does not place.
         PhysicalChannelError: For a value, rate or state the profile cannot honor, or
             pose motion the head cannot follow.
         UnsupportedRigShapeError: If a step's target group matches no fixture.
@@ -367,6 +376,7 @@ def compile_physical_template(
     segments: list[FixtureSegment] = []
     dropped: list[dict[str, str | int]] = []
     resolved: dict[str, dict[str, ResolvedStepComponents]] = {}
+    phases: dict[str, dict[str, ResolvedFixturePhase]] = {}
     for instance in schedule_result.instances:
         step = step_map[instance.step_id]
         requested_t0 = context.bar_offset_to_ms(instance.start_bars)
@@ -416,8 +426,14 @@ def compile_physical_template(
                         )
                     ) from error
             components = resolved[step.step_id]
+        distribution = None
+        if step.physical_distribution:
+            if step.step_id not in phases:
+                phases[step.step_id] = _resolve_phases(step, template, context, targets)
+            distribution = phases[step.step_id]
         for fixture in targets:
             fixture_components = None if components is None else components[fixture.fixture_id]
+            phase = None if distribution is None else distribution[fixture.fixture_id]
             step_context = StepCompileContext(
                 section_id=section_id,
                 segment_id=segment_id,
@@ -438,6 +454,8 @@ def compile_physical_template(
                 physical_profile=fixture.physical_profile,
                 phase_map=phase_map,
                 resolved_components=fixture_components,
+                phase_offset_by_channel={} if phase is None else phase.phase_by_channel,
+                pan_sign=1 if phase is None else phase.pan_sign,
             )
             try:
                 segment = compile_physical_step(
@@ -464,6 +482,18 @@ def compile_physical_template(
             segment.add_metadata(FALLBACK_METADATA_KEY, step.physical_reposition_fallback)
             if fixture_components is not None:
                 segment.add_metadata("component_provenance", fixture_components.provenance)
+            if phase is not None:
+                segment.add_metadata(
+                    "phase_distribution",
+                    {
+                        "rank": phase.rank,
+                        "pan_sign": phase.pan_sign,
+                        "offsets": {
+                            channel.value: str(offset)
+                            for channel, offset in phase.phase_by_channel.items()
+                        },
+                    },
+                )
             segments.append(segment)
 
     return TemplateCompileResult(
@@ -473,6 +503,41 @@ def compile_physical_template(
         provenance=provenance,
         dropped_steps=dropped,
     )
+
+
+def _resolve_phases(
+    step: TemplateStep,
+    template: Template,
+    context: TemplateCompileContext,
+    targets: Sequence[FixtureContext],
+) -> dict[str, ResolvedFixturePhase]:
+    """Each target fixture's phase offsets and pan sign under the step's distribution."""
+
+    def reject(message: str) -> PhysicalCompileError:
+        return PhysicalCompileError(
+            MHDiagnostic(
+                code="unsupported_attribute",
+                severity="error",
+                message=f"template {template.template_id!r}, step {step.step_id!r}: {message}",
+                section_id=context.section_id,
+                action="rejected",
+            )
+        )
+
+    if context.topology is None:
+        raise reject(
+            f"physical_distribution needs the rig's topology, but fixture group "
+            f"{context.fixture_group_id!r} declares no topology and not every fixture "
+            "declares position.position_index to derive one row from"
+        )
+    try:
+        return resolve_distribution(
+            context.topology,
+            step.physical_distribution,
+            tuple(fixture.fixture_id for fixture in targets),
+        )
+    except ValueError as error:
+        raise reject(str(error)) from error
 
 
 def apply_entry_window(

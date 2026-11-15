@@ -50,6 +50,7 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
     TransitionDiagnostic,
 )
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
+from twinklr.core.sequencer.models.moving_heads.topology import rig_topology
 from twinklr.core.sequencer.models.transition import TransitionRegistry
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.channel_blender import ChannelBlender
@@ -552,6 +553,7 @@ def check_physical_templates(
         for fixture in fixture_group.expand_fixtures()
         if fixture.config.physical_profile is not None
     }
+    topology = rig_topology(fixture_group)
     phase_map = build_musical_phase_map(beat_grid)
     duration_ms = int(beat_grid.duration_ms)
     start_limit, end_limit = physical_cue_limits(phase_map, duration_ms)
@@ -577,6 +579,8 @@ def check_physical_templates(
                 movement_registry=registries["movement"],
                 dimmer_registry=registries["dimmer"],
                 presets=fixture_group.presets,
+                topology=topology,
+                fixture_group_id=fixture_group.group_id,
             )
             try:
                 compiled = compile_physical_template(
@@ -647,7 +651,13 @@ def _plan_key(
     profile: FixtureCapabilities,
     initial: InitialFixtureState | None,
 ) -> tuple[Any, ...]:
-    """What `plan_prepositions` reads of one fixture without locks; identifiers aside."""
+    """What `plan_prepositions` reads of one fixture without locks; identifiers aside.
+
+    Every channel's trajectory is hashed, so heads whose phase or pan sign changes a
+    trajectory are never planned as one. A cue's `phase_distribution` metadata (its
+    head's rank, offsets and sign) is left out: the planner never reads it, and its
+    rank alone would keep heads with identical cues from being planned once.
+    """
     return (
         profile.model_dump_json(),
         None if initial is None else initial.model_dump_json(),
@@ -656,7 +666,13 @@ def _plan_key(
                 cue.t0_ms,
                 cue.t1_ms,
                 tuple(sorted((ch.value, value.physical) for ch, value in cue.channels.items())),
-                tuple(sorted(cue.metadata.items())),
+                tuple(
+                    sorted(
+                        (key, value)
+                        for key, value in cue.metadata.items()
+                        if key != "phase_distribution"
+                    )
+                ),
             )
             for cue in cues
         ),
@@ -1060,6 +1076,7 @@ class RenderingPipeline:
                 ValueError: For a step, value, model or output the path refuses.
         """
         policy = self.job_config.moving_heads
+        topology = rig_topology(self.fixture_group)
         phase_map = build_musical_phase_map(self.beat_grid)
         duration_ms = int(self.beat_grid.duration_ms)
         start_limit, end_limit = physical_cue_limits(phase_map, duration_ms)
@@ -1112,6 +1129,8 @@ class RenderingPipeline:
                 shutter_registry=self.shutter_registry,
                 gobo_registry=self.gobo_registry,
                 presets=self.fixture_group.presets,
+                topology=topology,
+                fixture_group_id=self.fixture_group.group_id,
             )
             time_markers.append(
                 TimeMarker(
@@ -1266,6 +1285,25 @@ class RenderingPipeline:
                 for record in in_window
             ],
             "entry_windows": entry_windows,
+            "topology": (
+                None
+                if topology is None
+                else {
+                    "source": "derived" if self.fixture_group.topology is None else "declared",
+                    "canonical_order": list(topology.canonical_ids),
+                }
+            ),
+            "phase_distribution": [
+                {
+                    "section_id": cue.section_id,
+                    "step_id": cue.step_id,
+                    "fixture_id": cue.fixture_id,
+                    "t0_ms": cue.t0_ms,
+                    **json.loads(cue.metadata["phase_distribution"]),
+                }
+                for cue in cues
+                if "phase_distribution" in cue.metadata
+            ],
             "transactions": [d.model_dump(mode="json") for d in result.diagnostics],
             "diagnostics": [d.model_dump(mode="json") for d in diagnostics],
         }

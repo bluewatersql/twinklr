@@ -327,10 +327,23 @@ A fixture group may also declare `presets`, named components that `physical_v2` 
 
 A preset naming a fixture outside the group, a state its profile does not declare, a dimmer level on a profile without a dimmer axis, a fallback that is not declared, or a fallback chain that cycles fails when the fixture file loads. A referenced preset that declares nothing for a fixture, along its whole fallback chain, refuses the render (and, for an offered template, the run before planning); a head is never aimed at a center or default. Presets are rig data: an edit changes the render fingerprint, never the planner's session or cache.
 
+A fixture group may also declare a `topology`, the canonical full rig that a `physical_v2` step's `physical_distribution` (below) spreads phase over; the legacy renderer ignores it, and an absent `topology` is left out of the group's dump:
+
+| Key | Meaning |
+|---|---|
+| `topology.members` | One entry per head of the full rig, including a head this group lacks (a missing or disabled head keeps its place, so the others are never rephased). Every fixture of the group must be listed; fixture ids and ordinals are unique |
+| `topology.members.fixture_id` | The head this entry places |
+| `topology.members.row` | Its row; rows order first |
+| `topology.members.column` | Its column within the row; columns order next |
+| `topology.members.ordinal` | A unique number that orders heads sharing a row and column |
+
+Heads are ranked in `(row, column, ordinal, fixture_id)` order over the whole topology, before any head is selected. A group without `topology` gets one derived row when every fixture declares `position.position_index`, ranked by `position_index` itself (index 1 is the first slot), in the rig's left-to-right order: an index the file skips is an empty slot, so a missing head keeps its place whenever the remaining indices show it (a head missing after the highest index cannot be seen; declare a `topology` for that). Two fixtures with the same `position_index` refuse a step with a distribution, naming them. Without either, a step with a distribution refuses the render, and the run before planning, naming the fixture group. The topology is rig data: it changes the render fingerprint, never the planner's session or cache.
+
 _Source: `packages/twinklr/cli/main.py` (`_resolve_fixture_config_path`),
 `packages/twinklr/core/config/fixtures/dmx.py` (`DmxMapping`),
-`packages/twinklr/core/config/fixtures/capabilities.py` (`FixtureCapabilities`) and
-`packages/twinklr/core/config/fixtures/presets.py` (`RigPresetLibrary`)_
+`packages/twinklr/core/config/fixtures/capabilities.py` (`FixtureCapabilities`),
+`packages/twinklr/core/config/fixtures/presets.py` (`RigPresetLibrary`) and
+`packages/twinklr/core/sequencer/models/moving_heads/topology.py` (`FixtureTopology`)_
 
 ---
 
@@ -451,6 +464,30 @@ References resolve per fixture when the template compiles, both in the pre-plann
 compile and in the render, and each cue records `component_provenance` in its metadata:
 per channel, `step` or the referenced preset, the preset its fallback chain resolved to
 and the SHA-256 of the entry used.
+
+A `physical_v2` template step may spread phase across the rig's heads (chases, cascades,
+mirrored wings) with `physical_distribution`, a list of distributions over the fixture
+group's `topology` (fixture config, above). The legacy renderer refuses a step that
+carries one, and an empty list is left out of dumps:
+
+| Key | Meaning |
+|---|---|
+| `physical_distribution.domains` | The channels this distribution phases: `pan`, `tilt`, `dimmer` and `shutter` (color and gobo are held states with no phase). Two distributions of one step may not share a domain; a domain none lists keeps the step phase |
+| `physical_distribution.block_size` | Default `1`. Consecutive heads (after folding) that share one slot |
+| `physical_distribution.group_count` | Default none. Interleaves the blocks into this many slots (block number modulo the count) |
+| `physical_distribution.wings` | `1` (default) or `2`. Two wings fold the ordered rig at its center, so heads mirrored about it share a phase, and negate the left wing's pan displacement (an odd center head gets none); a referenced or authored start aim is never mirrored. The sign comes from the distribution that owns `pan` |
+| `physical_distribution.spread_cycles` | Default `0`, at least `0`. The phase span from the first slot to the last, both included, in cycles of each kernel's own period; taken at its exact decimal value |
+| `physical_distribution.direction` | `forward` (default: slot 0 leads) or `reverse` |
+
+A head's phase in a domain is the step phase minus its offset, so slot 0 leads and later
+slots lag; `phase_origin_ms` and a pulse's own `phase_cycles` are unchanged. A lagging
+head on a finite `linear` path holds its start pose until its phase reaches zero, and
+a head reaches the terminal pose once its phase reaches one; a step that ends sooner
+cuts a lagging head wherever its path has reached. A lagging pulse starts its step mid-cycle; as
+for any phase shift, the intervals the step start and end cut are exempt from the
+one-frame rule, and every other interval is checked at the head's own phase. Each cue
+records its head's rank, offsets and pan sign as `phase_distribution` metadata, and the
+trace lists them with the rig's canonical order.
 
 ### Deterministic FSEQ comparison (CI-safe)
 

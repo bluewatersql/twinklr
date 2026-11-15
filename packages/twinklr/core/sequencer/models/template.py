@@ -4,7 +4,8 @@ This module defines all template-related models:
 - Timing models: BaseTiming, PhaseOffset, RepeatContract
 - Step components: Geometry, Movement, Dimmer, StepTiming, TemplateStep
 - Physical renderer step data: PhysicalMovementSpec, PhysicalPulseSpec and its
-  dimmer and shutter forms, named shutter, color and gobo states, and ComponentRefs
+  dimmer and shutter forms, named shutter, color and gobo states, ComponentRefs and
+  PhaseDistribution
 - Template structure: Template, TemplatePreset, TemplateDoc
 
 These models define how choreography is structured and executed.
@@ -26,6 +27,10 @@ from twinklr.core.sequencer.models.enum import (
     TemplateCategory,
     TemplateRole,
     TimingMode,
+)
+from twinklr.core.sequencer.models.moving_heads.topology import (
+    PhaseDistribution,
+    check_domain_ownership,
 )
 from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
 from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
@@ -457,6 +462,11 @@ class TemplateStep(BaseModel):
     component_refs: ComponentRefs | None = Field(
         default=None, exclude_if=lambda value: value is None
     )
+    # Physical renderer only; left out of dumps when empty. Phase spread over the rig
+    # topology, each distribution over its own domains.
+    physical_distribution: tuple[PhaseDistribution, ...] = Field(
+        default=(), exclude_if=lambda value: not value
+    )
 
     @property
     def has_physical_data(self) -> bool:
@@ -470,12 +480,18 @@ class TemplateStep(BaseModel):
             or self.physical_gobo is not None
             or self.physical_reposition_fallback is not None
             or self.component_refs is not None
+            or bool(self.physical_distribution)
         )
 
     @model_validator(mode="after")
     def _validate_physical_shutter(self) -> "TemplateStep":
         if self.physical_shutter is not None and self.physical_shutter_state is not None:
             raise ValueError("set physical_shutter_state or physical_shutter, not both")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_distribution(self) -> "TemplateStep":
+        check_domain_ownership(self.physical_distribution)
         return self
 
     @model_validator(mode="after")

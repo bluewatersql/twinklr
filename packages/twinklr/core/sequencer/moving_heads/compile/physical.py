@@ -7,7 +7,9 @@ A named state selects only the byte the profile declares for it
 (`resolve_discrete_state`); a wheel change is one event, never a sweep through the
 states between, and an undeclared state or wheel is rejected, never replaced by open
 or zero. Motion and pulses are evaluated on musical phase from the step start, never
-on sample-index parity or an average tempo. Nothing is clamped: an out-of-range
+on sample-index parity or an average tempo; a step distributed over the rig topology
+evaluates each fixture at the step phase minus its offset in that domain, and its pan
+displacement times its mirror sign. Nothing is clamped: an out-of-range
 value, a travel rate above the configured speed, motion at an unknown speed, a pulse
 interval shorter than one frame, or a shutter change faster than its known latency
 and settle time is rejected. A legacy step is never reinterpreted.
@@ -54,9 +56,9 @@ from twinklr.core.sequencer.models.template import (
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
 from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
 from twinklr.core.sequencer.timing.musical_phase import (
+    MusicalPhaseError,
     MusicalPhaseMap,
     exact_decimal,
-    musical_phase_at,
     musical_phase_fraction,
     musical_time_at,
 )
@@ -119,7 +121,8 @@ def compile_physical_step(
             song's musical phase map. Phase is measured from `context.start_ms`. For a
             step with component references, `resolved_components` supplies the start
             aim, and the held shutter, color, gobo and dimmer level in place of the
-            step's own static states.
+            step's own static states. `phase_offset_by_channel` and `pan_sign` carry
+            the fixture's place in the step's phase distribution.
         sample_times_ms: The encoder's frame starts in the step's half-open span:
             every frame from its start to the last before its end. The step's start
             and end (`context`) must already be frame-grid times: the caller quantizes
@@ -170,12 +173,18 @@ def compile_physical_step(
         # Both set: checked by _require_physical_step.
         assert movement.start_pan_deg is not None and movement.start_tilt_deg is not None
         pose = PoseDegrees(pan_deg=movement.start_pan_deg, tilt_deg=movement.start_tilt_deg)
+    offsets = context.phase_offset_by_channel
     for channel in (ChannelName.PAN, ChannelName.TILT):
+        sign = context.pan_sign if channel is ChannelName.PAN else 1
+        offset = offsets.get(channel, Fraction(0))
         trajectory = ContinuousTrajectory(
             unit="degree",
             points=tuple(
                 PhysicalPoint(
-                    t_ms=t, value=_movement_value(movement, pose, channel, phase_map, t, t0_ms)
+                    t_ms=t,
+                    value=_movement_value(
+                        movement, pose, channel, phase_map, t, t0_ms, offset=offset, sign=sign
+                    ),
                 )
                 for t in (*times, t1_ms)
             ),
@@ -186,13 +195,20 @@ def compile_physical_step(
 
     dimmer = step.dimmer.physical
     if dimmer is not None:
-        _check_pulse_widths(context.fixture_id, ChannelName.DIMMER, dimmer, phase_map, t0_ms, t1_ms)
+        offset = offsets.get(ChannelName.DIMMER, Fraction(0))
+        _check_pulse_widths(
+            context.fixture_id, ChannelName.DIMMER, dimmer, phase_map, t0_ms, t1_ms, offset=offset
+        )
         levels = ContinuousTrajectory(
             unit="normalized",
             points=tuple(
                 PhysicalPoint(
                     t_ms=t,
-                    value=dimmer.high if _pulse_high(dimmer, phase_map, t, t0_ms) else dimmer.low,
+                    value=(
+                        dimmer.high
+                        if _pulse_high(dimmer, phase_map, t, t0_ms, offset=offset)
+                        else dimmer.low
+                    ),
                 )
                 for t in times
             ),
@@ -211,10 +227,11 @@ def compile_physical_step(
 
     shutter = step.physical_shutter
     if shutter is not None:
+        offset = offsets.get(ChannelName.SHUTTER, Fraction(0))
         _check_pulse_widths(
-            context.fixture_id, ChannelName.SHUTTER, shutter, phase_map, t0_ms, t1_ms
+            context.fixture_id, ChannelName.SHUTTER, shutter, phase_map, t0_ms, t1_ms, offset=offset
         )
-        states = _shutter_states(shutter, phase_map, times, t0_ms)
+        states = _shutter_states(shutter, phase_map, times, t0_ms, offset=offset)
         _add(segment, ChannelName.SHUTTER, states, profile)
         _check_shutter_timing(context.fixture_id, states, t1_ms, profile)
 
@@ -494,28 +511,56 @@ def _movement_value(
     phase_map: MusicalPhaseMap,
     time_ms: int,
     origin_ms: int,
+    *,
+    offset: Fraction = Fraction(0),
+    sign: int = 1,
 ) -> float:
+    """The axis value at `time_ms`: the start aim plus `sign` times the kernel's
+    displacement at the fixture's phase, the step phase minus `offset` (exact)."""
     is_pan = channel is ChannelName.PAN
     start = pose.pan_deg if is_pan else pose.tilt_deg
-    extent = movement.pan_extent_deg if is_pan else movement.tilt_extent_deg
+    extent = sign * (movement.pan_extent_deg if is_pan else movement.tilt_extent_deg)
     if movement.shape == "hold" or movement.period_beats is None:
         return start
-    phase = musical_phase_at(
-        phase_map, time_ms, origin_ms=origin_ms, period_beats=movement.period_beats
+    phase_cycles = (
+        musical_phase_fraction(
+            phase_map, time_ms, origin_ms=origin_ms, period_beats=movement.period_beats
+        )
+        - offset
     )
+    try:
+        phase = float(phase_cycles)
+    except OverflowError as error:
+        raise MusicalPhaseError(
+            f"phase at {time_ms} ms over a {movement.period_beats}-beat period is too large"
+        ) from error
     if movement.shape == "linear":
-        return start + extent * min(phase, 1.0)
+        # A lagging head holds its start until its phase reaches zero.
+        return start + extent * min(max(phase, 0.0), 1.0)
     # sine_pan/sine_tilt: the unused axis has zero extent by validation.
     return start + extent * math.sin(2 * math.pi * phase)
 
 
 def _pulse_high(
-    pulse: PhysicalPulseSpec, phase_map: MusicalPhaseMap, time_ms: int, origin_ms: int
+    pulse: PhysicalPulseSpec,
+    phase_map: MusicalPhaseMap,
+    time_ms: int,
+    origin_ms: int,
+    *,
+    offset: Fraction = Fraction(0),
 ) -> bool:
-    """High while the exact fractional pulse phase is in `[0, duty_cycle)`."""
-    phase = musical_phase_fraction(
-        phase_map, time_ms, origin_ms=origin_ms, period_beats=pulse.period_beats
-    ) + exact_decimal(pulse.phase_cycles)
+    """High while the exact fractional pulse phase is in `[0, duty_cycle)`.
+
+    The pulse phase is the step phase minus the fixture's `offset`, plus the pulse's
+    own `phase_cycles`; a lagging head starts its step mid-cycle.
+    """
+    phase = (
+        musical_phase_fraction(
+            phase_map, time_ms, origin_ms=origin_ms, period_beats=pulse.period_beats
+        )
+        - offset
+        + exact_decimal(pulse.phase_cycles)
+    )
     return phase - math.floor(phase) < exact_decimal(pulse.duty_cycle)
 
 
@@ -526,16 +571,21 @@ def _check_pulse_widths(
     phase_map: MusicalPhaseMap,
     t0_ms: int,
     t1_ms: int,
+    *,
+    offset: Fraction = Fraction(0),
 ) -> None:
     """Reject a high or low interval inside the step shorter than one frame.
 
-    Edges are the exact times the pulse phase crosses a whole cycle (rising) or
-    `duty_cycle` (falling). An interval cut by the step start or end is exempt.
+    Edges are the exact times the fixture's pulse phase (`_pulse_high`) crosses a whole
+    cycle (rising) or `duty_cycle` (falling). An interval cut by the step start or end
+    is exempt, for a lagging head as for any phase shift: the cut interval at the start
+    holds at least the step's first frame, one at the end shorter than a frame reaches
+    no frame, and the transaction pass owns both boundaries.
     """
     duty = exact_decimal(pulse.duty_cycle)
     if duty == 1:
         return
-    shift = exact_decimal(pulse.phase_cycles)
+    shift = exact_decimal(pulse.phase_cycles) - offset
     end = (
         musical_phase_fraction(phase_map, t1_ms, origin_ms=t0_ms, period_beats=pulse.period_beats)
         + shift
@@ -567,10 +617,13 @@ def _shutter_states(
     phase_map: MusicalPhaseMap,
     times: tuple[int, ...],
     origin_ms: int,
+    *,
+    offset: Fraction = Fraction(0),
 ) -> DiscreteTrajectory:
     events: list[DiscretePoint] = []
     for t in times:
-        state = pulse.high_state if _pulse_high(pulse, phase_map, t, origin_ms) else pulse.low_state
+        high = _pulse_high(pulse, phase_map, t, origin_ms, offset=offset)
+        state = pulse.high_state if high else pulse.low_state
         if not events or events[-1].state != state:
             events.append(DiscretePoint(t_ms=t, state=state))
     return DiscreteTrajectory(events=tuple(events))
