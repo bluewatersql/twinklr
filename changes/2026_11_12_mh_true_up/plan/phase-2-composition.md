@@ -598,6 +598,48 @@ and a confirmation):
 - **Low, left as is.** A head whose first cue is moved without a window is recorded in
   the trace as `action: "none"`, with the shift visible only in `first_cue_ms`.
 
+P2.3, 2026-11-15 (reviewed separately from its author; a review with one high finding,
+a fix round, a re-review, then three items closed):
+
+- **Formulas.** Path position `u` is the step phase minus the head's distribution
+  offset plus `transform.phase_cycles`, in exact fractions; `reverse` makes it `1 - u`.
+  Circle `(cos 2πu, sin 2πu)`; lissajous `(sin 2πau, sin 2πbu)`, default 1:2; periodic
+  sweep `(-cos 2πu, 0)`; finite sweep `(-cos π·clamp(u,0,1), 0)`. The displacement is
+  rotated, scaled per axis by its extent, and added to the resolved aim; the mirror
+  sign multiplies the pan component after rotation and scaling. The reviewer's
+  independent evaluator agreed on 180,000 evaluations. The Phase 1 kernels are
+  bit-identical over 200,000 values.
+- **Where paths start.** A circle starts at the aim plus the pan extent, a periodic
+  sweep at the aim minus the pan extent, a lissajous at the aim. This sets the entry
+  aim.
+- **Extents bound the unrotated path.** A lissajous turned by a non-quarter angle
+  reaches up to √2 times its extents; limits are checked on real frames.
+- **Pulses never see the transform or `reverse`.**
+- **Refused at validation:** `transform` on `hold`, the sine kernels and `linear`;
+  `reverse` on a periodic sweep (it would do nothing); an extent a turned sweep
+  ignores; under `ONCE`, a dimmer or shutter pulse with duty below 1 (it would keep
+  flashing through the hold; no planned family needs one).
+- **`ONCE`.** One cycle at musical rate. `HOLD_LAST_POSE` extends the closing cues to
+  the section end: a head reaches and holds its terminal pose, and a phase-lagged head
+  finishes its move during the hold. `TRUNCATE` schedules nothing after the cycle; a
+  lagging head is cut where it is and held dark. A step whose move cannot complete
+  within it, `period × (1 − phase_cycles)` beats against the step's beats, is refused
+  at compile, and so at the gate, because beats per bar come from the grid.
+- **Gate for `ONCE`.** The gate compiles and reposition-checks every bar a full cycle
+  can start from, over the cycle plus any lagging head's remaining move plus one bar,
+  deduplicating placements identical relative to their start; bar 1 is never used to
+  stand in for a later bar, because it enters from the initial state. Author's
+  measurement on the 8-head, 4-minute song: 1.2 s at steady tempo, 4.8 s with 120
+  distinct bars, 9.4 s with a lagging head as well.
+- **Registry.** `repeat.mode` keeps its legacy record; `ONCE` is evidenced in
+  `test_physical_paths.py`. `RepeatMode` is in no planner schema or context, and the
+  selector does not read it.
+- **Evidence at re-review.** Every admitted `ONCE` template rendered at every start bar
+  from 2 on at three section lengths: 1,153 renders, 0 failures. 1,000 random renders:
+  0 failures after admission.
+- **Design choices awaiting a look judgment (`PENDING-OWNER`):** the finite sweep's
+  cosine easing and the periodic sweep starting at an edge.
+
 ## Phase exit
 
 `physical_v2` accepts grids with silent edges, reports the covered span and holds every fixture dark outside it without inferring tempo; a grid Phase 1 accepted renders the same frames and fingerprint. Legacy session ids, the 16 Phase 0 fingerprints and the Phase 1 request fingerprints are unchanged. Six core families compile deterministically on the synthetic rig matrix and are offered only under `physical_v2`, each only on a rig that can render it; independent phase domains work; missing heads preserve canonical ranks; preset overrides have explicit scope; a `ONCE` hold stays one cue per fixture and holds its terminal pose to the section end; fly-in/out lit directions and dark returns are frame-proven; flicks settle while dark and resume the current base. Each section's entry window is sized at render from a bound the fuzz shows dominates the transaction pass, so section-entry repositioning fits by construction; the dip is skipped where the predecessor ends where the successor begins, and the plan-dependent failures P2.4c lists still surface at render. The zoom pilot is source/synthetic proven with any real-profile acceptance explicitly pending. Legacy regression and clean-tree `make validate` pass. Owner visual acceptance, including whether the remaining section-entry dips look acceptable, is a separate `PENDING-OWNER` record, not a consequence of a new effect name or passing bytes.
