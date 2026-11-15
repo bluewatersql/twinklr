@@ -517,6 +517,32 @@ findings, a fix round, a re-review and a final confirmation):
   sizing but not by the envelope form used before planning.
 - **Unverified.** Real fixtures; how the remaining dark dips look (`PENDING-OWNER`).
 
+P2.1, 2026-11-15 (reviewed separately from its author; one review, then test gaps
+closed):
+
+- **Start angles are optional on the physical movement spec.** A step must still get
+  each angle from itself or from a position reference; a position preset entry carries
+  both angles, so "set by neither" is decided at template validation, and a reference
+  that does not resolve on the rig is refused by the gate before planning. Existing
+  templates dump and fingerprint as before.
+- **Stricter than the plan.** Two attribute presets that set the same channel fail even
+  when their values agree. A broken position reference fails even when the step sets
+  both angles itself. A preset naming a fixture outside the group, or an attribute
+  preset on a fixture without a physical profile, is refused when the fixture file
+  loads, for legacy jobs too.
+- **Provenance** is a SHA-256 of each preset entry used, in segment metadata
+  (`component_provenance`); presets have no version field.
+- **Identity, corrected from the plan's wording.** Presets stay out of the session id,
+  so an edit never re-keys planning. The render fingerprint hashes the whole fixture
+  group, so any preset edit changes the fingerprint of every render on that rig, not
+  only of renders that depend on that preset, and adding presets to a rig changes its
+  legacy fingerprints while the bytes stay identical. That over-invalidates and is safe.
+- **Precedence** as the plan corrected it: a template preset patch counts as set on the
+  step.
+- **Mutations.** 21 tried by the reviewer; all are now caught.
+- **Test time.** The full suite went from about 137 s to about 240 s in P2.4a; nine of
+  the ten slowest tests are its fuzz and gate tests. Trimmed in a follow-up commit.
+
 ## Phase exit
 
 `physical_v2` accepts grids with silent edges, reports the covered span and holds every fixture dark outside it without inferring tempo; a grid Phase 1 accepted renders the same frames and fingerprint. Legacy session ids, the 16 Phase 0 fingerprints and the Phase 1 request fingerprints are unchanged. Six core families compile deterministically on the synthetic rig matrix and are offered only under `physical_v2`, each only on a rig that can render it; independent phase domains work; missing heads preserve canonical ranks; preset overrides have explicit scope; a `ONCE` hold stays one cue per fixture and holds its terminal pose to the section end; fly-in/out lit directions and dark returns are frame-proven; flicks settle while dark and resume the current base. Each section's entry window is sized at render from a bound the fuzz shows dominates the transaction pass, so section-entry repositioning fits by construction; the dip is skipped where the predecessor ends where the successor begins, and the plan-dependent failures P2.4c lists still surface at render. The zoom pilot is source/synthetic proven with any real-profile acceptance explicitly pending. Legacy regression and clean-tree `make validate` pass. Owner visual acceptance, including whether the remaining section-entry dips look acceptable, is a separate `PENDING-OWNER` record, not a consequence of a new effect name or passing bytes.
