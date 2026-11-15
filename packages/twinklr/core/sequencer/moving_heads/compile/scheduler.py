@@ -2,7 +2,7 @@
 
 This module provides functions to schedule template repeats within
 a playback window, handling PING_PONG and JOINER repeat modes,
-and remainder policies.
+and remainder policies, and the physical renderer's single-cycle ONCE mode.
 
 Steps are placed at the ``start_offset_bars`` they declare, measured from the start
 of the cycle. That field used to be ignored: the scheduler laid every loop step end
@@ -111,6 +111,8 @@ def schedule_repeats(
         step_durations = dict.fromkeys(contract.loop_step_ids, default_duration)
 
     placements = _cycle_placements(contract, step_durations, step_offsets)
+    if contract.mode == RepeatMode.ONCE:
+        return _schedule_once(placements, contract, duration_bars)
 
     # Calculate number of complete cycles
     num_complete_cycles = int(duration_bars // contract.cycle_bars)
@@ -187,6 +189,47 @@ def schedule_repeats(
     return ScheduleResult(
         instances=instances,
         num_complete_cycles=num_complete_cycles,
+        remainder_bars=remainder_bars,
+        remainder_policy=contract.remainder_policy,
+    )
+
+
+def _schedule_once(
+    placements: list[_Placement], contract: RepeatContract, duration_bars: float
+) -> ScheduleResult:
+    """Schedule exactly one cycle at its nominal rate, never repeated or compressed.
+
+    A window shorter than the cycle gets the cycle's head with no complete cycle; the
+    physical compile refuses that cut. After a complete cycle, HOLD_LAST_POSE extends
+    the instances that close it to the window end, so each stays one instance with one
+    start (``_hold_last_pose`` would append a new one at the remainder start); every
+    other policy schedules nothing after it.
+    """
+    instances = _schedule_cycle(
+        placements, contract, cycle_num=0, cycle_start=0.0, window_end=duration_bars
+    )
+    if duration_bars < contract.cycle_bars - _EPSILON_BARS:
+        return ScheduleResult(
+            instances=instances,
+            num_complete_cycles=0,
+            remainder_bars=duration_bars,
+            remainder_policy=contract.remainder_policy,
+        )
+    remainder_bars = max(duration_bars - contract.cycle_bars, 0.0)
+    if (
+        remainder_bars > _EPSILON_BARS
+        and contract.remainder_policy == RemainderPolicy.HOLD_LAST_POSE
+    ):
+        cycle_end = max(instance.end_bars for instance in instances)
+        instances = [
+            instance.model_copy(update={"end_bars": duration_bars})
+            if abs(instance.end_bars - cycle_end) <= _EPSILON_BARS
+            else instance
+            for instance in instances
+        ]
+    return ScheduleResult(
+        instances=instances,
+        num_complete_cycles=1,
         remainder_bars=remainder_bars,
         remainder_policy=contract.remainder_policy,
     )

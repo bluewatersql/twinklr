@@ -489,6 +489,50 @@ one-frame rule, and every other interval is checked at the head's own phase. Eac
 records its head's rank, offsets and pan sign as `phase_distribution` metadata, and the
 trace lists them with the rig's canonical order.
 
+A `physical_v2` step may move on a path about its base aim (its start angles or its
+position reference, never both added) with `movement.physical.shape` `circle`,
+`lissajous` (both periodic) or `sweep` (periodic: edge to edge and back each period;
+finite: one way, then held). Each extent is that axis's maximum signed displacement of
+the unrotated path, so a circle with pan extent 30 and tilt extent 10 is an ellipse ±30°
+by ±10°. A circle starts at the aim plus its pan extent, a sweep at the aim minus it
+(plus it, when a finite sweep is reversed) and a lissajous at the aim, so the first cue
+of a path enters there. A sweep moves along pan, so its tilt extent must be zero unless
+`rotation_deg` turns it (and its pan extent zero when turned a quarter turn). The legacy
+renderer refuses these shapes, and the fields below are left out of dumps when absent:
+
+| Key | Meaning |
+|---|---|
+| `movement.physical.lissajous_ratio` | `lissajous` only: pan and tilt cycles per period, positive integers, default `[1, 2]` (a figure eight) |
+| `movement.physical.transform.rotation_deg` | Default `0`. Turns the path about the aim before each axis is scaled by its own extent, so a 90° turn moves a pan sweep onto tilt at the tilt extent. Turning a circle only shifts where it starts; a lissajous turned off a quarter turn can reach past its extents, by up to √2 times (about 1.24 times for 1:2 at 45°) |
+| `movement.physical.transform.reverse` | Default `false`. Runs the path backwards (a circle clockwise instead of counter-clockwise, a finite sweep from the other edge); pulses are unchanged. Refused on a periodic sweep, which it would not change |
+| `movement.physical.transform.phase_cycles` | Default `0`. Starts the path this many cycles into its travel, at its exact decimal value; pulses are unchanged |
+
+A transform applies only to these three shapes; `hold`, `sine_pan`, `sine_tilt` and
+`linear` keep their meaning. Each axis is evaluated at the head's phase in that axis's
+domain, so a distribution meant to shift the whole path lists both `pan` and `tilt`;
+a mirrored wing negates the pan component after rotation, reflecting the path. The exact
+formulas are in `evaluate_physical_path` (`compile/physical.py`). Nothing is normalized
+or closed: a path that leaves an axis's range, exceeds its travel speed or moves finer
+than the head can follow at any frame is refused by the pre-planning dry compile, like
+any other motion.
+
+A `physical_v2` template may set `repeat.mode` to `ONCE`: its one cycle plays at its
+nominal tempo and never repeats. Every step must declare finite motion
+(`movement.physical.mode` `finite`) that completes within the step (`period_beats`,
+less the share a positive `transform.phase_cycles` skips, or more for a negative one), and no
+dimmer or shutter pulse with a duty cycle below 1, so a head reaches its terminal pose
+by the end of the cycle. With `remainder_policy` `HOLD_LAST_POSE`, the cues that close
+the cycle run on to the section end as one cue each: a head holds its terminal pose and
+states there (lit when the step is), and a head lagging by its phase distribution
+completes its move first. With `TRUNCATE`, nothing follows the cycle: a lagging head
+that has not finished is cut where it is, and every head is held dark until its next
+cue. `FADE_OUT` is refused. The pre-planning dry compile checks a `ONCE` template at
+every bar a section could start on, since its single cycle meets that bar's tempo.
+A section shorter than the cycle fails the render, after planning, because the gate
+cannot know the planner's section lengths; a cycle cut by the end of the song or of the
+detected beats is cut without error. The legacy renderer refuses `ONCE`; the planner
+sees template IDs and descriptions, never a repeat mode.
+
 ### Deterministic FSEQ comparison (CI-safe)
 
 After xLights has rendered two `.fseq` files, compare them without launching xLights or

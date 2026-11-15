@@ -3,9 +3,9 @@
 This module defines all template-related models:
 - Timing models: BaseTiming, PhaseOffset, RepeatContract
 - Step components: Geometry, Movement, Dimmer, StepTiming, TemplateStep
-- Physical renderer step data: PhysicalMovementSpec, PhysicalPulseSpec and its
-  dimmer and shutter forms, named shutter, color and gobo states, ComponentRefs and
-  PhaseDistribution
+- Physical renderer step data: PhysicalMovementSpec and its PathTransform,
+  PhysicalPulseSpec and its dimmer and shutter forms, named shutter, color and gobo
+  states, ComponentRefs and PhaseDistribution
 - Template structure: Template, TemplatePreset, TemplateDoc
 
 These models define how choreography is structured and executed.
@@ -14,7 +14,7 @@ These models define how choreography is structured and executed.
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, model_validator
 
 from twinklr.core.config.fixtures.presets import PresetId, StateName
 from twinklr.core.config.poses import PanPose, TiltPose
@@ -43,6 +43,8 @@ from twinklr.core.sequencer.moving_heads.libraries.shutter import ShutterPattern
 class RepeatMode(StrEnum):
     PING_PONG = "PING_PONG"
     JOINER = "JOINER"
+    # Physical renderer only: one cycle, never repeated; see `RepeatContract`.
+    ONCE = "ONCE"
 
 
 class RemainderPolicy(StrEnum):
@@ -113,7 +115,15 @@ class RepeatContract(BaseModel):
     Defines how a template section loops during playback.
 
     Attributes:
-        mode: How to repeat (PING_PONG or JOINER).
+        mode: How to repeat (PING_PONG or JOINER), or ONCE: the physical renderer plays
+            one cycle at its nominal rate and never repeats it. Every step of a ONCE
+            template is finite and its move ends within the step, so a head without a
+            phase offset reaches its terminal pose by the cycle end. After the cycle,
+            HOLD_LAST_POSE extends the cues that close it to the section end (one cue,
+            one phase origin): a head holds its terminal pose there, and a
+            phase-lagged head completes its move first. TRUNCATE schedules nothing, so
+            a lagged head that has not finished is cut where it is and held dark by
+            the transaction pass. A section shorter than the cycle is refused.
         cycle_bars: Duration of one complete cycle, in bars.
         loop_step_ids: Which steps are included in the loop.
         remainder_policy: What to do with time remaining after last full cycle.
@@ -176,6 +186,27 @@ MIN_PHYSICAL_PERIOD_BEATS = 1 / 64
 20 ms frame, so anything shorter is an authoring error rather than a pulse."""
 
 
+RELATIVE_PATH_SHAPES = ("circle", "lissajous", "sweep")
+"""Shapes evaluated as a centered displacement about the base aim; only these take a
+`PathTransform`."""
+
+
+class PathTransform(BaseModel):
+    """Template-owned transform of a relative path (`RELATIVE_PATH_SHAPES`).
+
+    `rotation_deg` turns the centered displacement before each axis is scaled by its
+    extent. `phase_cycles` shifts where along its travel the path is, in cycles of its
+    period, at its exact decimal value. `reverse` runs the travel backwards; pulses and
+    every other phase domain are unaffected by either.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    rotation_deg: float = Field(default=0.0, allow_inf_nan=False)
+    reverse: bool = False
+    phase_cycles: float = Field(default=0.0, allow_inf_nan=False)
+
+
 class PhysicalMovementSpec(BaseModel):
     """Physical motion of a step for the physical renderer, in fixture-local degrees.
 
@@ -183,13 +214,18 @@ class PhysicalMovementSpec(BaseModel):
     rate (`period_beats`) are independent. Kernels: `hold` keeps the start pose;
     `sine_pan`/`sine_tilt` add the selected extent times sin(2*pi*phase) and are
     periodic; `linear` moves from start to start plus extent over one period, then
-    holds, and is finite. A start angle left unset comes from the step's position
-    reference (`TemplateStep.component_refs`); a step without one must set both.
+    holds, and is finite. `circle`, `lissajous` (periodic) and `sweep` (periodic or
+    finite) move about the start pose; each extent is that axis's maximum signed
+    displacement before rotation, and `transform` rotates, shifts or reverses them
+    (`evaluate_physical_path` states each formula). `lissajous_ratio` is the pan and
+    tilt cycles per period, default 1:2. A start angle left unset comes from the
+    step's position reference (`TemplateStep.component_refs`); a step without one
+    must set both.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    shape: Literal["hold", "sine_pan", "sine_tilt", "linear"]
+    shape: Literal["hold", "sine_pan", "sine_tilt", "linear", "circle", "lissajous", "sweep"]
     mode: Literal["periodic", "finite"]
     start_pan_deg: float | None = Field(default=None, allow_inf_nan=False)
     start_tilt_deg: float | None = Field(default=None, allow_inf_nan=False)
@@ -201,6 +237,11 @@ class PhysicalMovementSpec(BaseModel):
         allow_inf_nan=False,
         description="Required unless shape is hold",
     )
+    # Left out of dumps when absent, so existing physical templates dump as before.
+    lissajous_ratio: tuple[PositiveInt, PositiveInt] | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
+    transform: PathTransform | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode="after")
     def _validate_kernel(self) -> "PhysicalMovementSpec":
@@ -208,6 +249,15 @@ class PhysicalMovementSpec(BaseModel):
             raise ValueError("linear motion is finite; periodic linear is not supported")
         if self.shape in ("sine_pan", "sine_tilt") and self.mode != "periodic":
             raise ValueError(f"{self.shape} is periodic; finite sine is not supported")
+        if self.shape in ("circle", "lissajous") and self.mode != "periodic":
+            raise ValueError(f"{self.shape} is periodic; a finite {self.shape} is not supported")
+        if self.lissajous_ratio is not None and self.shape != "lissajous":
+            raise ValueError("lissajous_ratio applies only to the lissajous shape")
+        if self.transform is not None and self.shape not in RELATIVE_PATH_SHAPES:
+            raise ValueError(
+                f"transform applies only to the relative shapes {list(RELATIVE_PATH_SHAPES)}; "
+                f"{self.shape} keeps its Phase 1 meaning"
+            )
         if self.shape == "hold":
             if self.pan_extent_deg or self.tilt_extent_deg or self.period_beats is not None:
                 raise ValueError("hold takes no extent or period")
@@ -217,7 +267,24 @@ class PhysicalMovementSpec(BaseModel):
         unused = {"sine_pan": self.tilt_extent_deg, "sine_tilt": self.pan_extent_deg}
         if unused.get(self.shape):
             raise ValueError(f"{self.shape} moves one axis; the other extent must be zero")
+        if self.shape == "sweep":
+            self._validate_sweep()
         return self
+
+    def _validate_sweep(self) -> None:
+        """Refuse sweep settings that would change nothing: reversing a periodic sweep
+        (it is symmetric in time), and an extent on an axis the turned sweep never moves
+        (tilt unless turned off the pan line, pan when turned a quarter turn)."""
+        transform = self.transform or PathTransform()
+        if transform.reverse and self.mode == "periodic":
+            raise ValueError(
+                "reverse leaves a periodic sweep unchanged; shift it with phase_cycles instead"
+            )
+        rest = transform.rotation_deg % 180
+        if rest == 0 and self.tilt_extent_deg:
+            raise ValueError("a sweep along pan ignores tilt_extent_deg; set it to zero")
+        if rest == 90 and self.pan_extent_deg:
+            raise ValueError("a sweep turned onto tilt ignores pan_extent_deg; set it to zero")
 
 
 class PhysicalPulseSpec(BaseModel):
@@ -650,7 +717,30 @@ class Template(BaseModel):
             if step.target not in list(SemanticGroupType):
                 raise ValueError(f"Step '{step.step_id}' targets unknown group: '{step.target}'")
 
+        if self.repeat.mode is RepeatMode.ONCE:
+            self._require_finite_steps()
         return self
+
+    def _require_finite_steps(self) -> None:
+        """A ONCE cycle ends in a terminal state its remainder holds, so each step must
+        declare finite physical motion and no dimmer or shutter pulse below duty 1."""
+        for step in self.steps:
+            movement = step.movement.physical
+            if movement is None or movement.mode != "finite":
+                raise ValueError(
+                    f"repeat mode ONCE needs every step finite, but step {step.step_id!r} "
+                    "declares no finite movement.physical (mode 'finite')"
+                )
+            pulses = (
+                ("dimmer.physical", step.dimmer.physical),
+                ("physical_shutter", step.physical_shutter),
+            )
+            for name, pulse in pulses:
+                if pulse is not None and pulse.duty_cycle != 1:
+                    raise ValueError(
+                        f"repeat mode ONCE needs every step finite, but step {step.step_id!r} "
+                        f"pulses {name} with duty_cycle {pulse.duty_cycle}"
+                    )
 
 
 class TemplateDoc(BaseModel):

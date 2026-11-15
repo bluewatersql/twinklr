@@ -28,6 +28,7 @@ from twinklr.core.sequencer.models.moving_heads.topology import (
 )
 from twinklr.core.sequencer.models.template import (
     RemainderPolicy,
+    RepeatMode,
     Template,
     TemplatePreset,
     TemplateStep,
@@ -63,7 +64,7 @@ from twinklr.core.sequencer.moving_heads.compile.step_compiler import (
 from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import quantize_cue
 from twinklr.core.sequencer.moving_heads.utils import resolve_semantic_group
-from twinklr.core.sequencer.timing.musical_phase import MusicalPhaseMap
+from twinklr.core.sequencer.timing.musical_phase import MusicalPhaseMap, exact_decimal
 from twinklr.core.utils.logging import get_renderer_logger, log_performance
 
 logger = logging.getLogger(__name__)
@@ -132,11 +133,20 @@ def compile_template(
     Returns:
         TemplateCompileResult with all compiled segments.
 
+    Raises:
+        ValueError: For repeat mode ONCE, or a step carrying physical data, which only
+            physical_v2 renders.
+
     Example:
         >>> template = Template(...)
         >>> context = TemplateCompileContext(...)
         >>> result = compile_template(template, context)
     """
+    if template.repeat.mode == RepeatMode.ONCE:
+        raise ValueError(
+            f"template {template.template_id!r} uses repeat mode ONCE; it compiles only "
+            "under physical_v2"
+        )
     # Initialize provenance
     renderer_log.debug(f"Template: {template.template_id}")
     provenance: list[str] = [f"template:{template.template_id}"]
@@ -329,7 +339,10 @@ def compile_physical_template(
 
     Raises:
         PhysicalCompileError: For a FADE_OUT remainder policy, which has no physical
-            fade, a step the physical compile rejects, a component reference that
+            fade, a ONCE template whose single cycle the section is too short for (a
+            cut at `end_limit_ms` is not refused) or with a step whose finite move
+            outlasts the step, a step the physical compile
+            rejects, a component reference that
             does not resolve on this rig (naming template, step, preset and fixture),
             or a distribution on a rig without a topology (naming the fixture group)
             or over a fixture the topology does not place.
@@ -357,6 +370,10 @@ def compile_physical_template(
             )
         )
 
+    if working_template.repeat.mode == RepeatMode.ONCE:
+        for step in working_template.steps:
+            _require_move_within_step(step, template, context)
+
     step_map = {step.step_id: step for step in working_template.steps}
     schedule_result = schedule_repeats(
         working_template.repeat,
@@ -369,6 +386,21 @@ def compile_physical_template(
             for step in working_template.steps
         },
     )
+    if working_template.repeat.mode == RepeatMode.ONCE and schedule_result.num_complete_cycles == 0:
+        raise PhysicalCompileError(
+            MHDiagnostic(
+                code="unsupported_attribute",
+                severity="error",
+                message=(
+                    f"template {template.template_id!r} plays one ONCE cycle of "
+                    f"{working_template.repeat.cycle_bars} bars, but section "
+                    f"{context.section_id!r} lasts {context.duration_bars} bar(s): a "
+                    "section end may not cut it short"
+                ),
+                section_id=context.section_id,
+                action="rejected",
+            )
+        )
     section_segment = context.section_id.split("|")
     section_id = section_segment[0]
     segment_id = section_segment[1] if len(section_segment) > 1 else "A"
@@ -503,6 +535,37 @@ def compile_physical_template(
         provenance=provenance,
         dropped_steps=dropped,
     )
+
+
+def _require_move_within_step(
+    step: TemplateStep, template: Template, context: TemplateCompileContext
+) -> None:
+    """A ONCE step's finite move must end within the step, so a head without a phase
+    offset reaches its terminal pose there: from a path's `transform.phase_cycles` c,
+    the move takes `period_beats * (1 - c)`. Bars become beats at the grid's meter."""
+    movement = step.movement.physical
+    if movement is None or movement.period_beats is None:
+        return
+    step_beats = exact_decimal(step.timing.base_timing.duration_bars) * (
+        context.beat_grid.beats_per_bar
+    )
+    phase = movement.transform.phase_cycles if movement.transform else 0.0
+    if exact_decimal(movement.period_beats) * (1 - exact_decimal(phase)) > step_beats:
+        raise PhysicalCompileError(
+            MHDiagnostic(
+                code="unsupported_attribute",
+                severity="error",
+                message=(
+                    f"template {template.template_id!r} repeats ONCE, but step "
+                    f"{step.step_id!r} moves over {movement.period_beats} beats from phase "
+                    f"{phase} in a {float(step_beats):g}-beat step, so it would still be "
+                    "moving at its "
+                    "end instead of reaching its terminal pose"
+                ),
+                section_id=context.section_id,
+                action="rejected",
+            )
+        )
 
 
 def _resolve_phases(

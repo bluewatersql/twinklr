@@ -2828,6 +2828,26 @@ for _topology_path, _note in {
         _note,
     )
 
+# P2.3 relative paths: the template-owned transform of a circle, lissajous or sweep and
+# the lissajous frequency ratio. They feed only the opt-in physical compile; each exact
+# path mutates its field and must change the compiled pan and tilt values. The `ONCE`
+# repeat value has no path of its own: `template.template.repeat.mode` keeps its legacy
+# discriminator, and ONCE's physical scheduling is tested in the same module.
+for _path_field in (
+    "transform",
+    "transform.rotation_deg",
+    "transform.reverse",
+    "transform.phase_cycles",
+    "lissajous_ratio",
+):
+    _path_path = f"template.template.steps.movement.physical.{_path_field}"
+    CONFIG_EFFECTS[_path_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/compile/test_physical_paths.py::"
+        f"test_path_field_changes_compile[{_path_path}]",
+        _PHYSICAL_TEMPLATE_COMPILED,
+    )
+
 # Exact App/Job discriminators. These overrides prevent stale generic smoke-test
 # pointers from re-entering the accountable ledger.
 for _root_path in ("app.project_root", "app.cache_dir"):

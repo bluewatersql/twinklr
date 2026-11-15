@@ -9,7 +9,8 @@ states between, and an undeclared state or wheel is rejected, never replaced by 
 or zero. Motion and pulses are evaluated on musical phase from the step start, never
 on sample-index parity or an average tempo; a step distributed over the rig topology
 evaluates each fixture at the step phase minus its offset in that domain, and its pan
-displacement times its mirror sign. Nothing is clamped: an out-of-range
+displacement times its mirror sign. Relative paths (circle, lissajous, sweep) move
+about the resolved aim (`evaluate_physical_path`). Nothing is clamped: an out-of-range
 value, a travel rate above the configured speed, motion at an unknown speed, a pulse
 interval shorter than one frame, or a shutter change faster than its known latency
 and settle time is rejected. A legacy step is never reinterpreted.
@@ -46,6 +47,8 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
     check_physical_value,
 )
 from twinklr.core.sequencer.models.template import (
+    RELATIVE_PATH_SHAPES,
+    PathTransform,
     PhaseOffset,
     PhysicalMovementSpec,
     PhysicalPulseSpec,
@@ -515,30 +518,108 @@ def _movement_value(
     offset: Fraction = Fraction(0),
     sign: int = 1,
 ) -> float:
-    """The axis value at `time_ms`: the start aim plus `sign` times the kernel's
-    displacement at the fixture's phase, the step phase minus `offset` (exact)."""
+    """The axis value at `time_ms`: `evaluate_physical_path` at the fixture's phase in
+    this axis's domain, the step phase minus `offset` (exact), with pan sign `sign`."""
     is_pan = channel is ChannelName.PAN
-    start = pose.pan_deg if is_pan else pose.tilt_deg
-    extent = sign * (movement.pan_extent_deg if is_pan else movement.tilt_extent_deg)
     if movement.shape == "hold" or movement.period_beats is None:
-        return start
-    phase_cycles = (
+        return pose.pan_deg if is_pan else pose.tilt_deg
+    phase = (
         musical_phase_fraction(
             phase_map, time_ms, origin_ms=origin_ms, period_beats=movement.period_beats
         )
         - offset
     )
     try:
-        phase = float(phase_cycles)
+        at = evaluate_physical_path(movement, pose=pose, phase=phase, pan_sign=sign)
     except OverflowError as error:
         raise MusicalPhaseError(
             f"phase at {time_ms} ms over a {movement.period_beats}-beat period is too large"
         ) from error
-    if movement.shape == "linear":
+    return at.pan_deg if is_pan else at.tilt_deg
+
+
+def evaluate_physical_path(
+    spec: PhysicalMovementSpec, *, pose: PoseDegrees, phase: Fraction, pan_sign: int = 1
+) -> PoseDegrees:
+    """The pose a movement kernel commands at `phase`, in unwrapped degrees.
+
+    `phase` is the fixture's exact phase in cycles of `spec.period_beats`: the step
+    phase minus its distribution offset. `pose` is the resolved base aim (the step's
+    start angles or its position reference, never both added). `pan_sign` is the
+    fixture's mirror sign; it multiplies the pan displacement, for a 2-D path the pan
+    component after rotation and scaling, so a mirrored wing is the path reflected
+    about the vertical through its aim. With `φ = float(phase)`, `E_p`/`E_t` the pan
+    and tilt extents and `s = pan_sign`:
+
+    - `hold`: `pose`.
+    - `linear` (finite): `pose + (s·E_p, E_t) · clamp(φ, 0, 1)`.
+    - `sine_pan`/`sine_tilt`: `pose + (s·E_p, E_t) · sin(2πφ)` (the unused extent is 0).
+
+    The relative shapes are a centered displacement `(x, y)` at the path parameter
+    `u = phase + transform.phase_cycles` (exact), or `1 - u` when `transform.reverse`:
+
+    - `circle`: `(cos 2πu, sin 2πu)`, starting at `(1, 0)`.
+    - `lissajous` with `lissajous_ratio` `(a, b)`, default `(1, 2)`: `(sin 2πau, sin 2πbu)`,
+      starting at `(0, 0)`, the aim.
+    - `sweep`, periodic: `(-cos 2πu, 0)`, from `(-1, 0)` edge to edge and back each
+      period; finite: `(-cos π·clamp(u, 0, 1), 0)`, one way, then held at `(1, 0)`.
+
+    It is rotated by `θ = transform.rotation_deg` (exact at quarter turns),
+    `(x', y') = (x cos θ - y sin θ, x sin θ + y cos θ)`, then scaled and added:
+    `pose + (s·E_p·x', E_t·y')`. Each extent is that axis's maximum signed displacement
+    of the unrotated path. Turning a circle only shifts its phase, and a sweep stays
+    within its extents; a lissajous turned off a quarter turn can exceed them, by up to
+    √2 (about 1.24 for 1:2 at 45°). Extents are never normalized to a common radius
+    and no endpoint is closed. Bounds and rate are the compile's checks, on every
+    frame, not this function's.
+
+    Raises:
+        OverflowError: If the phase is too large to evaluate as a float.
+    """
+    if spec.shape == "hold" or spec.period_beats is None:
+        return pose
+    pan_extent = pan_sign * spec.pan_extent_deg
+    if spec.shape in RELATIVE_PATH_SHAPES:
+        x, y = _centered_displacement(spec, phase)
+        return PoseDegrees.model_construct(
+            pan_deg=pose.pan_deg + pan_extent * x, tilt_deg=pose.tilt_deg + spec.tilt_extent_deg * y
+        )
+    fraction = float(phase)
+    if spec.shape == "linear":
         # A lagging head holds its start until its phase reaches zero.
-        return start + extent * min(max(phase, 0.0), 1.0)
-    # sine_pan/sine_tilt: the unused axis has zero extent by validation.
-    return start + extent * math.sin(2 * math.pi * phase)
+        progress = min(max(fraction, 0.0), 1.0)
+    else:
+        # sine_pan/sine_tilt: the unused axis has zero extent by validation.
+        progress = math.sin(2 * math.pi * fraction)
+    return PoseDegrees.model_construct(
+        pan_deg=pose.pan_deg + pan_extent * progress,
+        tilt_deg=pose.tilt_deg + spec.tilt_extent_deg * progress,
+    )
+
+
+def _centered_displacement(spec: PhysicalMovementSpec, phase: Fraction) -> tuple[float, float]:
+    """A relative shape's rotated displacement `(x', y')`; see `evaluate_physical_path`."""
+    transform = spec.transform or PathTransform()
+    travel = phase + exact_decimal(transform.phase_cycles)
+    u = float(1 - travel if transform.reverse else travel)
+    if spec.shape == "circle":
+        x, y = math.cos(2 * math.pi * u), math.sin(2 * math.pi * u)
+    elif spec.shape == "lissajous":
+        a, b = spec.lissajous_ratio or (1, 2)
+        x, y = math.sin(2 * math.pi * a * u), math.sin(2 * math.pi * b * u)
+    elif spec.mode == "finite":
+        x, y = -math.cos(math.pi * min(max(u, 0.0), 1.0)), 0.0
+    else:
+        x, y = -math.cos(2 * math.pi * u), 0.0
+    if not transform.rotation_deg:
+        return x, y
+    quarters, rest = divmod(transform.rotation_deg, 90)
+    if rest == 0:
+        cos, sin = ((1.0, 0.0), (0.0, 1.0), (-1.0, 0.0), (0.0, -1.0))[int(quarters) % 4]
+    else:
+        angle = math.radians(transform.rotation_deg)
+        cos, sin = math.cos(angle), math.sin(angle)
+    return x * cos - y * sin, x * sin + y * cos
 
 
 def _pulse_high(

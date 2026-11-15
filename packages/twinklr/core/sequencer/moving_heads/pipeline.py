@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import bisect
 from collections import defaultdict
 from collections.abc import Iterator, Mapping, Sequence
 from fractions import Fraction
@@ -51,6 +52,7 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
 )
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
 from twinklr.core.sequencer.models.moving_heads.topology import rig_topology
+from twinklr.core.sequencer.models.template import RepeatMode
 from twinklr.core.sequencer.models.transition import TransitionRegistry
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.channel_blender import ChannelBlender
@@ -564,88 +566,182 @@ def check_physical_templates(
     failures: list[str] = []
     for template_id in template_ids:
         document = get_template(template_id)
+        repeat = document.template.repeat
         for preset in (None, *document.presets):
             where = f"template {template_id!r}" + (
                 f", preset {preset.preset_id!r}" if preset else ""
             )
-            context = TemplateCompileContext(
-                section_id="render_preflight",
-                template_id=document.template.template_id,
-                preset_id=preset.preset_id if preset else None,
-                fixtures=fixtures,
-                beat_grid=beat_grid,
-                start_bar=1,
-                duration_bars=max(bars, 1),
-                curve_registry=CurveRegistry(),
-                geometry_registry=registries["geometry"],
-                movement_registry=registries["movement"],
-                dimmer_registry=registries["dimmer"],
-                presets=fixture_group.presets,
-                topology=topology,
-                fixture_group_id=fixture_group.group_id,
-            )
-            try:
-                compiled = compile_physical_template(
-                    document.template,
-                    context,
-                    preset,
-                    phase_map=phase_map,
-                    start_limit_ms=start_limit,
-                    end_limit_ms=end_limit,
+            # A ONCE cycle plays once wherever a section starts, so it is checked at every
+            # start bar a full cycle fits from, not only at bar 1's tempo.
+            placements = [(1, max(bars, 1))]
+            seen: set[tuple[Any, ...]] = set()
+            while placements:
+                start_bar, duration_bars = placements.pop(0)
+                at = where if start_bar == 1 else f"{where}, placed at bar {start_bar}"
+                context = TemplateCompileContext(
+                    section_id="render_preflight",
+                    template_id=document.template.template_id,
+                    preset_id=preset.preset_id if preset else None,
+                    fixtures=fixtures,
+                    beat_grid=beat_grid,
+                    start_bar=start_bar,
+                    duration_bars=duration_bars,
+                    curve_registry=CurveRegistry(),
+                    geometry_registry=registries["geometry"],
+                    movement_registry=registries["movement"],
+                    dimmer_registry=registries["dimmer"],
+                    presets=fixture_group.presets,
+                    topology=topology,
+                    fixture_group_id=fixture_group.group_id,
                 )
-            except (
-                PhysicalCompileError,
-                PhysicalChannelError,
-                UnsupportedRigShapeError,
-                ValueError,
-            ) as error:
-                # A step's error carries a note naming its template, step and fixture.
-                notes = "; ".join(getattr(error, "__notes__", ()))
-                if notes and preset:
-                    notes += f", preset {preset.preset_id!r}"
-                failures.append(f"{notes or where}: {error}")
-                continue
-            cues, _, _ = _enter_section(
-                compiled.segments,
-                {},
-                profiles,
-                initial_states,
-                section_start_ms=context.start_ms,
-                phase_map=phase_map,
-                failure_mode=failure_mode,
-            )
-            # Heads with the same profile, initial state and cues plan identically (the
-            # gate has no locks): plan one of each.
-            groups: dict[tuple[Any, ...], list[str]] = defaultdict(list)
-            for fixture_id, profile in profiles.items():
-                own = [cue for cue in cues if cue.fixture_id == fixture_id]
-                groups[_plan_key(own, profile, initial_states.get(fixture_id))].append(fixture_id)
-            members = {group[0]: group for group in groups.values()}
-            heads = set(members)
-            result = plan_prepositions(
-                [cue for cue in cues if cue.fixture_id in heads],
-                {fixture_id: profiles[fixture_id] for fixture_id in heads},
-                initial_states=initial_states,
-                locks=(),
-                frame_ms=EFFECT_GRID_MS,
-                sequence_end_ms=sequence_end_ms,
-                failure_mode=failure_mode,
-            )
-            errors = [d for d in result.diagnostics if d.status == "error"]
-            if errors:
-                failures.append(
-                    f"{where}: dark repositioning between its own cues cannot be planned: "
-                    + "; ".join(
-                        f"{'/'.join(members[d.fixture_id])} cue at {d.cue_ms} ms: "
-                        f"{d.code}: {d.reason}"
-                        for d in errors
+                if start_bar > 1:
+                    key = _placement_key(context, phase_map, start_limit, end_limit)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                try:
+                    compiled = compile_physical_template(
+                        document.template,
+                        context,
+                        preset,
+                        phase_map=phase_map,
+                        start_limit_ms=start_limit,
+                        end_limit_ms=end_limit,
                     )
+                except (
+                    PhysicalCompileError,
+                    PhysicalChannelError,
+                    UnsupportedRigShapeError,
+                    ValueError,
+                ) as error:
+                    # A step's error carries a note naming its template, step and fixture.
+                    notes = "; ".join(getattr(error, "__notes__", ()))
+                    if notes and preset:
+                        notes += f", preset {preset.preset_id!r}"
+                    if notes and start_bar > 1:
+                        notes += f", placed at bar {start_bar}"
+                    failures.append(f"{notes or at}: {error}")
+                    break
+                cues, _, _ = _enter_section(
+                    compiled.segments,
+                    {},
+                    profiles,
+                    initial_states,
+                    section_start_ms=context.start_ms,
+                    phase_map=phase_map,
+                    failure_mode=failure_mode,
                 )
+                # Heads with the same profile, initial state and cues plan identically (the
+                # gate has no locks): plan one of each.
+                groups: dict[tuple[Any, ...], list[str]] = defaultdict(list)
+                for fixture_id, profile in profiles.items():
+                    own = [cue for cue in cues if cue.fixture_id == fixture_id]
+                    groups[_plan_key(own, profile, initial_states.get(fixture_id))].append(
+                        fixture_id
+                    )
+                members = {group[0]: group for group in groups.values()}
+                heads = set(members)
+                result = plan_prepositions(
+                    [cue for cue in cues if cue.fixture_id in heads],
+                    {fixture_id: profiles[fixture_id] for fixture_id in heads},
+                    initial_states=initial_states,
+                    locks=(),
+                    frame_ms=EFFECT_GRID_MS,
+                    sequence_end_ms=sequence_end_ms,
+                    failure_mode=failure_mode,
+                )
+                errors = [d for d in result.diagnostics if d.status == "error"]
+                if errors:
+                    failures.append(
+                        f"{at}: dark repositioning between its own cues cannot be planned: "
+                        + "; ".join(
+                            f"{'/'.join(members[d.fixture_id])} cue at {d.cue_ms} ms: "
+                            f"{d.code}: {d.reason}"
+                            for d in errors
+                        )
+                    )
+                    break
+                if start_bar == 1 and repeat.mode == RepeatMode.ONCE:
+                    window = _once_window_bars(
+                        compiled.segments,
+                        phase_map,
+                        section_start_ms=context.start_ms,
+                        cycle_bars=repeat.cycle_bars,
+                        beats_per_bar=beat_grid.beats_per_bar,
+                    )
+                    # Bar 1's key is not marked seen: there the head enters from its
+                    # initial state at the song start, so an equal key later may still
+                    # reposition differently.
+                    placements = [
+                        (later, min(bars - later + 1, window))
+                        for later in range(2, bars + 1)
+                        if bars - later + 1 >= repeat.cycle_bars - 1e-9
+                    ]
     if failures:
         raise UnsupportedRenderModeError(
             "moving_heads.mode 'physical_v2' would offer the planner templates this rig "
             "cannot render: " + "; ".join(failures)
         )
+
+
+def _once_window_bars(
+    segments: Sequence[FixtureSegment],
+    phase_map: MusicalPhaseMap,
+    *,
+    section_start_ms: int,
+    cycle_bars: float,
+    beats_per_bar: int,
+) -> int:
+    """Bars a ONCE section must span for the gate to see all of its motion.
+
+    The cycle, then every head's motion past it (a phase-lagged head finishing its move
+    in the hold), measured in beats at bar 1, where the gate compiled the whole song;
+    past that each cue holds its terminal pose. Phase is musical, so the span in beats
+    is the same at every placement; one bar more covers frame quantization.
+    """
+    last_ms = section_start_ms
+    for segment in segments:
+        for channel in _POSE:
+            points = _pose_points(segment, channel)
+            moving = [point.t_ms for point in points if point.value != points[-1].value]
+            if moving:
+                last_ms = max(last_ms, max(moving) + EFFECT_GRID_MS)
+    beats = musical_phase_fraction(phase_map, last_ms, origin_ms=section_start_ms, period_beats=1.0)
+    return math.ceil(max(Fraction(repr(cycle_bars)), beats / beats_per_bar)) + 1
+
+
+def _placement_key(
+    context: TemplateCompileContext,
+    phase_map: MusicalPhaseMap,
+    start_limit_ms: int,
+    end_limit_ms: int,
+) -> tuple[Any, ...]:
+    """What a section's compile depends on besides the template and rig, relative to its
+    start: its frame alignment, the downbeats and phase knots it spans (with the knot on
+    each side), and the cue limits inside it. Equal keys compile to the same cues shifted
+    by whole frames. The section's end needs no entry of its own: inside the downbeats it
+    is the last one listed, and short of the end limit it is the end-limit entry; past
+    that limit every cue is cut there."""
+    bars = context.beat_grid.bar_boundaries
+    origin = bars[context.start_bar - 1]
+    end = context.end_ms
+    times = phase_map.knot_times_ms
+    low = max(bisect.bisect_right(times, origin) - 1, 0)
+    high = min(bisect.bisect_left(times, end) + 1, len(times) - 1)
+    first_beat = phase_map.knots[low].beat_index
+    return (
+        origin % EFFECT_GRID_MS,
+        tuple(
+            bar - origin
+            for bar in bars[context.start_bar - 1 : context.start_bar + context.duration_bars]
+        ),
+        tuple(
+            (knot.time_ms - origin, knot.beat_index - first_beat)
+            for knot in phase_map.knots[low : high + 1]
+        ),
+        max(start_limit_ms - context.start_ms, 0),
+        min(end_limit_ms, end) - context.start_ms,
+    )
 
 
 def _plan_key(

@@ -1,7 +1,7 @@
 """Synthetic physical-renderer inputs: a fixture profile, a known initial state,
 physical fixture segments, the P1.6 pipeline case (rig, grid, job, plan and the
-test-only template), rig presets with steps that reference them, and multi-head rigs
-with a topology.
+test-only template), rig presets with steps that reference them, multi-head rigs
+with a topology, and steps on relative paths.
 
 In-memory payloads only; no owner profile or measured data.
 """
@@ -380,10 +380,46 @@ def sweep_step(
     return step
 
 
+def path_step(
+    step_id: str,
+    shape: str,
+    *,
+    pan: float = 0.0,
+    tilt: float = 0.0,
+    pan_extent: float = 20.0,
+    tilt_extent: float | None = None,
+    period_beats: float = 4.0,
+    mode: str = "periodic",
+    transform: dict[str, Any] | None = None,
+    **fields: Any,
+) -> dict[str, Any]:
+    """`hold_step` moving on a relative `circle`, `lissajous` or `sweep` path about its aim,
+    with an optional path `transform`. The tilt extent defaults to 10, or 0 for a sweep,
+    which moves along pan."""
+    step = hold_step(step_id, pan, tilt=tilt, **fields)
+    if tilt_extent is None:
+        tilt_extent = 0.0 if shape == "sweep" else 10.0
+    step["movement"]["physical"].update(
+        shape=shape,
+        mode=mode,
+        pan_extent_deg=pan_extent,
+        tilt_extent_deg=tilt_extent,
+        period_beats=period_beats,
+    )
+    if transform is not None:
+        step["movement"]["physical"]["transform"] = transform
+    return step
+
+
 def physical_template_doc(
-    template_id: str, steps: Sequence[dict[str, Any]], *, cycle_bars: float = 1.0
+    template_id: str,
+    steps: Sequence[dict[str, Any]],
+    *,
+    cycle_bars: float = 1.0,
+    mode: str = "JOINER",
+    remainder_policy: str = "HOLD_LAST_POSE",
 ) -> TemplateDoc:
-    """A JOINER physical template looping every step once per `cycle_bars`."""
+    """A physical template looping every step once per `cycle_bars` (JOINER by default)."""
     return TemplateDoc.model_validate(
         {
             "template": {
@@ -392,10 +428,10 @@ def physical_template_doc(
                 "name": template_id,
                 "category": "low_energy",
                 "repeat": {
-                    "mode": "JOINER",
+                    "mode": mode,
                     "cycle_bars": cycle_bars,
                     "loop_step_ids": [step["step_id"] for step in steps],
-                    "remainder_policy": "HOLD_LAST_POSE",
+                    "remainder_policy": remainder_policy,
                 },
                 "steps": list(steps),
                 "metadata": {
