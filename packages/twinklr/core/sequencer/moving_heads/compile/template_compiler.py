@@ -4,7 +4,7 @@ This module provides the top-level compilation function that orchestrates
 all components to compile a complete template to IR segments.
 """
 
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 import logging
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -542,43 +542,51 @@ def _resolve_phases(
 
 def apply_entry_window(
     segments: Sequence[FixtureSegment],
-    window_end_ms: int,
+    window_ends: Mapping[str, int],
     *,
     profiles: Mapping[str, FixtureCapabilities],
-    skip_fixture_ids: Collection[str] = (),
 ) -> tuple[list[FixtureSegment], list[dict[str, str | int]]]:
-    """Hold a section's opening dark until `window_end_ms`, the end of its entry window.
+    """Hold each fixture's section opening dark until its entry window ends.
 
-    A cue running across the window end is cut to begin there with
-    `slice_physical_segment`, so its phase origin is kept; where the shutter state in
-    force there could not be held for the visibility latency plus settle it needs when
-    the cue reveals, the cut moves on to the cue's next shutter change, dropping the
-    partial state. A cue ending before a usable cut is dropped and recorded; later cues
-    are unchanged. The dark gap before each cut is the transaction pass's to fill. Cues
-    of a fixture in `skip_fixture_ids` are kept as compiled.
+    For a fixture in `window_ends`, its first cue to be revealed after the window is
+    entered from the transaction pass's darkness: a cue running across the window end is
+    cut to begin there with `slice_physical_segment`, so its phase origin is kept, and
+    that cue (or, when every earlier cue lies in the window, the first cue after it)
+    begins where its shutter state can be held for the visibility latency plus settle
+    it needs, moving on to the cue's next shutter change otherwise and dropping the
+    partial state. A cue with no such point is dropped and recorded, and the next one is
+    tried; later cues are unchanged. Fixtures not in `window_ends` keep every cue.
 
     Args:
-        segments: A section's compiled physical cues, on the frame grid.
-        window_end_ms: The window's end, on the frame grid.
+        segments: A section's compiled physical cues on the frame grid, each fixture's in
+            time order.
+        window_ends: Each windowed fixture's window end, on the frame grid.
         profiles: Each fixture's physical profile.
-        skip_fixture_ids: Fixtures whose entry plays as authored instead.
 
     Returns:
         The kept cues, in input order, and one record per dropped cue.
     """
     kept: list[FixtureSegment] = []
     dropped: list[dict[str, str | int]] = []
+    entered: set[str] = set()
     for segment in segments:
-        if segment.fixture_id in skip_fixture_ids or segment.t0_ms >= window_end_ms:
+        window_end = window_ends.get(segment.fixture_id)
+        if window_end is None or segment.fixture_id in entered:
             kept.append(segment)
             continue
+        start = max(segment.t0_ms, window_end)
         cut = (
             None
-            if segment.t1_ms <= window_end_ms
-            else _holdable_cut(segment, window_end_ms, profiles[segment.fixture_id])
+            if segment.t1_ms <= start
+            else _holdable_cut(segment, start, profiles[segment.fixture_id])
         )
         if cut is not None:
-            kept.append(slice_physical_segment(segment, cut, segment.t1_ms))
+            entered.add(segment.fixture_id)
+            kept.append(
+                segment
+                if cut == segment.t0_ms
+                else slice_physical_segment(segment, cut, segment.t1_ms)
+            )
             continue
         dropped.append(
             {
@@ -587,7 +595,7 @@ def apply_entry_window(
                 "step_id": segment.step_id,
                 "requested_start_ms": int(segment.metadata["requested_t0_ms"]),
                 "requested_end_ms": int(segment.metadata["requested_t1_ms"]),
-                "entry_window_end_ms": window_end_ms,
+                "entry_window_end_ms": window_end,
             }
         )
     return kept, dropped

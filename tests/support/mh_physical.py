@@ -686,7 +686,9 @@ def assert_honest_transactions(
     its end; a feasible cue's frames equal the cue encoded alone, a `preserve_aim` cue
     changes only its held pose, a dropped cue is commanded dark; no change outside a
     cue's own content moves or settles in a lit frame; a cue's own motion still under
-    way when light returns after it went dark past its end is a leak; back-to-back cues
+    way when light returns after the planner darkened the fixture past its end (a
+    transaction, a park or a substituted cue; not a following cue's own dark frames) is a
+    leak; back-to-back cues
     step within one frame's travel and keep their wheels; a lit cue after a transaction
     reveals on its own frame; no locked frame differs from the cues alone.
     """
@@ -782,13 +784,17 @@ def assert_honest_transactions(
         return "transition"
 
     def relit_after(cue: FixtureSegment) -> int | None:
-        """The first lit frame after a commanded-dark frame, both at or after the cue's end."""
+        """The first lit frame after a frame the planner darkened, both at or after the
+        cue's end. A frame a cue played as authored commands dark itself hides nothing:
+        there the head follows the cues' own path, as it would were the frame lit."""
         seen_dark = False
         for index in range(cue.t1_ms // EFFECT_GRID_MS, count):
-            if commanded_dark[index]:
+            here = cue_at[index]
+            if not commanded_dark[index]:
+                if seen_dark:
+                    return times[index]
+            elif here is None or status.get(here.t0_ms) != "feasible":
                 seen_dark = True
-            elif seen_dark:
-                return times[index]
         return None
 
     def check_busy(index: int, busy_end: Fraction, what: str) -> None:

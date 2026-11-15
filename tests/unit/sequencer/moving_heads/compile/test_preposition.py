@@ -27,6 +27,7 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
     PhysicalPoint,
     RenderLock,
     TransitionDiagnostic,
+    TransitionStatus,
 )
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
@@ -1036,3 +1037,126 @@ def test_follow_lag_refuses_only_motion_the_head_falls_a_word_behind(
     assert (lag is not None) == refused, lag
     if lag is not None:
         assert lag[0] == _PAN and "words/s" in lag[2]
+
+
+# --- Authored darkness across a continuation (P2.2 review M2) ----------------------------
+
+
+def _moving(
+    name: str, t0: int, t1: int, start: float, end: float, levels: tuple[tuple[int, float], ...]
+) -> FixtureSegment:
+    """A lit-shutter cue panning linearly from `start` to `end` with dimmer `levels`."""
+    pan = ContinuousTrajectory(
+        unit="degree",
+        points=(PhysicalPoint(t_ms=t0, value=start), PhysicalPoint(t_ms=t1, value=end)),
+        interpolation="linear",
+    )
+    dimmer = ContinuousTrajectory(
+        unit="normalized",
+        points=tuple(PhysicalPoint(t_ms=t, value=v) for t, v in levels),
+        interpolation="hold",
+    )
+    return physical_segment(
+        {
+            _PAN: pan,
+            _TILT: _line(0.0, t0, t1),
+            _DIMMER: dimmer,
+            _SHUTTER: _states((t0, "open")),
+            _COLOR: _states((t0, "white")),
+        },
+        t0_ms=t0,
+        t1_ms=t1,
+        segment_id=name,
+        section_id=name,
+    )
+
+
+_SETTLING = {"settle_ms": 40}
+"""720 degrees/s with a 40 ms settle: a frame's command at 1380 ms settles at 1427."""
+
+
+def test_a_continuation_dark_by_its_own_dimmer_relights_on_its_authored_motion() -> None:
+    """A pans at 250 degrees/s and goes dark at 1300 ms; B continues the pan back to back,
+    dark on its own first frame and lit from 1420 ms. At 1420 the head is still settling
+    from A's 1380 ms command, but nothing hid anything: no transaction ran, the head only
+    followed the cues' own continuous path, exactly as it would had the dimmer stayed lit.
+    The oracle accepts it (it once rejected it: "pan motion from 1380 ms leaks to 1420")."""
+    profile = _profile(pan=_SETTLING)
+    a = _moving("A", 1000, 1400, 0.0, 100.0, ((1000, 1.0), (1300, 0.0)))
+    b = _moving("B", 1400, 1800, 100.0, 200.0, ((1400, 0.0), (1420, 1.0)))
+
+    result = _plan([a, b], profile, _initial())
+
+    assert _at(result, 1400).reason == "continues the previous cue without a gap"
+    assert_honest_transactions(result, [a, b], profile, _initial())
+
+
+def _doctored(
+    planned: PrepositionResult,
+    segments: tuple[FixtureSegment, ...],
+    statuses: dict[int, TransitionStatus],
+) -> PrepositionResult:
+    """`planned` with other segments and one diagnostic per cue start in `statuses`."""
+    template = planned.diagnostics[0]
+    diagnostics = tuple(
+        template.model_copy(update={"cue_ms": cue_ms, "status": status, "code": None})
+        for cue_ms, status in statuses.items()
+    )
+    return planned.model_copy(update={"segments": segments, "diagnostics": diagnostics})
+
+
+def _dark_hold(t0: int, t1: int, pan: float) -> FixtureSegment:
+    return physical_segment(
+        {
+            _PAN: _line(pan, t0, t1),
+            _TILT: _line(0.0, t0, t1),
+            _DIMMER: ContinuousTrajectory(
+                unit="normalized", points=(PhysicalPoint(t_ms=t0, value=0.0),), interpolation="hold"
+            ),
+            _SHUTTER: _states((t0, "closed")),
+            _COLOR: _states((t0, "white")),
+        },
+        t0_ms=t0,
+        t1_ms=t1,
+        segment_id="T/preposition",
+        section_id="T",
+    )
+
+
+def test_a_dark_gap_that_hides_the_previous_cues_settling_is_still_a_leak() -> None:
+    """The nearest real leak: the same pan A, then a one-frame dark transaction holding its
+    aim, then B lit at 1420 ms at that aim while A's last command is still settling. The
+    darkness is the planner's, so the relight shows travel nobody authored as lit."""
+    profile = _profile(pan=_SETTLING)
+    a = _moving("A", 1000, 1400, 0.0, 100.0, ((1000, 1.0), (1300, 0.0)))
+    b = _moving("B", 1420, 1800, 95.0, 95.0, ((1420, 1.0),))
+    planned = _plan([a, b], profile, _initial())  # the planner itself waits: B is refused
+    assert planned.has_errors
+    before = _plan([a], profile, _initial(), end_ms=1400)  # the transaction into A, and A
+    assert [s.segment_id for s in before.segments] == ["A/preposition", "A"]
+    doctored = _doctored(
+        before,
+        (*before.segments, _dark_hold(1400, 1420, 95.0), b),
+        {1000: "feasible", 1420: "feasible"},
+    )
+
+    with pytest.raises(AssertionError, match="leaks to 1420"):
+        assert_honest_transactions(doctored, [a, b], profile, _initial())
+
+
+def test_a_dropped_cue_that_hides_the_previous_cues_settling_is_still_a_leak() -> None:
+    """As above, but the dark frame is a back-to-back cue the planner dropped: its frames
+    are dark by the planner's substitution, not by its own content."""
+    profile = _profile(pan=_SETTLING)
+    a = _moving("A", 1000, 1400, 0.0, 100.0, ((1000, 1.0), (1300, 0.0)))
+    dropped = _opt_in(_cue("D", 1400, 1420, pan=150.0), "drop_accent")
+    c = _moving("C", 1420, 1800, 95.0, 95.0, ((1420, 1.0),))
+    before = _plan([a], profile, _initial(), end_ms=1400)
+    doctored = _doctored(
+        before,
+        (*before.segments, _dark_hold(1400, 1420, 95.0), c),
+        {1000: "feasible", 1400: "drop_accent", 1420: "feasible"},
+    )
+
+    with pytest.raises(AssertionError, match="leaks to 1420"):
+        assert_honest_transactions(doctored, [a, dropped, c], profile, _initial())

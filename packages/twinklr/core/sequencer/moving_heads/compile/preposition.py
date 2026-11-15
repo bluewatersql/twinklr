@@ -335,7 +335,9 @@ def entry_feasible(
     frame_ms: int,
 ) -> bool:
     """Whether `plan_prepositions` in `error` mode plays `segment` as authored right after
-    `after` (or, without it, from the run's initial state)."""
+    `after` (or, without it, from the run's initial state): its transaction or
+    continuation fits, and every shutter change from the predecessor's last frame to the
+    segment's own first change takes effect in time (`shutter_timing`)."""
     planner = _FixturePlanner(
         segment.fixture_id, profile, initial, locks, frame_ms, segment.t1_ms, "error"
     )
@@ -346,10 +348,12 @@ def entry_feasible(
     else:
         state = _State(0, planner._head(initial), None, None, planner._evidence(), None)
     try:
-        planner._transaction(state, segment)
+        plan = planner._transaction(state, segment)
     except _InfeasibleError:
         return False
-    return True
+    previous = None if after is None else after.segment
+    authored = [s for s in (previous, plan.segment, segment) if s is not None]
+    return all(problem.cue_ms < state.start_ms for problem in planner.shutter_timing(authored))
 
 
 def follow_lag(

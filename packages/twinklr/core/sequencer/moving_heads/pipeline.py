@@ -279,20 +279,22 @@ def _enter_section(
     `kept` holds, per fixture, the cues kept so far as `follow_cues` followed them. A
     fixture whose cues `plan_prepositions` would play as authored after its last kept
     cue, up to and including its first gap (in `error` mode: `_plays_as_authored`),
-    keeps its cues uncut (`skipped`); a last
-    kept cue that may be substituted under `failure_mode` leaves the head's state
-    unknown, so that fixture always enters through the window. For every other fixture
-    `worst_case_entry_ms` bounds the reposition into any pose and wheel state the
-    section's cues hold, from where the kept cues can have left the head
-    (`_predecessor`). The window is one per section: from the section start, the fewest
-    whole beats on the phase map whose end, rounded up to the frame grid, leaves each
-    such fixture its bound after its last kept cue; `apply_entry_window` cuts or drops
-    its cues there. A fixture with an unknown bound adds nothing to the window.
+    keeps its cues uncut (`skipped`); a last kept cue that may be substituted under
+    `failure_mode` leaves the head's state unknown, so that fixture always enters
+    through a window. For every other fixture `worst_case_entry_ms` bounds the
+    reposition into any pose and wheel state its section cues hold, from where its kept
+    cues can have left the head (`_predecessor`). Each fixture's window is its own, so a
+    head missing from the rig changes no other head's output: from the section start,
+    the fewest whole beats on the phase map whose end, rounded up to the frame grid,
+    leaves the fixture its bound after its last kept cue; `apply_entry_window` cuts or
+    drops its cues there. A fixture with an unknown bound, or whose bound already fits
+    before the section, gets no window, but its first revealed cue still begins where
+    its shutter state can take effect.
 
     Returns:
-        The kept cues, one record per cue dropped inside the window, and one record per
-        fixture with cues: its bound, the window, its first kept cue and `skipped`, `cut`
-        or `none` (no window was needed).
+        The kept cues, in input order, one record per cue dropped inside a window, and
+        one record per fixture with cues: its bound, its window, its first kept cue and
+        `skipped`, `cut` or `none` (no window was needed).
     """
     if not cues:
         return [], [], []
@@ -300,18 +302,18 @@ def _enter_section(
     for cue in sorted(cues, key=lambda cue: cue.t0_ms):
         by_fixture[cue.fixture_id].append(cue)
     bounds: dict[str, int | None] = {}
+    windows: dict[str, int | None] = {}
     skipped: set[str] = set()
-    required_ms: int | None = None
     for fixture_id, own in by_fixture.items():
         profile = profiles[fixture_id]
         before = kept.get(fixture_id, ())
         initial = initial_states.get(fixture_id)
         last = before[-1] if before else None
+        bounds[fixture_id] = windows[fixture_id] = None
         if (last is None or not _substitutable(last.segment, failure_mode)) and _plays_as_authored(
             own, profile, last, initial, locks
         ):
             skipped.add(fixture_id)
-            bounds[fixture_id] = None
             continue
         channels = [ch for ch in _POSE if AXIS_KEYS[ch] in profile.axes]
         predecessor = _predecessor(before, initial, channels, profile, failure_mode)
@@ -330,35 +332,35 @@ def _enter_section(
         )
         if bound is not None:
             needed = (last.segment.t1_ms if last else 0) + bound
-            required_ms = needed if required_ms is None else max(required_ms, needed)
+            windows[fixture_id] = _window_end(phase_map, section_start_ms, needed)
 
-    window_end = (
-        None if required_ms is None else _window_end(phase_map, section_start_ms, required_ms)
-    )
-    entered: list[FixtureSegment] = list(cues)
-    dropped: list[dict[str, Any]] = []
-    if window_end is not None:
-        entered, dropped = apply_entry_window(
-            cues, window_end, profiles=profiles, skip_fixture_ids=skipped
-        )
+    # Every entry not played as authored begins where its shutter can take effect, with
+    # or without a dark window before it (a bound that fits before the section, or none).
+    window_ends = {
+        fixture_id: by_fixture[fixture_id][0].t0_ms if end is None else end
+        for fixture_id, end in windows.items()
+        if fixture_id not in skipped
+    }
+    entered, dropped = apply_entry_window(cues, window_ends, profiles=profiles)
     first = {}
     for cue in sorted(entered, key=lambda cue: -cue.t0_ms):
         first[cue.fixture_id] = cue.t0_ms
-    records = [
-        {
-            "section_id": cues[0].section_id,
-            "fixture_id": fixture_id,
-            "bound_ms": bounds[fixture_id],
-            "section_start_ms": section_start_ms,
-            "window_end_ms": window_end,
-            "window_ms": None if window_end is None else window_end - section_start_ms,
-            "first_cue_ms": first.get(fixture_id),
-            "action": (
-                "skipped" if fixture_id in skipped else "none" if window_end is None else "cut"
-            ),
-        }
-        for fixture_id in sorted(by_fixture)
-    ]
+    records = []
+    for fixture_id in sorted(by_fixture):
+        end = windows[fixture_id]
+        action = "skipped" if fixture_id in skipped else "none" if end is None else "cut"
+        records.append(
+            {
+                "section_id": cues[0].section_id,
+                "fixture_id": fixture_id,
+                "bound_ms": bounds[fixture_id],
+                "section_start_ms": section_start_ms,
+                "window_end_ms": end,
+                "window_ms": None if end is None else end - section_start_ms,
+                "first_cue_ms": first.get(fixture_id),
+                "action": action,
+            }
+        )
     return entered, dropped, records
 
 
@@ -1181,7 +1183,10 @@ class RenderingPipeline:
             cues.extend(entered)
             in_window.extend(inside)
             entry_windows.extend(windows)
-            window_end = windows[0]["window_end_ms"] if windows else None
+            window_end = max(
+                (w["window_end_ms"] for w in windows if w["window_end_ms"] is not None),
+                default=None,
+            )
             if window_end is not None and window_end >= context.end_ms:
                 logger.warning(
                     "physical_v2: section %r (%s-%s ms) is shorter than its entry window, "

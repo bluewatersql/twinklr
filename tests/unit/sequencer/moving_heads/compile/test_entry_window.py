@@ -31,7 +31,10 @@ from tests.support.mh_physical import (
     physical_template_doc,
     physical_test_templates,
     registered_templates,
+    sine_step,
     sweep_step,
+    topology_payload,
+    topology_rig,
 )
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import JobConfig
@@ -490,10 +493,7 @@ def test_apply_entry_window_cuts_drops_and_skips() -> None:
     profile = physical_rig().expand_fixtures()[0].config.physical_profile
     assert profile is not None
     kept, dropped = apply_entry_window(
-        [inside, across, after, skipped],
-        200,
-        profiles={"MH1": profile, "MH2": profile},
-        skip_fixture_ids={"MH2"},
+        [inside, across, after, skipped], {"MH1": 200}, profiles={"MH1": profile, "MH2": profile}
     )
 
     assert [(c.fixture_id, c.t0_ms, c.t1_ms) for c in kept] == [
@@ -779,12 +779,39 @@ def test_apply_entry_window_moves_a_cut_past_a_shutter_state_it_cannot_hold() ->
     segment.add_metadata("requested_t0_ms", 0)
     segment.add_metadata("requested_t1_ms", 400)
 
-    (kept,), dropped = apply_entry_window([segment], 120, profiles={"MH1": profile})
+    (kept,), dropped = apply_entry_window([segment], {"MH1": 120}, profiles={"MH1": profile})
     assert dropped == [] and kept.t0_ms == 140
 
     # Open from 300 ms holds only to the cue's end, 100 ms: nothing left can be held.
-    kept_cues, dropped = apply_entry_window([segment], 300, profiles={"MH1": profile})
+    kept_cues, dropped = apply_entry_window([segment], {"MH1": 300}, profiles={"MH1": profile})
     assert kept_cues == [] and [d["entry_window_end_ms"] for d in dropped] == [300]
+
+
+def test_the_first_cue_after_the_window_also_begins_where_its_shutter_takes_effect() -> None:
+    """A cue that starts after the window end is still the first to reveal after the
+    transaction's darkness: its 40 ms open state cannot take its 150 ms settle, so it
+    begins at its next change instead (the review's seed 50085 failed at render here)."""
+    profile = _pulse_rig(150).expand_fixtures()[0].config.physical_profile
+    assert profile is not None
+    line = ContinuousTrajectory(
+        unit="degree",
+        points=(PhysicalPoint(t_ms=140, value=0.0), PhysicalPoint(t_ms=400, value=0.0)),
+        interpolation="linear",
+    )
+    shutter = DiscreteTrajectory(
+        events=tuple(DiscretePoint(t_ms=t, state=s) for t, s in ((140, "open"), (180, "closed")))
+    )
+    segment = physical_segment(
+        {ChannelName.PAN: line, ChannelName.TILT: line, ChannelName.SHUTTER: shutter},
+        t0_ms=140,
+        t1_ms=400,
+    )
+    segment.add_metadata("requested_t0_ms", 140)
+    segment.add_metadata("requested_t1_ms", 400)
+
+    (kept,), dropped = apply_entry_window([segment], {"MH1": 120}, profiles={"MH1": profile})
+
+    assert dropped == [] and kept.t0_ms == 180
 
 
 def test_a_wheel_state_the_predecessor_already_holds_needs_no_settle() -> None:
@@ -1112,7 +1139,7 @@ def test_a_cut_waits_for_the_open_latency_too() -> None:
     segment.add_metadata("requested_t0_ms", 0)
     segment.add_metadata("requested_t1_ms", 400)
 
-    (kept,), _ = apply_entry_window([segment], 120, profiles={"MH1": profile})
+    (kept,), _ = apply_entry_window([segment], {"MH1": 120}, profiles={"MH1": profile})
     assert kept.t0_ms == 140
 
 
@@ -1151,21 +1178,19 @@ def test_the_gate_names_every_head_that_shares_a_refused_plan() -> None:
 
 
 def test_the_gate_plans_heads_with_different_initial_states_apart() -> None:
-    """Both heads enter the same cues the same way, but MH2 starts with its shutter open
-    (dark by its dimmer): closing it at time zero needs the closed state's 30 ms settle
-    before the 20 ms cue, so only MH2's plan fails and the heads are not one."""
-
-    def closed_settles(profile: dict[str, Any]) -> None:
-        profile["discrete"]["shutter"]["states"]["closed"]["settle_ms"] = 30
-
-    shutter_open = dict(
-        PHYSICAL_INITIAL_STATE,
-        discrete_states={"shutter": "open", "color": "white", "gobo": "open"},
+    """Only the centre head has cues; MH1 and MH3 only park, from their initial states.
+    MH3 starts unsettled, so its park fails while MH1's passes: they are not one."""
+    centre = physical_template_doc("p24a_centre", [hold_step("h", 0.0, target="INNER")])
+    unsettled = dict(PHYSICAL_INITIAL_STATE, settled=False)
+    states = {"MH1": PHYSICAL_INITIAL_STATE, "MH2": PHYSICAL_INITIAL_STATE, "MH3": unsettled}
+    message = _gate(
+        "p24a_centre",
+        topology_rig(("MH1", "MH2", "MH3")),
+        physical_job(initial_states=states),
+        centre,
     )
-    job = physical_job(initial_states={"MH1": PHYSICAL_INITIAL_STATE, "MH2": shutter_open})
-    message = _gate("p24a_center", _same_heads(closed_settles), job)
-    assert "MH2 cue at" in message
-    assert "MH1 cue at" not in message and "MH1/MH2" not in message
+    assert "MH3 cue at" in message
+    assert "MH1" not in message
 
 
 def test_the_gate_plans_heads_with_different_cue_metadata_apart() -> None:
@@ -1194,3 +1219,311 @@ def test_the_gate_plans_heads_with_different_cue_metadata_apart() -> None:
         "p24a_jump_split", _same_heads(), physical_job(reposition_fallback="drop_accent"), split
     )
     assert "MH2 cue at" in message and "MH1 cue at" not in message and "MH1/" not in message
+
+
+# --- A missing head leaves the other heads' output alone (P2.2 review M1) ----------------
+
+
+def _subset_docs() -> tuple[TemplateDoc, ...]:
+    """Distributed and mirrored families that leave each head at its own aim, so the heads'
+    entry windows differ."""
+    pulse = {"physical": {"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0}}
+    return (
+        physical_template_doc(
+            "ss_wings",
+            [
+                sine_step(
+                    "w",
+                    0.0,
+                    20.0,
+                    period_beats=2.0,
+                    distribution=[{"domains": ["pan", "dimmer"], "wings": 2, "spread_cycles": 0.5}],
+                    dimmer=pulse,
+                )
+            ],
+        ),
+        physical_template_doc(
+            "ss_reverse",
+            [
+                sine_step(
+                    "s",
+                    60.0,
+                    30.0,
+                    distribution=[
+                        {"domains": ["pan"], "spread_cycles": 0.75, "direction": "reverse"}
+                    ],
+                )
+            ],
+        ),
+        physical_template_doc(
+            "ss_fan",
+            [
+                sweep_step(
+                    "c",
+                    0.0,
+                    120.0,
+                    period_beats=8.0,
+                    duration=4.0,
+                    physical_distribution=[{"domains": ["pan"], "spread_cycles": 0.4, "wings": 2}],
+                )
+            ],
+            cycle_bars=4.0,
+        ),
+        physical_template_doc(
+            "ss_fan_line",
+            [
+                sweep_step(
+                    "c",
+                    0.0,
+                    120.0,
+                    period_beats=16.0,
+                    duration=4.0,
+                    physical_distribution=[{"domains": ["pan"], "spread_cycles": 0.4}],
+                )
+            ],
+            cycle_bars=4.0,
+        ),
+        physical_template_doc("ss_hold", [hold_step("d", 120.0)]),
+        physical_template_doc("ss_left", [hold_step("d", -90.0)]),
+    )
+
+
+def _head_frames(
+    fixture_ids: tuple[str, ...],
+    sections: tuple[tuple[str, int, int], ...],
+    grid: BeatGrid,
+    speed: float,
+    full_ids: tuple[str, ...],
+) -> dict[str, list[tuple[int, tuple[tuple[int, int], ...]]]]:
+    """Render `sections` on the heads present, with the full rig's declared topology."""
+
+    def at_speed(profile: dict[str, Any]) -> None:
+        for name in ("pan", "tilt"):
+            profile["axes"][name]["travel_speed_per_s"] = speed
+
+    payload = topology_rig(fixture_ids, topology=topology_payload(full_ids)).model_dump(mode="json")
+    for fixture in payload["fixtures"]:
+        at_speed(fixture["config"]["physical_profile"])
+    rig = FixtureGroup.model_validate(payload)
+    job = physical_job(initial_states=dict.fromkeys(fixture_ids, PHYSICAL_INITIAL_STATE))
+    pipeline = RenderingPipeline(
+        choreography_plan=physical_sections(*sections),
+        beat_grid=grid,
+        fixture_group=rig,
+        job_config=job,
+        output_path=None,
+    )
+    pipeline.render()
+    frames: dict[str, list[tuple[int, tuple[tuple[int, int], ...]]]] = {}
+    for frame in pipeline.frames:
+        channels = tuple(sorted(dict(frame.channels).items()))
+        frames.setdefault(frame.fixture_id, []).append((frame.time_ms, channels))
+    return frames
+
+
+def _assert_subset_stable(
+    sections: tuple[tuple[str, int, int], ...],
+    grid: BeatGrid,
+    *,
+    heads: int,
+    missing: tuple[str, ...],
+    speed: float,
+) -> None:
+    full_ids = tuple(f"MH{index}" for index in range(1, heads + 1))
+    full = _head_frames(full_ids, sections, grid, speed, full_ids)
+    for gone in missing:
+        present = tuple(fixture_id for fixture_id in full_ids if fixture_id != gone)
+        subset = _head_frames(present, sections, grid, speed, full_ids)
+        for fixture_id in present:
+            assert subset[fixture_id] == full[fixture_id], (gone, fixture_id)
+
+
+@pytest.mark.parametrize(
+    ("sections", "heads", "missing", "speed"),
+    [
+        pytest.param(
+            (("ss_wings", 1, 2), ("ss_reverse", 3, 3), ("ss_fan", 4, 7), ("ss_hold", 8, 9)),
+            5,
+            ("MH1", "MH3"),
+            150.0,
+            id="review-repro-wings-reverse-fan-hold",
+        ),
+        pytest.param(
+            (("ss_left", 1, 2), ("ss_fan_line", 3, 6), ("ss_left", 7, 8)),
+            4,
+            ("MH1", "MH3"),
+            45.0,
+            id="lagging-fan-out-and-back-slow",
+        ),
+    ],
+)
+def test_a_missing_head_leaves_every_other_heads_frames_unchanged(
+    sections: tuple[tuple[str, int, int], ...], heads: int, missing: tuple[str, ...], speed: float
+) -> None:
+    """Each head's entry window is its own: removing a head (its topology slot kept) never
+    lengthens or shortens another head's window, so every remaining head's encoded frames
+    equal the full rig's byte for byte. A section-wide window failed the first case: without
+    MH1, the fan's window ended 500 ms earlier for MH2-MH5."""
+    with registered_templates(*_subset_docs()):
+        _assert_subset_stable(
+            sections, _grid(*[500.0] * 10), heads=heads, missing=missing, speed=speed
+        )
+
+
+_SUBSET_SEEDS = 4
+_SUBSET_KNOWN = (20, 30)
+"""Seeds on which a section-wide window changes a remaining head (found in 60)."""
+
+
+def _subset_case(seed: int) -> bool:
+    """One random subset case; return whether the full rig rendered it to compare. The
+    subset families must be registered."""
+    rng = random.Random(seed)
+    ids = [doc.template.template_id for doc in _subset_docs()]
+    sections: list[tuple[str, int, int]] = [("ss_left", 1, 1)]
+    bar = 2
+    for _ in range(rng.randint(1, 3)):
+        template_id = rng.choice(ids)
+        length = 4 if template_id.startswith("ss_fan") else rng.randint(1, 2)
+        sections.append((template_id, bar, bar + length - 1))
+        bar += length
+    grid = _grid(*[rng.choice([400.0, 500.0, 600.0]) for _ in range(bar)])
+    heads = rng.randint(3, 5)
+    # The first head leads every distribution, so its window is often the widest.
+    missing = (rng.choice(["MH1", f"MH{rng.randint(2, heads)}"]),)
+    speed = rng.choice([45.0, 150.0, 360.0])
+    try:
+        _assert_subset_stable(tuple(sections), grid, heads=heads, missing=missing, speed=speed)
+    except AssertionError as error:
+        raise AssertionError(f"seed {seed}: {error}") from error
+    except (PhysicalChannelError, PhysicalRenderError):
+        return False  # the full rig cannot render it either: nothing to compare
+    return True
+
+
+def test_subset_stability_fuzz() -> None:
+    """Random sections of the distributed families after an opening hold on 3-5 heads,
+    random tempo and speed; one head removed, the leading one half the time. The known
+    seeds catch a section-wide window; then a random sweep."""
+    with registered_templates(*_subset_docs()):
+        for seed in _SUBSET_KNOWN:
+            assert _subset_case(seed), seed
+        compared = sum(_subset_case(seed) for seed in range(_SUBSET_SEEDS))
+    assert compared >= _SUBSET_SEEDS // 2, compared
+
+
+def test_an_uncut_entry_must_also_give_its_first_shutter_state_time() -> None:
+    """The closed-shutter hold continues straight into a pulse that opens for only 40 ms;
+    the pose and wheels allow the continuation, but the open state needs 60 ms latency
+    and 60 ms settle (later in each bar it opens for 460 ms, which is enough). The uncut entry is therefore not played as authored: it gets a
+    window whose cut begins where the shutter can take effect."""
+
+    def slow_open(profile: dict[str, Any]) -> None:
+        profile["visibility"]["open_latency_ms"] = 60
+        profile["discrete"]["shutter"]["states"]["open"]["settle_ms"] = 60
+
+    closed = physical_template_doc(
+        "p24a_closed", [hold_step("h", -90.0, physical_shutter_state="closed")]
+    )
+    step = hold_step("p", -90.0)
+    step.pop("physical_shutter_state")
+    step["physical_shutter"] = {
+        "period_beats": 4.0,
+        "duty_cycle": 0.25,
+        "phase_cycles": 0.23,
+        "low_state": "closed",
+        "high_state": "open",
+    }
+    pulse = physical_template_doc("p24a_short_open", [step])
+    pipeline, segments = _render(
+        ("p24a_closed", 1, 2), ("p24a_short_open", 3, 4), rig=_rig(slow_open), docs=(closed, pulse)
+    )
+    for fixture_id, window in _windows(pipeline, "s2").items():
+        assert window["action"] == "cut"
+        assert _first(segments, "s2", fixture_id).t0_ms > 4020
+
+
+# --- Every entry that is not played as authored gets the holdable cut (review H-A) -------
+
+
+def _straddling_pulse(pan: float) -> TemplateDoc:
+    """A pulse open for the first 0.05 beat of each cue (then every other half beat)."""
+    step = hold_step("p", pan)
+    step.pop("physical_shutter_state")
+    step["physical_shutter"] = {
+        "period_beats": 1.0,
+        "duty_cycle": 0.5,
+        "phase_cycles": 0.45,
+        "low_state": "closed",
+        "high_state": "open",
+    }
+    return physical_template_doc(f"ha_pulse_{pan:g}", [step])
+
+
+@pytest.mark.parametrize("open_settle", [60, 100, 150])
+def test_an_entry_without_a_window_still_begins_where_its_shutter_takes_effect(
+    open_settle: int,
+) -> None:
+    """MH1 has no cue in the first section, so its bound fits long before the pulse
+    section starts and it needs no dark window; but its first, 40 ms open state cannot
+    take its settle, so its entry is not played as authored. It still begins where the
+    shutter takes effect: the gate admitted this and the render then failed."""
+    right_only = physical_template_doc("ha_right_only", [hold_step("h", 90.0, target="RIGHT")])
+    pipeline, segments = _render(
+        ("ha_right_only", 1, 2),
+        ("ha_pulse_0", 3, 6),
+        rig=_pulse_rig(open_settle),
+        docs=(right_only, _straddling_pulse(0.0)),
+    )
+    window = _windows(pipeline, "s2")["MH1"]
+    assert window["window_end_ms"] is None and window["action"] != "skipped"
+    assert _first(segments, "s2", "MH1").t0_ms > 4020
+
+
+def _unknown_tilt_latency(profile: dict[str, Any]) -> None:
+    """A 100 ms open settle, and tilt latency unknown: no entry bound can be computed."""
+    profile["discrete"]["shutter"]["states"]["open"]["settle_ms"] = 100
+    profile["axes"]["tilt"]["latency_ms"] = None
+
+
+def _slow_settling(profile: dict[str, Any]) -> None:
+    """45 degrees/s and a 100 ms open settle."""
+    _slow()(profile)
+    profile["discrete"]["shutter"]["states"]["open"]["settle_ms"] = 100
+
+
+@pytest.mark.parametrize(
+    ("sections", "edit", "docs"),
+    [
+        pytest.param(
+            (("p24a_left", 1, 2), ("p24a_right", 3, 3), ("ha_pulse_-90", 4, 7)),
+            _slow_settling,
+            (),
+            id="earlier-cues-all-dropped",
+        ),
+        pytest.param(
+            (("ha_closed_0", 1, 2), ("ha_pulse_0", 3, 6)),
+            _unknown_tilt_latency,
+            (
+                physical_template_doc(
+                    "ha_closed_0", [hold_step("h", 0.0, physical_shutter_state="closed")]
+                ),
+            ),
+            id="unknown-bound",
+        ),
+    ],
+)
+def test_the_gate_admits_only_what_renders_on_every_entry_path(
+    sections: tuple[tuple[str, int, int], ...],
+    edit: Callable[[dict[str, Any]], None],
+    docs: tuple[TemplateDoc, ...],
+) -> None:
+    """Entries that need no dark window for other reasons than a fitting bound: a
+    predecessor sections back (the section between had every cue dropped), and an
+    unknown bound. `_render` gates first; each renders honestly."""
+    _render(
+        *sections,
+        grid=_grid(*[500.0] * 8),
+        rig=_rig(edit),
+        docs=(*docs, _straddling_pulse(0.0), _straddling_pulse(-90.0)),
+    )
