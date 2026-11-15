@@ -543,6 +543,31 @@ closed):
 - **Test time.** The full suite went from about 137 s to about 240 s in P2.4a; nine of
   the ten slowest tests are its fuzz and gate tests. Trimmed in a follow-up commit.
 
+P2.2, 2026-11-15 (reviewed separately from its author; one review, then four low
+findings closed):
+
+- **Arithmetic verified independently.** The reviewer reimplemented the resolver from
+  this plan's text and compared 75,435 head values across random rigs, blocks, groups,
+  wings, spreads and subsets: no disagreement. Eighteen mutations, none survived.
+- **Exactness.** `spread_cycles` is converted with `exact_decimal` and multiplied by
+  `Fraction(slot, S-1)`; it must be 0 or more, and direction is set by `direction`.
+- **Pan sign** comes only from the distribution that owns PAN and multiplies the pan
+  displacement; a referenced base aim is not mirrored.
+- **Lagging head.** It reaches the terminal pose once its phase reaches one; a step
+  that ends sooner cuts it where its path has reached. Its pulse starts mid-cycle:
+  intervals cut by the step start or end keep the Phase 1 exemption, and every interval
+  inside the step is checked at that head's own phase.
+- **Derived topology.** Without a declared topology, one row is ranked by
+  `position_index`, gaps kept as empty slots, so a head absent from the file leaves a
+  hole when the indices show it. A shared index refuses a distribution.
+- **Gate grouping.** `_plan_key` hashes trajectories, not the distribution metadata, so
+  heads with identical trajectories are still planned once. Gate time per combination
+  on the 8-head, 4-minute song: distributed hold 0.83 s, distributed sine 2.02 s.
+- **Found by this review, fixed in a follow-up to P2.4a:** the entry window was the
+  maximum over a section's fixtures, so removing one head could change the others'
+  frames; and one fuzz case fails the byte-level honesty check at a back-to-back cycle
+  boundary, reproducible before P2.2.
+
 ## Phase exit
 
 `physical_v2` accepts grids with silent edges, reports the covered span and holds every fixture dark outside it without inferring tempo; a grid Phase 1 accepted renders the same frames and fingerprint. Legacy session ids, the 16 Phase 0 fingerprints and the Phase 1 request fingerprints are unchanged. Six core families compile deterministically on the synthetic rig matrix and are offered only under `physical_v2`, each only on a rig that can render it; independent phase domains work; missing heads preserve canonical ranks; preset overrides have explicit scope; a `ONCE` hold stays one cue per fixture and holds its terminal pose to the section end; fly-in/out lit directions and dark returns are frame-proven; flicks settle while dark and resume the current base. Each section's entry window is sized at render from a bound the fuzz shows dominates the transaction pass, so section-entry repositioning fits by construction; the dip is skipped where the predecessor ends where the successor begins, and the plan-dependent failures P2.4c lists still surface at render. The zoom pilot is source/synthetic proven with any real-profile acceptance explicitly pending. Legacy regression and clean-tree `make validate` pass. Owner visual acceptance, including whether the remaining section-entry dips look acceptable, is a separate `PENDING-OWNER` record, not a consequence of a new effect name or passing bytes.
