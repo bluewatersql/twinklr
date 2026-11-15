@@ -568,6 +568,36 @@ findings closed):
   frames; and one fuzz case fails the byte-level honesty check at a back-to-back cycle
   boundary, reproducible before P2.2.
 
+P2.4a follow-up, 2026-11-15 (from the P2.2 review; reviewed separately, one fix round
+and a confirmation):
+
+- **Entry window per fixture.** Each head has its own kept-as-authored probe, bound,
+  window and cut. A rig with any head removed renders every remaining head
+  byte-identically to the full rig (reviewer: 978 comparisons across declared and
+  derived topologies, presets, wings and all three fallback policies, no difference).
+  Consequence: after a section boundary heads can re-enter at different times. How
+  that looks is `PENDING-OWNER`.
+- **Every head not kept as authored is cut where its first shutter state can take
+  effect,** with or without a window. The probe checks shutter timing. This closed
+  three cases the gate admitted and the render refused.
+- **The honesty check was narrowed, deliberately.** `assert_honest_transactions` now
+  treats only darkness the planner created (a transaction, a park, a substituted cue)
+  as able to hide residual motion. It no longer flags motion inside a cue, or carried
+  across back-to-back cues played as authored, that is still under way when a cue's own
+  dark pulse ends. The reviewer traced the triggering case (the head on the next cue's
+  authored sine, about 7 ms behind) and confirmed that transitions, the continuation
+  jump limit, wheel changes, cue frame equality and substituted cues are still checked
+  by unchanged rules; five constructed leak scenarios are each still caught, and no
+  planner mutation newly survives.
+- **Renderer revision stays 1.** No input renderable on `main` at `d6096254` changes
+  bytes (34 of 700 random inputs render there; all identical, with the request and
+  Phase 0 outputs). Inputs that need P2.2 or P2.4a did change between commits on this
+  branch under an unchanged fingerprint; none of those was ever released.
+- **Evidence at confirmation.** 800 random renders: 482 pass the honesty check, 318
+  refused at the gate, 0 fail after admission. 46 of 46 mutations caught.
+- **Low, left as is.** A head whose first cue is moved without a window is recorded in
+  the trace as `action: "none"`, with the shift visible only in `first_cue_ms`.
+
 ## Phase exit
 
 `physical_v2` accepts grids with silent edges, reports the covered span and holds every fixture dark outside it without inferring tempo; a grid Phase 1 accepted renders the same frames and fingerprint. Legacy session ids, the 16 Phase 0 fingerprints and the Phase 1 request fingerprints are unchanged. Six core families compile deterministically on the synthetic rig matrix and are offered only under `physical_v2`, each only on a rig that can render it; independent phase domains work; missing heads preserve canonical ranks; preset overrides have explicit scope; a `ONCE` hold stays one cue per fixture and holds its terminal pose to the section end; fly-in/out lit directions and dark returns are frame-proven; flicks settle while dark and resume the current base. Each section's entry window is sized at render from a bound the fuzz shows dominates the transaction pass, so section-entry repositioning fits by construction; the dip is skipped where the predecessor ends where the successor begins, and the plan-dependent failures P2.4c lists still surface at render. The zoom pilot is source/synthetic proven with any real-profile acceptance explicitly pending. Legacy regression and clean-tree `make validate` pass. Owner visual acceptance, including whether the remaining section-entry dips look acceptable, is a separate `PENDING-OWNER` record, not a consequence of a new effect name or passing bytes.
