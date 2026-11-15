@@ -4,17 +4,18 @@ This module defines all template-related models:
 - Timing models: BaseTiming, PhaseOffset, RepeatContract
 - Step components: Geometry, Movement, Dimmer, StepTiming, TemplateStep
 - Physical renderer step data: PhysicalMovementSpec, PhysicalPulseSpec and its
-  dimmer and shutter forms, and named shutter, color and gobo states
+  dimmer and shutter forms, named shutter, color and gobo states, and ComponentRefs
 - Template structure: Template, TemplatePreset, TemplateDoc
 
 These models define how choreography is structured and executed.
 """
 
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from twinklr.core.config.fixtures.presets import PresetId, StateName
 from twinklr.core.config.poses import PanPose, TiltPose
 from twinklr.core.sequencer.models.enum import (
     AimZone,
@@ -170,10 +171,6 @@ MIN_PHYSICAL_PERIOD_BEATS = 1 / 64
 20 ms frame, so anything shorter is an authoring error rather than a pulse."""
 
 
-StateName = Annotated[str, Field(pattern=r"\S")]
-"""A profile state name: not empty and not only whitespace."""
-
-
 class PhysicalMovementSpec(BaseModel):
     """Physical motion of a step for the physical renderer, in fixture-local degrees.
 
@@ -181,15 +178,16 @@ class PhysicalMovementSpec(BaseModel):
     rate (`period_beats`) are independent. Kernels: `hold` keeps the start pose;
     `sine_pan`/`sine_tilt` add the selected extent times sin(2*pi*phase) and are
     periodic; `linear` moves from start to start plus extent over one period, then
-    holds, and is finite.
+    holds, and is finite. A start angle left unset comes from the step's position
+    reference (`TemplateStep.component_refs`); a step without one must set both.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     shape: Literal["hold", "sine_pan", "sine_tilt", "linear"]
     mode: Literal["periodic", "finite"]
-    start_pan_deg: float = Field(allow_inf_nan=False)
-    start_tilt_deg: float = Field(allow_inf_nan=False)
+    start_pan_deg: float | None = Field(default=None, allow_inf_nan=False)
+    start_tilt_deg: float | None = Field(default=None, allow_inf_nan=False)
     pan_extent_deg: float = Field(default=0.0, allow_inf_nan=False)
     tilt_extent_deg: float = Field(default=0.0, allow_inf_nan=False)
     period_beats: float | None = Field(
@@ -239,6 +237,28 @@ class PhysicalShutterPulse(PhysicalPulseSpec):
 
     low_state: StateName
     high_state: StateName
+
+
+class ComponentRefs(BaseModel):
+    """Rig presets a physical step names, resolved per fixture from the fixture group.
+
+    `position_id` supplies each start angle the step leaves unset; the attribute presets
+    supply each held shutter, color, gobo or dimmer channel the step does not set
+    itself. Two attribute presets may not both set a channel of one fixture.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    position_id: PresetId | None = None
+    attribute_preset_ids: tuple[PresetId, ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_refs(self) -> "ComponentRefs":
+        if self.position_id is None and not self.attribute_preset_ids:
+            raise ValueError("component_refs names no position or attribute preset")
+        if len(set(self.attribute_preset_ids)) != len(self.attribute_preset_ids):
+            raise ValueError("attribute_preset_ids names a preset more than once")
+        return self
 
 
 class Movement(BaseModel):
@@ -432,6 +452,11 @@ class TemplateStep(BaseModel):
     physical_reposition_fallback: Literal["preserve_aim", "drop_accent"] | None = Field(
         default=None, exclude_if=lambda value: value is None
     )
+    # Physical renderer only; left out of dumps when absent. Named rig presets for the
+    # start angles and held channels the step leaves unset.
+    component_refs: ComponentRefs | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
     @property
     def has_physical_data(self) -> bool:
@@ -444,12 +469,29 @@ class TemplateStep(BaseModel):
             or self.physical_color is not None
             or self.physical_gobo is not None
             or self.physical_reposition_fallback is not None
+            or self.component_refs is not None
         )
 
     @model_validator(mode="after")
     def _validate_physical_shutter(self) -> "TemplateStep":
         if self.physical_shutter is not None and self.physical_shutter_state is not None:
             raise ValueError("set physical_shutter_state or physical_shutter, not both")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_pose_source(self) -> "TemplateStep":
+        """Each start angle is set on the step or supplied by a position reference."""
+        movement = self.movement.physical
+        if movement is None or (
+            self.component_refs is not None and self.component_refs.position_id is not None
+        ):
+            return self
+        for name in ("start_pan_deg", "start_tilt_deg"):
+            if getattr(movement, name) is None:
+                raise ValueError(
+                    f"step {self.step_id!r} sets no movement.physical.{name} and no "
+                    "component_refs.position_id: an axis nothing sets is never centered"
+                )
         return self
 
     @model_validator(mode="before")

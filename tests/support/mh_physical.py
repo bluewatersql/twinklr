@@ -1,6 +1,6 @@
 """Synthetic physical-renderer inputs: a fixture profile, a known initial state,
-physical fixture segments, and the P1.6 pipeline case (rig, grid, job, plan and the
-test-only template).
+physical fixture segments, the P1.6 pipeline case (rig, grid, job, plan and the
+test-only template), and rig presets with steps that reference them.
 
 In-memory payloads only; no owner profile or measured data.
 """
@@ -458,6 +458,80 @@ def physical_rig(*, mh1_pan_max: float = 270.0) -> FixtureGroup:
             inverted=not mh1, pan_max=mh1_pan_max if mh1 else 270.0
         )
     return FixtureGroup.model_validate(payload)
+
+
+def preset_library_payload() -> dict[str, Any]:
+    """Rig presets for `physical_rig`'s two heads, in its profile's state names.
+
+    `front` and `wash` declare MH1 only and fall back to `home` and `wash_all` for MH2;
+    `side` and `cool` declare both heads.
+    """
+    return {
+        "positions": {
+            "front": {
+                "fixtures": {"MH1": {"pan_deg": -30.0, "tilt_deg": 20.0}},
+                "fallback": "home",
+            },
+            "home": {
+                "fixtures": {
+                    "MH1": {"pan_deg": 0.0, "tilt_deg": 0.0},
+                    "MH2": {"pan_deg": 10.0, "tilt_deg": 5.0},
+                }
+            },
+            "side": {
+                "fixtures": {
+                    "MH1": {"pan_deg": 60.0, "tilt_deg": 30.0},
+                    "MH2": {"pan_deg": -60.0, "tilt_deg": 30.0},
+                }
+            },
+        },
+        "attributes": {
+            "wash": {
+                "fixtures": {
+                    "MH1": {"shutter": "open", "color": "red", "gobo": "dots", "dimmer": 0.8}
+                },
+                "fallback": "wash_all",
+            },
+            "wash_all": {
+                "fixtures": {
+                    "MH1": {"shutter": "open", "color": "white", "gobo": "open", "dimmer": 1.0},
+                    "MH2": {"shutter": "open", "color": "blue", "gobo": "star", "dimmer": 0.6},
+                }
+            },
+            "cool": {"fixtures": {"MH1": {"color": "blue"}, "MH2": {"color": "white"}}},
+        },
+    }
+
+
+def physical_preset_rig(presets: dict[str, Any] | None = None) -> FixtureGroup:
+    """`physical_rig` carrying `presets` (default `preset_library_payload()`)."""
+    payload = physical_rig().model_dump(mode="python")
+    payload["presets"] = preset_library_payload() if presets is None else presets
+    return FixtureGroup.model_validate(payload)
+
+
+def referencing_step(
+    step_id: str = "look",
+    *,
+    position_id: str | None = "front",
+    attribute_preset_ids: Sequence[str] = ("wash",),
+    start: float = 0.0,
+    duration: float = 1.0,
+    **fields: Any,
+) -> dict[str, Any]:
+    """A physical hold step whose aim and held states come from rig presets alone."""
+    return {
+        "step_id": step_id,
+        "timing": {"base_timing": {"start_offset_bars": start, "duration_bars": duration}},
+        "geometry": {},
+        "movement": {"physical": {"shape": "hold", "mode": "periodic"}},
+        "dimmer": {},
+        "component_refs": {
+            "position_id": position_id,
+            "attribute_preset_ids": list(attribute_preset_ids),
+        },
+        **fields,
+    }
 
 
 def physical_job(**policy: Any) -> JobConfig:

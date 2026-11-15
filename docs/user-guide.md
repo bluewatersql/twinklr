@@ -316,9 +316,21 @@ Each fixture's `dmx_mapping` also declares the value the render exports for that
 
 A fixture's `config` may also carry an optional `physical_profile` for the opt-in `physical_v2` renderer; in the `base_config` form, `base_config.physical_profile` applies to every fixture and a fixture's `config_overrides.physical_profile` replaces it for that fixture. An invalid profile fails when the fixture file loads, naming the fixture. The `physical_v2` renderer requires one on every fixture and renders from it alone; the legacy renderer ignores it and refuses a physical channel value rather than exporting nothing. Physical output is written to the fixture's own xLights model, which must be a single-color DMX model with at least `footprint` channels; `twinklr run --layout` checks this before analysis (and records the layout's content hash in the trace), and without a layout the check is skipped with a warning. It declares the fixture explicitly rather than inferring anything from the legacy fields above: `profile_id`, `provenance` (`synthetic`, `manufacturer` or `measured`), the model-relative channel `footprint` (at most 48, the xLights DMX effect's limit) with a default byte for every channel `1..footprint`, continuous `axes` (`pan`/`tilt` in degrees, `dimmer` normalized) with calibrated `physical_min`/`physical_max`, an optional narrower `allowed_min`/`allowed_max` operating window that does not rescale the mapping, coarse/fine offsets and inversion, `discrete` shutter/color/gobo channels whose named states each select one explicit byte inside a declared, non-overlapping range, and `visibility` (what extinguishes output, and close/open latency). A profile cannot claim darkness it cannot produce: the shutter's `open_state` cannot extinguish, and `dimmer_zero_extinguishes` needs a dimmer axis calibrated from `0` whose operating window admits `0`. Normalized axes lie within `0..1`. Unknown speed, latency and settle times stay `null`; they are never filled in. A profile does not say where a fixture is now; that is `moving_heads.initial_states` in the job config. The retired `capabilities` and `movement_speed` keys stay ignored.
 
+A fixture group may also declare `presets`, named components that `physical_v2` template steps refer to by id (`component_refs`, below) instead of hard-coding angles and profile state names; the legacy renderer ignores them, and an empty `presets` is left out of the group's dump:
+
+| Key | Meaning |
+|---|---|
+| `presets.positions.<id>.fixtures.<fixture_id>` | That fixture's aim, `pan_deg` and `tilt_deg`, in unwrapped fixture-local degrees (never taken modulo 360; the renderer's bounds and travel-rate checks still apply) |
+| `presets.positions.<id>.fallback` | Another position preset id, used for every fixture this preset does not list |
+| `presets.attributes.<id>.fixtures.<fixture_id>` | That fixture's held `shutter`, `color` and `gobo` states, named as its own `physical_profile` names them, and a normalized `dimmer` level; at least one is set. One preset id can so select a different state name on each profile |
+| `presets.attributes.<id>.fallback` | Another attribute preset id, used for every fixture this preset does not list |
+
+A preset naming a fixture outside the group, a state its profile does not declare, a dimmer level on a profile without a dimmer axis, a fallback that is not declared, or a fallback chain that cycles fails when the fixture file loads. A referenced preset that declares nothing for a fixture, along its whole fallback chain, refuses the render (and, for an offered template, the run before planning); a head is never aimed at a center or default. Presets are rig data: an edit changes the render fingerprint, never the planner's session or cache.
+
 _Source: `packages/twinklr/cli/main.py` (`_resolve_fixture_config_path`),
-`packages/twinklr/core/config/fixtures/dmx.py` (`DmxMapping`) and
-`packages/twinklr/core/config/fixtures/capabilities.py` (`FixtureCapabilities`)_
+`packages/twinklr/core/config/fixtures/dmx.py` (`DmxMapping`),
+`packages/twinklr/core/config/fixtures/capabilities.py` (`FixtureCapabilities`) and
+`packages/twinklr/core/config/fixtures/presets.py` (`RigPresetLibrary`)_
 
 ---
 
@@ -425,6 +437,20 @@ uv run twinklr run \
   --template-dir /tmp/mh-templates \
   --allow-template-overrides
 ```
+
+A `physical_v2` template step may name the rig's presets (fixture config, above) instead
+of hard-coding them, with `component_refs`; the legacy renderer refuses a step that
+carries it, and it is left out of dumps when absent:
+
+| Key | Meaning |
+|---|---|
+| `component_refs.position_id` | A position preset that supplies each start angle the step leaves unset. `movement.physical.start_pan_deg` and `start_tilt_deg` become optional; one set on the step (by the template or a template preset's patch) replaces the reference for that axis only. A step without a position reference must set both |
+| `component_refs.attribute_preset_ids` | Attribute presets that supply each fixture's held shutter, color, gobo and dimmer level. The step's own `physical_shutter_state`, `physical_shutter` pulse, `physical_color`, `physical_gobo` or `dimmer.physical` replaces the reference for that channel only; two listed presets that both set a channel of one fixture are refused rather than one silently winning |
+
+References resolve per fixture when the template compiles, both in the pre-planning dry
+compile and in the render, and each cue records `component_provenance` in its metadata:
+per channel, `step` or the referenced preset, the preset its fallback chain resolved to
+and the SHA-256 of the entry used.
 
 ### Deterministic FSEQ comparison (CI-safe)
 

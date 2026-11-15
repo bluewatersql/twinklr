@@ -12,7 +12,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from twinklr.core.config.fixtures import FixtureCapabilities
 from twinklr.core.curves.models import CurvePoint, PointsCurve
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
-from twinklr.core.sequencer.models.context import FixtureContext, TemplateCompileContext
+from twinklr.core.sequencer.models.context import (
+    FixtureContext,
+    ResolvedStepComponents,
+    TemplateCompileContext,
+)
 from twinklr.core.sequencer.models.enum import ChannelName, ChaseOrder, TemplateRole
 from twinklr.core.sequencer.models.moving_heads.physical import (
     DiscreteTrajectory,
@@ -43,6 +47,10 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
     follow_lag,
 )
 from twinklr.core.sequencer.moving_heads.compile.preset import apply_preset
+from twinklr.core.sequencer.moving_heads.compile.presets import (
+    ComponentRefError,
+    resolve_component_refs,
+)
 from twinklr.core.sequencer.moving_heads.compile.scheduler import schedule_repeats
 from twinklr.core.sequencer.moving_heads.compile.step_compiler import (
     StepCompileContext,
@@ -297,7 +305,9 @@ def compile_physical_template(
     commands the head cannot follow within one encoded word (`follow_lag`) is refused.
     Each segment records its requested musical bounds in metadata `requested_t0_ms`
     and `requested_t1_ms`, and a step's `physical_reposition_fallback` under
-    `FALLBACK_METADATA_KEY`.
+    `FALLBACK_METADATA_KEY`. A step's `component_refs` are resolved per target
+    fixture against `context.presets`, after the preset patch, and each such segment
+    records `component_provenance`.
 
     Args:
         template: The template to compile.
@@ -312,7 +322,8 @@ def compile_physical_template(
 
     Raises:
         PhysicalCompileError: For a FADE_OUT remainder policy, which has no physical
-            fade, or a step the physical compile rejects.
+            fade, a step the physical compile rejects, or a component reference that
+            does not resolve on this rig (naming template, step, preset and fixture).
         PhysicalChannelError: For a value, rate or state the profile cannot honor, or
             pose motion the head cannot follow.
         UnsupportedRigShapeError: If a step's target group matches no fixture.
@@ -355,6 +366,7 @@ def compile_physical_template(
 
     segments: list[FixtureSegment] = []
     dropped: list[dict[str, str | int]] = []
+    resolved: dict[str, dict[str, ResolvedStepComponents]] = {}
     for instance in schedule_result.instances:
         step = step_map[instance.step_id]
         requested_t0 = context.bar_offset_to_ms(instance.start_bars)
@@ -384,7 +396,28 @@ def compile_physical_template(
                 f"{context.section_id!r} ({requested_t0}-{requested_t1} ms) leaves no "
                 f"frame once quantized and cut at {end_limit_ms} ms"
             )
-        for fixture in _resolve_target_fixtures(step, template, context):
+        targets = _resolve_target_fixtures(step, template, context)
+        components = None
+        if step.component_refs is not None:
+            if step.step_id not in resolved:
+                try:
+                    resolved[step.step_id] = resolve_component_refs(
+                        step, tuple(fixture.fixture_id for fixture in targets), context.presets
+                    )
+                except ComponentRefError as error:
+                    raise PhysicalCompileError(
+                        MHDiagnostic(
+                            code="unsupported_attribute",
+                            severity="error",
+                            message=f"template {template.template_id!r}, {error}",
+                            fixture_id=error.fixture_id,
+                            section_id=context.section_id,
+                            action="rejected",
+                        )
+                    ) from error
+            components = resolved[step.step_id]
+        for fixture in targets:
+            fixture_components = None if components is None else components[fixture.fixture_id]
             step_context = StepCompileContext(
                 section_id=section_id,
                 segment_id=segment_id,
@@ -404,6 +437,7 @@ def compile_physical_template(
                 dimmer_registry=context.dimmer_registry,
                 physical_profile=fixture.physical_profile,
                 phase_map=phase_map,
+                resolved_components=fixture_components,
             )
             try:
                 segment = compile_physical_step(
@@ -428,6 +462,8 @@ def compile_physical_template(
             segment.add_metadata("requested_t0_ms", requested_t0)
             segment.add_metadata("requested_t1_ms", requested_t1)
             segment.add_metadata(FALLBACK_METADATA_KEY, step.physical_reposition_fallback)
+            if fixture_components is not None:
+                segment.add_metadata("component_provenance", fixture_components.provenance)
             segments.append(segment)
 
     return TemplateCompileResult(

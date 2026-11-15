@@ -2773,6 +2773,35 @@ for _fallback_path in (
         _PHYSICAL_PREPOSITION,
     )
 
+# P2.1 named rig components: a fixture group's position and attribute presets and the
+# step references that name them. They feed only the opt-in physical compile; each
+# exact path mutates its field and must either change `compile_physical_template`'s
+# result or be refused by validation or compile (a reference that no longer resolves).
+for _component_path, _note in {
+    "fixture.presets": _PHYSICAL_TEMPLATE_REJECTED,
+    "fixture.presets.positions": _PHYSICAL_TEMPLATE_REJECTED,
+    "fixture.presets.positions.fixtures": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.positions.fixtures.pan_deg": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.positions.fixtures.tilt_deg": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.positions.fallback": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.attributes": _PHYSICAL_TEMPLATE_REJECTED,
+    "fixture.presets.attributes.fixtures": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.attributes.fixtures.shutter": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.attributes.fixtures.color": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.attributes.fixtures.gobo": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.attributes.fixtures.dimmer": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.attributes.fallback": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.component_refs": _PHYSICAL_TEMPLATE_REJECTED,
+    "template.template.steps.component_refs.position_id": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.component_refs.attribute_preset_ids": _PHYSICAL_TEMPLATE_COMPILED,
+}.items():
+    CONFIG_EFFECTS[_component_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/compile/test_component_presets.py::"
+        f"test_component_preset_field_changes_compile[{_component_path}]",
+        _note,
+    )
+
 # Exact App/Job discriminators. These overrides prevent stale generic smoke-test
 # pointers from re-entering the accountable ledger.
 for _root_path in ("app.project_root", "app.cache_dir"):

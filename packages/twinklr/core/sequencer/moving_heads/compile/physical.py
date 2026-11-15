@@ -29,6 +29,7 @@ import math
 from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.config.fixtures.capabilities import DiscreteCapability, FixtureCapabilities
+from twinklr.core.config.fixtures.presets import PoseDegrees
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.models.context import StepCompileContext
 from twinklr.core.sequencer.models.enum import ChannelName
@@ -115,7 +116,10 @@ def compile_physical_step(
     Args:
         step: A physical step: `movement.physical` set and no legacy handler data.
         context: Step identity, timing, the fixture's physical profile and the
-            song's musical phase map. Phase is measured from `context.start_ms`.
+            song's musical phase map. Phase is measured from `context.start_ms`. For a
+            step with component references, `resolved_components` supplies the start
+            aim, and the held shutter, color, gobo and dimmer level in place of the
+            step's own static states.
         sample_times_ms: The encoder's frame starts in the step's half-open span:
             every frame from its start to the last before its end. The step's start
             and end (`context`) must already be frame-grid times: the caller quantizes
@@ -125,12 +129,13 @@ def compile_physical_step(
     Returns:
         A segment over the step with PAN and TILT (sampled, plus a terminal point at
         the step end), DIMMER and SHUTTER when the step declares their pulses, and
-        SHUTTER, COLOR and GOBO as one held event when it declares a static state.
+        SHUTTER, COLOR and GOBO as one held event when it declares a static state,
+        and DIMMER as one held level when a referenced attribute preset supplies it.
         `metadata["phase_origin_ms"]` records the origin.
 
     Raises:
-        PhysicalCompileError: For a legacy step, legacy data on a physical step, or a
-            fixture without a physical profile.
+        PhysicalCompileError: For a legacy step, legacy data on a physical step, a
+            fixture without a physical profile, or a start angle nothing sets.
         PhysicalChannelError: For a value, rate or state change the profile cannot honor,
             including a state or wheel the profile does not declare.
         OffGridTimeError: For a step bound or sample time off the frame grid.
@@ -158,11 +163,20 @@ def compile_physical_step(
 
     movement = step.movement.physical
     assert movement is not None  # checked by _require_physical_step
+    components = context.resolved_components
+    if components is not None:
+        pose = components.pose
+    else:
+        # Both set: checked by _require_physical_step.
+        assert movement.start_pan_deg is not None and movement.start_tilt_deg is not None
+        pose = PoseDegrees(pan_deg=movement.start_pan_deg, tilt_deg=movement.start_tilt_deg)
     for channel in (ChannelName.PAN, ChannelName.TILT):
         trajectory = ContinuousTrajectory(
             unit="degree",
             points=tuple(
-                PhysicalPoint(t_ms=t, value=_movement_value(movement, channel, phase_map, t, t0_ms))
+                PhysicalPoint(
+                    t_ms=t, value=_movement_value(movement, pose, channel, phase_map, t, t0_ms)
+                )
                 for t in (*times, t1_ms)
             ),
             interpolation="linear",
@@ -186,6 +200,15 @@ def compile_physical_step(
         )
         _add(segment, ChannelName.DIMMER, levels, profile)
 
+    if components is not None and components.dimmer is not None:
+        # A referenced attribute preset's level, held for the whole step.
+        level = ContinuousTrajectory(
+            unit="normalized",
+            points=(PhysicalPoint(t_ms=t0_ms, value=components.dimmer),),
+            interpolation="hold",
+        )
+        _add(segment, ChannelName.DIMMER, level, profile)
+
     shutter = step.physical_shutter
     if shutter is not None:
         _check_pulse_widths(
@@ -196,11 +219,15 @@ def compile_physical_step(
         _check_shutter_timing(context.fixture_id, states, t1_ms, profile)
 
     # Static named states hold for the whole step. Entering one from the preceding
-    # state (wheel masking and settle) is the transaction pass's work.
-    for channel, state in (
-        (ChannelName.SHUTTER, step.physical_shutter_state),
-        (ChannelName.COLOR, step.physical_color),
-        (ChannelName.GOBO, step.physical_gobo),
+    # state (wheel masking and settle) is the transaction pass's work. Resolved
+    # components already carry the step's own states where it sets them.
+    held_states = (
+        (step.physical_shutter_state, step.physical_color, step.physical_gobo)
+        if components is None
+        else (components.shutter, components.color, components.gobo)
+    )
+    for channel, state in zip(
+        (ChannelName.SHUTTER, ChannelName.COLOR, ChannelName.GOBO), held_states, strict=True
     ):
         if state is not None:
             held = DiscreteTrajectory(events=(DiscretePoint(t_ms=t0_ms, state=state),))
@@ -392,6 +419,14 @@ def _require_physical_step(step: TemplateStep, context: StepCompileContext) -> F
         )
     if context.physical_profile is None:
         raise reject(f"fixture {context.fixture_id!r} has no physical_profile")
+    if context.resolved_components is None:
+        for name in ("start_pan_deg", "start_tilt_deg"):
+            if getattr(step.movement.physical, name) is None:
+                raise reject(
+                    f"step {step.step_id!r} of template {context.template_id!r} sets no "
+                    f"movement.physical.{name} and no position reference; an axis nothing "
+                    "sets is never centered"
+                )
     return context.physical_profile
 
 
@@ -454,13 +489,14 @@ def _check_sample_times(times: Sequence[int], t0_ms: int, t1_ms: int) -> tuple[i
 
 def _movement_value(
     movement: PhysicalMovementSpec,
+    pose: PoseDegrees,
     channel: ChannelName,
     phase_map: MusicalPhaseMap,
     time_ms: int,
     origin_ms: int,
 ) -> float:
     is_pan = channel is ChannelName.PAN
-    start = movement.start_pan_deg if is_pan else movement.start_tilt_deg
+    start = pose.pan_deg if is_pan else pose.tilt_deg
     extent = movement.pan_extent_deg if is_pan else movement.tilt_extent_deg
     if movement.shape == "hold" or movement.period_beats is None:
         return start

@@ -529,7 +529,8 @@ def check_physical_templates(
     cue limits (`physical_cue_limits`). That checks target groups against the rig's
     roles, legacy data a preset adds, every step's states and channels against each
     profile, axis bounds, travel rate, pose motion the head can follow, and pulse and
-    shutter timing for that placement. The section then enters as the render enters a
+    shutter timing for that placement, and each step's component references against
+    the rig's presets, exactly as the render resolves them. The section then enters as the render enters a
     section (`_enter_section`) and `plan_prepositions` runs over it from the run's
     `initial_states` under the run's `failure_mode`, so a template whose own cues
     cannot be repositioned between is refused unless it declares the fallback the run
@@ -575,6 +576,7 @@ def check_physical_templates(
                 geometry_registry=registries["geometry"],
                 movement_registry=registries["movement"],
                 dimmer_registry=registries["dimmer"],
+                presets=fixture_group.presets,
             )
             try:
                 compiled = compile_physical_template(
@@ -1109,6 +1111,7 @@ class RenderingPipeline:
                 color_registry=self.color_registry,
                 shutter_registry=self.shutter_registry,
                 gobo_registry=self.gobo_registry,
+                presets=self.fixture_group.presets,
             )
             time_markers.append(
                 TimeMarker(
