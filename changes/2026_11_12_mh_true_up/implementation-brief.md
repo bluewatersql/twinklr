@@ -126,6 +126,7 @@ Phase 2 (tasks and order in [plan/phase-2-composition.md](plan/phase-2-compositi
 | Begin Phase 2 implementation | Owner go-ahead, 2026-11-14 ("then proceed to phase 2"). Covers Phase 2's offline work; its owner-gated steps need their own authorization |
 | Run Phase 2 to completion without check-ins | Owner direction, 2026-11-15 ("continue with autoplot and ultraqwork without stopping until finished"). Covers Phase 2's offline tasks and closeout; integrator decisions made under it are recorded in the Phase 2 plan for the owner to reverse |
 | Merge Phase 2 to `main` and push when complete | Owner direction, 2026-11-16 ("continue. commit. merge and push when completer"). Applies once Phase 2's tasks are reviewed, committed and `make validate` passes. Does not cover xLights runs, hardware, look verdicts or starting Phase 3 |
+| xLights test and recording of the Phase 2 families | Owner authorization, 2026-11-16 ("run the test in xlights as screen record the results"). Run on a scratch show; [result](evidence/2026-11-16-p2-xlights-result/README.md). Does not cover hardware or a look verdict |
 | Phase 0 keeps `identity.py` (render fingerprint) | Kept as planned. Its Phase 0 consumer is the evidence record; say so if it should move to Phase 1 instead |
 
 ## Kickoff checklist
