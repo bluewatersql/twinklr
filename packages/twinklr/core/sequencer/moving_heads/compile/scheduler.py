@@ -118,7 +118,8 @@ def schedule_repeats(
 
     # Complete cycles, their bounds and the remainder are counted and summed exactly, so
     # a cycle ends exactly where the next begins and a window of whole cycles leaves no
-    # remainder, whatever decimal the cycle length is (two thirds of a bar, say).
+    # remainder to schedule. A length written as a repeating decimal (two thirds of a
+    # bar, say) leaves one far below ``_EPSILON_BARS``, which schedules nothing.
     cycle = exact_decimal(contract.cycle_bars)
     window = exact_decimal(duration_bars)
     num_complete_cycles = int(window // cycle)

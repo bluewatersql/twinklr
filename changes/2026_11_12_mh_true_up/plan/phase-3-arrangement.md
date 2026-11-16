@@ -508,3 +508,18 @@ fix round, and a verification of the fixes by separate agents.
 - **Not done:** deriving travel speed from the xLights layout's `SlewLimit`. Feasible
   (the layout profiler already parses it) but it is a preview limit, not a
   measurement; left as an owner option.
+
+### Verification and gate after the family adaptation and profile defaults — 2026-11-16
+
+- `make validate` on `dcc14ddf`, tree clean before and after: format, lint and
+  type-check passed; **7048 passed, 39 skipped**.
+- A verifier separate from every author compared the old renderer at `647eed83`
+  (before any scheduler change) with `dcc14ddf`: 11,580 renders of the 37 built-in
+  templates, zero byte differences; 36,181 direct scheduler calls, zero differences; no
+  built-in template has a step end the new end-snapping rule could move. Goldens and
+  regression files are unchanged from `main`.
+- The same verifier confirmed the last fix round (collector restored on every exit;
+  per-channel phase continuation; exact cycle counts tile a window with no gap, overlap
+  or zero-length instance). One behaviour to know: on a finite-move step, a pulse whose
+  period divides the distance from the first repeat now continues that repeat's phase
+  instead of restarting.
