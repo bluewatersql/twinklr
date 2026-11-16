@@ -677,6 +677,53 @@ a fix round and a re-review):
   on a bar the gate never aligned it to; and the boundary into a `HOLD_LAST_POSE`
   remainder, which the gate never compiles (poses before this task, wheels with it).
 
+Gate-coverage follow-up, 2026-11-16 (commit `5844117b`; reviewed separately from its
+author over three rounds, the last two approving):
+
+- **A planned show always renders (integrator decision, made under the owner's
+  run-to-completion instruction; the owner can reverse it).** The first attempt widened
+  the gate to enumerate every placement; review still found plans that passed it and
+  failed at render (a `drop_accent` cascade reaching the song end, a window cut into a
+  cue's dark tail). Correctness after paid planning no longer depends on the gate
+  predicting every placement. New render-only policy field
+  `MHRenderPolicy.on_unplayable: "dark" | "error"`, default `"dark"`, left out of dumps
+  at its default and listed in `RENDER_ONLY_CONFIG_KEYS`.
+- **This supersedes two statements in P2.4c above:** "No automatic remedy is added at
+  render" and "under the default `error` it fails after planning". Darkness is the
+  remedy, never a delayed or altered reveal; `"error"` restores fail-fast.
+- **What degrades under `"dark"`.** A cue whose reposition still fails after its
+  declared fallback is dropped dark. A too-short shutter state or failed park traced to
+  a cue keeps that cue dark and the fixture is replanned; the dark set only grows, so
+  it terminates. A step one fixture cannot compile at a section's placement
+  (`PhysicalCompileError`, `PhysicalChannelError`, `EmptyStepError`) is left out for
+  that fixture; a `ONCE` cycle too long for its section loses all its cues.
+- **What still raises.** Unknown initial state, locks, an error no cue can absorb, a
+  template that also fails from bar 1 over the song, and any other exception
+  (`ValidationError` and plain `ValueError` included), so a code defect is not turned
+  into a dark cue.
+- **Reporting.** Each dropped cue is in trace `dropped_cues` (fixture, section,
+  template, step, frames, reason, code); `unplayable_totals` per code in the render
+  record; one warning per run. The CLI print of that warning has no test.
+- **What the gate now guarantees.** An admitted template plays at every bar alignment
+  (bars 1..p), from every `ONCE` start bar, and at revealing and song-start entries.
+  Section ends, remainders, predecessor state and cascades are left to the degrade.
+  The full remainder enumeration runs only under `"error"`.
+- **Window-cut fix.** `apply_entry_window` drops a cut slice that stays commanded dark
+  to its end; before, the planner miscounted that darkness. No input renderable on
+  `main` changed bytes; the renderer revision stays "1".
+- **Measured (reviewer).** 13,557 multi-section renders over admitted templates under
+  `"dark"`: no exception, every fixture honest from encoded bytes, every record dark in
+  the bytes, 4,781 subset comparisons identical. About 3.0% of authored cue frames
+  were kept dark, 99% of them `ONCE` cycles too long for their section. Under
+  `"error"` the known failing seeds still raise their original errors.
+- **Gate time is over target.** Projected for 18 template-and-preset combinations on 8
+  heads and a 4-minute song: 24.2 s steady, 27.6 s variable tempo (49.6 s under
+  `"error"`), against a 20 s target. Per-head phase distribution defeats head
+  deduplication and most of the time is the planner's per-frame follow. Carried to
+  P2.4c's measurement with the six real families; a known cut is reusing a cue's
+  encoded words across the two bar-1 entries.
+- **Whether a dark cue is an acceptable look is `PENDING-OWNER`.**
+
 ## Phase exit
 
 `physical_v2` accepts grids with silent edges, reports the covered span and holds every fixture dark outside it without inferring tempo; a grid Phase 1 accepted renders the same frames and fingerprint. Legacy session ids, the 16 Phase 0 fingerprints and the Phase 1 request fingerprints are unchanged. Six core families compile deterministically on the synthetic rig matrix and are offered only under `physical_v2`, each only on a rig that can render it; independent phase domains work; missing heads preserve canonical ranks; preset overrides have explicit scope; a `ONCE` hold stays one cue per fixture and holds its terminal pose to the section end; fly-in/out lit directions and dark returns are frame-proven; flicks settle while dark and resume the current base. Each section's entry window is sized at render from a bound the fuzz shows dominates the transaction pass, so section-entry repositioning fits by construction; the dip is skipped where the predecessor ends where the successor begins, and the plan-dependent failures P2.4c lists still surface at render. The zoom pilot is source/synthetic proven with any real-profile acceptance explicitly pending. Legacy regression and clean-tree `make validate` pass. Owner visual acceptance, including whether the remaining section-entry dips look acceptable, is a separate `PENDING-OWNER` record, not a consequence of a new effect name or passing bytes.
