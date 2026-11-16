@@ -285,9 +285,16 @@ Revised order:
    model replaces the current one in place, the existing prompt packs are edited, and
    saved plans in the old shape are not loaded.
 
-Work that does not depend on the owner's viewing (T1–T3a on the planner side) proceeds
-single-contract while C0 is pending; nothing is deleted from the old renderer before
-acceptance.
+Corrected the same day by the [cutover inventory](cutover-inventory.md): the old
+renderer reads the planner fields T1 replaces, so **T1 and T3a cannot land before the
+cutover**, and the selector port would be a second selector until then. Before the
+owner's acceptance only work that survives the cutover and adds no second path is
+built: the gate additions D8 and D9, the pure `motif_schedule.py`, and moving the rig
+builders out of the golden harness into `tests/support/`. Nothing is deleted from the
+old renderer before acceptance. The inventory splits C1 into consumer ports (`show`,
+`eval-report`, live `inject`/`regenerate`, selector and experiment), one atomic
+flip-and-delete, model narrowing, renames and documents, and lists the owner decisions
+the cutover needs.
 
 ## Execution record
 

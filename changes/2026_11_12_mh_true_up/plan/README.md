@@ -26,7 +26,8 @@ criteria, the kickoff checklist and the approvals still needed.
 2. [P0 — Behavior contracts and reference cases](phase-0-foundation.md).
 3. [P1 — Fixture fidelity and dark movement](phase-1-fixture-fidelity.md).
 4. [P2 — Spatial composition and effect families](phase-2-composition.md).
-5. [P3 — Musical arrangement](phase-3-arrangement.md).
+5. [P3 — Musical arrangement](phase-3-arrangement.md). Its single-path cutover is inventoried in
+   [cutover-inventory.md](cutover-inventory.md).
 6. [P4 — Controlled refinement and interoperability](phase-4-refinement.md).
 7. [P5 — Evaluation and release decisions](phase-5-evaluation.md).
 
