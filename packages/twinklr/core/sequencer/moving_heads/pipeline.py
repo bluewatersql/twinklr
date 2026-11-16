@@ -525,16 +525,22 @@ def _wheel_states(
 class TemplateAdmission:
     """What the pre-planning gate offers the planner (`check_physical_templates`).
 
-    `admitted` keeps the order the templates were given in. `exclusions` holds one
-    `{"template_id", "reason"}` per catalog template left out. `entry_dips` holds, per
-    admitted template, its worst-case section-entry dip: the largest `worst_case_entry_ms`
-    over its presets and fixtures, from any pose in the union of every admitted
-    template's poses and the initial pose, with any of their wheel states held, as
+    `admitted` keeps the order the templates were given in, and `admitted_presets` holds
+    each admitted template's admitted presets in the order it declares them; a section
+    naming any other preset renders without one. `exclusions` holds one
+    `{"template_id", "reason"}` per catalog template left out with its presets, and
+    `preset_exclusions` one `{"template_id", "preset_id", "reason"}` per preset left out
+    of an admitted catalog template. `entry_dips` holds, per admitted template, its
+    worst-case section-entry dip: the largest `worst_case_entry_ms` over its admitted
+    presets and fixtures, from any pose in the union of every admitted template's and
+    preset's poses and the initial pose, with any of their wheel states held, as
     `{"fixture_id", "bound_ms", "beats"}`, `beats` at the song's shortest beat.
     """
 
     admitted: tuple[str, ...]
+    admitted_presets: dict[str, tuple[str, ...]]
     exclusions: tuple[dict[str, str], ...]
+    preset_exclusions: tuple[dict[str, str], ...]
     entry_dips: dict[str, dict[str, Any]]
 
 
@@ -583,12 +589,14 @@ def check_physical_templates(
     fixture and the unknown profile terms. Each admitted template's worst-case dip is
     reported (`TemplateAdmission.entry_dips`, and logged).
 
-    A template in `excludable` (the shipped physical catalog) that fails is left out
-    of the offer with its reason instead of refusing the run; any other failing
-    template refuses it.
+    A template in `excludable` (the shipped physical catalog) whose base (no preset)
+    fails is left out of the offer with its presets and the reason instead of refusing
+    the run; one whose base passes is admitted, and only its failing presets are left
+    out, each with its reason. Any other template that fails, with or without a preset,
+    refuses the run.
 
     Returns:
-        The admitted templates, the exclusions and the worst-case entry dips.
+        The admitted templates and presets, the exclusions and the worst-case entry dips.
 
     Raises:
         UnsupportedRenderModeError: Naming each template, preset, step, fixture and
@@ -613,12 +621,16 @@ def check_physical_templates(
     start_limit, end_limit = physical_cue_limits(phase_map, duration_ms)
     sequence_end_ms = len(frame_times(duration_ms)) * EFFECT_GRID_MS
     bars = sum(1 for start in beat_grid.bar_boundaries if start < beat_grid.duration_ms)
-    failures: dict[str, list[str]] = defaultdict(list)
-    reach: dict[str, list[dict[str, _Reach]]] = defaultdict(list)
+    # Keyed by (template id, preset id), None for the base.
+    failures: dict[tuple[str, str | None], list[str]] = {}
+    reach: dict[tuple[str, str | None], dict[str, _Reach]] = {}
+    presets_of: dict[str, tuple[str, ...]] = {}
     for template_id in template_ids:
         document = get_template(template_id)
         repeat = document.template.repeat
+        presets_of[template_id] = tuple(preset.preset_id for preset in document.presets)
         for preset in (None, *document.presets):
+            combination = (template_id, preset.preset_id if preset else None)
             where = f"template {template_id!r}" + (
                 f", preset {preset.preset_id!r}" if preset else ""
             )
@@ -695,10 +707,10 @@ def check_physical_templates(
                     notes = "; ".join(getattr(error, "__notes__", ()))
                     if notes:
                         notes += at.removeprefix(f"template {template_id!r}")
-                    failures[template_id].append(f"{notes or at}: {error}")
+                    failures.setdefault(combination, []).append(f"{notes or at}: {error}")
                     break
                 if whole:
-                    reach[template_id].append(_reach(compiled.segments, profiles))
+                    reach[combination] = _reach(compiled.segments, profiles)
                 if not plan:
                     continue
                 refusal = _plan_placement(
@@ -713,7 +725,7 @@ def check_physical_templates(
                     song_start=start_bar == 1,
                 )
                 if refusal:
-                    failures[template_id].append(
+                    failures.setdefault(combination, []).append(
                         f"{at}: dark repositioning between its own cues cannot be planned: "
                         + refusal
                     )
@@ -732,7 +744,11 @@ def check_physical_templates(
                         if bars - later + 1 >= repeat.cycle_bars - 1e-9
                     ]
     dips = _entry_dips(
-        {t: reach[t] for t in template_ids if t not in failures},
+        {
+            combination: per_fixture
+            for combination, per_fixture in reach.items()
+            if combination not in failures and (combination[0], None) not in failures
+        },
         profiles,
         initial_states,
         failures,
@@ -741,25 +757,53 @@ def check_physical_templates(
             default=None,
         ),
     )
-    refused = [reason for t in template_ids if t not in excludable for reason in failures[t]]
+
+    def reasons(template_id: str) -> list[str]:
+        """Every failure of the template and its presets, base first."""
+        return [
+            reason
+            for preset_id in (None, *presets_of[template_id])
+            for reason in failures.get((template_id, preset_id), ())
+        ]
+
+    refused = [reason for t in template_ids if t not in excludable for reason in reasons(t)]
     if refused:
         raise UnsupportedRenderModeError(
             "moving_heads.mode 'physical_v2' would offer the planner templates this rig "
             "cannot render: " + "; ".join(refused)
         )
     exclusions = tuple(
-        {"template_id": t, "reason": "; ".join(failures[t])} for t in template_ids if failures[t]
+        {"template_id": t, "reason": "; ".join(reasons(t))}
+        for t in template_ids
+        if (t, None) in failures
     )
-    admitted = tuple(t for t in template_ids if not failures[t])
+    admitted = tuple(t for t in template_ids if (t, None) not in failures)
     if template_ids and not admitted:
         raise UnsupportedRenderModeError(
             "moving_heads.mode 'physical_v2' has no template this rig can render, so no "
             "template remains to offer the planner: "
             + "; ".join(exclusion["reason"] for exclusion in exclusions)
         )
+    admitted_presets = {
+        t: tuple(p for p in presets_of[t] if (t, p) not in failures) for t in admitted
+    }
+    preset_exclusions = tuple(
+        {"template_id": t, "preset_id": p, "reason": "; ".join(failures[t, p])}
+        for t in admitted
+        for p in presets_of[t]
+        if (t, p) in failures
+    )
     for exclusion in exclusions:
         logger.warning(
             "physical_v2: template %r is left out of the planner's offer: %s",
+            exclusion["template_id"],
+            exclusion["reason"],
+        )
+    for exclusion in preset_exclusions:
+        logger.warning(
+            "physical_v2: preset %r of template %r is not admitted, so a section naming it "
+            "renders the template without a preset: %s",
+            exclusion["preset_id"],
             exclusion["template_id"],
             exclusion["reason"],
         )
@@ -772,7 +816,13 @@ def check_physical_templates(
             dip["bound_ms"],
             dip["fixture_id"],
         )
-    return TemplateAdmission(admitted=admitted, exclusions=exclusions, entry_dips=dips)
+    return TemplateAdmission(
+        admitted=admitted,
+        admitted_presets=admitted_presets,
+        exclusions=exclusions,
+        preset_exclusions=preset_exclusions,
+        entry_dips=dips,
+    )
 
 
 def _reach(
@@ -794,20 +844,22 @@ def _reach(
 
 
 def _entry_dips(
-    reach: Mapping[str, Sequence[Mapping[str, _Reach]]],
+    reach: Mapping[tuple[str, str | None], Mapping[str, _Reach]],
     profiles: Mapping[str, FixtureCapabilities],
     initial_states: Mapping[str, InitialFixtureState],
-    failures: dict[str, list[str]],
+    failures: dict[tuple[str, str | None], list[str]],
     *,
     shortest_beat_ms: float | None,
 ) -> dict[str, dict[str, Any]]:
-    """Each template's worst-case section-entry dip. A template without a bound on some
-    fixture gets a failure instead, naming the fixture and the unknown terms: no section
-    entry into it can be sized.
+    """Each template's worst-case section-entry dip, over its base and presets in `reach`
+    (keyed by template and preset id, None for the base, base first). A base or preset
+    without a bound on some fixture gets a failure instead, naming the fixture and the
+    unknown terms: no section entry into it can be sized. A base without one leaves its
+    presets unchecked, since the template is left out with them.
 
-    The predecessor may be any template in `reach` or the initial state: per fixture,
-    the envelope is the union of their pose ranges and the initial pose, and the wheels
-    held are the union of their wheel states and the initial ones.
+    The predecessor may be any template and preset in `reach` or the initial state: per
+    fixture, the envelope is the union of their pose ranges and the initial pose, and the
+    wheels held are the union of their wheel states and the initial ones.
     """
     envelope: dict[str, dict[ChannelName, tuple[float, float]]] = {}
     held: dict[str, dict[ChannelName, set[str]]] = defaultdict(lambda: defaultdict(set))
@@ -825,52 +877,53 @@ def _entry_dips(
             state = initial.discrete_states.get(DISCRETE_KEYS[channel])
             if state is not None:
                 held[fixture_id][channel].add(state)
-    for presets in reach.values():
-        for per_fixture in presets:
-            for fixture_id, (poses, wheels) in per_fixture.items():
-                merged = envelope.setdefault(fixture_id, dict(poses))
-                for ch, (low, high) in poses.items():
-                    merged[ch] = (min(merged[ch][0], low), max(merged[ch][1], high))
-                for channel, states in wheels.items():
-                    held[fixture_id][channel] |= states
+    for per_fixture in reach.values():
+        for fixture_id, (poses, wheels) in per_fixture.items():
+            merged = envelope.setdefault(fixture_id, dict(poses))
+            for ch, (low, high) in poses.items():
+                merged[ch] = (min(merged[ch][0], low), max(merged[ch][1], high))
+            for channel, states in wheels.items():
+                held[fixture_id][channel] |= states
 
-    dips: dict[str, dict[str, Any]] = {}
-    for template_id, presets in reach.items():
-        worst: tuple[int, str] | None = None
-        unknown = ""
-        for per_fixture in presets:
-            for fixture_id, (poses, wheels) in sorted(per_fixture.items()):
-                profile = profiles[fixture_id]
-                bound = worst_case_entry_ms(
-                    profile,
-                    entry_pose=poses,
-                    entry_wheels=wheels,
-                    pose_envelope=envelope[fixture_id],
-                    held_wheels=held[fixture_id],
-                    frame_ms=EFFECT_GRID_MS,
+    worst: dict[str, tuple[int, str]] = {}
+    for (template_id, preset_id), per_fixture in reach.items():
+        if (template_id, None) in failures:
+            continue  # the base has no bound, so the template is left out with its presets
+        found: tuple[int, str] | None = None
+        for fixture_id, (poses, wheels) in sorted(per_fixture.items()):
+            profile = profiles[fixture_id]
+            bound = worst_case_entry_ms(
+                profile,
+                entry_pose=poses,
+                entry_wheels=wheels,
+                pose_envelope=envelope[fixture_id],
+                held_wheels=held[fixture_id],
+                frame_ms=EFFECT_GRID_MS,
+            )
+            if bound is None:
+                where = f"template {template_id!r}" + (
+                    f", preset {preset_id!r}" if preset_id else ""
                 )
-                if bound is None:
-                    unknown = (
-                        f"template {template_id!r}: fixture {fixture_id!r} has no worst-case "
-                        "section-entry bound, since its profile leaves "
-                        + ", ".join(_unknown_bound_terms(profile, wheels, held[fixture_id]))
-                        + " unknown"
-                    )
-                    break
-                if worst is None or bound > worst[0]:
-                    worst = (bound, fixture_id)
-            if unknown:
+                failures.setdefault((template_id, preset_id), []).append(
+                    f"{where}: fixture {fixture_id!r} has no worst-case section-entry bound, "
+                    "since its profile leaves "
+                    + ", ".join(_unknown_bound_terms(profile, wheels, held[fixture_id]))
+                    + " unknown"
+                )
                 break
-        if unknown:
-            failures[template_id].append(unknown)
-        elif worst is not None:
-            bound, fixture_id = worst
-            dips[template_id] = {
-                "fixture_id": fixture_id,
-                "bound_ms": bound,
-                "beats": None if shortest_beat_ms is None else math.ceil(bound / shortest_beat_ms),
-            }
-    return dips
+            if found is None or bound > found[0]:
+                found = (bound, fixture_id)
+        else:
+            if found is not None and (template_id not in worst or found[0] > worst[template_id][0]):
+                worst[template_id] = found
+    return {
+        template_id: {
+            "fixture_id": fixture_id,
+            "bound_ms": bound,
+            "beats": None if shortest_beat_ms is None else math.ceil(bound / shortest_beat_ms),
+        }
+        for template_id, (bound, fixture_id) in worst.items()
+    }
 
 
 def _unknown_bound_terms(
@@ -1183,17 +1236,24 @@ def _plan_key(
 
 
 def _physical_preset(
-    section: PlanSection, template_doc: TemplateDoc, diagnostics: list[MHDiagnostic]
+    section: PlanSection,
+    template_doc: TemplateDoc,
+    diagnostics: list[MHDiagnostic],
+    not_admitted: Mapping[tuple[str, str], str],
 ) -> TemplatePreset | None:
     """The preset the template declares under the section's id, or none.
 
     An undeclared id is not turned into an energy preset under `physical_v2`: that is
-    planner intent, which Phase 1 does not apply, and it would add legacy data.
+    planner intent, which Phase 1 does not apply, and it would add legacy data. A
+    declared preset the pre-planning gate did not admit (`not_admitted`, its reason by
+    template and preset id) is treated as undeclared.
     """
     if not section.preset_id:
         return None
+    template_id = template_doc.template.template_id
+    reason = not_admitted.get((template_id, section.preset_id))
     for preset in template_doc.presets:
-        if preset.preset_id == section.preset_id:
+        if preset.preset_id == section.preset_id and reason is None:
             return preset
     diagnostics.append(
         MHDiagnostic(
@@ -1201,8 +1261,12 @@ def _physical_preset(
             severity="warning",
             message=(
                 f"section {section.section_name!r}: preset {section.preset_id!r} is not "
-                f"declared by template {template_doc.template.template_id!r}; physical_v2 "
-                "applies no preset"
+                + (
+                    f"declared by template {template_id!r}"
+                    if reason is None
+                    else f"admitted for template {template_id!r} on this rig and song ({reason})"
+                )
+                + "; physical_v2 applies no preset"
             ),
             section_id=section.section_name,
             action="unchanged",
@@ -1313,7 +1377,7 @@ class RenderingPipeline:
         locks: Sequence[RenderLock] = (),
         layout_models: Sequence[Model] | None = None,
         layout_sha256: str | None = None,
-        admission_exclusions: Sequence[Mapping[str, str]] = (),
+        admission: TemplateAdmission | None = None,
     ):
         """Initialize rendering pipeline.
 
@@ -1337,10 +1401,11 @@ class RenderingPipeline:
             layout_sha256: Content hash of the layout file, recorded in the physical
                 trace as evidence. Not render identity: the check passes or refuses
                 and never changes a byte.
-            admission_exclusions: The catalog templates the pre-planning gate left out
-                of the planner's offer, with each reason (`TemplateAdmission`); a
-                `physical_v2` trace records them as `admission_exclusions` when there
-                are any. Not render identity.
+            admission: The pre-planning gate's result, when it ran. A `physical_v2`
+                render applies no preset the gate did not admit for its template, as
+                for an undeclared one, and its trace records the gate's exclusions as
+                `admission_exclusions` and `admission_preset_exclusions` when there are
+                any. Not render identity.
 
         Raises:
             UnsupportedRenderModeError: The job's render mode cannot render this rig
@@ -1364,7 +1429,7 @@ class RenderingPipeline:
         self.locks = tuple(locks)
         self.layout_models = layout_models
         self.layout_sha256 = layout_sha256
-        self.admission_exclusions = tuple(dict(exclusion) for exclusion in admission_exclusions)
+        self.admission = admission
         self.artifacts: DeliveryArtifacts | None = None
         """Set by `render()` when `output_path` is given."""
         self.frames: tuple[EncodedFixtureFrame, ...] = ()
@@ -1620,6 +1685,10 @@ class RenderingPipeline:
         entry_windows: list[dict[str, Any]] = []
         time_markers: list[TimeMarker] = []
         diagnostics: list[MHDiagnostic] = []
+        not_admitted = {
+            (exclusion["template_id"], exclusion["preset_id"]): exclusion["reason"]
+            for exclusion in (self.admission.preset_exclusions if self.admission else ())
+        }
         fixture_contexts = self._build_fixture_contexts()
         for section in self.iterate_plan_sections(self.choreography_plan):
             if not section.template_id:
@@ -1628,7 +1697,7 @@ class RenderingPipeline:
                 template_doc = get_template(section.template_id)
             except Exception as e:
                 raise ValueError(f"Template not found: {section.template_id}") from e
-            preset = _physical_preset(section, template_doc, diagnostics)
+            preset = _physical_preset(section, template_doc, diagnostics, not_admitted)
             context = TemplateCompileContext(
                 section_id=section.section_name,
                 template_id=template_doc.template.template_id,
@@ -1874,9 +1943,17 @@ class RenderingPipeline:
             "transactions": [d.model_dump(mode="json") for d in result.diagnostics],
             "diagnostics": [d.model_dump(mode="json") for d in diagnostics],
         }
-        if self.admission_exclusions:
-            # Left out when the gate excluded nothing, so earlier traces keep their keys.
-            self.render_record["admission_exclusions"] = list(self.admission_exclusions)
+        if self.admission is not None:
+            # Exclusions are left out when the gate excluded nothing, so earlier traces
+            # keep their keys.
+            if self.admission.exclusions:
+                self.render_record["admission_exclusions"] = [
+                    dict(exclusion) for exclusion in self.admission.exclusions
+                ]
+            if self.admission.preset_exclusions:
+                self.render_record["admission_preset_exclusions"] = [
+                    dict(exclusion) for exclusion in self.admission.preset_exclusions
+                ]
         omitted = [
             {
                 "section_id": cue.section_id,

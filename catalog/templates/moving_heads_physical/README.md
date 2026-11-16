@@ -7,10 +7,13 @@ registry never see them. They live outside `catalog/templates/moving_heads`, who
 documents must stay model-equal to their Python builtins.
 
 Before planning, the render preflight dry-compiles each family with no preset and with
-each preset on the run's rig and song (`check_physical_templates`). A family that fails
-there, with any preset, is left out of the planner's offer and the reason is logged and
-recorded in the render trace (`admission_exclusions`); the run is refused only when no
-template remains. The gate also logs each admitted family's worst-case section-entry dip.
+each preset on the run's rig and song (`check_physical_templates`). A family whose base
+(no preset) fails there is left out of the planner's offer with its presets, and the
+reason is logged and recorded in the render trace (`admission_exclusions`); the run is
+refused only when no template remains. A family whose base passes is offered, and only
+a preset that fails is left out, logged and recorded (`admission_preset_exclusions`); a
+section naming it renders the family without a preset, as for a preset the family does
+not declare. The gate also logs each admitted family's worst-case section-entry dip.
 
 Every family sets explicit start angles and names no rig position preset, authors its
 dimmer, and declares `physical_reposition_fallback: drop_accent` on every step, so a
@@ -18,8 +21,9 @@ job that sets `moving_heads.reposition_fallback: drop_accent` plays a cue it can
 reposition into dark. Each declares two variants as presets: `narrow` (less reach) and
 `slow` (half the rate). Both ask for less speed than the base, but a variant can still
 fail where the base plays (see Meter), and the gate checks the base and both variants:
-any failure leaves the whole family out. How any family looks is `PENDING-OWNER`; these
-are synthetic designs, not accepted looks.
+a failing variant is left out on its own, a failing base leaves the whole family out.
+How any family looks is `PENDING-OWNER`; these are synthetic designs, not accepted
+looks.
 
 ## Meter
 
@@ -35,7 +39,7 @@ beats. Measured on a 4-head rig at 500 ms beats:
   spans beats 2 to 6 of a 6-beat cycle.
 - 6/8 (six beats a bar): the base periods fit, but the `slow` variants of
   `target_orbit`, `mirror_wings` and `zoom_wave` (8 beats in a 12-beat cycle) do not, so
-  those families are left out; the others play.
+  those families are offered with `narrow` only; the others play with both variants.
 
 ## Families and what each needs
 
@@ -92,7 +96,10 @@ and how the family looks, is `PENDING-OWNER`.
 
 Measured on 2026-11-16 with the six families on the 8-head synthetic rig: the dip is the
 longest a head may stay dark entering a section of the family, from any pose and wheel
-state an admitted family or the initial state leaves. Whether these look acceptable is
+state an admitted family or the initial state leaves. Admitting more families or presets
+widens that envelope, so another family's dip can grow, and a template entering on a
+wheel state with no known settle time can lose its bound and be left out (a
+`--template-dir` template then refuses the run). Whether these look acceptable is
 `PENDING-OWNER`.
 
 | Profile | 60–120 BPM | 150 BPM | 180 BPM |

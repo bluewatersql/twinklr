@@ -33,6 +33,7 @@ from tests.support.mh_physical import (
     family_job,
     family_rig,
     hold_step,
+    overlay,
     physical_bars_grid,
     physical_catalog,
     physical_job,
@@ -40,6 +41,7 @@ from tests.support.mh_physical import (
     physical_sections,
     physical_template_doc,
     registered_templates,
+    sweep_step,
     zoom_job,
     zoom_rig,
 )
@@ -47,10 +49,12 @@ from twinklr.cli.main import _run_pipeline_async
 from twinklr.core.agents.sequencer.moving_heads.deterministic_selector import (
     DeterministicSelector,
 )
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.config.fixtures import AxisCapability, FixtureCapabilities, FixtureGroup
 from twinklr.core.config.models import JobConfig
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.models.enum import SemanticGroupType
+from twinklr.core.sequencer.models.template import TemplateDoc, TemplatePreset
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.physical import is_physical_template
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
@@ -311,54 +315,233 @@ def _meter_grid(beats_per_bar: int, beat_ms: float, bars: int) -> BeatGrid:
     )
 
 
+_BOTH = ("narrow", "slow")
+"""Every family's presets, in the order each declares them."""
+
+
 @pytest.mark.parametrize(
-    ("beats_per_bar", "slow_only"),
-    [pytest.param(3, False, id="3-4"), pytest.param(6, True, id="6-8")],
+    ("zoom", "jumping"),
+    [
+        pytest.param(False, ("target_orbit", "mirror_wings"), id="family-rig"),
+        pytest.param(True, ("target_orbit", "mirror_wings", ZOOM_FAMILY_ID), id="zoom-rig"),
+    ],
 )
-def test_outside_four_four_the_orbit_and_wings_are_left_out(
-    beats_per_bar: int, slow_only: bool
+def test_in_three_four_a_family_whose_base_jumps_is_left_out_with_its_presets(
+    zoom: bool, jumping: tuple[str, ...]
 ) -> None:
     """The families are authored for 4/4. Their 2-bar cycles of continuous motion span
-    whole periods only there: in 3/4 the base's 4-beat period, in 6/8 the slow variant's
-    8-beat period, ends mid-path at the cycle end, so orbit and wings jump there and are
-    left out; the others play."""
-    job = family_job(HEADS)
+    whole periods only there: in 3/4 the base's 4-beat period ends mid-path at the cycle
+    end, so orbit, wings and the zoom wave jump there and are left out whole, the reason
+    naming the base and the slow variant; the others play with both variants."""
+    rig, job = (
+        (zoom_rig(HEADS), zoom_job(HEADS)) if zoom else (family_rig(HEADS), family_job(HEADS))
+    )
+    template_ids = CATALOG_IDS if zoom else FAMILY_IDS
     with physical_catalog():
-        admission = _gate(FAMILY_IDS, _meter_grid(beats_per_bar, 500.0, 6), family_rig(HEADS), job)
+        admission = _gate(template_ids, _meter_grid(3, 500.0, 6), rig, job)
 
-    assert set(admission.admitted) == set(FAMILY_IDS) - {"target_orbit", "mirror_wings"}
+    assert set(admission.admitted) == set(template_ids) - set(jumping)
+    assert admission.admitted_presets == dict.fromkeys(admission.admitted, _BOTH)
+    assert admission.preset_exclusions == ()
+    assert {exclusion["template_id"] for exclusion in admission.exclusions} == set(jumping)
     for exclusion in admission.exclusions:
         reason = exclusion["reason"]
-        assert "jumps across the cue" in reason and "preset 'slow'" in reason, exclusion
-        base = f"template {exclusion['template_id']!r}: dark repositioning"
-        assert (base in reason) is not slow_only, exclusion
+        assert f"template {exclusion['template_id']!r}: dark repositioning" in reason, reason
+        assert "jumps across the cue" in reason and "preset 'slow'" in reason, reason
 
 
 @pytest.mark.parametrize(
-    ("beats_per_bar", "slow_only"),
-    [pytest.param(3, False, id="3-4"), pytest.param(6, True, id="6-8")],
+    ("zoom", "jumping"),
+    [
+        pytest.param(False, ("target_orbit", "mirror_wings"), id="family-rig"),
+        pytest.param(True, ("target_orbit", "mirror_wings", ZOOM_FAMILY_ID), id="zoom-rig"),
+    ],
 )
-def test_outside_four_four_the_zoom_wave_is_left_out_on_a_zoom_rig(
-    beats_per_bar: int, slow_only: bool
+def test_in_six_eight_a_family_whose_slow_variant_jumps_is_offered_without_it(
+    zoom: bool, jumping: tuple[str, ...]
 ) -> None:
-    """`zoom_wave` has the orbit's 4-beat period in a 2-bar cycle, so on a zoom rig it is
-    left out in 3/4 (the base, and the slow variant) and in 6/8 (the slow variant only)."""
-    job = zoom_job(HEADS)
+    """In 6/8 the base's 4-beat period fits the 12-beat cycle but the slow variant's 8-beat
+    one does not, so orbit, wings and the zoom wave are admitted with `narrow` only; the
+    slow variant's exclusion is recorded with its reason. Every family stays offered, and
+    each admitted family's entry dip is reported."""
+    rig, job = (
+        (zoom_rig(HEADS), zoom_job(HEADS)) if zoom else (family_rig(HEADS), family_job(HEADS))
+    )
+    template_ids = CATALOG_IDS if zoom else FAMILY_IDS
     with physical_catalog():
+        admission = _gate(template_ids, _meter_grid(6, 500.0, 6), rig, job)
+
+    assert admission.admitted == template_ids and admission.exclusions == ()
+    assert admission.admitted_presets == {
+        template_id: ("narrow",) if template_id in jumping else _BOTH
+        for template_id in template_ids
+    }
+    assert [(e["template_id"], e["preset_id"]) for e in admission.preset_exclusions] == [
+        (template_id, "slow") for template_id in template_ids if template_id in jumping
+    ]
+    for exclusion in admission.preset_exclusions:
+        reason = exclusion["reason"]
+        assert reason.startswith(f"template {exclusion['template_id']!r}, preset 'slow'"), reason
+        assert "jumps across the cue" in reason, reason
+    assert admission.entry_dips.keys() == set(template_ids)
+
+
+def _with_preset(document: TemplateDoc, preset_id: str, patches: dict[str, Any]) -> TemplateDoc:
+    """`document` declaring one preset of `patches` by step id."""
+    preset = TemplatePreset.model_validate(
+        {"preset_id": preset_id, "name": preset_id, "step_patches": patches}
+    )
+    return TemplateDoc(template=document.template, presets=[preset])
+
+
+def test_a_failing_presets_poses_stay_out_of_every_entry_dip() -> None:
+    """A preset that compiles at bar 1 but whose own cues cannot be repositioned between
+    (a 120-degree sweep jumping back at every cycle) is left out, and its poses widen no
+    entry envelope: every admitted template's dip is as if it were not declared."""
+    rig, job = physical_rig(), physical_job()
+    grid = physical_bars_grid(500.0, 500.0, 500.0)
+    still = physical_template_doc("p3_still", [hold_step("still", 0.0)])
+    aim = physical_template_doc("p3_aim", [hold_step("aim", 0.0)])
+    sweep = {"shape": "linear", "mode": "finite", "pan_extent_deg": 120.0, "period_beats": 4.0}
+    swept = _with_preset(aim, "sweep", {"aim": {"movement": {"physical": sweep}}})
+    with registered_templates(still, swept):
+        admission = _gate(["p3_aim", "p3_still"], grid, rig, job)
+    with registered_templates(still, aim):
+        undeclared = _gate(["p3_aim", "p3_still"], grid, rig, job)
+
+    assert admission.admitted == ("p3_aim", "p3_still")
+    assert admission.admitted_presets == {"p3_aim": (), "p3_still": ()}
+    [exclusion] = admission.preset_exclusions
+    assert (exclusion["template_id"], exclusion["preset_id"]) == ("p3_aim", "sweep")
+    assert "jumps across the cue" in exclusion["reason"]
+    assert admission.entry_dips == undeclared.entry_dips
+
+
+def test_a_base_without_an_entry_bound_leaves_out_its_presets_dips() -> None:
+    """Red's settle time is unknown. The base flicks to red over the first two beats of
+    its one cycle, entered from a red initial state, so it plays at every placement, but
+    beside white cues it has no entry bound and is left out. Its `late` preset starts
+    after the flick, plays only white and has a bound, yet the template gets no dip."""
+    payload = physical_rig().model_dump(mode="json")
+    for fixture in payload["fixtures"]:
+        red = fixture["config"]["physical_profile"]["discrete"]["color"]["states"]["red"]
+        red["settle_ms"] = None
+    rig = FixtureGroup.model_validate(payload)
+    policy = physical_job().model_dump(mode="json")
+    for state in policy["moving_heads"]["initial_states"].values():
+        state["discrete_states"]["color"] = "red"
+    job = JobConfig.model_validate(policy)
+    still = physical_template_doc("p3_still", [hold_step("still", 0.0)])
+    flick = _with_preset(
+        physical_template_doc(
+            "p3_flick",
+            [sweep_step("look", 0.0, 0.0, physical_color="white")],
+            mode="ONCE",
+            overlays=[overlay("color", 0.0, 2.0, 0.5, "red")],
+        ),
+        "late",
+        {
+            "look": {
+                "movement": {"physical": {"period_beats": 2.0}},
+                "timing": {"base_timing": {"start_offset_bars": 0.5, "duration_bars": 0.5}},
+            }
+        },
+    )
+    with registered_templates(still, flick):
         admission = _gate(
-            [ZOOM_FAMILY_ID, "finite_snap_hold"],
-            _meter_grid(beats_per_bar, 500.0, 6),
-            zoom_rig(HEADS),
-            job,
+            ["p3_flick", "p3_still"], physical_bars_grid(500.0, 500.0, 500.0), rig, job
         )
 
-    assert admission.admitted == ("finite_snap_hold",)
+    assert admission.admitted == ("p3_still",)
     [exclusion] = admission.exclusions
-    reason = exclusion["reason"]
-    assert exclusion["template_id"] == ZOOM_FAMILY_ID
-    assert "jumps across the cue" in reason and "preset 'slow'" in reason, reason
-    base = f"template {ZOOM_FAMILY_ID!r}: dark repositioning"
-    assert (base in reason) is not slow_only, reason
+    assert exclusion["template_id"] == "p3_flick"
+    assert "discrete.color.states.red.settle_ms unknown" in exclusion["reason"]
+    assert "preset 'late'" not in exclusion["reason"]
+    assert admission.entry_dips.keys() == {"p3_still"}
+
+
+def _preset_plan(*sections: tuple[str, str | None, int, int]) -> ChoreographyPlan:
+    """`physical_sections` of `(template_id, preset_id, start_bar, end_bar)`."""
+    plan = physical_sections(*((t, start, end) for t, _, start, end in sections))
+    return plan.model_copy(
+        update={
+            "sections": [
+                section.model_copy(update={"preset_id": preset_id})
+                for section, (_, preset_id, _, _) in zip(plan.sections, sections, strict=True)
+            ]
+        }
+    )
+
+
+def _render_admitted(
+    plan: ChoreographyPlan,
+    grid: BeatGrid,
+    rig: FixtureGroup,
+    job: JobConfig,
+    admission: TemplateAdmission | None,
+) -> RenderingPipeline:
+    pipeline = RenderingPipeline(
+        choreography_plan=plan,
+        beat_grid=grid,
+        fixture_group=rig,
+        job_config=job,
+        admission=admission,
+    )
+    pipeline.render()
+    return pipeline
+
+
+def test_a_preset_the_gate_did_not_admit_renders_as_an_undeclared_one() -> None:
+    """In 6/8 the orbit is admitted without `slow`. A section naming `slow` then renders
+    the orbit with no preset, exactly as one naming a preset the orbit does not declare,
+    and the warning names why; without the gate's result `slow` still applies. An
+    admitted preset applies as before, and the trace records the preset's exclusion."""
+    grid = _meter_grid(6, 500.0, 3)
+    rig, job = family_rig(HEADS), family_job(HEADS)
+    with physical_catalog():
+        admission = _gate(["target_orbit"], grid, rig, job)
+        runs = {
+            (preset, gated): _render_admitted(
+                _preset_plan(("target_orbit", preset, 1, 2)),
+                grid,
+                rig,
+                job,
+                admission if gated else None,
+            )
+            for preset, gated in [
+                (None, True),
+                ("slow", True),
+                ("undeclared", True),
+                ("slow", False),
+                ("narrow", True),
+                ("narrow", False),
+            ]
+        }
+
+    base = runs[None, True].frames
+    assert runs["slow", True].frames == runs["undeclared", True].frames == base
+    assert runs["slow", False].frames != base
+    assert runs["narrow", True].frames == runs["narrow", False].frames != base
+    record = runs["slow", True].render_record
+    assert record is not None
+    [warning] = [d for d in record["diagnostics"] if "preset 'slow'" in d["message"]]
+    assert "is not admitted for template 'target_orbit'" in warning["message"]
+    assert "jumps across the cue" in warning["message"]
+    assert warning["message"].endswith("physical_v2 applies no preset")
+    assert (warning["code"], warning["severity"], warning["action"]) == (
+        "unsupported_attribute",
+        "warning",
+        "unchanged",
+    )
+    [undeclared] = [
+        d
+        for d in runs["undeclared", True].render_record["diagnostics"]
+        if "undeclared" in d["message"]
+    ]
+    assert "is not declared by template 'target_orbit'" in undeclared["message"]
+    assert record["admission_preset_exclusions"] == [dict(e) for e in admission.preset_exclusions]
+    assert "admission_exclusions" not in record
+    assert "admission_preset_exclusions" not in (runs["slow", False].render_record or {})
 
 
 _FAST_BEAT_MS = 340.0

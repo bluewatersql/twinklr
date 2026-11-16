@@ -360,3 +360,32 @@ low or tempo is doubled; families adapt to tempo and fixture speed instead of be
 excluded), and use 150°/s, the layout's limit, for the rig's profile. A read-only
 diagnosis and design precedes the implementation tasks, which are added here when it
 reports.
+
+### Per-preset admission (D9) — 2026-11-16
+
+Implemented by one agent, reviewed by a second (approve with fixes), fixed by a third.
+
+- **Behaviour.** A catalog family whose base passes the gate is admitted; only its
+  failing presets are excluded, recorded on `TemplateAdmission`
+  (`admitted_presets`, `preset_exclusions`) and in the trace
+  (`admission_preset_exclusions`). A family whose base fails is excluded whole. A
+  `--template-dir` template that fails anywhere still refuses the run. A section
+  naming a preset that was not admitted renders the family's base with a warning, on
+  the same path as an undeclared preset. `RenderingPipeline(admission=...)` replaces
+  `admission_exclusions=`.
+- **Effect.** In 6/8 the orbit, wings and zoom wave are now offered without `slow`;
+  2/4 likewise. In 3/4 their bases fail, so nothing changes there yet.
+- **Output.** 13,338 matrix comparisons and the reviewer's own rerun: zero differences
+  for inputs that rendered before; Phase 0 and Phase 1 fingerprints hold.
+  `PHYSICAL_RENDERER_REVISION` stays "1".
+- **Known consequences, by the documented union rule.** Admitting more families widens
+  the predecessor envelope, so another family's entry dip can grow; a template whose
+  entry wheel state has no known settle time can lose its bound and be excluded (a
+  user template: the run is refused). Not reachable with the shipped catalog. Where the
+  offer grows (6/8, 2/4, 5/4), the planner cache key changes and one re-plan is paid.
+  A saved plan naming a previously excluded family with its non-admitted preset now
+  renders the base.
+- **D8 withdrawn.** `min_section_bars` was implemented and then removed before commit
+  (integrator decision): it was 1 for every shipped family, had no consumer, and its
+  definition did not hold under `on_unplayable="dark"` or beside entry windows. If the
+  T3a validator needs a feasibility bound, it defines what it needs then.

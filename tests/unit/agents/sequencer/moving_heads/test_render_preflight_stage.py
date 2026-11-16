@@ -484,6 +484,7 @@ async def test_render_stage_records_the_gates_exclusions_in_the_trace(tmp_path: 
     [exclusion] = trace["render"]["admission_exclusions"]
     assert exclusion["template_id"] == "masked_wheel_flick"
     assert _NO_FLICK in exclusion["reason"]
+    assert "admission_preset_exclusions" not in trace["render"]  # none: left out
 
 
 @pytest.mark.asyncio
