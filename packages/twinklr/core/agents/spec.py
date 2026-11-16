@@ -90,7 +90,10 @@ class AgentSpec(BaseModel):
 
     allow_json_object_fallback: bool = Field(
         default=True,
-        description="Allow a second compatibility request after strict-format rejection",
+        description=(
+            "Allow a response without a server-enforced schema when the provider's strict "
+            "format is unavailable or rejected"
+        ),
     )
 
     # Schema repair

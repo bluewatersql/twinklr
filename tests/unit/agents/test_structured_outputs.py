@@ -267,6 +267,47 @@ def test_all_registered_strict_roots_stay_within_openai_schema_ceilings() -> Non
         assert stats.enum_value_count <= STRICT_SCHEMA_ENUM_LIMIT, (model.__name__, stats)
 
 
+# Live evidence for Claude's grammar limit: the 2026-11-12 probe of every registered
+# schema (changes/twinklr-reactivation-review/evidence/2026-11-12-claude-provider-live/
+# README.md). Apart from descriptions and titles, the schemas Claude receives for the
+# registered specs are byte-identical to the probed ones.
+_CLAUDE_COMPILED_SPECS = frozenset(
+    {
+        "asset_prompt_enricher",
+        "lyrics",
+        "section_judge",
+        "holistic_judge",
+        "mh_judge",
+        "macro_judge",
+        "vision_judge",
+        "show_vision_judge",
+    }
+)
+_CLAUDE_REJECTED_SPECS = frozenset(
+    {"audio_profile", "group_planner", "holistic_corrector", "mh_planner", "macro_planner"}
+)
+
+
+def test_claude_grammar_limits_classify_every_registered_spec() -> None:
+    """Claude structured outputs are requested only for schemas Claude compiles.
+
+    Claude documents a limit of 16 parameters with union types per request and an
+    unquantified limit on compiled grammar size
+    (https://platform.claude.com/docs/en/build-with-claude/structured-outputs#schema-complexity-limits).
+    The grammar-size limit cannot be computed offline, so ``CLAUDE_SCHEMA_NODE_LIMIT``
+    is a conservative proxy: schema nodes with every ``$ref`` expanded, capped at the
+    largest schema the live probe saw compile. A schema change that moves a spec across
+    either limit fails here, before any request is spent.
+    """
+    from twinklr.core.agents.providers.anthropic import claude_json_schema, claude_schema_size
+
+    specs = _registered_specs()
+    assert {spec.name for spec in specs} == _CLAUDE_COMPILED_SPECS | _CLAUDE_REJECTED_SPECS
+    for spec in specs:
+        size = claude_schema_size(claude_json_schema(spec.response_model))
+        assert size.within_limits is (spec.name in _CLAUDE_COMPILED_SPECS), (spec.name, size)
+
+
 def test_shipped_full_response_examples_match_registered_strict_models() -> None:
     """Few-shot response examples must contain every server-required DTO key."""
     jsonl_contracts = {

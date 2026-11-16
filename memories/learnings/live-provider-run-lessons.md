@@ -2,7 +2,7 @@
 type: learning
 status: active
 created: 2026-11-01
-updated: 2026-11-12
+updated: 2026-11-16
 confidence: confirmed
 tags: [live-run, providers]
 ---
@@ -38,8 +38,14 @@ own date.
   explicit limits of 16 and 24. The judge, lyrics,
   enricher and vision schemas compile. The rejection depends only on the schema, comes
   back in 0.3 s, and generates no tokens.
-  - The Anthropic adapter resends once with the schema carried only by the prompt, and
-    remembers the rejection (`f0ae0da`).
+  - Since 2026-11-16 the Anthropic adapter decides before sending: a schema over 16 union
+    parameters (documented) or 68 schema nodes with `$ref`s expanded (a proxy calibrated
+    on this probe) goes out with the schema in the prompt only, in one request, and is
+    logged once. `test_claude_grammar_limits_classify_every_registered_spec` pins which
+    registered schemas are server-enforced. This replaced the resend-on-400 of `f0ae0da`.
+  - A grammar rejection of a schema within those limits now fails the call; nothing is
+    resent. If it happens, probe that schema once, then lower `CLAUDE_SCHEMA_NODE_LIMIT`
+    or reclassify the spec in that test.
   - Before claiming a new or enlarged schema is server-enforced on Claude, probe it once.
   - See the
     [evidence](../../changes/twinklr-reactivation-review/evidence/2026-11-12-claude-provider-live/README.md).

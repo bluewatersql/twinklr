@@ -433,10 +433,10 @@ The shipped structured-output paths are:
 - Opt-in Ollama cloud through the loopback daemon, using `/v1/chat/completions` with a
   JSON-schema `response_format` plus the schema in the prompt. Its real `MacroPlan` smoke
   awaits an owner decision.
-- Claude via the Messages API with `output_config.format`. When Claude rejects a schema
-  as too complex to compile, which it does for every planner schema, the adapter resends
-  once with the schema carried only by the prompt. The runner then validates and repairs
-  the response as usual.
+- Claude via the Messages API with `output_config.format`. Claude cannot compile every
+  planner schema, so the adapter measures each schema before sending. One that exceeds
+  Claude's limits goes out in a single request with the schema carried only by the
+  prompt, and the runner validates and repairs the response as usual.
 
 ### Adding New Audio Enhancement Features
 

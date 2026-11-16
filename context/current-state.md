@@ -101,9 +101,10 @@ Provider behavior learned from these runs is in
 points that shape current behavior:
 
 - Claude refuses to compile the five planner schemas (`compiled grammar is too large`).
-  The adapter resends those requests once with the schema in the prompt only and validates
-  client-side, so planner output on Claude has no server-side schema guarantee. The owner
-  kept this fallback and deferred a schema redesign.
+  The adapter recognizes them before sending (union-parameter limit and a schema-size
+  proxy) and sends them once with the schema in the prompt only, validated client-side, so
+  planner output on Claude has no server-side schema guarantee. The owner deferred a
+  schema redesign.
 - Ollama Cloud does not enforce `response_format`; the schema travels in the prompt.
 - On OpenAI, strict mode passes for 7 of 8 roles; `audio_profile` shows runaway output.
 

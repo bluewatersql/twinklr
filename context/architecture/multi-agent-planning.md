@@ -73,8 +73,8 @@ pending; implementation fixtures are not decision evidence.
   Ollama Cloud does not enforce `response_format`, so the schema travels in the prompt. Claude
   (`llm_provider: anthropic`, default `claude-opus-5-5`) uses `output_config.format`
   structured outputs. Claude refuses to compile the planner schemas ("compiled grammar
-  is too large"), so those requests are resent with the schema carried only by the
-  prompt and validated client-side. The first Claude live run passed on 2026-11-12
+  is too large"), so the adapter sends those requests with the schema carried only by the
+  prompt, decided before sending, and validates them client-side. The first Claude live run passed on 2026-11-12
   ([evaluation](../../evaluations/2026-11-12-claude-baseline-live-run/README.md)).
 - Runtime prompt packs: `packages/twinklr/core/**/prompts/` (Jinja2 — application source,
   distinct from the root `prompts/` agent-workflow library)

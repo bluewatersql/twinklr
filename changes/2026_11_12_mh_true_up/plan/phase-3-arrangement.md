@@ -549,3 +549,17 @@ The four ports are built in separate worktrees from `824dce1d`. Until C1.2 they 
 each command work on physical output while the old path still exists; the old guard
 goes in C1.2. Testing `inject` or `regenerate` against a running xLights show is not
 authorized; those ports are proven offline.
+
+### Constraint on the planner contract (T1) from the provider's schema limits — 2026-11-16
+
+The moving-head plan schema is not provider-enforced on Claude: it exceeds the
+documented limit of 16 union-typed parameters and the compiled-grammar size limit
+([follow-up](../evidence/2026-11-16-p3-viewing-render/README.md#follow-up-to-finding-1--2026-11-16)).
+The arrangement contract as drafted above would be larger. T1 therefore designs the
+single planner contract to fit: at most 16 union-typed fields and at most 68 expanded
+schema nodes as measured by `claude_schema_size`, asserted for its spec in
+`test_claude_grammar_limits_classify_every_registered_spec`, and confirmed by one live
+probe. Means consistent with the LLM/renderer boundary: categorical choices resolved
+in code in place of the nested per-channel transition objects; nullable choices
+written as one enum that includes null; nesting no deeper than five. The spec list in
+that guard test is hand-maintained, so T1 adds its spec to it.

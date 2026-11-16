@@ -122,6 +122,31 @@ the client's fallback succeeded (finding 1).
 4. **The first macro plan used 18 theme tags the code does not know;** the second
    iteration was accepted.
 
+## Follow-up to finding 1 — 2026-11-16
+
+Fixed on owner direction ("fix the plan schema rejection"). The record above
+understated it: the run log shows the audio-profile and macro-plan schemas were
+rejected too, and the 2026-11-12 live probe had already found five planner schemas
+over the provider's limit, with the schema redesign deferred by the owner that day.
+
+The Claude adapter now measures each schema before sending. One over the documented
+limit of 16 union-typed parameters, or over 68 expanded schema nodes (a proxy for the
+undocumented compiled-grammar limit: every registered schema of 68 nodes or fewer
+compiled on 2026-11-12 and every one of 82 or more was rejected), goes out in a single
+request with the schema in the prompt and is validated locally as before. The
+resend-after-rejection path is removed, so a rejection of a schema the proxy admits
+now fails that call. No model, schema, prompt pack or cache key changed.
+
+Two live requests confirmed it (`claude-opus-5-5`, 12,843 tokens in total): the
+moving-head planner request was sent once and not rejected; the judge schema, at
+exactly 68 nodes, was still accepted with provider-enforced structure.
+
+Not fixed: the five planner schemas (audio profile, macro plan, group planner,
+holistic corrector, moving-head plan) are still not provider-enforced on Claude. The
+moving-head plan has 25 union-typed fields; the best contract-preserving rewrite
+reaches about 102 nodes. Enforcing it needs a contract that fits the limits, which is
+a constraint on the Phase 3 planner contract.
+
 ## Not verified
 
 Any real fixture; any other song or rig; a literal screen recording (not made).

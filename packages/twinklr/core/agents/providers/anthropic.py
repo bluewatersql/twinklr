@@ -72,23 +72,45 @@ _SERVER_SIDE_FALLBACK_MODELS = frozenset(
 _SERVER_SIDE_FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 # Claude compiles each output schema into a grammar and rejects one that is too
-# large with HTTP 400 before generating anything.  Every planner schema hits this
-# (live probe 2026-11-12), so such requests are resent with the schema carried
-# only by the prompt, which the runner validates and repairs like any response.
-_SCHEMA_COMPLEXITY_REJECTION_MARKERS = (
-    "compiled grammar is too large",
-    "schema is too complex",
-)
+# complex with HTTP 400 before generating anything.  Documented limit: at most 16
+# parameters with union types per request
+# (https://platform.claude.com/docs/en/build-with-claude/structured-outputs#schema-complexity-limits);
+# every node with ``anyOf`` or a type array is counted, which is conservative.  The
+# documented limit of 24 optional parameters is not checked: ``strict_json_schema``
+# makes every key required, so there are none.
+CLAUDE_UNION_PARAMETER_LIMIT = 16
+# The compiled-grammar size limit is not quantified.  Proxy: schema nodes with every
+# $ref expanded.  The 2026-11-12 live probe on claude-opus-5-5 (the only model probed)
+# compiled every schema up to 68 nodes and rejected every schema from 82 nodes up; no
+# schema between 69 and 81 nodes was observed, so 68 is the conservative bound.  The
+# proxy ignores enum and const cardinality and does not descend into allOf, oneOf or
+# prefixItems, which the strict builder removes or rewrites.
+CLAUDE_SCHEMA_NODE_LIMIT = 68
+
+
+@dataclass(frozen=True)
+class ClaudeSchemaSize:
+    """A Claude output schema measured against its grammar limits."""
+
+    union_parameters: int
+    nodes: int
+
+    @property
+    def within_limits(self) -> bool:
+        """Whether Claude is expected to compile the schema."""
+        return (
+            self.union_parameters <= CLAUDE_UNION_PARAMETER_LIMIT
+            and self.nodes <= CLAUDE_SCHEMA_NODE_LIMIT
+        )
 
 
 @dataclass(frozen=True)
 class _ClaudeRequest:
-    """One Messages request plus the context needed to resend and parse it."""
+    """One Messages request plus the context needed to parse it."""
 
     params: dict[str, Any]
     response_model: type[BaseModel] | None
     schema_hash: str | None
-    allow_prompt_only_fallback: bool
 
     @property
     def prompt_only(self) -> bool:
@@ -101,6 +123,36 @@ class _ClaudeRequest:
 def claude_json_schema(model: type[BaseModel]) -> dict[str, Any]:
     """Derive the Claude structured-output schema from Twinklr's strict schema."""
     return cast("dict[str, Any]", _claude_schema_node(strict_json_schema(model)))
+
+
+def claude_schema_size(schema: dict[str, Any]) -> ClaudeSchemaSize:
+    """Measure a Claude output schema with every ``$ref`` expanded where it is used."""
+    definitions = schema.get("$defs", {})
+    nodes = 0
+    unions = 0
+
+    def walk(node: dict[str, Any], expanding: frozenset[str]) -> None:
+        nonlocal nodes, unions
+        ref = node.get("$ref")
+        if isinstance(ref, str):
+            name = ref.removeprefix("#/$defs/")
+            if name not in definitions:
+                raise ValueError(f"Cannot measure a schema with unresolvable $ref {ref!r}")
+            # Claude rejects recursive schemas outright; stop rather than loop.
+            if name not in expanding:
+                walk(definitions[name], expanding | {name})
+            return
+        nodes += 1
+        if "anyOf" in node or isinstance(node.get("type"), list):
+            unions += 1
+        children = [*node.get("properties", {}).values(), *node.get("anyOf", ())]
+        if isinstance(node.get("items"), dict):
+            children.append(node["items"])
+        for child in children:
+            walk(child, expanding)
+
+    walk(schema, frozenset())
+    return ClaudeSchemaSize(union_parameters=unions, nodes=nodes)
 
 
 def _claude_schema_node(value: Any) -> Any:
@@ -183,8 +235,8 @@ class AnthropicProvider:
 
         # Conversation state
         self._conversations: dict[str, Conversation] = {}
-        # (model, schema hash) pairs Claude refused to compile; later requests skip the 400.
-        self._prompt_only_schemas: set[tuple[str, str]] = set()
+        # Hashes of schemas already reported as carried by the prompt only.
+        self._prompt_only_schemas: set[str] = set()
 
     async def aclose(self) -> None:
         """Close the underlying Anthropic HTTP clients and their connection pools."""
@@ -369,8 +421,8 @@ class AnthropicProvider:
         response_model = kwargs.pop("response_model", None)
         if kwargs.pop("input_image_urls", None):
             raise LLMProviderError("Configured provider does not support vision image inputs")
-        allow_prompt_only_fallback = kwargs.pop("allow_json_object_fallback", True)
-        if not isinstance(allow_prompt_only_fallback, bool):
+        allow_prompt_only_schema = kwargs.pop("allow_json_object_fallback", True)
+        if not isinstance(allow_prompt_only_schema, bool):
             raise LLMProviderError("allow_json_object_fallback must be a boolean")
         # OpenAI-only transport switch.
         kwargs.pop("provider_max_attempts", None)
@@ -408,11 +460,27 @@ class AnthropicProvider:
                 raise LLMProviderError("response_model must be a Pydantic model class")
             schema_model = cast("type[BaseModel]", response_model)
             schema_hash = response_schema_hash(schema_model)
-            if (model, schema_hash) not in self._prompt_only_schemas:
-                output_config["format"] = {
-                    "type": "json_schema",
-                    "schema": claude_json_schema(schema_model),
-                }
+            schema = claude_json_schema(schema_model)
+            size = claude_schema_size(schema)
+            if size.within_limits:
+                output_config["format"] = {"type": "json_schema", "schema": schema}
+            elif not allow_prompt_only_schema:
+                raise LLMProviderError(
+                    f"The {schema_model.__name__} schema exceeds Claude's structured-output "
+                    f"limits ({size}) and this request does not allow a prompt-only schema"
+                )
+            elif schema_hash not in self._prompt_only_schemas:
+                self._prompt_only_schemas.add(schema_hash)
+                logger.warning(
+                    "Claude structured outputs are not used for the %s schema: %d union "
+                    "parameters (limit %d) and %d schema nodes (limit %d). The schema is "
+                    "carried by the prompt only and the response is validated locally.",
+                    schema_model.__name__,
+                    size.union_parameters,
+                    CLAUDE_UNION_PARAMETER_LIMIT,
+                    size.nodes,
+                    CLAUDE_SCHEMA_NODE_LIMIT,
+                )
         if output_config:
             request_params["output_config"] = output_config
         if timeout_seconds is not None:
@@ -424,46 +492,7 @@ class AnthropicProvider:
             params=request_params,
             response_model=cast("type[BaseModel] | None", response_model),
             schema_hash=schema_hash,
-            allow_prompt_only_fallback=allow_prompt_only_fallback,
         )
-
-    def _prompt_only_request(
-        self, request: _ClaudeRequest, error: Exception
-    ) -> _ClaudeRequest | None:
-        """Return the request without a schema Claude refused to compile, if allowed."""
-        if (
-            request.response_model is None
-            or request.schema_hash is None
-            or request.prompt_only
-            or not request.allow_prompt_only_fallback
-            or getattr(error, "status_code", None) != 400
-        ):
-            return None
-        body = getattr(error, "body", None)
-        detail = body.get("error") if isinstance(body, dict) else None
-        message = detail.get("message") if isinstance(detail, dict) else None
-        text = (message if isinstance(message, str) else str(error)).lower()
-        if not any(marker in text for marker in _SCHEMA_COMPLEXITY_REJECTION_MARKERS):
-            return None
-        logger.warning(
-            "Claude rejected the %s schema as too complex to compile; "
-            "resending with the schema carried only by the prompt: %s",
-            request.response_model.__name__,
-            error,
-        )
-        model = request.params["model"]
-        self._prompt_only_schemas.add((model, request.schema_hash))
-        retry_params = {
-            key: value for key, value in request.params.items() if key != "output_config"
-        }
-        retry_config = {
-            key: value
-            for key, value in request.params.get("output_config", {}).items()
-            if key != "format"
-        }
-        if retry_config:
-            retry_params["output_config"] = retry_config
-        return replace(request, params=retry_params)
 
     @staticmethod
     def _decode_prompt_only_json(text: str) -> Any:
@@ -538,7 +567,7 @@ class AnthropicProvider:
                     if request.prompt_only
                     else "json_schema"
                 ),
-                # A structured request only drops its schema after a complexity rejection.
+                # A structured request drops its schema only when it exceeds Claude's limits.
                 structured_output_fallback_reason=(
                     "schema_too_complex" if request.prompt_only else None
                 ),
@@ -576,14 +605,7 @@ class AnthropicProvider:
         """
         try:
             request = self._build_request(messages, model, temperature, kwargs)
-            try:
-                response = self._stream_sync(request.params)
-            except Exception as exc:
-                retry = self._prompt_only_request(request, exc)
-                if retry is None:
-                    raise
-                request = retry
-                response = self._stream_sync(request.params)
+            response = self._stream_sync(request.params)
             return self._parse_message(response, model, request)
 
         except LLMProviderError:
@@ -686,18 +708,10 @@ class AnthropicProvider:
         """
         try:
             request = self._build_request(messages, model, temperature, kwargs)
-            # The outer bound keeps timeout_seconds a limit on the whole call,
-            # prompt-only resend included, since the HTTP timeout only bounds each
-            # read of a stream that keeps pinging.
+            # The outer bound keeps timeout_seconds a limit on the whole call, since
+            # the HTTP timeout only bounds each read of a stream that keeps pinging.
             async with asyncio.timeout(request.params.get("timeout")):
-                try:
-                    response = await self._stream_async(request.params)
-                except Exception as exc:
-                    retry = self._prompt_only_request(request, exc)
-                    if retry is None:
-                        raise
-                    request = retry
-                    response = await self._stream_async(request.params)
+                response = await self._stream_async(request.params)
             return self._parse_message(response, model, request)
 
         except LLMProviderError:

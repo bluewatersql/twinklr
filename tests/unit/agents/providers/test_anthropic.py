@@ -770,171 +770,171 @@ def _structured_result_model() -> type:
     return Result
 
 
+def test_claude_schema_size_expands_refs_and_counts_unions() -> None:
+    from pydantic import BaseModel, ConfigDict
+
+    from twinklr.core.agents.providers.anthropic import claude_json_schema, claude_schema_size
+
+    class Leaf(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+
+        label: str | None
+
+    class Root(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+
+        first: Leaf
+        second: list[Leaf]
+
+    size = claude_schema_size(claude_json_schema(Root))
+
+    # Leaf is 4 nodes (object, anyOf, string, null) and is expanded at both uses:
+    # Root 1 + first 4 + second array 1 + its Leaf 4.
+    assert (size.nodes, size.union_parameters) == (10, 2)
+    assert size.within_limits
+
+
+def test_claude_schema_size_names_an_unresolvable_ref() -> None:
+    from twinklr.core.agents.providers.anthropic import claude_schema_size
+
+    schema = {"type": "object", "properties": {"x": {"$ref": "#/$defs/Missing"}}}
+    with pytest.raises(ValueError, match="#/\\$defs/Missing"):
+        claude_schema_size(schema)
+
+
 @pytest.mark.asyncio
-async def test_schema_too_complex_is_resent_prompt_only_and_remembered(
-    mock_anthropic_clients: dict,
+@pytest.mark.parametrize(("fields", "enforced"), [(16, True), (17, False)])
+async def test_union_parameter_limit_decides_the_format(
+    mock_anthropic_clients: dict, fields: int, enforced: bool
 ) -> None:
-    """A grammar-size 400 resends once without the schema; later calls skip the 400."""
+    """Claude's documented limit is 16 union parameters, far below the node proxy."""
+    from pydantic import ConfigDict, create_model
+
+    from twinklr.core.agents.providers.anthropic import claude_json_schema, claude_schema_size
+
+    nullable = create_model(  # type: ignore[call-overload]
+        f"Nullable{fields}",
+        __config__=ConfigDict(extra="forbid"),
+        **{f"field_{index}": (str | None, ...) for index in range(fields)},
+    )
+    size = claude_schema_size(claude_json_schema(nullable))
+    assert size.union_parameters == fields
+    assert size.nodes < 68
+    assert size.within_limits is enforced
+
+    provider = _make_provider(mock_anthropic_clients)
+    await provider.generate_json_async(
+        messages=[{"role": "user", "content": "test"}],
+        model="claude-opus-5-5",
+        response_model=nullable,
+    )
+
+    request = mock_anthropic_clients["async_client"].messages.stream.call_args.kwargs
+    assert ("format" in request.get("output_config", {})) is enforced
+
+
+@pytest.mark.asyncio
+async def test_moving_head_plan_is_one_prompt_only_request(
+    mock_anthropic_clients: dict, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The moving-head plan schema exceeds Claude's limits, so it is never sent as a format."""
+    from twinklr.core.agents.sequencer.moving_heads.specs import get_planner_spec
+
+    spec = get_planner_spec(model="claude-opus-5-5")
     provider = _make_provider(mock_anthropic_clients)
     stream = mock_anthropic_clients["async_client"].messages.stream
-    stream.side_effect = [_grammar_rejection(), stream.return_value, stream.return_value]
-    mock_anthropic_clients["async_msg"].content[0].text = '```json\n{"result": "ok"}\n```'
-    model = _structured_result_model()
     call = {
-        "messages": [{"role": "user", "content": "test"}],
-        "model": "claude-opus-5-5",
-        "response_model": model,
+        "messages": [{"role": "user", "content": "plan"}],
+        "model": spec.model,
+        "response_model": spec.response_model,
         "reasoning_effort": "high",
+        "allow_json_object_fallback": spec.allow_json_object_fallback,
     }
 
-    first = await provider.generate_json_async(**call)
+    with caplog.at_level("WARNING", logger="twinklr.core.agents.providers.anthropic"):
+        first = await provider.generate_json_async(**call)
+        await provider.generate_json_async(**call)
 
     assert stream.call_count == 2
-    assert "format" in stream.call_args_list[0].kwargs["output_config"]
-    assert stream.call_args_list[1].kwargs["output_config"] == {"effort": "high"}
-    assert first.content == {"result": "ok"}
+    for sent in stream.call_args_list:
+        assert sent.kwargs["output_config"] == {"effort": "high"}
     assert first.metadata.structured_output_mode == "prompt_schema"
     assert first.metadata.structured_output_fallback_reason == "schema_too_complex"
-
-    second = await provider.generate_json_async(**call)
-
-    assert stream.call_count == 3
-    assert stream.call_args_list[2].kwargs["output_config"] == {"effort": "high"}
-    assert second.metadata.structured_output_mode == "prompt_schema"
+    notices = [record for record in caplog.records if "ChoreographyPlan" in record.getMessage()]
+    assert len(notices) == 1
 
 
-def test_schema_too_complex_fallback_on_sync_path(mock_anthropic_clients: dict) -> None:
+def test_prompt_only_schema_on_sync_path(mock_anthropic_clients: dict) -> None:
+    from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+
     provider = _make_provider(mock_anthropic_clients)
     stream = mock_anthropic_clients["sync_client"].messages.stream
-    stream.side_effect = [
-        _grammar_rejection("Schema is too complex for compilation."),
-        stream.return_value,
-    ]
 
     response = provider.generate_json(
         messages=[{"role": "user", "content": "test"}],
         model="claude-opus-5-5",
-        response_model=_structured_result_model(),
+        response_model=ChoreographyPlan,
     )
 
-    assert stream.call_count == 2
-    assert "output_config" not in stream.call_args_list[1].kwargs
+    assert stream.call_count == 1
+    assert "output_config" not in stream.call_args.kwargs
     assert response.metadata.structured_output_mode == "prompt_schema"
 
 
-def _server_error_mentioning_grammar() -> Exception:
-    import anthropic
-    import httpx
-
-    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
-    message = "compiled grammar is too large"
-    return anthropic.InternalServerError(
-        message,
-        response=httpx.Response(500, request=request),
-        body={"type": "error", "error": {"type": "api_error", "message": message}},
-    )
-
-
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("error", "allow_fallback"),
-    [
-        (_grammar_rejection(), False),
-        (_grammar_rejection("messages: roles must alternate"), True),
-        (_server_error_mentioning_grammar(), True),
-    ],
-    ids=("fallback-disabled", "unrelated-400", "non-400-with-marker"),
-)
-async def test_other_rejections_are_not_resent(
-    mock_anthropic_clients: dict, error: Exception, allow_fallback: bool
-) -> None:
-    provider = _make_provider(mock_anthropic_clients)
-    stream = mock_anthropic_clients["async_client"].messages.stream
-    stream.side_effect = error
-
-    with pytest.raises(LLMProviderError, match="Provider error"):
-        await provider.generate_json_async(
-            messages=[{"role": "user", "content": "test"}],
-            model="claude-opus-5-5",
-            response_model=_structured_result_model(),
-            allow_json_object_fallback=allow_fallback,
-        )
-
-    assert stream.call_count == 1
-
-
-@pytest.mark.asyncio
-async def test_async_runner_forwards_fallback_switch_to_anthropic(
+async def test_schema_over_limits_without_fallback_fails_before_any_request(
     mock_anthropic_clients: dict, tmp_path: Path
 ) -> None:
+    from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+
     provider = _make_provider(mock_anthropic_clients)
-    stream = mock_anthropic_clients["async_client"].messages.stream
-    stream.side_effect = _grammar_rejection()
     runner = AsyncAgentRunner(provider=provider, prompt_base_path=tmp_path)
     spec = AgentSpec(
         name="anthropic-test",
         prompt_pack="unused",
-        response_model=_structured_result_model(),
+        response_model=ChoreographyPlan,
         model="claude-opus-5-5",
         allow_json_object_fallback=False,
     )
 
-    with pytest.raises(LLMProviderError):
+    with pytest.raises(LLMProviderError, match="ChoreographyPlan"):
         await runner._call_oneshot_async(spec, [{"role": "user", "content": "test"}])
 
-    assert stream.call_count == 1
+    mock_anthropic_clients["async_client"].messages.stream.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_prompt_only_resend_is_not_repeated_when_it_also_fails(
+async def test_grammar_rejection_is_a_provider_error_without_resend(
     mock_anthropic_clients: dict,
 ) -> None:
+    """A schema within the limits that Claude still rejects is reported, not retried."""
     provider = _make_provider(mock_anthropic_clients)
     stream = mock_anthropic_clients["async_client"].messages.stream
-    stream.side_effect = [_grammar_rejection(), _grammar_rejection()]
+    stream.side_effect = _grammar_rejection()
 
-    with pytest.raises(LLMProviderError, match="Provider error"):
+    with pytest.raises(LLMProviderError, match="compiled grammar is too large"):
         await provider.generate_json_async(
             messages=[{"role": "user", "content": "test"}],
             model="claude-opus-5-5",
             response_model=_structured_result_model(),
         )
 
-    assert stream.call_count == 2
+    assert stream.call_count == 1
 
 
-@pytest.mark.asyncio
-async def test_rejection_memo_is_scoped_to_model_and_schema(
-    mock_anthropic_clients: dict,
-) -> None:
-    from pydantic import BaseModel, ConfigDict
-
-    class Other(BaseModel):
-        model_config = ConfigDict(extra="forbid")
-
-        other: str
-
+def test_grammar_rejection_on_sync_path_is_not_resent(mock_anthropic_clients: dict) -> None:
     provider = _make_provider(mock_anthropic_clients)
-    stream = mock_anthropic_clients["async_client"].messages.stream
-    stream.side_effect = [_grammar_rejection(), *[stream.return_value] * 3]
-    rejected = _structured_result_model()
-    mock_anthropic_clients["async_msg"].content[0].text = '{"result": "ok", "other": "ok"}'
+    stream = mock_anthropic_clients["sync_client"].messages.stream
+    stream.side_effect = _grammar_rejection()
 
-    async def send(model: str, response_model: type) -> None:
-        await provider.generate_json_async(
+    with pytest.raises(LLMProviderError, match="compiled grammar is too large"):
+        provider.generate_json(
             messages=[{"role": "user", "content": "test"}],
-            model=model,
-            response_model=response_model,
+            model="claude-opus-5-5",
+            response_model=_structured_result_model(),
         )
 
-    await send("claude-opus-5-5", rejected)
-    await send("claude-opus-5-5", Other)
-    await send("claude-sonnet-5-5", rejected)
-
-    sent_format = [
-        "format" in call.kwargs.get("output_config", {}) for call in stream.call_args_list
-    ]
-    assert sent_format == [True, False, True, True]
+    assert stream.call_count == 1
 
 
 @pytest.mark.asyncio
@@ -949,15 +949,15 @@ async def test_rejection_memo_is_scoped_to_model_and_schema(
 async def test_prompt_only_reply_tolerates_surrounding_prose(
     mock_anthropic_clients: dict, text: str
 ) -> None:
+    from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+
     provider = _make_provider(mock_anthropic_clients)
-    stream = mock_anthropic_clients["async_client"].messages.stream
-    stream.side_effect = [_grammar_rejection(), stream.return_value]
     mock_anthropic_clients["async_msg"].content[0].text = text
 
     response = await provider.generate_json_async(
         messages=[{"role": "user", "content": "test"}],
         model="claude-opus-5-5",
-        response_model=_structured_result_model(),
+        response_model=ChoreographyPlan,
     )
 
     assert response.content == {"result": "ok"}
@@ -981,51 +981,44 @@ async def test_schema_enforced_reply_with_prose_is_still_a_decode_error(
 
 
 @pytest.mark.asyncio
-async def test_conversation_path_uses_prompt_only_fallback(mock_anthropic_clients: dict) -> None:
+async def test_conversation_path_sends_prompt_only_schema(mock_anthropic_clients: dict) -> None:
+    from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+
     provider = _make_provider(mock_anthropic_clients)
     stream = mock_anthropic_clients["async_client"].messages.stream
-    stream.side_effect = [_grammar_rejection(), stream.return_value]
 
     response = await provider.generate_json_with_conversation_async(
         user_message="test",
-        conversation_id="conv-fallback",
+        conversation_id="conv-prompt-only",
         model="claude-opus-5-5",
-        response_model=_structured_result_model(),
+        response_model=ChoreographyPlan,
     )
 
-    assert stream.call_count == 2
+    assert stream.call_count == 1
     assert response.metadata.structured_output_mode == "prompt_schema"
-    assert response.metadata.conversation_id == "conv-fallback"
+    assert response.metadata.conversation_id == "conv-prompt-only"
 
 
 @pytest.mark.asyncio
-async def test_one_deadline_bounds_the_attempt_and_the_resend(
-    mock_anthropic_clients: dict,
-) -> None:
-    """timeout_seconds limits the whole call, so the resend cannot double it."""
+async def test_timeout_seconds_bounds_the_whole_call(mock_anthropic_clients: dict) -> None:
+    """timeout_seconds limits the call even while the stream keeps the connection alive."""
     import asyncio
 
     provider = _make_provider(mock_anthropic_clients)
     stream = mock_anthropic_clients["async_client"].messages.stream
-    calls = 0
 
     async def slow_enter() -> object:
-        nonlocal calls
-        calls += 1
         await asyncio.sleep(0.3)
-        if calls == 1:
-            raise _grammar_rejection()
         return MagicMock()
 
     stream.return_value.__aenter__ = AsyncMock(side_effect=slow_enter)
 
-    with pytest.raises(LLMProviderError, match=r"timeout_seconds=0\.5") as caught:
+    with pytest.raises(LLMProviderError, match=r"timeout_seconds=0\.1") as caught:
         await provider.generate_json_async(
             messages=[{"role": "user", "content": "test"}],
             model="claude-opus-5-5",
             response_model=_structured_result_model(),
-            timeout_seconds=0.5,
+            timeout_seconds=0.1,
         )
 
     assert isinstance(caught.value.__cause__, TimeoutError)
-    assert calls == 2
