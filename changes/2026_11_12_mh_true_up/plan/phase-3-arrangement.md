@@ -335,3 +335,18 @@ follow-up).
   around the gate would remove most of it but is a process-wide change; not done.
 - **Validation.** `make validate` on `3113d062`: 6832 passed, 39 skipped, tree clean
   before and after.
+
+### Owner decisions on the cutover inventory — 2026-11-16
+
+| Inventory item | Decision |
+|---|---|
+| When `show`, `eval-report`, `inject` and `regenerate` move to the physical renderer | After the owner accepts the look; nothing new is built behind the mode switch |
+| `regenerate --section` (F1) | Re-plan the chosen section, re-render the moving heads for the whole song and inject all of it |
+| Old-renderer comparison for Phase 5 (F6) | Render the old-renderer version of the viewing song or songs before the cutover and keep the files as the reference |
+| Rig without a physical profile (F8) | Refuse before planning with guidance naming the fixtures and what a profile needs; and give profile fields reasonable defaults wherever possible, so configuration is not a blocker ("avoid config hell") |
+
+The last adds a cutover task, **C1.0 Profile defaults:** find which `FixtureCapabilities`
+and `initial_states` fields can default safely (timings, default bytes, a dark initial
+state) and which a rig must state (channel offsets, ranges, model name). Defaulted
+timings are chosen, not measured; the trace says which values were defaulted. This
+survives the cutover and adds no second path, so it may be built before acceptance.
