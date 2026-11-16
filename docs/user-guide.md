@@ -533,6 +533,45 @@ cannot know the planner's section lengths; a cycle cut by the end of the song or
 detected beats is cut without error. The legacy renderer refuses `ONCE`; the planner
 sees template IDs and descriptions, never a repeat mode.
 
+A `physical_v2` step with a period may light only part of its movement with
+`physical_visibility`, and a `physical_v2` template may flick a wheel to another state
+for part of every cycle with `physical_overlays`. Neither moves a head in the dark
+itself: the dark spans they leave between cues are repositioned by the same pass as
+every other gap, which darkens the fixture, turns wheels, travels and settles before
+the next reveal. The legacy renderer refuses both, and both are left out of dumps when
+absent:
+
+| Key | Meaning |
+|---|---|
+| `physical_visibility.visible_phase_start` | Where in each movement period the step lights, as a fraction from `0` (inclusive) up to `visible_phase_end`. Read at the head's own movement phase, its pan/tilt distribution offset included, so a lagging head's window lags with its path. The window is in phase before the path's own `transform`, so a transform changes which arc is lit, not when: `reverse` on a finite sweep lit over `0`-`0.5` lights its travel from the far edge to the aim. A periodic movement lights in every period. A finite movement's phase clamps to `0`-`1` as its motion does, so a window from `0` also lights a lagging head holding its start. A frame is lit when its start lies in the window |
+| `physical_visibility.visible_phase_end` | Where the lit window ends, at most `1`. On a finite movement a window ending at `1` includes the terminal pose, so the head stays lit at `level` through any hold after the move (a `ONCE` `HOLD_LAST_POSE` remainder included) and takes no `release_beats`; one ending before `1` leaves the hold dark. A lit window or a dark interval inside a step shorter than one 20 ms frame is refused, never dropped |
+| `physical_visibility.attack_beats` | Default `0`. The dimmer rises linearly from 0 over this many beats from the window start |
+| `physical_visibility.release_beats` | Default `0`. The dimmer falls linearly to 0 over this many beats before the window end. Attack and release together must fit inside the window |
+| `physical_visibility.level` | Default `1`. The lit dimmer level. The envelope replaces the dimmer: the step may not set `dimmer.physical` or a `physical_shutter` pulse, and it replaces a dimmer level an attribute preset supplies. A profile without a dimmer axis needs zero ramps and level `1` |
+| `physical_overlays.start_beats` | Where the overlay starts, in beats from the start of each cycle; it may span a step boundary |
+| `physical_overlays.end_beats` | Where it ends, within the cycle. Overlays on one wheel may not overlap; overlays on the color and gobo wheels may, each splitting what the other leaves |
+| `physical_overlays.mask_beats` | The dark time after the start and before the end while the wheel turns and settles. A mask too short for the wheel fails the render like any reposition that does not fit, and a step's declared `physical_reposition_fallback` applies |
+| `physical_overlays.channel` | `color` or `gobo` |
+| `physical_overlays.state` | The state to show, named as each fixture's profile names it; never a byte |
+| `physical_overlays.attribute_preset_id` | Instead of `state`: a rig attribute preset whose entry for each fixture (along its fallback chain) names that fixture's state on `channel` |
+| `physical_overlays.release` | `resume_base`, the only value: after the end the head shows whichever step is in force then, so a step change during the overlay is what resumes |
+
+An overlay applies in every cycle the section plays as authored, including the head of a
+cycle a `TRUNCATE` remainder plays, but not over a `HOLD_LAST_POSE` remainder, which
+holds the cycle's closing step from a new start where no authored cycle plays it. A cue
+that already holds the overlay's state (its own, or the profile's default where it sets
+none) is left whole, without masks, and records the channel under `overlay_unchanged` in
+its metadata. An overlay that falls wholly inside an envelope's dark part changes
+nothing, since there is no cue there to split.
+
+The lit shutter is the step's own static `physical_shutter_state` (or a referenced
+preset's), else the profile's `discrete.open_state`; a step with neither is refused.
+Between overlay masks the head plays its steps' own cues with the wheel replaced, so a
+change the steps themselves make inside the flick on another wheel is still refused,
+and an overlay over a `PING_PONG` template is refused because every other cycle mirrors
+its steps. Envelopes and overlays are applied in the compile both the pre-planning dry
+compile and the render use, so the gate checks the same cues the render plays.
+
 ### Deterministic FSEQ comparison (CI-safe)
 
 After xLights has rendered two `.fseq` files, compare them without launching xLights or

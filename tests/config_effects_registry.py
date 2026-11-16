@@ -2609,7 +2609,6 @@ _PHYSICAL_PROFILE_FIELDS = {
     "discrete.states.settle_ms": _PHYSICAL_CHANGES,
     "discrete.default_state": _PHYSICAL_CHANGES,
     "discrete.closed_state": _PHYSICAL_PREPOSITION,
-    "discrete.open_state": _PHYSICAL_IDENTITY_ONLY,
     "visibility": _PHYSICAL_PREPOSITION,
     "visibility.dimmer_zero_extinguishes": _PHYSICAL_DARKNESS,
     "visibility.extinguishing_shutter_states": _PHYSICAL_DARKNESS,
@@ -2845,6 +2844,45 @@ for _path_field in (
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/sequencer/moving_heads/compile/test_physical_paths.py::"
         f"test_path_field_changes_compile[{_path_path}]",
+        _PHYSICAL_TEMPLATE_COMPILED,
+    )
+
+# P2.4b visibility envelopes and attribute overlays: a step's lit window and the
+# template's temporary wheel states. They feed only the opt-in physical compile; each
+# exact path mutates its field and must change the compiled cues or be refused. The
+# profile's `discrete.open_state`, identity-only until now, is what an envelope step
+# without a static shutter state is lit through; its records are repointed here.
+for _visibility_path, _note in {
+    "template.template.steps.physical_visibility": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_visibility.visible_phase_start": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_visibility.visible_phase_end": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_visibility.attack_beats": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_visibility.release_beats": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_visibility.level": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.physical_overlays": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.physical_overlays.start_beats": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.physical_overlays.end_beats": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.physical_overlays.mask_beats": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.physical_overlays.channel": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.physical_overlays.state": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.physical_overlays.attribute_preset_id": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.physical_overlays.release": _PHYSICAL_TEMPLATE_REJECTED,
+}.items():
+    CONFIG_EFFECTS[_visibility_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/compile/test_visibility.py::"
+        f"test_visibility_field_changes_compile[{_visibility_path}]",
+        _note,
+    )
+for _profile_root in (
+    "fixture.fixtures[FixtureInstance].config.physical_profile",
+    "fixture.base_config.physical_profile",
+):
+    _open_state_path = f"{_profile_root}.discrete.open_state"
+    CONFIG_EFFECTS[_open_state_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/compile/test_visibility.py::"
+        f"test_open_state_changes_the_lit_shutter[{_open_state_path}]",
         _PHYSICAL_TEMPLATE_COMPILED,
     )
 

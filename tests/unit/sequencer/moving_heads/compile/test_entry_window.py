@@ -510,6 +510,8 @@ def test_apply_entry_window_cuts_drops_and_skips() -> None:
             "step_id": "step",
             "requested_start_ms": -5,
             "requested_end_ms": 95,
+            "start_ms": 0,
+            "end_ms": 100,
             "entry_window_end_ms": 200,
         }
     ]
@@ -915,6 +917,8 @@ def test_dropped_cues_share_one_record_shape() -> None:
         "step_id",
         "requested_start_ms",
         "requested_end_ms",
+        "start_ms",
+        "end_ms",
         "start_limit_ms",
         "end_limit_ms",
         "entry_window_end_ms",

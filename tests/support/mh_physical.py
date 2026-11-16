@@ -1,7 +1,7 @@
 """Synthetic physical-renderer inputs: a fixture profile, a known initial state,
 physical fixture segments, the P1.6 pipeline case (rig, grid, job, plan and the
 test-only template), rig presets with steps that reference them, multi-head rigs
-with a topology, and steps on relative paths.
+with a topology, steps on relative paths, and visibility envelopes and attribute overlays.
 
 In-memory payloads only; no owner profile or measured data.
 """
@@ -411,6 +411,48 @@ def path_step(
     return step
 
 
+def envelope_step(
+    step_id: str,
+    pan: float,
+    extent: float,
+    *,
+    lit: tuple[float, float],
+    attack: float = 0.0,
+    release: float = 0.0,
+    level: float = 1.0,
+    period_beats: float = 4.0,
+    **fields: Any,
+) -> dict[str, Any]:
+    """`sine_step` lit only over the movement phases `lit` by a visibility envelope, which
+    replaces its dimmer; the shutter holds `open`."""
+    step = sine_step(step_id, pan, extent, period_beats=period_beats, **fields)
+    step["dimmer"] = {}
+    step["physical_visibility"] = {
+        "visible_phase_start": lit[0],
+        "visible_phase_end": lit[1],
+        "attack_beats": attack,
+        "release_beats": release,
+        "level": level,
+    }
+    return step
+
+
+def overlay(
+    channel: str, start: float, end: float, mask: float, state: str | None = None, **fields: Any
+) -> dict[str, Any]:
+    """An attribute overlay on `channel` over beats `[start, end)` of each cycle."""
+    payload = {
+        "channel": channel,
+        "start_beats": start,
+        "end_beats": end,
+        "mask_beats": mask,
+        **fields,
+    }
+    if state is not None:
+        payload["state"] = state
+    return payload
+
+
 def physical_template_doc(
     template_id: str,
     steps: Sequence[dict[str, Any]],
@@ -418,31 +460,32 @@ def physical_template_doc(
     cycle_bars: float = 1.0,
     mode: str = "JOINER",
     remainder_policy: str = "HOLD_LAST_POSE",
+    overlays: Sequence[dict[str, Any]] = (),
 ) -> TemplateDoc:
-    """A physical template looping every step once per `cycle_bars` (JOINER by default)."""
-    return TemplateDoc.model_validate(
-        {
-            "template": {
-                "template_id": template_id,
-                "version": 1,
-                "name": template_id,
-                "category": "low_energy",
-                "repeat": {
-                    "mode": mode,
-                    "cycle_bars": cycle_bars,
-                    "loop_step_ids": [step["step_id"] for step in steps],
-                    "remainder_policy": remainder_policy,
-                },
-                "steps": list(steps),
-                "metadata": {
-                    "tags": ["test_only", "physical_v2"],
-                    "recommended_sections": ["verse"],
-                    "energy_range": [0, 100],
-                    "description": "Test-only physical template, never in the catalog.",
-                },
-            }
-        }
-    )
+    """A physical template looping every step once per `cycle_bars` (JOINER by default),
+    with optional attribute `overlays`."""
+    template: dict[str, Any] = {
+        "template_id": template_id,
+        "version": 1,
+        "name": template_id,
+        "category": "low_energy",
+        "repeat": {
+            "mode": mode,
+            "cycle_bars": cycle_bars,
+            "loop_step_ids": [step["step_id"] for step in steps],
+            "remainder_policy": remainder_policy,
+        },
+        "steps": list(steps),
+        "metadata": {
+            "tags": ["test_only", "physical_v2"],
+            "recommended_sections": ["verse"],
+            "energy_range": [0, 100],
+            "description": "Test-only physical template, never in the catalog.",
+        },
+    }
+    if overlays:
+        template["physical_overlays"] = list(overlays)
+    return TemplateDoc.model_validate({"template": template})
 
 
 @contextmanager
@@ -720,8 +763,9 @@ def assert_honest_transactions(
 
     Asserted: the result encodes with the full footprint and covers every frame up to
     its end; a feasible cue's frames equal the cue encoded alone, a `preserve_aim` cue
-    changes only its held pose, a dropped cue is commanded dark; no change outside a
-    cue's own content moves or settles in a lit frame; a cue's own motion still under
+    changes only its held pose, a dropped cue is commanded dark; no wheel turns or
+    settles in a lit frame, inside a cue or not; no pose change outside a cue's own
+    content moves or settles in a lit frame; a cue's own motion still under
     way when light returns after the planner darkened the fixture past its end (a
     transaction, a park or a substituted cue; not a following cue's own dark frames) is a
     leak; back-to-back cues
@@ -889,13 +933,15 @@ def assert_honest_transactions(
             previous = frame[wheel.offset]
             assert kind(index) != "continuation", f"{name} changes between back-to-back cues"
             selected = next(s for s in wheel.states.values() if s.value == previous)
-            # A wheel is masked when it turns, so even an instant one needs a dark frame.
+            # A wheel is masked when it turns, so even an instant one needs a dark frame;
+            # that holds inside a cue's own content too.
             settle_at = (
                 infinite
                 if selected.settle_ms is None
                 else Fraction(times[index] + max(selected.settle_ms, 1))
             )
-            check_busy(index, settle_at, name)
+            hit = lit_between(Fraction(times[index]), settle_at)
+            assert hit is None, f"{name} turns at {times[index]} ms and is lit at {hit} ms"
 
     pose_offsets = [o for c in (ChannelName.PAN, ChannelName.TILT) for o in _offsets(profile, c)]
     for cue in cues:

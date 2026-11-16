@@ -97,6 +97,8 @@ def test_cue_before_covered_start_is_dropped_with_a_record() -> None:
             "step_id": "reveal",
             "requested_start_ms": 2115,
             "requested_end_ms": 3015,
+            "start_ms": 2120,
+            "end_ms": 3020,
             "start_limit_ms": 2520,
             "end_limit_ms": 7000,
         }

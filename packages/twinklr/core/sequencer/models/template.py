@@ -5,13 +5,15 @@ This module defines all template-related models:
 - Step components: Geometry, Movement, Dimmer, StepTiming, TemplateStep
 - Physical renderer step data: PhysicalMovementSpec and its PathTransform,
   PhysicalPulseSpec and its dimmer and shutter forms, named shutter, color and gobo
-  states, ComponentRefs and PhaseDistribution
-- Template structure: Template, TemplatePreset, TemplateDoc
+  states, ComponentRefs, PhaseDistribution and the VisibilityEnvelope
+- Template structure: Template (with its physical AttributeOverlays), TemplatePreset,
+  TemplateDoc
 
 These models define how choreography is structured and executed.
 """
 
 from enum import StrEnum
+from itertools import pairwise
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, model_validator
@@ -20,6 +22,7 @@ from twinklr.core.config.fixtures.presets import PresetId, StateName
 from twinklr.core.config.poses import PanPose, TiltPose
 from twinklr.core.sequencer.models.enum import (
     AimZone,
+    ChannelName,
     ChaseOrder,
     Intensity,
     QuantizeMode,
@@ -38,6 +41,7 @@ from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
 from twinklr.core.sequencer.moving_heads.libraries.gobo import GoboPattern
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 from twinklr.core.sequencer.moving_heads.libraries.shutter import ShutterPattern
+from twinklr.core.sequencer.timing.musical_phase import exact_decimal
 
 
 class RepeatMode(StrEnum):
@@ -311,6 +315,71 @@ class PhysicalShutterPulse(PhysicalPulseSpec):
     high_state: StateName
 
 
+class VisibilityEnvelope(BaseModel):
+    """Where along its movement a physical step is lit; dark everywhere else.
+
+    The phases are fractions of the step's movement period (`period_beats`), read at the
+    fixture's own movement phase: the step phase minus its pan/tilt distribution offset,
+    so a lagging head's lit window lags with its path. The window is in phase before the
+    path's own `transform` (`phase_cycles`, `reverse`), which moves no pulse either; a
+    transform changes which arc of the path is lit, not when. A periodic movement is lit
+    in `[visible_phase_start, visible_phase_end)` of every cycle. A finite movement's
+    phase clamps to `[0, 1]` as its motion does and a window ending at 1 includes 1, so
+    it stays lit through the terminal hold (and takes no release); one ending before 1
+    leaves the hold dark. The envelope replaces the dimmer: lit at `level`, ramping
+    linearly up over `attack_beats` from the window start and down over `release_beats`
+    to the window end. The dark complement is left between cues, so the transaction pass
+    performs every dark return.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    visible_phase_start: float = Field(ge=0, lt=1, allow_inf_nan=False)
+    visible_phase_end: float = Field(gt=0, le=1, allow_inf_nan=False)
+    attack_beats: float = Field(default=0.0, ge=0, allow_inf_nan=False)
+    release_beats: float = Field(default=0.0, ge=0, allow_inf_nan=False)
+    level: float = Field(default=1.0, gt=0, le=1)
+
+    @model_validator(mode="after")
+    def _validate_window(self) -> "VisibilityEnvelope":
+        if self.visible_phase_end <= self.visible_phase_start:
+            raise ValueError("visible_phase_end must be after visible_phase_start")
+        return self
+
+
+class AttributeOverlay(BaseModel):
+    """A temporary wheel state over part of every cycle of a physical template.
+
+    `start_beats` and `end_beats` are offsets from the cycle start and may span a step
+    boundary. Each fixture is held dark for `mask_beats` after the start while the wheel
+    turns in, shows the base cues with `channel` set to the overlay's state, and is held
+    dark for `mask_beats` before the end while it turns back; from the end it resumes
+    whichever base step is in force then (`release` `resume_base`). The state is named:
+    `state` in each fixture's profile, or the `channel` entry of the rig attribute preset
+    `attribute_preset_id`; never a byte.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    start_beats: float = Field(ge=0, allow_inf_nan=False)
+    end_beats: float = Field(allow_inf_nan=False)
+    mask_beats: float = Field(gt=0, allow_inf_nan=False)
+    channel: Literal["color", "gobo"]
+    state: StateName | None = None
+    attribute_preset_id: PresetId | None = None
+    release: Literal["resume_base"] = "resume_base"
+
+    @model_validator(mode="after")
+    def _validate_overlay(self) -> "AttributeOverlay":
+        if (self.state is None) == (self.attribute_preset_id is None):
+            raise ValueError("an overlay names exactly one of state and attribute_preset_id")
+        if self.end_beats - self.start_beats <= 2 * self.mask_beats:
+            raise ValueError(
+                "an overlay must outlast its two masks: end_beats - start_beats > 2 * mask_beats"
+            )
+        return self
+
+
 class ComponentRefs(BaseModel):
     """Rig presets a physical step names, resolved per fixture from the fixture group.
 
@@ -534,6 +603,11 @@ class TemplateStep(BaseModel):
     physical_distribution: tuple[PhaseDistribution, ...] = Field(
         default=(), exclude_if=lambda value: not value
     )
+    # Physical renderer only; left out of dumps when absent. Lights only part of each
+    # movement period and replaces the dimmer.
+    physical_visibility: VisibilityEnvelope | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
     @property
     def has_physical_data(self) -> bool:
@@ -548,12 +622,69 @@ class TemplateStep(BaseModel):
             or self.physical_reposition_fallback is not None
             or self.component_refs is not None
             or bool(self.physical_distribution)
+            or self.physical_visibility is not None
         )
 
     @model_validator(mode="after")
     def _validate_physical_shutter(self) -> "TemplateStep":
         if self.physical_shutter is not None and self.physical_shutter_state is not None:
             raise ValueError("set physical_shutter_state or physical_shutter, not both")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_visibility(self) -> "TemplateStep":
+        """An envelope needs a movement period, owns the dimmer, and reads one movement
+        phase, so pan and tilt share their distribution offset."""
+        envelope = self.physical_visibility
+        if envelope is None:
+            return self
+        movement = self.movement.physical
+        if movement is None or movement.period_beats is None:
+            raise ValueError(
+                f"step {self.step_id!r}: physical_visibility needs movement.physical with a "
+                "period; a hold step has no movement phase to light"
+            )
+        if self.dimmer.physical is not None or self.physical_shutter is not None:
+            raise ValueError(
+                f"step {self.step_id!r}: physical_visibility replaces the dimmer and needs a "
+                "static shutter; remove dimmer.physical and the physical_shutter pulse"
+            )
+        window_beats = exact_decimal(envelope.visible_phase_end) - exact_decimal(
+            envelope.visible_phase_start
+        )
+        ramps = exact_decimal(envelope.attack_beats) + exact_decimal(envelope.release_beats)
+        if ramps > window_beats * exact_decimal(movement.period_beats):
+            raise ValueError(
+                f"step {self.step_id!r}: attack_beats plus release_beats exceed the lit window "
+                f"of {float(window_beats * exact_decimal(movement.period_beats)):g} beats"
+            )
+        if movement.mode == "finite" and envelope.visible_phase_end == 1 and envelope.release_beats:
+            raise ValueError(
+                f"step {self.step_id!r}: a finite movement's window ending at 1 stays lit "
+                "through the terminal hold, so it takes no release_beats; end the window "
+                "before 1 to fade out"
+            )
+        owners = [
+            [ChannelName.PAN in spec.domains, ChannelName.TILT in spec.domains]
+            for spec in self.physical_distribution
+            if {ChannelName.PAN, ChannelName.TILT} & set(spec.domains)
+        ]
+        if owners and owners != [[True, True]]:
+            raise ValueError(
+                f"step {self.step_id!r}: physical_visibility reads the movement phase, so pan "
+                "and tilt must be distributed together, by one distribution"
+            )
+        light = [
+            domain.value
+            for spec in self.physical_distribution
+            for domain in spec.domains
+            if domain in (ChannelName.DIMMER, ChannelName.SHUTTER)
+        ]
+        if light:
+            raise ValueError(
+                f"step {self.step_id!r}: physical_visibility follows the movement phase; "
+                f"distributing {light} would do nothing"
+            )
         return self
 
     @model_validator(mode="after")
@@ -689,6 +820,10 @@ class Template(BaseModel):
     defaults: dict[str, Any] = Field(default_factory=dict)
     steps: list["TemplateStep"] = Field(default_factory=list)
     metadata: TemplateMetadata | None = None
+    # Physical renderer only; left out of dumps when empty, refused by the legacy compile.
+    physical_overlays: tuple[AttributeOverlay, ...] = Field(
+        default=(), exclude_if=lambda value: not value
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -719,7 +854,31 @@ class Template(BaseModel):
 
         if self.repeat.mode is RepeatMode.ONCE:
             self._require_finite_steps()
+        self._validate_overlays()
         return self
+
+    def _validate_overlays(self) -> None:
+        """Overlays on one channel may not overlap; a PING_PONG cycle mirrors its steps,
+        which an overlay's offsets from the cycle start would not follow."""
+        if not self.physical_overlays:
+            return
+        if self.repeat.mode is RepeatMode.PING_PONG:
+            raise ValueError(
+                "physical_overlays are offsets from the cycle start; repeat mode PING_PONG "
+                "mirrors every other cycle, so use JOINER or ONCE"
+            )
+        for channel in ("color", "gobo"):
+            spans = sorted(
+                (overlay.start_beats, overlay.end_beats)
+                for overlay in self.physical_overlays
+                if overlay.channel == channel
+            )
+            for (_, end), (start, _) in pairwise(spans):
+                if start < end:
+                    raise ValueError(
+                        f"two physical_overlays on {channel} overlap at beat {start:g}; an "
+                        "overlay on a channel must end before the next starts"
+                    )
 
     def _require_finite_steps(self) -> None:
         """A ONCE cycle ends in a terminal state its remainder holds, so each step must

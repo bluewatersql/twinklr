@@ -5,6 +5,7 @@ all components to compile a complete template to IR segments.
 """
 
 from collections.abc import Mapping, Sequence
+from fractions import Fraction
 import logging
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -27,6 +28,7 @@ from twinklr.core.sequencer.models.moving_heads.topology import (
     resolve_distribution,
 )
 from twinklr.core.sequencer.models.template import (
+    AttributeOverlay,
     RemainderPolicy,
     RepeatMode,
     Template,
@@ -60,6 +62,10 @@ from twinklr.core.sequencer.moving_heads.compile.scheduler import schedule_repea
 from twinklr.core.sequencer.moving_heads.compile.step_compiler import (
     StepCompileContext,
     compile_step,
+)
+from twinklr.core.sequencer.moving_heads.compile.visibility import (
+    apply_overlay,
+    apply_visibility,
 )
 from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import quantize_cue
@@ -134,8 +140,8 @@ def compile_template(
         TemplateCompileResult with all compiled segments.
 
     Raises:
-        ValueError: For repeat mode ONCE, or a step carrying physical data, which only
-            physical_v2 renders.
+        ValueError: For repeat mode ONCE, physical overlays, or a step carrying physical
+            data, which only physical_v2 renders.
 
     Example:
         >>> template = Template(...)
@@ -145,6 +151,11 @@ def compile_template(
     if template.repeat.mode == RepeatMode.ONCE:
         raise ValueError(
             f"template {template.template_id!r} uses repeat mode ONCE; it compiles only "
+            "under physical_v2"
+        )
+    if template.physical_overlays:
+        raise ValueError(
+            f"template {template.template_id!r} declares physical_overlays; it compiles only "
             "under physical_v2"
         )
     # Initialize provenance
@@ -324,7 +335,11 @@ def compile_physical_template(
     records `component_provenance`. A step's `physical_distribution` is resolved over
     `context.topology`, the canonical full rig, so each target fixture's phase offsets
     and pan sign depend on its rank there alone; each such segment records them, with
-    the rank, as `phase_distribution`.
+    the rank, as `phase_distribution`. A step's `physical_visibility` keeps only each
+    cue's lit slices (`apply_visibility`), and the template's `physical_overlays` then
+    split each fixture's cues around every cycle's overlay (`apply_overlay`); both leave
+    their dark spans as gaps for the transaction pass, so the pre-planning gate, which
+    compiles through here, sees exactly the cues the render does.
 
     Args:
         template: The template to compile.
@@ -344,10 +359,12 @@ def compile_physical_template(
             outlasts the step, a step the physical compile
             rejects, a component reference that
             does not resolve on this rig (naming template, step, preset and fixture),
-            or a distribution on a rig without a topology (naming the fixture group)
-            or over a fixture the topology does not place.
-        PhysicalChannelError: For a value, rate or state the profile cannot honor, or
-            pose motion the head cannot follow.
+            a distribution on a rig without a topology (naming the fixture group)
+            or over a fixture the topology does not place, or an overlay that ends
+            after its cycle or whose attribute preset sets no state for a fixture.
+        PhysicalChannelError: For a value, rate or state the profile cannot honor, pose
+            motion the head cannot follow, or an envelope the profile cannot light
+            (`apply_visibility`).
         UnsupportedRigShapeError: If a step's target group matches no fixture.
         ValueError: If a step starting inside the limits is zero-length on the grid.
     """
@@ -426,6 +443,8 @@ def compile_physical_template(
                     "step_id": step.step_id,
                     "requested_start_ms": requested_t0,
                     "requested_end_ms": requested_t1,
+                    "start_ms": t0,
+                    "end_ms": quantize_cue(requested_t1).actual_ms,
                     "start_limit_ms": start_limit_ms,
                     "end_limit_ms": end_limit_ms,
                 }
@@ -526,8 +545,48 @@ def compile_physical_template(
                         },
                     },
                 )
-            segments.append(segment)
+            if step.physical_visibility is None:
+                segments.append(segment)
+                continue
+            # After the metadata, so every lit slice carries it.
+            assert step.movement.physical is not None  # checked by the step compile
+            try:
+                segments.extend(
+                    apply_visibility(
+                        segment,
+                        step.physical_visibility,
+                        movement=step.movement.physical,
+                        offset=step_context.phase_offset_by_channel.get(
+                            ChannelName.PAN, Fraction(0)
+                        ),
+                        profile=fixture.physical_profile,
+                        phase_map=phase_map,
+                    )
+                )
+            except PhysicalChannelError as error:
+                error.add_note(
+                    f"template {template.template_id!r}, step {step.step_id!r}, "
+                    f"fixture {fixture.fixture_id!r}"
+                )
+                raise
 
+    if working_template.physical_overlays:
+        # A HOLD_LAST_POSE remainder replays the cycle's closing step from a new phase
+        # origin; no authored cycle plays it there, so it takes no overlay. A TRUNCATE
+        # remainder is the head of a cycle and keeps them; ONCE has no remainder instance.
+        held = (
+            schedule_result.num_complete_cycles
+            if working_template.repeat.mode != RepeatMode.ONCE
+            and schedule_result.remainder_policy == RemainderPolicy.HOLD_LAST_POSE
+            and schedule_result.num_complete_cycles > 0
+            else None
+        )
+        segments = _apply_overlays(
+            working_template,
+            context,
+            sorted({instance.cycle_number for instance in schedule_result.instances} - {held}),
+            segments,
+        )
     return TemplateCompileResult(
         template_id=working_template.template_id,
         segments=segments,
@@ -566,6 +625,109 @@ def _require_move_within_step(
                 action="rejected",
             )
         )
+
+
+def _apply_overlays(
+    template: Template,
+    context: TemplateCompileContext,
+    cycles: Sequence[int],
+    segments: list[FixtureSegment],
+) -> list[FixtureSegment]:
+    """Split each fixture's cues around every overlay of every scheduled cycle.
+
+    An overlay's beats are offsets from its cycle's start, placed and quantized exactly
+    as a step starting there would be, so an overlay ending on a step boundary ends on
+    that step's first frame.
+    """
+    beats_per_bar = context.beat_grid.beats_per_bar
+    cycle_bars = template.repeat.cycle_bars
+    cycle_beats = exact_decimal(cycle_bars) * beats_per_bar
+    profiles = {
+        fixture.fixture_id: fixture.physical_profile
+        for fixture in context.fixtures
+        if fixture.physical_profile is not None
+    }
+    fixture_ids = sorted({segment.fixture_id for segment in segments})
+    for overlay in template.physical_overlays:
+        where = (
+            f"template {template.template_id!r}, overlay on {overlay.channel} over beats "
+            f"[{overlay.start_beats:g}, {overlay.end_beats:g})"
+        )
+        if exact_decimal(overlay.end_beats) > cycle_beats:
+            raise _overlay_error(
+                f"{where} ends after its {float(cycle_beats):g}-beat cycle", context
+            )
+        states = _overlay_states(overlay, fixture_ids, context, where)
+        for cycle in cycles:
+
+            def at(beats: float, cycle: int = cycle) -> int:
+                bars = cycle * cycle_bars + beats / beats_per_bar
+                return quantize_cue(context.bar_offset_to_ms(bars)).actual_ms
+
+            segments = apply_overlay(
+                segments,
+                channel=ChannelName(overlay.channel),
+                states=states,
+                start_ms=at(overlay.start_beats),
+                flick_start_ms=at(overlay.start_beats + overlay.mask_beats),
+                flick_end_ms=at(overlay.end_beats - overlay.mask_beats),
+                end_ms=at(overlay.end_beats),
+                profiles=profiles,
+            )
+    return segments
+
+
+def _overlay_states(
+    overlay: AttributeOverlay,
+    fixture_ids: Sequence[str],
+    context: TemplateCompileContext,
+    where: str,
+) -> dict[str, str]:
+    """Each fixture's overlay state: the named state, or the `channel` entry of the rig
+    attribute preset's first entry for the fixture along its fallback chain."""
+    if overlay.state is not None:
+        return dict.fromkeys(fixture_ids, overlay.state)
+    preset_id = overlay.attribute_preset_id
+    assert preset_id is not None  # one of the two is set (validation)
+    attributes = context.presets.attributes
+    if preset_id not in attributes:
+        raise _overlay_error(
+            f"{where} references attribute preset {preset_id!r}, which the fixture group "
+            f"does not declare (declared: {sorted(attributes)})",
+            context,
+        )
+    states: dict[str, str] = {}
+    for fixture_id in fixture_ids:
+        current: str | None = preset_id
+        entry = None
+        while current is not None and entry is None:
+            entry = attributes[current].fixtures.get(fixture_id)
+            current = attributes[current].fallback
+        state = None if entry is None else getattr(entry, overlay.channel)
+        if state is None:
+            raise _overlay_error(
+                f"{where}: attribute preset {preset_id!r} sets no {overlay.channel} for "
+                f"fixture {fixture_id!r} along its fallback chain",
+                context,
+                fixture_id,
+            )
+        states[fixture_id] = state
+    return states
+
+
+def _overlay_error(
+    message: str, context: TemplateCompileContext, fixture_id: str | None = None
+) -> PhysicalCompileError:
+    return PhysicalCompileError(
+        MHDiagnostic(
+            code="unsupported_attribute",
+            severity="error",
+            message=message,
+            fixture_id=fixture_id,
+            section_id=context.section_id,
+            action="rejected",
+        )
+    )
 
 
 def _resolve_phases(
@@ -627,7 +789,9 @@ def apply_entry_window(
         profiles: Each fixture's physical profile.
 
     Returns:
-        The kept cues, in input order, and one record per dropped cue.
+        The kept cues, in input order, and one record per dropped cue: its step's requested
+        bounds and the frames `[start_ms, end_ms)` it held, which for a lit slice or an
+        overlay part are that part's own.
     """
     kept: list[FixtureSegment] = []
     dropped: list[dict[str, str | int]] = []
@@ -658,6 +822,8 @@ def apply_entry_window(
                 "step_id": segment.step_id,
                 "requested_start_ms": int(segment.metadata["requested_t0_ms"]),
                 "requested_end_ms": int(segment.metadata["requested_t1_ms"]),
+                "start_ms": segment.t0_ms,
+                "end_ms": segment.t1_ms,
                 "entry_window_end_ms": window_end,
             }
         )

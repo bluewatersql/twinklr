@@ -702,10 +702,6 @@ _PROFILE_MUTATIONS: dict[str, Mutation] = {
         "preposition",
         lambda p: _set(p, ("discrete", "shutter", "closed_state"), None),
     ),
-    "discrete.open_state": (
-        "fingerprint",
-        lambda p: _set(p, ("discrete", "shutter", "open_state"), None),
-    ),
     "visibility": ("preposition", lambda p: _set(p, ("visibility",), {})),
     "visibility.dimmer_zero_extinguishes": (
         "darkness",
