@@ -1,9 +1,9 @@
 ---
 type: plan
-status: active
+status: complete
 area: engineering
 created: 2026-11-12
-updated: 2026-11-14
+updated: 2026-11-16
 ---
 
 # P2 — Reusable spatial composition Implementation Plan
@@ -771,6 +771,37 @@ with two medium findings, a fix round and an approving re-review):
 - **Left open (low).** `_predecessor`'s unknown-follow return is reachable only by a
   plan that skips the gate (a checkpoint) and is not exercised by a test.
 - **How the families look is `PENDING-OWNER`.**
+
+P2.5, 2026-11-16 (commit `6c8bcd33`; reviewed separately from its author: an approving
+review with six low findings, a fix round and a confirmation):
+
+- **`InitialFixtureState.zoom_deg` is a new required setting on a zoom rig.** The
+  planner needs a known starting zoom; the field is refused on a profile without a zoom
+  axis. A zoom rig whose initial state lacks it is refused at the gate ("no initial
+  zoom").
+- **`pipeline.py` was edited, outside the task's file list.** Section entry windows
+  count zoom travel; the trace gains `omitted_optional`, written only when a cue
+  dropped its zoom.
+- **A step without a zoom spec on a zoom rig holds the default byte explicitly,** so
+  the transaction pass can hold zoom between cues. Bytes are unchanged.
+- **Zoom follows the movement's phase at the head's pan offset.** A preset cannot patch
+  `physical_zoom`, so `zoom_wave`'s `narrow` narrows only the sway; `slow` slows both.
+- **`zoom_wave` is authored for 4/4** like the other families: left out in 3/4, and in
+  6/8 by its `slow` preset. On a rig without a zoom axis it is excluded through P2.4c's
+  admission with the reason "no zoom axis".
+- **The honesty check now covers zoom:** held through every gap and settled before a
+  reveal.
+- **16-channel pilot profile.** `zoom_pilot_profile_payload` in
+  `tests/support/mh_physical.py`: every offset in 1–16, zoom on 9, 10°–40° over bytes
+  20–220, labelled synthetic. No real fixture value is claimed; real-profile acceptance
+  is `PENDING-OWNER`.
+- **Evidence at review.** 1,280 renders on 320 rigs including 1,882 `zoom_wave`
+  sections: no exception, no dishonest frame, deterministic, 560 subset comparisons
+  identical. 200 zoomless family renders match the previous commit. 22 mutations, all
+  but one redundant check caught after the fix round.
+- **Gate time (reviewer, machine under load).** Zoom rig, 21 combinations: 56.0 s
+  steady, 61.6 s variable tempo. Zoomless rig: 40.8 s, unchanged by this task. Target
+  20 s; not met in Phase 2 (see the exit evidence).
 
 ## Phase exit
 

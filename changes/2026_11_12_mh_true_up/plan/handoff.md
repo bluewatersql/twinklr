@@ -313,3 +313,54 @@ Next action: owner go-ahead for the merge, the xLights test, and Phase 2.
 
 Next action: Phase 2 kickoff recheck, then P2 tasks.
 
+## Phase 2 implementation — 2026-11-16
+
+Status: **Phase 2 complete on `feat/mh-true-up-p2` and merged to `main` on owner
+direction of 2026-11-16.** Phase 3 needs its own go-ahead.
+
+Delivered, all opt-in under `physical_v2`: silent song edges held dark; named position
+and attribute presets; rig topology with independent phase domains; relative paths and
+finite (`ONCE`) motion; visibility windows and masked wheel overlays; per-fixture
+section-entry repositioning with declared fallbacks; a pre-planning gate that offers
+only templates the rig can render; seven physical families in
+`catalog/templates/moving_heads_physical/` (six plus the `zoom_wave` pilot); a zoom
+axis with a DMX subrange. Default `legacy_v1` output is byte-identical. Tasks, commits
+and review rounds are in the
+[exit evidence](../evidence/2026-11-16-p2-exit/README.md); decisions are in
+[phase-2-composition.md](phase-2-composition.md#decisions-and-carry-forwards-recorded-during-execution).
+
+Validation: `make validate` on `9d0fb9ce` passed, 6800 passed and 39 skipped, tree
+clean before and after; no golden or regression file changed. The closeout documents
+were committed after that run and are documentation only.
+
+xLights: the six families were rendered on a scratch show on owner authorization;
+xLights 2026.20 reproduced all 376,384 bytes and a house-preview video was exported
+([result](../evidence/2026-11-16-p2-xlights-result/README.md)).
+
+Integrator decisions the owner has not confirmed (listed in the exit evidence):
+`on_unplayable` defaults to `"dark"`; an unknown entry bound fails any template;
+families are 4/4 only; the gate-time target was missed and carried forward.
+
+Open items:
+
+- **Owner: look acceptance** of the families, section-entry dips, dark song edges and
+  dark-dropped cues. `PENDING-OWNER`. The preview video is at
+  `~/xlights/_twinklr_verify/p2_show/out/`.
+- **Owner: hardware accuracy,** and the zoom pilot on a real fixture profile
+  (`zoom_pilot_profile_payload` is the 16-channel synthetic starting point).
+  `PENDING-OWNER`.
+- **Gate time:** 36–62 s before planning on 8 heads against a 20 s target. Known safe
+  cut: cache path and phase values for periodic kernels. Do this before Phase 3 adds
+  variants to the gate.
+- **Phase 3 carries:** binding planner intensity to family variants (P3-T3);
+  per-preset eligibility (P3-T2); render feasibility in planner validation (P3-T3).
+- **Not yet exercised:** a full `twinklr run` with a live planner on the physical
+  path, and any real-audio beat grid.
+
+Knowledge promotion: `context/current-state.md` now describes the physical path as it
+stands. No decision is promoted to `memories/`: the path still has no hardware or look
+acceptance.
+
+Next action: owner review of the preview video and the integrator decisions, then a
+go-ahead for Phase 3.
+
