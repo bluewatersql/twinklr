@@ -364,3 +364,55 @@ acceptance.
 Next action: owner review of the preview video and the integrator decisions, then a
 go-ahead for Phase 3.
 
+
+## Phase 3 in progress — 2026-11-16
+
+Status: **Phase 3 started on `feat/mh-true-up-p3` (cut from `main` at `7356b376`); not
+merged.** The plan of record is [phase-3-arrangement.md](phase-3-arrangement.md): its
+original text is superseded where its dated amendments say so. Read the amendments
+first.
+
+What changed the phase's shape, all owner decisions of 2026-11-16:
+
+- **Single path.** No backward-compatibility layers; the physical renderer becomes the
+  only moving-head path ([guardrail 9](../../shared/agent_guardrails.md)). The old
+  renderer is deleted only after the owner views a real-audio physical render and
+  accepts it. The inventory for that cutover is
+  [cutover-inventory.md](cutover-inventory.md).
+- **Robustness first.** The first real-audio gate on the owner's rig admitted one
+  family of seven ([evidence](../evidence/2026-11-16-p3-real-audio-gate/README.md)), so
+  the beat grid and family adaptation are fixed before any viewing.
+- Targets cut from Phase 3; density simplified; the deterministic selector and the
+  three-arm experiment are ported at the cutover, not kept beside a new one;
+  `regenerate` re-renders the whole song; profile fields get defaults.
+
+Done and committed on the branch:
+
+| Work | Commits | State |
+|---|---|---|
+| Gate-time cut (57 s → 17 s in 4/4, output identical) | `3113d062`, `512ae0cc` | Reviewed twice; `make validate` passed on `3113d062` |
+| Per-preset admission (D9) | `647eed83` | Reviewed; `make validate` passed |
+| Beat-grid fix (meter, tempo octave, downbeats) | `5145fb3d`, `8b23a36d`, `16b3e170`, `3431c7ba` | Reviewed twice and verified; [record](../evidence/2026-11-16-p3-beat-grid-fix/README.md); full gate not yet run on the branch with it |
+
+In progress when this was written (uncommitted or on side branches):
+
+- **Family adaptation** (variant ladder, whole-period cycles, renderer revision 2), in
+  the worktree, under its review fix round: gate time outside 4/4, the render
+  fingerprint, entry-dip fixpoint, tests and docs.
+- **Profile defaults (C1.0)** on `feat/mh-profile-defaults` in an agent worktree.
+
+Next actions, in order:
+
+1. Land the family adaptation (re-review, commit), cherry-pick profile defaults after
+   review, run `make validate` on the branch.
+2. Rerun the offline gate for Need A Favor on the corrected grid with the owner rig
+   at 150°/s.
+3. Viewing render and old-renderer reference on the corrected grid, in the expendable
+   show `~/xlights/_twinklr_verify/p3_view/`, with a side-by-side preview video. Inputs
+   and limits are in the brief's approvals table. The look verdict is `PENDING-OWNER`.
+4. After acceptance only: the cutover (C1), then the planner tasks T1–T5 with one
+   contract.
+
+Open for the owner: bar placement by ear on their songs; the three songs left at
+147.7 BPM; whether to keep a tempo-change detector (removed as unused); the integrator
+decisions listed in the Phase 3 plan.
