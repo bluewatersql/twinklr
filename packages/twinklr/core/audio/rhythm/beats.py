@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from itertools import pairwise
+import math
 from typing import Any
 
 import librosa
 import numpy as np
 
-from twinklr.core.audio.utils import frames_to_time, normalize_to_0_1
+from twinklr.core.audio.utils import frames_to_time
 
 
 def compute_beats(
@@ -53,6 +54,13 @@ _NULL_SEED = 0
 TRIPLE_METER_MARGIN = 0.10
 # Fewest tracker beats (eight 4-beat cycles) on which the octave evidence is tested.
 _OCTAVE_MIN_BEATS = 32
+# Fewest winning bars for downbeat evidence to decide (eight bars, as above): a handful
+# of outsized chord changes, such as section changes, cannot place the bar alone.
+_MIN_EVIDENCE_GROUPS = 8
+# Smallest chroma change (1 - cosine) counted as a chord change. Two triads sharing two
+# notes differ by 1/3; the timbre-only chroma flicker in the MIR fixtures stays below
+# 0.05 and section changes reach ~0.97.
+_MIN_CHORD_CHANGE = 0.05
 
 
 def _beat_strengths(onset_env: np.ndarray, beat_frames: np.ndarray) -> np.ndarray:
@@ -202,6 +210,10 @@ def detect_time_signature(
     (3/4 or 6/8) beats the duple evidence (2/4 or 4/4) by ``TRIPLE_METER_MARGIN``; duple
     evidence is reported as 4/4 because accents alone do not separate 2/4 from 4/4.
 
+    ``confidence`` is 1 minus the permutation p-value of the deciding grouping: the share
+    of shuffled-beat arrangements whose best-phase score the observed score exceeds
+    (0.5 is chance; 0.95 or more means a significant bar accent at p < 0.05).
+
     Args:
         beat_frames: Beat frame indices
         onset_env: Onset strength envelope
@@ -215,35 +227,107 @@ def detect_time_signature(
     strengths = _beat_strengths(onset_env, beat_frames)
 
     if strengths.size < 12:
-        return {"time_signature": "4/4", "confidence": 0.3, "method": "default"}
+        return {"time_signature": "4/4", "confidence": 0.0, "method": "default"}
 
     z = _zscore(strengths)
     shuffled = _shuffles(z, _NULL_SHUFFLES)
     excess: dict[int, float] = {}
+    beaten: dict[int, float] = {}
     for n in (2, 3, 4, 6):
         if len(z) < n * 3:
-            excess[n] = 0.0
+            excess[n], beaten[n] = 0.0, 0.0
             continue
-        baseline = float(np.mean([_best_phase_grouping(s, n) for s in shuffled]))
-        excess[n] = _best_phase_grouping(z, n) - baseline
+        observed = _best_phase_grouping(z, n)
+        null = np.array([_best_phase_grouping(s, n) for s in shuffled])
+        excess[n] = observed - float(null.mean())
+        beaten[n] = 1.0 - (1.0 + float(np.sum(null >= observed))) / (1.0 + len(null))
 
-    duple = max(excess[2], excess[4])
-    triple = max(excess[3], excess[6])
-    if triple > duple + TRIPLE_METER_MARGIN and triple > TRIPLE_METER_MARGIN:
-        signature = "3/4" if excess[3] >= excess[6] else "6/8"
-        best = triple
+    duple_n = 4 if excess[4] >= excess[2] else 2
+    triple_n = 3 if excess[3] >= excess[6] else 6
+    if (
+        excess[triple_n] > excess[duple_n] + TRIPLE_METER_MARGIN
+        and excess[triple_n] > TRIPLE_METER_MARGIN
+    ):
+        signature, deciding = ("3/4" if triple_n == 3 else "6/8"), triple_n
     else:
-        signature, best = "4/4", duple
+        signature, deciding = "4/4", duple_n
+    best = excess[deciding]
 
     return {
         "time_signature": signature,
-        "confidence": float(np.clip(best, 0.0, 1.0)),
+        "confidence": round(beaten[deciding], 3),
         "method": "accent_pattern" if best > TRIPLE_METER_MARGIN else "default",
         "all_scores": {
             label: round(excess[n], 3)
             for label, n in (("2/4", 2), ("3/4", 3), ("4/4", 4), ("6/8", 6))
         },
     }
+
+
+def _group_wins(values: np.ndarray, n: int, floor: float = 0.0) -> np.ndarray:
+    """Per phase, the n-beat groups (from beat 0) where it is the strict maximum >= floor."""
+    k = len(values) // n
+    groups = values[: k * n].reshape(k, n)
+    top = groups.max(axis=1, keepdims=True)
+    counted = (np.sum(groups == top, axis=1) == 1) & (top[:, 0] >= floor)
+    return np.bincount(groups.argmax(axis=1)[counted], minlength=n)
+
+
+def _phase_wins_test(values: np.ndarray, n: int, floor: float = 0.0) -> tuple[int, float, bool]:
+    """Phase that most often holds the group maximum, as (phase, 1 - p, decisive).
+
+    p is the permutation p-value of its win count against shuffled beats. Decisive
+    needs p < 0.05 and at least ``_MIN_EVIDENCE_GROUPS`` wins.
+    """
+    wins = _group_wins(values, n, floor)
+    phase = int(np.argmax(wins))
+    null = np.array([_group_wins(s, n, floor).max() for s in _shuffles(values, 2 * _NULL_SHUFFLES)])
+    p_value = (1.0 + float(np.sum(null >= wins[phase]))) / (1.0 + len(null))
+    decisive = p_value < 0.05 and int(wins[phase]) >= _MIN_EVIDENCE_GROUPS
+    return phase, 1.0 - p_value, decisive
+
+
+def _pair_test(
+    values: np.ndarray, n: int, a: int, b: int, floor: float = 0.0
+) -> tuple[int, float, bool]:
+    """Which of bar phases a and b is larger in more bars, as (phase, 1 - p, decisive).
+
+    p is the exact two-sided sign-test p-value over bars where the two differ and the
+    larger reaches ``floor``. Decisive needs p < 0.05 and at least
+    ``_MIN_EVIDENCE_GROUPS`` wins.
+    """
+    count = min(len(values[a::n]), len(values[b::n]))
+    first, second = values[a::n][:count], values[b::n][:count]
+    counted = np.maximum(first, second) >= floor
+    a_wins = int(np.sum((first > second) & counted))
+    b_wins = int(np.sum((second > first) & counted))
+    decided, top = a_wins + b_wins, max(a_wins, b_wins)
+    tail = sum(math.comb(decided, i) for i in range(top, decided + 1)) / 2.0**decided
+    p_value = min(1.0, 2.0 * tail) if decided else 1.0
+    winner = a if a_wins >= b_wins else b
+    return winner, 1.0 - p_value, p_value < 0.05 and top >= _MIN_EVIDENCE_GROUPS
+
+
+def _downbeat_phase(onset: np.ndarray, change: np.ndarray, n: int) -> tuple[int, float, str]:
+    """Bar phase from chord changes first, onset accents second (see the caller)."""
+    if n % 2 == 0:
+        half = n // 2
+        parity, parity_conf, parity_ok = _phase_wins_test(change, half, _MIN_CHORD_CHANGE)
+        if parity_ok:
+            first, second = parity, parity + half
+            phase, pair_conf, pair_ok = _pair_test(change, n, first, second, _MIN_CHORD_CHANGE)
+            if pair_ok:
+                return phase, min(parity_conf, pair_conf), "harmonic_change"
+            phase, pair_conf, _ = _pair_test(onset, n, first, second)
+            return phase, min(parity_conf, pair_conf), "harmonic_change+onset"
+    phase, conf, decisive = _phase_wins_test(change, n, _MIN_CHORD_CHANGE)
+    if decisive:
+        return phase, conf, "harmonic_change"
+    phase, conf, decisive = _phase_wins_test(onset, n)
+    if decisive:
+        return phase, conf, "onset_accent"
+    _, phase = _phase_contrast(_zscore(onset), n)
+    return phase, 0.0, "fallback"
 
 
 def detect_downbeats_phase_aligned(
@@ -255,9 +339,24 @@ def detect_downbeats_phase_aligned(
     chroma_cqt: np.ndarray,
     beats_per_bar: int,
 ) -> dict[str, Any]:
-    """Detect downbeats by choosing a global phase offset.
+    """Detect downbeats by choosing a global bar phase.
 
-    Maximizes onset strength + harmonic change at downbeat positions.
+    Chord changes mark bar starts more reliably than loudness: in backbeat music the
+    snare on 2 and 4 is the loudest beat. Evidence is counted per bar (which phase holds
+    the bar's largest value), so a few outsized events cannot decide alone.
+
+    1. Even bars: if one half-bar phase holds the largest chord change in significantly
+       many half-bars, the downbeat is that phase or the one half a bar later. Chord
+       change chooses between the two when it differs significantly; otherwise the
+       onset accent breaks the beat-1 / beat-3 tie (method ``harmonic_change+onset``).
+    2. Otherwise the bar phase holding the largest chord change, if significant.
+    3. Otherwise the bar phase holding the largest onset accent, if significant.
+    4. Otherwise the phase with the highest mean onset (method ``fallback``).
+
+    "Significant" is p < 0.05 with at least eight winning bars; a chord change counts
+    only from ``_MIN_CHORD_CHANGE``.
+    ``phase_confidence`` is 1 minus the largest p-value among the tests that decided
+    the phase (0.95 or more: every deciding test significant), and 0.0 for the fallback.
 
     Args:
         beat_frames: Beat frame indices
@@ -268,43 +367,28 @@ def detect_downbeats_phase_aligned(
         beats_per_bar: Number of beats per bar
 
     Returns:
-        Dict with downbeats, phase, phase_confidence
+        Dict with downbeats, phase, phase_confidence, method
     """
     if beats_per_bar < 2:
         beats_per_bar = 4
     if len(beat_frames) < beats_per_bar * 2:
-        return {"downbeats": [], "phase": 0, "phase_confidence": 0.0}
+        return {"downbeats": [], "phase": 0, "phase_confidence": 0.0, "method": "default"}
 
-    bf = np.clip(beat_frames.astype(int), 0, len(onset_env) - 1)
-    onset = np.asarray(onset_env[bf], dtype=np.float32)
-
-    # Harmonic change proxy: cosine distance between consecutive beat chroma vectors
-    idx = np.clip(bf, 0, chroma_cqt.shape[1] - 1)
-    C = np.asarray(chroma_cqt[:, idx], dtype=np.float32)  # 12 x nbeats
-    norms = np.linalg.norm(C, axis=0) + 1e-9
-    Cn = C / norms
-
-    harm_change = np.zeros(Cn.shape[1], dtype=np.float32)
-    if Cn.shape[1] > 1:
-        harm_change[1:] = 1.0 - np.sum(Cn[:, 1:] * Cn[:, :-1], axis=0)
-
-    score = 0.7 * normalize_to_0_1(onset) + 0.3 * normalize_to_0_1(harm_change)
-
-    phase_scores = [float(score[p::beats_per_bar].sum()) for p in range(beats_per_bar)]
-    best_phase = int(np.argmax(phase_scores))
-
-    sorted_scores = sorted(phase_scores, reverse=True)
-    if len(sorted_scores) >= 2 and sorted_scores[0] > 0.1:
-        # Confidence = margin between best and second-best, normalized
-        phase_conf = float((sorted_scores[0] - sorted_scores[1]) / sorted_scores[0])
-        phase_conf = np.clip(phase_conf, 0.0, 1.0)
-    else:
-        phase_conf = 0.0
+    beat_frames = np.asarray(beat_frames, dtype=int)
+    onset = _beat_strengths(onset_env, beat_frames)
+    change = _harmonic_change(chroma_cqt, beat_frames)
+    best_phase, phase_conf, method = _downbeat_phase(onset, change, beats_per_bar)
+    phase_conf = round(float(phase_conf), 3)
 
     downbeat_idxs = np.arange(best_phase, len(beat_frames), beats_per_bar)
     downbeats = []
     for bi in downbeat_idxs:
         t = float(frames_to_time(np.array([beat_frames[bi]]), sr=sr, hop_length=hop_length)[0])
-        downbeats.append({"beat_index": int(bi), "time_s": t, "confidence": float(phase_conf)})
+        downbeats.append({"beat_index": int(bi), "time_s": t, "confidence": phase_conf})
 
-    return {"downbeats": downbeats, "phase": best_phase, "phase_confidence": float(phase_conf)}
+    return {
+        "downbeats": downbeats,
+        "phase": best_phase,
+        "phase_confidence": phase_conf,
+        "method": method,
+    }

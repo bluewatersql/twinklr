@@ -37,12 +37,13 @@ T = TypeVar("T", bound=BaseModel)
 # written before the bump are rejected on load (CacheKey.step_version mismatch).
 # "5" — source selection and source-separation add explicit provenance/stem
 # status and change rhythm, structure, build/drop, vocal, and lyrics-gating inputs.
-# "6" — DSP meter detection is phase-aware and chance-corrected, and the tempo
-# octave is resolved from backbeat evidence (recorded as time_signature.tempo_octave).
+# "6" — DSP meter detection is phase-aware and chance-corrected, the tempo octave is
+# resolved from backbeat evidence (recorded as time_signature.tempo_octave), and the
+# downbeat phase follows chord changes (DSP source twinklr-dsp-v2).
 AUDIO_FEATURES_CACHE_VERSION = "6"
 
 _MIR_SOURCE_VERSIONS = {
-    "dsp": "twinklr-dsp-v1",
+    "dsp": "twinklr-dsp-v2",
     "beat_this": "1.1.0",
     "allinone": "1.0.6",
 }

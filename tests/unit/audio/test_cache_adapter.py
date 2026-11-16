@@ -73,6 +73,14 @@ class TestComputeAudioHash:
         assert "dsp" in dsp
         assert "beat_this" in beat_this
 
+    def test_analysis_fingerprint_names_the_running_dsp_version(self) -> None:
+        from twinklr.core.audio.mir.sources import DSPSource
+
+        fingerprint = audio_analysis_fingerprint(AudioProcessingConfig())
+
+        assert f"rhythm=dsp@{DSPSource.version};" in fingerprint
+        assert DSPSource.version == "twinklr-dsp-v2"
+
     @pytest.mark.asyncio
     async def test_hash_uses_full_file_not_prefix_only(self) -> None:
         """Files sharing first 10MB but differing later must hash differently."""

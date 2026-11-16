@@ -558,6 +558,179 @@ class TestMeterIsPhaseAwareAndChanceCorrected:
 
         assert first == second
 
+    @pytest.mark.parametrize(("pattern", "downbeat_phase", "expected"), _METER_CASES)
+    def test_confidence_is_share_of_shuffles_beaten(
+        self, pattern: list[float], downbeat_phase: int, expected: str
+    ) -> None:
+        """A clear accent pattern beats (almost) every shuffled arrangement of its beats."""
+        beat_frames, onset_env = _accent_grid(pattern, downbeat_phase=downbeat_phase)
+
+        result = detect_time_signature(beat_frames=beat_frames, onset_env=onset_env)
+
+        assert result["confidence"] >= 0.95
+
+    def test_confidence_is_low_without_accent_structure(self) -> None:
+        rng = np.random.default_rng(3)
+        beat_frames = np.arange(72, dtype=int) * 21 + 10
+        onset_env = np.zeros(int(beat_frames[-1]) + 30, dtype=np.float32)
+        onset_env[beat_frames] = rng.random(len(beat_frames)).astype(np.float32)
+
+        result = detect_time_signature(beat_frames=beat_frames, onset_env=onset_env)
+
+        assert 0.0 <= result["confidence"] < 0.95
+
+
+def _bar_grid(
+    *,
+    onset_pattern: list[float],
+    chord_positions: set[int],
+    downbeat_phase: int,
+    chords: list[tuple[int, ...]],
+    n_bars: int = 24,
+    seed: int = 0,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Beat frames, onset envelope and chroma for bars of ``len(onset_pattern)`` beats.
+
+    The bar starts at beat index ``downbeat_phase``. The chord advances through
+    ``chords`` on every bar position in ``chord_positions``.
+    """
+    rng = np.random.default_rng(seed)
+    beats_per_bar = len(onset_pattern)
+    n_beats = n_bars * beats_per_bar + downbeat_phase
+    beat_frames = np.arange(n_beats, dtype=int) * 21 + 10
+    n_frames = int(beat_frames[-1]) + 30
+    onset_env = rng.random(n_frames).astype(np.float32) * 0.02
+    chroma = rng.random((12, n_frames)).astype(np.float32) * 0.05
+    chord_index = 0
+    for index, frame in enumerate(beat_frames):
+        position = (index - downbeat_phase) % beats_per_bar
+        onset_env[frame] += max(0.0, onset_pattern[position] + rng.normal(0.0, 0.05))
+        if position in chord_positions:
+            chord_index += 1
+        for pitch in chords[chord_index % len(chords)]:
+            chroma[pitch, frame : frame + 21] += 1.0
+    return beat_frames, onset_env, chroma
+
+
+_C, _F, _G, _AM = (0, 4, 7), (5, 9, 0), (7, 11, 2), (9, 0, 4)
+
+
+class TestDownbeatPhaseFromHarmonicChange:
+    """Chord changes place the bar; onset accents only break a beat-1/beat-3 tie."""
+
+    def _downbeats(
+        self, beat_frames: np.ndarray, onset_env: np.ndarray, chroma: np.ndarray, bpb: int
+    ) -> dict[str, object]:
+        return detect_downbeats_phase_aligned(
+            beat_frames=beat_frames,
+            sr=SR,
+            hop_length=HOP,
+            onset_env=onset_env,
+            chroma_cqt=chroma,
+            beats_per_bar=bpb,
+        )
+
+    @pytest.mark.parametrize("downbeat_phase", range(4))
+    def test_backbeat_4_4_downbeat_is_a_chord_beat(self, downbeat_phase: int) -> None:
+        # Snare on 2 and 4 is the loudest beat; two chords alternate on 1 and 3.
+        beat_frames, onset_env, chroma = _bar_grid(
+            onset_pattern=[0.6, 1.0, 0.6, 1.0],
+            chord_positions={0, 2},
+            downbeat_phase=downbeat_phase,
+            chords=[_C, _G],
+        )
+
+        result = self._downbeats(beat_frames, onset_env, chroma, 4)
+
+        assert result["phase"] % 2 == downbeat_phase % 2
+
+    @pytest.mark.parametrize("downbeat_phase", range(4))
+    def test_backbeat_kick_on_1_breaks_the_beat_1_3_tie(self, downbeat_phase: int) -> None:
+        beat_frames, onset_env, chroma = _bar_grid(
+            onset_pattern=[0.75, 1.0, 0.55, 1.0],
+            chord_positions={0, 2},
+            downbeat_phase=downbeat_phase,
+            chords=[_C, _G],
+        )
+
+        result = self._downbeats(beat_frames, onset_env, chroma, 4)
+
+        assert result["phase"] == downbeat_phase
+        assert result["method"] == "harmonic_change+onset"
+
+    @pytest.mark.parametrize("downbeat_phase", range(4))
+    def test_chord_on_beat_1_only_decides_without_onset(self, downbeat_phase: int) -> None:
+        # Backbeat accents would put the bar on beat 2 or 4; the chord change says beat 1.
+        beat_frames, onset_env, chroma = _bar_grid(
+            onset_pattern=[0.6, 1.0, 0.6, 1.0],
+            chord_positions={0},
+            downbeat_phase=downbeat_phase,
+            chords=[_C, _F, _G, _AM],
+        )
+
+        result = self._downbeats(beat_frames, onset_env, chroma, 4)
+
+        assert result["phase"] == downbeat_phase
+        assert result["method"] == "harmonic_change"
+        assert result["phase_confidence"] >= 0.95
+
+    @pytest.mark.parametrize("downbeat_phase", range(4))
+    def test_downbeat_accented_4_4_without_chord_changes(self, downbeat_phase: int) -> None:
+        beat_frames, onset_env, chroma = _bar_grid(
+            onset_pattern=[1.0, 0.45, 0.65, 0.45],
+            chord_positions=set(),
+            downbeat_phase=downbeat_phase,
+            chords=[_C],
+        )
+
+        result = self._downbeats(beat_frames, onset_env, chroma, 4)
+
+        assert result["phase"] == downbeat_phase
+        assert result["method"] == "onset_accent"
+        assert result["phase_confidence"] >= 0.95
+
+    @pytest.mark.parametrize("downbeat_phase", range(4))
+    def test_downbeat_accented_4_4_with_chords_on_1(self, downbeat_phase: int) -> None:
+        beat_frames, onset_env, chroma = _bar_grid(
+            onset_pattern=[1.0, 0.45, 0.65, 0.45],
+            chord_positions={0},
+            downbeat_phase=downbeat_phase,
+            chords=[_C, _F, _G, _AM],
+        )
+
+        result = self._downbeats(beat_frames, onset_env, chroma, 4)
+
+        assert result["phase"] == downbeat_phase
+
+    @pytest.mark.parametrize("downbeat_phase", range(3))
+    def test_waltz_at_every_phase(self, downbeat_phase: int) -> None:
+        beat_frames, onset_env, chroma = _bar_grid(
+            onset_pattern=[1.0, 0.4, 0.4],
+            chord_positions={0},
+            downbeat_phase=downbeat_phase,
+            chords=[_C, _F, _G, _AM],
+        )
+
+        result = self._downbeats(beat_frames, onset_env, chroma, 3)
+
+        assert result["phase"] == downbeat_phase
+        assert result["phase_confidence"] >= 0.95
+
+    def test_no_evidence_falls_back_deterministically_with_zero_confidence(self) -> None:
+        rng = np.random.default_rng(5)
+        beat_frames = np.arange(96, dtype=int) * 21 + 10
+        n_frames = int(beat_frames[-1]) + 30
+        onset_env = np.zeros(n_frames, dtype=np.float32)
+        onset_env[beat_frames] = rng.random(len(beat_frames)).astype(np.float32)
+        chroma = rng.random((12, n_frames)).astype(np.float32)
+
+        first = self._downbeats(beat_frames, onset_env, chroma, 4)
+        second = self._downbeats(beat_frames, onset_env, chroma, 4)
+
+        assert first == second
+        assert first["method"] == "fallback"
+        assert first["phase_confidence"] == 0.0
+
 
 class TestResolveTempoOctave:
     """The tracker's tempo is halved only on backbeat evidence (see resolve_tempo_octave)."""

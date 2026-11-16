@@ -119,7 +119,7 @@ class DSPSource:
     """The existing librosa + Twinklr phase-voting/structure implementation."""
 
     name = "dsp"
-    version = "twinklr-dsp-v1"
+    version = "twinklr-dsp-v2"
 
     def analyze_rhythm(self, inputs: MIRInput) -> RhythmAnalysis:
         tracker_bpm, tracker_frames = compute_beats(

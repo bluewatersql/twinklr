@@ -263,6 +263,8 @@ def choose_downbeat_phase(
 
 That’s not the whole production version, but it captures the shape of it: test each phase, reward the one whose “first beats” are strongest.
 
+The current `detect_downbeats_phase_aligned()` in `packages/twinklr/core/audio/rhythm/beats.py` turns that order around, because loudest-beat-wins puts the bar on the snare in backbeat music. Chord change comes first: each bar (or half-bar) votes for the beat that holds its biggest chord change, and the vote counts only if it beats shuffled beats (p < 0.05) with at least eight winning bars. In 4/4 the half-bar vote says “beats 1 and 3”; chord change then picks between them if it can, and otherwise the louder of the two breaks the tie (so beat 1 versus beat 3 can stay genuinely uncertain). Without usable chord evidence the onset-accent vote decides, and without that the loudest phase is a labelled fallback. `phase_confidence` is 1 minus the largest p-value among the votes that decided, and 0.0 for the fallback.
+
 ![Beat strip grouped into 1-2-3-4 with downbeats highlighted](assets/illustrations/ILL-01-03.png)
 
 Once we had a downbeat phase, we could turn generic beats into bars. And once we had bars, we could hand the whole thing off to the timing layer that the rest of the system actually trusts.
@@ -296,7 +298,7 @@ def _grouping_score(z: np.ndarray, n: int, phase: int) -> float:
 # excess[n] = best-phase score - mean best-phase score over 100 seeded shuffles
 ```
 
-The answer is **4/4** unless the triple evidence (3/4 or 6/8) beats the duple evidence by more than 0.10. Accents alone cannot tell **2/4** from **4/4**, so duple meters are reported as 4/4.
+The answer is **4/4** unless the triple evidence (3/4 or 6/8) beats the duple evidence by more than 0.10. Accents alone cannot tell **2/4** from **4/4**, so duple meters are reported as 4/4. The reported confidence is the share of shuffled-beat arrangements the winning grouping beats: 0.5 is chance, and 0.95 or more is a significant bar accent.
 
 The point isn’t to become a full musicology engine. The point is to avoid dumb mistakes.
 
