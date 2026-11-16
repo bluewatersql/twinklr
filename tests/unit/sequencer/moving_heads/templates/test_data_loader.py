@@ -9,6 +9,7 @@ import pytest
 
 from twinklr.core.config.fixtures.dmx import DmxMapping
 from twinklr.core.config.fixtures.instances import FixtureConfig, FixtureInstance
+from twinklr.core.config.models import JobConfig
 from twinklr.core.curves.registry import CurveRegistry
 from twinklr.core.sequencer.models.context import (
     FixtureContext,
@@ -55,6 +56,8 @@ from twinklr.core.sequencer.moving_heads.templates.converter import (
 )
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
     DEFAULT_DATA_TEMPLATE_DIR,
+    PHYSICAL_TEMPLATE_DIR,
+    admit_physical_catalog,
     load_template_document,
     load_templates_from_directory,
 )
@@ -196,6 +199,39 @@ def test_tracked_data_proofs_load_alongside_all_python_builtins_only_with_overri
         "figure8_mirror_strobe",
     ]
     assert len(registry.list_all()) == 37
+
+
+def test_physical_catalog_is_admitted_only_under_physical_v2() -> None:
+    """The family catalog sits outside the recursively loaded data directory and loads
+    only for a physical_v2 job, into the registry it is given, once however many runs
+    admit it, and a legacy run withdraws it; its documents' source names the catalog
+    directory."""
+    assert not PHYSICAL_TEMPLATE_DIR.is_relative_to(DEFAULT_DATA_TEMPLATE_DIR)
+    legacy = TemplateRegistry()
+    assert admit_physical_catalog(JobConfig(), registry=legacy) == []
+    assert legacy.list_all() == []
+
+    physical = JobConfig.model_validate(
+        {
+            "schema_version": "3.1",
+            "moving_heads": {"mode": "physical_v2", "initial_states": {}},
+        }
+    )
+    registry = TemplateRegistry()
+    loaded = admit_physical_catalog(physical, registry=registry)
+
+    assert loaded == [path.stem for path in sorted(PHYSICAL_TEMPLATE_DIR.glob("*.json"))]
+    assert len(loaded) == 6
+    for template_id in loaded:
+        source = Path(registry.source(template_id).removeprefix("data:"))
+        assert source.parent == PHYSICAL_TEMPLATE_DIR
+    assert len(list_templates()) == 37  # the shared registry is untouched
+
+    # A later run in the same process: again physical keeps them, legacy withdraws them.
+    assert admit_physical_catalog(physical, registry=registry) == loaded
+    assert len(registry.list_all()) == 6
+    assert admit_physical_catalog(JobConfig(), registry=registry) == []
+    assert registry.list_all() == []
 
 
 def test_explicit_override_replaces_python_source(tmp_path: Path) -> None:

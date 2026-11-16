@@ -1,7 +1,8 @@
 """Synthetic physical-renderer inputs: a fixture profile, a known initial state,
 physical fixture segments, the P1.6 pipeline case (rig, grid, job, plan and the
 test-only template), rig presets with steps that reference them, multi-head rigs
-with a topology, steps on relative paths, and visibility envelopes and attribute overlays.
+with a topology, steps on relative paths, visibility envelopes and attribute overlays,
+and the physical family catalog with a rig and job for it.
 
 In-memory payloads only; no owner profile or measured data.
 """
@@ -41,6 +42,7 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
 )
 from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
+    PHYSICAL_TEMPLATE_DIR,
     load_template_document,
     load_templates_from_directory,
 )
@@ -289,6 +291,60 @@ def physical_test_templates() -> Iterator[None]:
     finally:
         for template_id in loaded:
             REGISTRY._remove_registration(template_id)
+
+
+FAMILY_IDS = (
+    "finite_snap_hold",
+    "fly_in_cascade",
+    "fly_out_cascade",
+    "masked_wheel_flick",
+    "mirror_wings",
+    "target_orbit",
+)
+"""The physical family catalog (`PHYSICAL_TEMPLATE_DIR`), sorted."""
+
+
+@contextmanager
+def physical_catalog(*, admit: bool = True) -> Iterator[list[str]]:
+    """Admit the physical family catalog to the shared registry for one test (with
+    `admit=False`, leave that to the code under test) and restore the registry on exit:
+    every template registered inside the block is removed again."""
+    load_builtin_templates()
+    before = {info.template_id for info in REGISTRY.list_all()}
+    try:
+        yield load_templates_from_directory(PHYSICAL_TEMPLATE_DIR) if admit else []
+    finally:
+        for info in REGISTRY.list_all():
+            if info.template_id not in before:
+                REGISTRY._remove_registration(info.template_id)
+
+
+def family_rig(
+    fixture_ids: Sequence[str], *, topology: bool = True, presets: bool = True
+) -> FixtureGroup:
+    """`topology_rig` of `fixture_ids` with a declared topology and the `flick` attribute
+    preset `masked_wheel_flick` names (red, else blue on every other head), or without."""
+    library = {
+        "positions": {},
+        "attributes": {
+            "flick": {
+                "fixtures": {
+                    fixture_id: {"color": "red" if index % 2 == 0 else "blue"}
+                    for index, fixture_id in enumerate(fixture_ids)
+                }
+            }
+        },
+    }
+    return topology_rig(
+        fixture_ids,
+        topology=topology_payload(fixture_ids) if topology else None,
+        presets=library if presets else None,
+    )
+
+
+def family_job(fixture_ids: Sequence[str], **policy: Any) -> JobConfig:
+    """`physical_job` with every head of `fixture_ids` in the known dark initial state."""
+    return physical_job(initial_states=dict.fromkeys(fixture_ids, PHYSICAL_INITIAL_STATE), **policy)
 
 
 def physical_grid() -> BeatGrid:

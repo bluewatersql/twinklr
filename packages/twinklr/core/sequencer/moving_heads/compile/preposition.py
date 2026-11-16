@@ -594,6 +594,15 @@ class _FixturePlanner:
             for lock in locks
             if fixture_id in lock.fixture_ids
         )
+        # Encoded pose words by commanded value (`_word`) and travel times by word
+        # distance (`_travel_ms`), reused wherever a value recurs, as on every cycle of
+        # a periodic cue; both are exact and pure.
+        self._words: dict[ChannelName, dict[Fraction, int]] = {
+            channel: {} for channel in self.pose_channels
+        }
+        self._travel: dict[ChannelName, dict[int, Fraction]] = {
+            channel: {} for channel in self.pose_channels
+        }
 
     # --- Planning ---------------------------------------------------------------------
 
@@ -1278,9 +1287,8 @@ class _FixturePlanner:
         for channel in self.pose_channels:
             physical = segment.channels[channel].physical
             assert isinstance(physical, ContinuousTrajectory)
-            axis = self._axis(channel)
             commands = (
-                (t, axis.dmx_word(value))
+                (t, self._word(channel, value))
                 for t, value in _frame_levels(physical, segment.t0_ms, segment.t1_ms, self.frame_ms)
             )
             motion[channel], _ = self._follow(
@@ -1414,12 +1422,23 @@ class _FixturePlanner:
             ("settle_ms", axis.settle_ms),
         ]
 
+    def _word(self, channel: ChannelName, value: Fraction) -> int:
+        """The axis' `dmx_word` for a commanded value."""
+        words = self._words[channel]
+        if value not in words:
+            words[value] = self._axis(channel).dmx_word(value)
+        return words[value]
+
     def _travel_ms(self, channel: ChannelName, start: int, end: int) -> Fraction:
         """Time to travel between two encoded words at the configured speed."""
-        axis = self._axis(channel)
-        assert axis.travel_speed_per_s is not None
-        span = Fraction(axis.physical_max) - Fraction(axis.physical_min)
-        return abs(end - start) * span / axis.full_word * 1000 / Fraction(axis.travel_speed_per_s)
+        travel = self._travel[channel]
+        words = abs(end - start)
+        if words not in travel:
+            axis = self._axis(channel)
+            assert axis.travel_speed_per_s is not None
+            span = Fraction(axis.physical_max) - Fraction(axis.physical_min)
+            travel[words] = words * span / axis.full_word * 1000 / Fraction(axis.travel_speed_per_s)
+        return travel[words]
 
     def _wheel_settle(self, channel: ChannelName, state: str) -> int | None:
         return self.profile.discrete[DISCRETE_KEYS[channel]].states[state].settle_ms

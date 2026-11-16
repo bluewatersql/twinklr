@@ -1494,6 +1494,69 @@ def _unknown_tilt_latency(profile: dict[str, Any]) -> None:
     profile["axes"]["tilt"]["latency_ms"] = None
 
 
+def _unknown_white_settle(profile: dict[str, Any]) -> None:
+    """The white color state's settle unknown."""
+    profile["discrete"]["color"]["states"]["white"]["settle_ms"] = None
+
+
+@pytest.mark.parametrize(
+    ("edit", "docs", "template_ids", "refused", "term"),
+    [
+        pytest.param(
+            _unknown_tilt_latency,
+            (
+                physical_template_doc(
+                    "ha_closed_0", [hold_step("h", 0.0, physical_shutter_state="closed")]
+                ),
+                _straddling_pulse(0.0),
+            ),
+            ["ha_closed_0", "ha_pulse_0"],
+            "ha_pulse_0",
+            "axes.tilt.latency_ms",
+            id="tilt-latency",
+        ),
+        pytest.param(
+            _unknown_white_settle,
+            (
+                physical_template_doc(
+                    "u_red", [hold_step("r", 0.0, start=0.5, duration=0.5, physical_color="red")]
+                ),
+                physical_template_doc("u_white", [hold_step("w", 0.0, physical_color="white")]),
+            ),
+            ["u_red", "u_white"],
+            "u_white",
+            "discrete.color.states.white.settle_ms",
+            id="white-settle",
+        ),
+    ],
+)
+def test_a_user_template_without_an_entry_bound_is_refused_before_planning(
+    edit: Callable[[dict[str, Any]], None],
+    docs: tuple[TemplateDoc, ...],
+    template_ids: list[str],
+    refused: str,
+    term: str,
+) -> None:
+    """No section entry into it can be sized, so a template whose bound has an unknown
+    term on a fixture refuses the run, naming template, fixture and term. Admitted, the
+    white-settle case failed at render under `error` and rendered its section dark under
+    `dark` (P2.4c review M1)."""
+    with (
+        registered_templates(*docs),
+        pytest.raises(UnsupportedRenderModeError) as error,
+    ):
+        check_physical_templates(
+            template_ids,
+            beat_grid=_grid(*[500.0] * 8),
+            fixture_group=_rig(edit),
+            initial_states=physical_job().moving_heads.initial_states,
+            failure_mode="error",
+        )
+    message = str(error.value)
+    assert f"template {refused!r}: fixture 'MH1' has no worst-case section-entry bound" in message
+    assert term in message
+
+
 def _slow_settling(profile: dict[str, Any]) -> None:
     """45 degrees/s and a 100 ms open settle."""
     _slow()(profile)
@@ -1509,16 +1572,6 @@ def _slow_settling(profile: dict[str, Any]) -> None:
             (),
             id="earlier-cues-all-dropped",
         ),
-        pytest.param(
-            (("ha_closed_0", 1, 2), ("ha_pulse_0", 3, 6)),
-            _unknown_tilt_latency,
-            (
-                physical_template_doc(
-                    "ha_closed_0", [hold_step("h", 0.0, physical_shutter_state="closed")]
-                ),
-            ),
-            id="unknown-bound",
-        ),
     ],
 )
 def test_the_gate_admits_only_what_renders_on_every_entry_path(
@@ -1526,9 +1579,9 @@ def test_the_gate_admits_only_what_renders_on_every_entry_path(
     edit: Callable[[dict[str, Any]], None],
     docs: tuple[TemplateDoc, ...],
 ) -> None:
-    """Entries that need no dark window for other reasons than a fitting bound: a
-    predecessor sections back (the section between had every cue dropped), and an
-    unknown bound. `_render` gates first; each renders honestly."""
+    """An entry that needs no dark window for another reason than a fitting bound: a
+    predecessor sections back (the section between had every cue dropped). `_render`
+    gates first; it renders honestly."""
     _render(
         *sections,
         grid=_grid(*[500.0] * 8),

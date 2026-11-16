@@ -55,6 +55,11 @@ class MovingHeadStage:
         - "macro": list[MacroSection] (from MacroPlannerStage; full plan is in state)
     Output: ChoreographyPlan
 
+    State consumed:
+        - "template_admission": the render preflight's `TemplateAdmission`, when a
+          physical run has one; the planner is then offered its admitted templates
+          instead of `available_templates`
+
     State stored:
         - "choreography_plan": ChoreographyPlan (for downstream rendering)
         - "beat_grid": BeatGrid (for downstream rendering)
@@ -156,6 +161,7 @@ class MovingHeadStage:
         from twinklr.core.agents.shared.judge.controller import IterationResult
         from twinklr.core.pipeline.execution import execute_step
         from twinklr.core.pipeline.result import failure_result
+        from twinklr.core.sequencer.moving_heads.pipeline import TemplateAdmission
 
         try:
             # Extract inputs per pipeline stage contract
@@ -191,9 +197,19 @@ class MovingHeadStage:
                 groups=self.fixture_groups,
             )
 
+            # A physical run offers only what the render preflight admitted on this rig.
+            admission = context.get_state("template_admission")
+            offered = (
+                list(admission.admitted)
+                if isinstance(admission, TemplateAdmission)
+                else self.available_templates
+            )
+
             # Build template descriptions from registry metadata
             template_descriptions = (
-                self._build_template_descriptions() if self.include_template_metadata else None
+                self._build_template_descriptions(offered)
+                if self.include_template_metadata
+                else None
             )
 
             # Build planning context with macro plan coordination
@@ -204,7 +220,7 @@ class MovingHeadStage:
                 # Same grid the renderer places effects on, so the bar numbers the
                 # planner produces name the instants the renderer will use.
                 beat_grid=beat_grid,
-                available_templates=self.available_templates,
+                available_templates=offered,
                 macro_plan=macro_plan,
                 macro_planning_enabled=self.macro_planning_enabled,
                 template_descriptions=template_descriptions,
@@ -328,8 +344,14 @@ class MovingHeadStage:
         )
         return selected_profile, selected_lyrics, selected_macro
 
-    def _build_template_descriptions(self) -> list[Any] | None:
+    def _build_template_descriptions(
+        self, template_ids: list[str] | None = None
+    ) -> list[Any] | None:
         """Load template metadata from the registry for prompt enrichment.
+
+        Args:
+            template_ids: The templates offered to the planner; default
+                `available_templates`.
 
         Returns:
             List of TemplateDescription objects, or None if registry not available.
@@ -340,7 +362,7 @@ class MovingHeadStage:
             from twinklr.core.sequencer.moving_heads.templates.library import REGISTRY
 
             descriptions: list[TemplateDescription] = []
-            for tid in self.available_templates:
+            for tid in self.available_templates if template_ids is None else template_ids:
                 try:
                     doc = REGISTRY.get(tid, deep_copy=False)
                     tmpl = doc.template

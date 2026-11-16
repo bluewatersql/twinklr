@@ -1,0 +1,102 @@
+{
+  "template": {
+    "template_id": "fly_out_cascade",
+    "version": 1,
+    "name": "Fly-Out Cascade",
+    "category": "medium_energy",
+    "repeat": {
+      "mode": "JOINER",
+      "cycle_bars": 2.0,
+      "loop_step_ids": [
+        "fly"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "fly",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 2.0
+          }
+        },
+        "geometry": {},
+        "movement": {
+          "physical": {
+            "shape": "sweep",
+            "mode": "periodic",
+            "start_pan_deg": 0.0,
+            "start_tilt_deg": 30.0,
+            "pan_extent_deg": 45.0,
+            "tilt_extent_deg": 0.0,
+            "period_beats": 4.0
+          }
+        },
+        "dimmer": {},
+        "physical_reposition_fallback": "drop_accent",
+        "physical_distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "wings": 2,
+            "spread_cycles": 0.25
+          }
+        ],
+        "physical_visibility": {
+          "visible_phase_start": 0.25,
+          "visible_phase_end": 0.5
+        }
+      }
+    ],
+    "metadata": {
+      "tags": [
+        "physical_v2",
+        "fly",
+        "cascade",
+        "mirror"
+      ],
+      "recommended_sections": [
+        "chorus",
+        "build",
+        "drop"
+      ],
+      "energy_range": [
+        50,
+        100
+      ],
+      "description": "Mirrored wings sweep pan edge to edge each period; each head is lit only while it travels from the centre out to its own wing's edge and returns dark, the heads staggered in a cascade."
+    }
+  },
+  "presets": [
+    {
+      "preset_id": "narrow",
+      "name": "Narrow",
+      "step_patches": {
+        "fly": {
+          "movement": {
+            "physical": {
+              "pan_extent_deg": 30.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "slow",
+      "name": "Slow",
+      "step_patches": {
+        "fly": {
+          "movement": {
+            "physical": {
+              "period_beats": 8.0
+            }
+          }
+        }
+      }
+    }
+  ]
+}

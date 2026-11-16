@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import bisect
 from collections import defaultdict
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Collection, Iterator, Mapping, Sequence
+from dataclasses import dataclass
 from fractions import Fraction
 import hashlib
 from itertools import pairwise
@@ -518,6 +519,27 @@ def _wheel_states(
     return states
 
 
+@dataclass(frozen=True)
+class TemplateAdmission:
+    """What the pre-planning gate offers the planner (`check_physical_templates`).
+
+    `admitted` keeps the order the templates were given in. `exclusions` holds one
+    `{"template_id", "reason"}` per catalog template left out. `entry_dips` holds, per
+    admitted template, its worst-case section-entry dip: the largest `worst_case_entry_ms`
+    over its presets and fixtures, from any pose in the union of every admitted
+    template's poses and the initial pose, with any of their wheel states held, as
+    `{"fixture_id", "bound_ms", "beats"}`, `beats` at the song's shortest beat.
+    """
+
+    admitted: tuple[str, ...]
+    exclusions: tuple[dict[str, str], ...]
+    entry_dips: dict[str, dict[str, Any]]
+
+
+_Reach = tuple[dict[ChannelName, tuple[float, float]], dict[ChannelName, set[str]]]
+"""Per fixture, the pose range and the wheel states a template's cues hold."""
+
+
 def check_physical_templates(
     template_ids: Sequence[str],
     *,
@@ -526,7 +548,8 @@ def check_physical_templates(
     initial_states: Mapping[str, InitialFixtureState],
     failure_mode: FailureMode,
     on_unplayable: UnplayableMode = "error",
-) -> None:
+    excludable: Collection[str] = (),
+) -> TemplateAdmission:
     """Dry-compile templates on the rig, so a plan can only name ones that will render.
 
     Each template is compiled with no preset and with each preset it declares (the
@@ -553,9 +576,22 @@ def check_physical_templates(
     checked only under `on_unplayable="error"`, as best effort, from every start bar;
     under `dark` the render keeps any such cue dark instead (`plan_prepositions`).
 
+    Section entry is sized at render (`_enter_section`), so a template fails for its
+    entry only where `worst_case_entry_ms` has no bound on some fixture, naming the
+    fixture and the unknown profile terms. Each admitted template's worst-case dip is
+    reported (`TemplateAdmission.entry_dips`, and logged).
+
+    A template in `excludable` (the shipped physical catalog) that fails is left out
+    of the offer with its reason instead of refusing the run; any other failing
+    template refuses it.
+
+    Returns:
+        The admitted templates, the exclusions and the worst-case entry dips.
+
     Raises:
         UnsupportedRenderModeError: Naming each template, preset, step, fixture and
-            item that fails.
+            item that fails, for any template not in `excludable`, or for every
+            exclusion when none remains to admit.
     """
     from twinklr.core.sequencer.moving_heads.compile.physical import PhysicalCompileError
     from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
@@ -575,7 +611,8 @@ def check_physical_templates(
     start_limit, end_limit = physical_cue_limits(phase_map, duration_ms)
     sequence_end_ms = len(frame_times(duration_ms)) * EFFECT_GRID_MS
     bars = sum(1 for start in beat_grid.bar_boundaries if start < beat_grid.duration_ms)
-    failures: list[str] = []
+    failures: dict[str, list[str]] = defaultdict(list)
+    reach: dict[str, list[dict[str, _Reach]]] = defaultdict(list)
     for template_id in template_ids:
         document = get_template(template_id)
         repeat = document.template.repeat
@@ -650,8 +687,10 @@ def check_physical_templates(
                     notes = "; ".join(getattr(error, "__notes__", ()))
                     if notes:
                         notes += at.removeprefix(f"template {template_id!r}")
-                    failures.append(f"{notes or at}: {error}")
+                    failures[template_id].append(f"{notes or at}: {error}")
                     break
+                if whole:
+                    reach[template_id].append(_reach(compiled.segments, profiles))
                 if not plan:
                     continue
                 refusal = _plan_placement(
@@ -666,7 +705,7 @@ def check_physical_templates(
                     song_start=start_bar == 1,
                 )
                 if refusal:
-                    failures.append(
+                    failures[template_id].append(
                         f"{at}: dark repositioning between its own cues cannot be planned: "
                         + refusal
                     )
@@ -684,11 +723,184 @@ def check_physical_templates(
                         for later in range(2, bars + 1)
                         if bars - later + 1 >= repeat.cycle_bars - 1e-9
                     ]
-    if failures:
+    dips = _entry_dips(
+        {t: reach[t] for t in template_ids if t not in failures},
+        profiles,
+        initial_states,
+        failures,
+        shortest_beat_ms=min(
+            (later - earlier for earlier, later in pairwise(beat_grid.beat_boundaries)),
+            default=None,
+        ),
+    )
+    refused = [reason for t in template_ids if t not in excludable for reason in failures[t]]
+    if refused:
         raise UnsupportedRenderModeError(
             "moving_heads.mode 'physical_v2' would offer the planner templates this rig "
-            "cannot render: " + "; ".join(failures)
+            "cannot render: " + "; ".join(refused)
         )
+    exclusions = tuple(
+        {"template_id": t, "reason": "; ".join(failures[t])} for t in template_ids if failures[t]
+    )
+    admitted = tuple(t for t in template_ids if not failures[t])
+    if template_ids and not admitted:
+        raise UnsupportedRenderModeError(
+            "moving_heads.mode 'physical_v2' has no template this rig can render, so no "
+            "template remains to offer the planner: "
+            + "; ".join(exclusion["reason"] for exclusion in exclusions)
+        )
+    for exclusion in exclusions:
+        logger.warning(
+            "physical_v2: template %r is left out of the planner's offer: %s",
+            exclusion["template_id"],
+            exclusion["reason"],
+        )
+    for template_id, dip in dips.items():
+        logger.info(
+            "physical_v2: template %r enters a section dark for up to %s beat(s) at the "
+            "song's shortest beat (%s ms on fixture %r, from any admitted template)",
+            template_id,
+            dip["beats"],
+            dip["bound_ms"],
+            dip["fixture_id"],
+        )
+    return TemplateAdmission(admitted=admitted, exclusions=exclusions, entry_dips=dips)
+
+
+def _reach(
+    segments: Sequence[FixtureSegment], profiles: Mapping[str, FixtureCapabilities]
+) -> dict[str, _Reach]:
+    """Per fixture, every pose and wheel state a compiled section's cues hold."""
+    by_fixture: dict[str, list[FixtureSegment]] = defaultdict(list)
+    for segment in segments:
+        by_fixture[segment.fixture_id].append(segment)
+    reach: dict[str, _Reach] = {}
+    for fixture_id, own in by_fixture.items():
+        profile = profiles[fixture_id]
+        channels = [ch for ch in _POSE if AXIS_KEYS[ch] in profile.axes]
+        reach[fixture_id] = (
+            {ch: _pose_range(own, ch) for ch in channels},
+            _wheel_states(own, profile),
+        )
+    return reach
+
+
+def _entry_dips(
+    reach: Mapping[str, Sequence[Mapping[str, _Reach]]],
+    profiles: Mapping[str, FixtureCapabilities],
+    initial_states: Mapping[str, InitialFixtureState],
+    failures: dict[str, list[str]],
+    *,
+    shortest_beat_ms: float | None,
+) -> dict[str, dict[str, Any]]:
+    """Each template's worst-case section-entry dip. A template without a bound on some
+    fixture gets a failure instead, naming the fixture and the unknown terms: no section
+    entry into it can be sized.
+
+    The predecessor may be any template in `reach` or the initial state: per fixture,
+    the envelope is the union of their pose ranges and the initial pose, and the wheels
+    held are the union of their wheel states and the initial ones.
+    """
+    envelope: dict[str, dict[ChannelName, tuple[float, float]]] = {}
+    held: dict[str, dict[ChannelName, set[str]]] = defaultdict(lambda: defaultdict(set))
+    for fixture_id, initial in initial_states.items():
+        if fixture_id not in profiles:
+            continue
+        pose = {ChannelName.PAN: initial.pan_deg, ChannelName.TILT: initial.tilt_deg}
+        envelope[fixture_id] = {
+            ch: (pose[ch], pose[ch]) for ch in _POSE if AXIS_KEYS[ch] in profiles[fixture_id].axes
+        }
+        for channel in _WHEELS:
+            state = initial.discrete_states.get(DISCRETE_KEYS[channel])
+            if state is not None:
+                held[fixture_id][channel].add(state)
+    for presets in reach.values():
+        for per_fixture in presets:
+            for fixture_id, (poses, wheels) in per_fixture.items():
+                merged = envelope.setdefault(fixture_id, dict(poses))
+                for ch, (low, high) in poses.items():
+                    merged[ch] = (min(merged[ch][0], low), max(merged[ch][1], high))
+                for channel, states in wheels.items():
+                    held[fixture_id][channel] |= states
+
+    dips: dict[str, dict[str, Any]] = {}
+    for template_id, presets in reach.items():
+        worst: tuple[int, str] | None = None
+        unknown = ""
+        for per_fixture in presets:
+            for fixture_id, (poses, wheels) in sorted(per_fixture.items()):
+                profile = profiles[fixture_id]
+                bound = worst_case_entry_ms(
+                    profile,
+                    entry_pose=poses,
+                    entry_wheels=wheels,
+                    pose_envelope=envelope[fixture_id],
+                    held_wheels=held[fixture_id],
+                    frame_ms=EFFECT_GRID_MS,
+                )
+                if bound is None:
+                    unknown = (
+                        f"template {template_id!r}: fixture {fixture_id!r} has no worst-case "
+                        "section-entry bound, since its profile leaves "
+                        + ", ".join(_unknown_bound_terms(profile, wheels, held[fixture_id]))
+                        + " unknown"
+                    )
+                    break
+                if worst is None or bound > worst[0]:
+                    worst = (bound, fixture_id)
+            if unknown:
+                break
+        if unknown:
+            failures[template_id].append(unknown)
+        elif worst is not None:
+            bound, fixture_id = worst
+            dips[template_id] = {
+                "fixture_id": fixture_id,
+                "bound_ms": bound,
+                "beats": None if shortest_beat_ms is None else math.ceil(bound / shortest_beat_ms),
+            }
+    return dips
+
+
+def _unknown_bound_terms(
+    profile: FixtureCapabilities,
+    entry_wheels: Mapping[ChannelName, Collection[str]],
+    held_wheels: Mapping[ChannelName, Collection[str]],
+) -> list[str]:
+    """The profile terms `worst_case_entry_ms` needs for this entry and finds unknown."""
+    visibility = profile.visibility
+    terms = [] if visibility.close_latency_ms is not None else ["visibility.close_latency_ms"]
+    if not visibility.dimmer_zero_extinguishes:
+        shutter = profile.discrete.get("shutter")
+        if shutter is None or shutter.closed_state not in visibility.extinguishing_shutter_states:
+            terms.append("an extinguishing discrete.shutter.closed_state")
+        else:
+            terms += [
+                f"discrete.shutter.states.{state}.settle_ms"
+                for state in visibility.extinguishing_shutter_states
+                if shutter.states[state].settle_ms is None
+            ]
+    for channel in _WHEELS:
+        key = DISCRETE_KEYS[channel]
+        capability = profile.discrete.get(key)
+        if capability is None:
+            continue
+        terms += [
+            f"discrete.{key}.states.{state}.settle_ms"
+            for state in sorted(entry_wheels.get(channel, (capability.default_state,)))
+            if set(held_wheels.get(channel, ())) != {state}
+            and capability.states[state].settle_ms is None
+        ]
+    for channel in _POSE:
+        name = AXIS_KEYS[channel]
+        axis = profile.axes.get(name)
+        if axis is not None:
+            terms += [
+                f"axes.{name}.{term}"
+                for term in ("travel_speed_per_s", "latency_ms", "settle_ms")
+                if getattr(axis, term) is None
+            ]
+    return terms
 
 
 def _repeating_placements(
@@ -1043,6 +1255,7 @@ class RenderingPipeline:
         locks: Sequence[RenderLock] = (),
         layout_models: Sequence[Model] | None = None,
         layout_sha256: str | None = None,
+        admission_exclusions: Sequence[Mapping[str, str]] = (),
     ):
         """Initialize rendering pipeline.
 
@@ -1066,6 +1279,10 @@ class RenderingPipeline:
             layout_sha256: Content hash of the layout file, recorded in the physical
                 trace as evidence. Not render identity: the check passes or refuses
                 and never changes a byte.
+            admission_exclusions: The catalog templates the pre-planning gate left out
+                of the planner's offer, with each reason (`TemplateAdmission`); a
+                `physical_v2` trace records them as `admission_exclusions` when there
+                are any. Not render identity.
 
         Raises:
             UnsupportedRenderModeError: The job's render mode cannot render this rig
@@ -1089,6 +1306,7 @@ class RenderingPipeline:
         self.locks = tuple(locks)
         self.layout_models = layout_models
         self.layout_sha256 = layout_sha256
+        self.admission_exclusions = tuple(dict(exclusion) for exclusion in admission_exclusions)
         self.artifacts: DeliveryArtifacts | None = None
         """Set by `render()` when `output_path` is given."""
         self.frames: tuple[EncodedFixtureFrame, ...] = ()
@@ -1598,6 +1816,9 @@ class RenderingPipeline:
             "transactions": [d.model_dump(mode="json") for d in result.diagnostics],
             "diagnostics": [d.model_dump(mode="json") for d in diagnostics],
         }
+        if self.admission_exclusions:
+            # Left out when the gate excluded nothing, so earlier traces keep their keys.
+            self.render_record["admission_exclusions"] = list(self.admission_exclusions)
         if self.output_path:
             xsq = build_physical_sequence(
                 requests,

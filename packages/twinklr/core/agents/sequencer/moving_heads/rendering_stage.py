@@ -36,6 +36,8 @@ class MovingHeadRenderingStage:
         - "choreography_plan": ChoreographyPlan (set by MovingHeadStage)
         - "layout_models", "layout_sha256": the xLights layout `twinklr run --layout`
           loaded, if any; only a physical render uses them
+        - "template_admission": the render preflight's result, if any; a physical
+          render traces its exclusions
 
     State stored:
         - "xsq_output_path": Path to generated XSQ file
@@ -104,7 +106,10 @@ class MovingHeadRenderingStage:
         from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
             UnsupportedRigShapeError,
         )
-        from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
+        from twinklr.core.sequencer.moving_heads.pipeline import (
+            RenderingPipeline,
+            TemplateAdmission,
+        )
 
         try:
             choreography_plan, _extras = resolve_typed_input(
@@ -135,6 +140,9 @@ class MovingHeadRenderingStage:
             # Build timeline tracks from audio data
             timeline_tracks = self._build_timeline_tracks(beat_grid, context)
             media_file, song, artist = self._resolve_media_metadata(context)
+            admission = context.get_state("template_admission")
+            if not isinstance(admission, TemplateAdmission):
+                admission = None
 
             # Create and run rendering pipeline
             pipeline = RenderingPipeline(
@@ -149,6 +157,7 @@ class MovingHeadRenderingStage:
                 artist=artist,
                 layout_models=context.get_state("layout_models"),
                 layout_sha256=context.get_state("layout_sha256"),
+                admission_exclusions=admission.exclusions if admission is not None else (),
             )
 
             # Render to segments and write the delivery
@@ -311,7 +320,10 @@ class RenderPreflightStage:
     the planner will be offered (`offered_template_ids`; every one must carry physical
     data, and each must dry-compile on this rig and plan the dark repositioning between
     its own cues under the job's `reposition_fallback`, at the placements its
-    `on_unplayable` leaves to the gate: `check_physical_templates`), the
+    `on_unplayable` leaves to the gate: `check_physical_templates`; a template of the
+    shipped physical catalog that fails is left out of the offer instead, unless none
+    remains, and the result is stored in state as `template_admission`, which the
+    planner offers and the render traces), the
     song's musical phase map, built from the detected BeatGrid, which the renderer
     never infers (it holds every fixture dark outside the map's covered span, which
     is logged), and, when the run supplies an xLights layout (`layout_models` in
@@ -344,6 +356,9 @@ class RenderPreflightStage:
         from twinklr.core.sequencer.moving_heads.pipeline import (
             check_physical_templates,
             offered_template_ids,
+        )
+        from twinklr.core.sequencer.moving_heads.templates.data_loader import (
+            in_physical_catalog,
         )
         from twinklr.core.sequencer.timing.musical_phase import (
             MusicalPhaseError,
@@ -385,13 +400,14 @@ class RenderPreflightStage:
                 phase_map.covered_end_ms,
                 phase_map.duration_ms,
             )
-            check_physical_templates(
+            admission = check_physical_templates(
                 offered,
                 beat_grid=beat_grid,
                 fixture_group=fixture_group,
                 initial_states=job_config.moving_heads.initial_states,
                 failure_mode=job_config.moving_heads.reposition_fallback,
                 on_unplayable=job_config.moving_heads.on_unplayable,
+                excludable=[t for t in offered if in_physical_catalog(t)],
             )
             layout_models = context.get_state("layout_models")
             if layout_models is not None:
@@ -399,4 +415,5 @@ class RenderPreflightStage:
         except (UnsupportedRenderModeError, PhysicalOutputError) as error:
             logger.error("Render preflight refused the job: %s", error)
             return failure_result(str(error), stage_name=self.name)
+        context.set_state("template_admission", admission)
         return success_result(input, stage_name=self.name)
