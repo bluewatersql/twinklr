@@ -523,3 +523,29 @@ fix round, and a verification of the fixes by separate agents.
   or zero-length instance). One behaviour to know: on a finite-move step, a pulse whose
   period divides the distance from the first repeat now continues that repeat's phase
   instead of restarting.
+
+### Look accepted; cutover started — 2026-11-16
+
+The owner accepted the physical render of Need A Favor and confirmed bar placement by
+ear ([record](../evidence/2026-11-16-p3-viewing-render/README.md)). P3-C0 is closed
+and the cutover (P3-C1) is authorized on this branch. The old-renderer reference the
+owner asked to keep exists as files beside that render.
+
+Cutover steps, from the [inventory](cutover-inventory.md), each reviewed separately
+and each ending green:
+
+| Step | Content | State |
+|---|---|---|
+| C1.1a | `twinklr show` renders moving heads physically | started |
+| C1.1b | `eval-report` reads physical output | started |
+| C1.1c | Live `inject` and `regenerate` on physical output (regenerate re-renders the whole song, owner decision) | started |
+| C1.1d | Deterministic selector and three-arm experiment ported to the admitted physical families (D12 folded in) | started |
+| C1.2 | Atomic flip: remove `mode`, the schema switch, transitions, the old render, compile, handlers, libraries, built-in templates, old export, their tests, goldens and registry records | after C1.1 |
+| C1.3 | Narrow the shared models to the physical payload | after C1.2 |
+| C1.4 | Renames that leave no trace of a second path | after C1.3 |
+| C1.5 | Documents, context, memories (superseded, not deleted), scripts | with C1.4 |
+
+The four ports are built in separate worktrees from `824dce1d`. Until C1.2 they make
+each command work on physical output while the old path still exists; the old guard
+goes in C1.2. Testing `inject` or `regenerate` against a running xLights show is not
+authorized; those ports are proven offline.

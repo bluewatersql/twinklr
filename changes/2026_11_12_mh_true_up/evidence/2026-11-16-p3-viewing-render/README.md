@@ -14,7 +14,12 @@ Two renders of one song for the owner to look at before the single-path cutover
 corrected beat grid. This is a transport result and a set of files. It makes no
 judgment of how either looks, and no real fixture was driven.
 
-**Look acceptance: `PENDING-OWNER`.** Nothing in the old renderer is deleted before it.
+**Look acceptance: given by the owner on 2026-11-16.** After watching the side-by-side
+preview video, the owner answered "approved" and, asked what that covered, chose "Look
+accepted, start the cutover"; asked whether bars and phrases started where they hear
+them, chose "Yes, they line up". The verdict covers this song, this rig and the house
+preview. It is not a hardware result: no real fixture was driven, and the profile's
+timings are still chosen, not measured.
 
 ## Inputs and authorization
 
@@ -119,5 +124,4 @@ the client's fallback succeeded (finding 1).
 
 ## Not verified
 
-How either render looks; whether bars start where the owner hears them; any real
-fixture; a literal screen recording (not made).
+Any real fixture; any other song or rig; a literal screen recording (not made).
