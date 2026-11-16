@@ -321,7 +321,9 @@ class VisibilityEnvelope(BaseModel):
 
     The phases are fractions of the step's movement period (`period_beats`), read at the
     fixture's own movement phase: the step phase minus its pan/tilt distribution offset,
-    so a lagging head's lit window lags with its path. The window is in phase before the
+    so a lagging head's lit window lags with its path, and, where a cycle continues the
+    previous cycle's phase (a step spanning its cycle, cycles meeting at a quantized
+    frame), measured on from that phase. The window is in phase before the
     path's own `transform` (`phase_cycles`, `reverse`), which moves no pulse either; a
     transform changes which arc of the path is lit, not when. A periodic movement is lit
     in `[visible_phase_start, visible_phase_end)` of every cycle. A finite movement's

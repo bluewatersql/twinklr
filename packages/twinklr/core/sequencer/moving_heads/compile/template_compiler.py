@@ -7,6 +7,7 @@ all components to compile a complete template to IR segments.
 from collections.abc import Mapping, Sequence
 from fractions import Fraction
 import logging
+import math
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -72,7 +73,11 @@ from twinklr.core.sequencer.moving_heads.compile.visibility import (
 from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import quantize_cue
 from twinklr.core.sequencer.moving_heads.utils import resolve_semantic_group
-from twinklr.core.sequencer.timing.musical_phase import MusicalPhaseMap, exact_decimal
+from twinklr.core.sequencer.timing.musical_phase import (
+    MusicalPhaseMap,
+    exact_decimal,
+    musical_phase_fraction,
+)
 from twinklr.core.utils.logging import get_renderer_logger, log_performance
 
 logger = logging.getLogger(__name__)
@@ -326,7 +331,9 @@ def compile_physical_template(
     """Compile a template's scheduled steps for the physical renderer.
 
     The physical counterpart of `compile_template`: the same preset, repeat schedule
-    and target resolution, then every step instance is compiled by
+    and target resolution, the repeating cycle first grown to whole bars holding whole
+    movement periods at the grid's meter (`whole_period_cycle`), then every step
+    instance is compiled by
     `compile_physical_step` on the frame grid. Its musical bounds are cut at the
     section end, quantized with the encoder's `quantize_cue`, and its end is cut at
     `end_limit_ms`, the last frame boundary inside the song and the covered phase span,
@@ -373,8 +380,9 @@ def compile_physical_template(
 
     Raises:
         PhysicalCompileError: For a FADE_OUT remainder policy, which has no physical
-            fade, a ONCE template whose single cycle the section is too short for (a
-            cut at `end_limit_ms` is not refused) or with a step whose finite move
+            fade, a cycle `whole_period_cycle` would grow too far, a ONCE template
+            whose single cycle the section is too short for (a cut at `end_limit_ms`
+            is not refused) or with a step whose finite move
             outlasts the step, a step the physical compile
             rejects, a component reference that
             does not resolve on this rig (naming template, step, preset and fixture),
@@ -406,6 +414,7 @@ def compile_physical_template(
                 action="rejected",
             )
         )
+    working_template = whole_period_cycle(working_template, context.beat_grid.beats_per_bar)
 
     if working_template.repeat.mode == RepeatMode.ONCE:
         for step in working_template.steps:
@@ -470,11 +479,14 @@ def compile_physical_template(
     resolved: dict[str, dict[str, ResolvedStepComponents]] = {}
     phases: dict[str, dict[str, ResolvedFixturePhase]] = {}
     profile_keys: dict[str, str | None] = {}
+    # Per step, the first instance of the run of instances each starting where the one
+    # before it ends (its start in bars and on the frame grid), and where the last ends.
+    chains: dict[str, tuple[float, int, float]] = {}
     for instance in schedule_result.instances:
         step = step_map[instance.step_id]
         requested_t0 = context.bar_offset_to_ms(instance.start_bars)
         requested_t1 = min(
-            context.bar_offset_to_ms(instance.start_bars + instance.duration_bars),
+            context.bar_offset_to_ms(instance.end_bars),
             context.end_ms,
         )
         t0 = quantize_cue(requested_t0).actual_ms
@@ -518,6 +530,21 @@ def compile_physical_template(
             )
             continue
         targets = _resolve_target_fixtures(step, template, context)
+        chain = chains.get(step.step_id)
+        anchor = (
+            (chain[0], chain[1])
+            if chain is not None and math.isclose(chain[2], instance.start_bars, abs_tol=1e-9)
+            else (instance.start_bars, t0)
+        )
+        chains[step.step_id] = (*anchor, instance.end_bars)
+        shift = _phase_shift(
+            step,
+            anchor,
+            instance.start_bars,
+            t0,
+            beats_per_bar=context.beat_grid.beats_per_bar,
+            phase_map=phase_map,
+        )
         components = None
         if step.component_refs is not None:
             if step.step_id not in resolved:
@@ -568,7 +595,9 @@ def compile_physical_template(
                 physical_profile=fixture.physical_profile,
                 phase_map=phase_map,
                 resolved_components=fixture_components,
-                phase_offset_by_channel={} if phase is None else phase.phase_by_channel,
+                phase_offset_by_channel=_shifted(
+                    {} if phase is None else phase.phase_by_channel, shift
+                ),
                 pan_sign=1 if phase is None else phase.pan_sign,
             )
             # Everything `compile_physical_step` and `follow_lag` read besides identity, so a
@@ -730,6 +759,176 @@ def compile_physical_template(
         num_complete_cycles=schedule_result.num_complete_cycles,
         provenance=provenance,
         dropped_steps=dropped,
+    )
+
+
+def _step_periods(step: TemplateStep) -> set[Fraction]:
+    """The periods, in beats, at which a step's motion and pulses repeat: a periodic
+    movement's, and each dimmer or shutter pulse's that is not lit throughout."""
+    movement = step.movement.physical
+    periods = {
+        exact_decimal(pulse.period_beats)
+        for pulse in (step.dimmer.physical, step.physical_shutter)
+        if pulse is not None and pulse.duty_cycle < 1
+    }
+    if movement is not None and movement.mode == "periodic" and movement.period_beats is not None:
+        periods.add(exact_decimal(movement.period_beats))
+    return periods
+
+
+def _phase_shift(
+    step: TemplateStep,
+    anchor: tuple[float, int],
+    start_bars: float,
+    t0: int,
+    *,
+    beats_per_bar: int,
+    phase_map: MusicalPhaseMap,
+) -> dict[ChannelName, Fraction]:
+    """The cycles each channel's phase of a step instance lags behind its own start, so
+    that it continues the phase of `anchor` (its start in bars and on the frame grid):
+    the first of the run of the step's instances in which each starts where the one
+    before it ends, as a step spanning its whole cycle repeats.
+
+    Each instance starts on the frame grid nearest its musical start, so measured from
+    its own start a step's phase would restart off by that instance's quantization, and
+    the pose would step where one cue meets the next. Each channel whose period the
+    instance starts whole periods after the anchor (pan and tilt, with the zoom and a
+    visibility envelope that follow pan, for a periodic movement; the dimmer and the
+    shutter for a pulse not lit throughout) measures its phase that many periods after
+    the anchor's: shifted by the musical time between the two frame-grid starts beyond
+    those whole beats. A finite movement restarts by design, so pan and tilt keep the
+    instance's own start then, as does every other channel. Empty when nothing shifts
+    (on a grid where every bar sits at the same distance from the frame grid, nothing
+    does).
+    """
+    anchor_bars, anchor_t0 = anchor
+    movement = step.movement.physical
+    periods = {
+        channel: exact_decimal(pulse.period_beats)
+        for channel, pulse in (
+            (ChannelName.DIMMER, step.dimmer.physical),
+            (ChannelName.SHUTTER, step.physical_shutter),
+        )
+        if pulse is not None and pulse.duty_cycle < 1
+    }
+    if movement is not None and movement.mode == "periodic" and movement.period_beats is not None:
+        periods[ChannelName.PAN] = periods[ChannelName.TILT] = exact_decimal(movement.period_beats)
+    beats = (exact_decimal(start_bars) - exact_decimal(anchor_bars)) * beats_per_bar
+    periods = {c: p for c, p in periods.items() if (beats / p).denominator == 1}
+    if not periods:
+        return {}
+    # The anchor's frame-grid start plus those whole beats, less this instance's.
+    lag = beats - musical_phase_fraction(phase_map, t0, origin_ms=anchor_t0, period_beats=1.0)
+    if not lag:
+        return {}
+    return {channel: lag / period for channel, period in periods.items()}
+
+
+def _shifted(
+    offsets: Mapping[ChannelName, Fraction], shift: Mapping[ChannelName, Fraction]
+) -> dict[ChannelName, Fraction]:
+    """`offsets` (a distribution's, in cycles each channel lags) plus `shift`."""
+    if not shift:
+        return dict(offsets)
+    return {
+        channel: offsets.get(channel, Fraction(0)) + shift.get(channel, Fraction(0))
+        for channel in {*offsets, *shift}
+    }
+
+
+MAX_GROWN_CYCLE_BARS = 8
+"""The longest cycle `whole_period_cycle` grows one to: every shipped family's cycle, in
+any meter, fits (8 bars is its `slow` variant at an odd number of beats a bar)."""
+
+
+def whole_period_cycle(template: Template, beats_per_bar: int) -> Template:
+    """`template` with a repeating cycle that holds whole movement periods at this meter.
+
+    Each cycle restarts its steps' motion and pulses, so a cycle whose length in beats is
+    not a whole number of every periodic step's movement period, and of every dimmer or
+    shutter pulse's period that is not lit throughout (duty below 1), would make the head
+    jump or the pulse restart at each cycle boundary, and one ending before an overlay
+    ends cannot hold the overlay.
+    When every loop step spans the whole cycle, such a cycle and its loop steps grow to
+    the smallest whole number of bars, no fewer than authored, that holds whole periods
+    of each and every overlay; an overlay still plays once per (grown) cycle. Any other
+    template is returned as it is: a ONCE template, a cycle that already holds them (the
+    shipped families' 2-bar cycles in 4/4), and a cycle whose loop steps do not each
+    span it, whose motion restarts at each step by design. The physical compile, and so
+    the pre-planning gate, plays every template through here.
+
+    Raises:
+        PhysicalCompileError: If the grown cycle would be longer than
+            `MAX_GROWN_CYCLE_BARS`.
+    """
+    repeat = template.repeat
+    if repeat.mode == RepeatMode.ONCE:
+        return template
+    cycle = exact_decimal(repeat.cycle_bars)
+    steps = [step for step in template.steps if step.step_id in repeat.loop_step_ids]
+    if any(
+        step.timing.base_timing.start_offset_bars != 0
+        or exact_decimal(step.timing.base_timing.duration_bars) != cycle
+        for step in steps
+    ):
+        return template
+    periods = {period for step in steps for period in _step_periods(step)}
+    ends = [exact_decimal(overlay.end_beats) for overlay in template.physical_overlays]
+    beats = cycle * beats_per_bar
+    if all((beats / period).denominator == 1 for period in periods) and all(
+        beats >= end for end in ends
+    ):
+        return template
+    # Whole bars hold whole periods of each when their beats are a multiple of the
+    # periods' least common multiple: every `multiple` bars.
+    multiple = 1
+    if periods:
+        lcm = Fraction(
+            math.lcm(*(period.numerator for period in periods)),
+            math.gcd(*(period.denominator for period in periods)),
+        )
+        multiple = (beats_per_bar / lcm).denominator
+    least = max([math.ceil(cycle), *(math.ceil(end / beats_per_bar) for end in ends)])
+    bars = -(-least // multiple) * multiple
+    if bars > MAX_GROWN_CYCLE_BARS:
+        raise PhysicalCompileError(
+            MHDiagnostic(
+                code="unsupported_attribute",
+                severity="error",
+                message=(
+                    f"template {template.template_id!r} repeats a {float(cycle):g}-bar cycle, "
+                    f"{float(beats):g} beats at {beats_per_bar} beats a bar, which holds no "
+                    "whole number of its movement and pulse periods ("
+                    + ", ".join(f"{float(period):g}" for period in sorted(periods))
+                    + " beats) or ends before an overlay ends; the shortest cycle of whole "
+                    f"bars that does is {bars} bars, longer than the {MAX_GROWN_CYCLE_BARS} "
+                    "bars a cycle may grow to"
+                ),
+                action="rejected",
+            )
+        )
+    grown = float(bars)
+    return template.model_copy(
+        update={
+            "repeat": repeat.model_copy(update={"cycle_bars": grown}),
+            "steps": [
+                step.model_copy(
+                    update={
+                        "timing": step.timing.model_copy(
+                            update={
+                                "base_timing": step.timing.base_timing.model_copy(
+                                    update={"duration_bars": grown}
+                                )
+                            }
+                        )
+                    }
+                )
+                if step.step_id in repeat.loop_step_ids
+                else step
+                for step in template.steps
+            ],
+        }
     )
 
 

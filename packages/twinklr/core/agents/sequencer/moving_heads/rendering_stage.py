@@ -37,7 +37,8 @@ class MovingHeadRenderingStage:
         - "layout_models", "layout_sha256": the xLights layout `twinklr run --layout`
           loaded, if any; only a physical render uses them
         - "template_admission": the render preflight's result, if any; a physical
-          render applies only the presets it admitted and traces its exclusions
+          render applies only the presets it admitted, plays each template's effective
+          variant where a section names none, and traces both
 
     State stored:
         - "xsq_output_path": Path to generated XSQ file
@@ -321,8 +322,9 @@ class RenderPreflightStage:
     data, and each must dry-compile on this rig and plan the dark repositioning between
     its own cues under the job's `reposition_fallback`, at the placements its
     `on_unplayable` leaves to the gate: `check_physical_templates`; a template of the
-    shipped physical catalog that fails is left out of the offer instead, unless none
-    remains, or only its failing presets when its base passes, and the result is stored
+    shipped physical catalog passes through the first of its base and declared presets
+    that does, its effective variant, and one none of whose variants passes is left out
+    of the offer instead of refusing the run, unless none remains; the result is stored
     in state as `template_admission`, which the planner offers and the render applies
     and traces), the
     song's musical phase map, built from the detected BeatGrid, which the renderer

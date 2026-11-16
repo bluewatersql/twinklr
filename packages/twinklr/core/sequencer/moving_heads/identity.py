@@ -30,7 +30,7 @@ LEGACY_BACKEND_ID = "xlights_dmx"
 LEGACY_RENDERER_REVISION = "1"
 """Bumped by hand in the commit that intentionally changes legacy rendering."""
 
-PHYSICAL_RENDERER_REVISION = "1"
+PHYSICAL_RENDERER_REVISION = "2"
 """Bumped by hand in the commit that intentionally changes physical rendering; the
 render identity also carries the frame encoder's own version."""
 
@@ -48,6 +48,7 @@ def render_fingerprint(
     seed: int | None = None,
     phase_map: BaseModel | None = None,
     locks: Sequence[BaseModel] = (),
+    preset_substitutions: Sequence[tuple[str, str | None]] = (),
 ) -> str:
     """Hash the functional inputs of a render.
 
@@ -66,11 +67,14 @@ def render_fingerprint(
         locks: Render locks the output must honor; hashed only when there are any, so
             a render without locks keeps its earlier identity. Neither the order of the
             locks nor of their fixtures and channels counts.
+        preset_substitutions: `(section name, preset id or None)` for each section that
+            renders a preset other than the one it names; hashed only when there are
+            any, so a render without one keeps its earlier identity.
 
     Returns:
         A 64-character lowercase SHA-256 hex digest.
     """
-    payload = {
+    payload: dict[str, Any] = {
         "plan": _plan_payload(plan),
         "beat_grid": beat_grid.model_dump(mode="json"),
         "fixtures": fixtures.model_dump(mode="json"),
@@ -87,6 +91,8 @@ def render_fingerprint(
         "effect_grid_ms": EFFECT_GRID_MS,
         "xlights_version_stamp": XLIGHTS_VERSION_STAMP,
     }
+    if preset_substitutions:
+        payload["preset_substitutions"] = [list(item) for item in preset_substitutions]
     if locks:
         payload["locks"] = sorted(
             (_canonical_lock(lock.model_dump(mode="json")) for lock in locks),

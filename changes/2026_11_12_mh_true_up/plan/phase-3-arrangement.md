@@ -399,3 +399,72 @@ pipelines are in the
 [evidence record](../evidence/2026-11-16-p3-beat-grid-fix/README.md). Integrator
 decisions inside it: 2/4 is no longer reported; the unused `tempo_changes` and
 `is_stable` outputs are removed; key, chords and structure keep full-mix chroma.
+
+### Family adaptation: variant ladder, whole-period cycles, continuity — 2026-11-16
+
+One implementing agent; two review rounds by separate agents (each approve with
+fixes, nothing critical; one high in round one, on gate time outside 4/4), and a last
+round of low fixes verified after commit.
+
+- **Variant ladder.** A catalog family is admitted through its first passing rung:
+  base, then its declared presets in order. That rung is its *effective variant* on
+  this rig and song (`TemplateAdmission.effective_preset`, trace
+  `admission_effective_presets`). A section naming no preset, or one that was not
+  admitted, renders the effective variant. A failed base is recorded like a failed
+  preset. `--template-dir` templates stay strict: any failing rung refuses the run
+  (integrator decision; the user guide promises it).
+- **Whole-period cycles.** A repeating cycle whose steps all span it grows to the
+  smallest whole number of bars that holds whole movement periods, pulse periods with
+  duty below 1, and its overlays; more than 8 bars is refused. It applies in every
+  meter and to user templates, including in 4/4 (integrator decision).
+- **Continuity.** Gap-free repeats of a step continue the first repeat's musical phase
+  exactly, instead of each restarting from its own frame-rounded start. This removed a
+  real jump of up to one frame of motion at every cycle join, which had excluded
+  variants on heads near their speed limit. Finite moves still restart by design.
+- **Render identity.** The fingerprint includes each section's rendered preset where it
+  differs from the named one.
+- **Entry bounds** are resolved to a fixpoint, so a rung that fails late no longer
+  widens other families' dips.
+- **Scheduler exactness** (shared with the old renderer): cycle bounds, counts and
+  step ends are computed exactly. Two pre-existing one-frame overlap defects on
+  non-dyadic user cycles, found by widening the fuzz to meters 2–6, are fixed. Old
+  renderer output is unchanged: 11,580 renders of the 37 built-in templates before and
+  after the first scheduler change, zero byte differences (reviewer); re-verified
+  after the last round (see the verification note below).
+- **Revision.** `PHYSICAL_RENDERER_REVISION` is "2". The Phase 1 request fingerprints
+  are now `60e0d5eb…11c7` and `b40905ec…cc86`; their frames and `.xsq` are
+  byte-identical to before. Phase 0 fingerprints are unchanged.
+
+Output changes, all on the physical path: non-4/4 renders (families newly admitted,
+longer cycles); on any grid whose bars drift against the 20 ms frame, lit poses move
+by at most about 2° and the edges of lit windows and masks by one frame, with no cue
+dropped in the reviewer's 147 configurations; steady 4/4 grids are byte-identical.
+
+Measured:
+
+- **Owner rig, Need A Favor on the corrected grid (78.3 BPM, 4/4), offline:** six of
+  seven families admitted, all on their base variant; entry dips 740–900 ms (two
+  beats); gate 4.5 s. The zoom wave is out for want of a zoom axis.
+- **Floor at 150°/s:** all six zoomless families from 50 to 180 BPM; all but the flick
+  at 200 BPM. Slower heads lose families at fast tempos; thresholds are in the catalog
+  README. At 90°/s: four families at 150 BPM, two at 200 BPM.
+- **Gate time, 8 heads, 4 minutes (reviewer, unloaded):** 4/4 11.7–13.0 s; 6/8 15.9 s;
+  3/4 26.7–30.9 s. At 16 heads and 6 minutes: 4/4 30.5 s, 3/4 71.8 s. The 20 s target
+  holds only in 4/4, 2/4 and 6/8 at 8 heads. Accepted as a meter- and size-dependent
+  cost (integrator decision): the audio analysis reports only 4/4, 3/4 or 6/8, the
+  gate runs once per song before any paid call, and the remaining cuts are a process
+  pool or a rewrite of per-frame data structures.
+- **Garbage collection is paused for the gate call** and restored on every exit
+  (integrator decision). Results are identical with and without; about a quarter
+  faster; peak memory 557 MB against 539 MB at 16 heads and 6 minutes.
+
+Known and recorded, not fixed:
+
+- The entry-bound fixpoint can drop two user templates that are each bounded alone
+  but unbounded only through each other's wheel states. Not reachable with the shipped
+  catalog.
+- The old `zigzag_alternating_pulse` template renders different bytes under different
+  `PYTHONHASHSEED` values, on `main` as well. It belongs to the old renderer, which the
+  cutover deletes.
+- For the planner contract (T3a): `INHERIT` means the effective variant, and the
+  admitted presets vary with rig speed and grid.

@@ -359,6 +359,7 @@ class TestMovingHeadStageExecute:
         admission = TemplateAdmission(
             admitted=("circle_fan_hold",),
             admitted_presets={"circle_fan_hold": ()},
+            effective_preset={"circle_fan_hold": None},
             exclusions=({"template_id": "sweep_lr_fan_pulse", "reason": "test"},),
             preset_exclusions=(),
             entry_dips={},

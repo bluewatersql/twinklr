@@ -810,12 +810,17 @@ plus any `--template-dir` documents. The moving-head pipeline's
 `render_preflight` stage repeats those checks right after audio analysis, before any
 planner, dry-compiles every offered template (and each declared preset) on the rig, and
 refuses a song whose detected beats cannot establish a musical phase (fewer than two,
-or beats outside the song). A family whose base (no preset) the rig cannot render is
-left out of the offer with its presets, its reason logged and traced
-(`admission_exclusions`); of a family whose base renders, only a failing preset is
-left out (`admission_preset_exclusions`), and a section naming it renders without a
-preset. A `--template-dir` template that fails refuses the run, as does a rig that can
-render no template. The stage logs each offered template's worst-case section-entry
+or beats outside the song). A family is offered through the first of its variants
+the rig can render, its base (no preset) and then each declared preset in order: its
+effective variant, which a section naming no preset, or a preset that was not admitted,
+renders (`admission_effective_presets` when it is not the base). Each failing variant
+is logged and traced (`admission_preset_exclusions`, `preset_id` null for the base); a
+family none of whose variants renders is left out of the offer, its reasons logged and
+traced (`admission_exclusions`). A `--template-dir` template that fails, with or
+without a preset, refuses the run, as does a rig that can render no template. The physical
+compile, for the gate and the render alike, grows a repeating cycle that would end
+mid-period in the song's meter to whole bars holding whole periods, so the families
+play in any meter. The stage logs each offered template's worst-case section-entry
 dip. A song with silence or a fade at
 either end renders only its covered span, the detected beats plus one beat interval
 beyond the first and last (or up to the song's edge when nearer); every fixture is held

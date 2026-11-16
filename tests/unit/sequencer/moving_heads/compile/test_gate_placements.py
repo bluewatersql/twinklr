@@ -11,6 +11,7 @@ admits renders wherever a plan puts it.
 from __future__ import annotations
 
 from collections.abc import Callable
+import gc
 from typing import Any
 
 import pytest
@@ -359,3 +360,28 @@ def test_the_gate_cache_never_shares_a_cue_between_resolved_components() -> None
 
     refusal = _gate(doc, physical_bars_grid(*[500.0] * 4), rig, physical_job())
     assert "'MH2'" in refusal and "'MH1'" not in refusal
+
+
+def test_the_gate_restores_the_garbage_collector_however_it_ends() -> None:
+    """The gate pauses cyclic collection while it runs; it leaves the collector as it
+    found it, after admitting, after refusing, and when it was already paused."""
+    grid, rig, job = physical_bars_grid(500.0, 500.0, 500.0), physical_rig(), physical_job()
+    still = physical_template_doc("p3_gc_still", [hold_step("still", 0.0)])
+    jump = physical_template_doc("p3_gc_jump", [sweep_step("go", 0.0, 120.0)])
+    enabled = gc.isenabled()
+    try:
+        gc.enable()
+        assert _gate(still, grid, rig, job) == ""
+        assert gc.isenabled()
+        assert _gate(jump, grid, rig, job) != ""
+        assert gc.isenabled()
+        gc.disable()
+        assert _gate(still, grid, rig, job) == ""
+        assert not gc.isenabled()
+        assert _gate(jump, grid, rig, job) != ""
+        assert not gc.isenabled()
+    finally:
+        if enabled:
+            gc.enable()
+        else:
+            gc.disable()

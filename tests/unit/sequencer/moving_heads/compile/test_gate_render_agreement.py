@@ -70,9 +70,12 @@ _KNOWN = (437, 1892, 3283, 2431, 5391, 5440, 5846)
 `drop_accent` cascade entered at another cue (437, 1892, 3283), a remainder after the
 last cycle (2431), a cycle started on another bar (5391, 5846) and a ONCE cycle a section
 is too short for (5440)."""
-_KNOWN_TARGET = (163, 540, 1427)
+_KNOWN_TARGET = (540,)
 """Target-arm seeds whose last cue, cut to one frame at the song end, opens a shutter
-state too short to take effect before the park (review G2): refused under `error`."""
+state too short to take effect before the park (review G2): refused under `error`.
+Seeds 163 and 1427 did too until a cycle holding no whole number of its movement periods
+grew to one that does (`whole_period_cycle`): their one-beat cycles of 3- and 4-beat
+periods now play over whole bars, and no other seed below 4000 reaches the case."""
 _ONCE_CUT = 5440
 _RENDER_ERRORS = (PhysicalRenderError, PhysicalCompileError, PhysicalChannelError, ValueError)
 
@@ -88,12 +91,12 @@ _SHAPES = [
 ]
 
 
-def _grid(rng: random.Random) -> BeatGrid:
+def _grid(rng: random.Random, meter: int = 4) -> BeatGrid:
     beats = [rng.choice([15.0, 7.3, 0.0])]
     bars = rng.randint(4, 9)
     steady = rng.random() < 0.4
     base = rng.choice([400.0, 500.0, 600.0])
-    for _ in range(4 * bars):
+    for _ in range(meter * bars):
         if steady:
             beats.append(beats[-1] + base)
         else:
@@ -102,12 +105,12 @@ def _grid(rng: random.Random) -> BeatGrid:
                 beats[-1] + rng.choice([300.0, 380.0] if fast else [430.0, 500.0, 610.0, 700.0])
             )
     return BeatGrid(
-        bar_boundaries=beats[::4],
+        bar_boundaries=beats[::meter],
         beat_boundaries=beats,
         eighth_boundaries=BeatGrid._calculate_eighth_boundaries(beats),
         sixteenth_boundaries=BeatGrid._calculate_sixteenth_boundaries(beats),
         tempo_bpm=120.0,
-        beats_per_bar=4,
+        beats_per_bar=meter,
         duration_ms=beats[-1] + 15.0,
     )
 
@@ -255,7 +258,9 @@ def _step(rng: random.Random, step_id: str, start: float, duration: float, once:
     return step
 
 
-def _document(rng: random.Random, template_id: str, use_preset: bool) -> TemplateDoc:
+def _document(
+    rng: random.Random, template_id: str, use_preset: bool, meter: int = 4
+) -> TemplateDoc:
     once = rng.random() < 0.2
     cycle = rng.choice([1.0, 1.0, 2.0])
     if rng.random() < 0.5:
@@ -264,7 +269,7 @@ def _document(rng: random.Random, template_id: str, use_preset: bool) -> Templat
         cut = cycle / 2
         steps = [_step(rng, "a", 0.0, cut, once), _step(rng, "b", cut, cycle - cut, once)]
     overlays = []
-    beats = cycle * 4
+    beats = cycle * meter
     for channel, states in (
         ("color", ["red", "blue", "white"]),
         ("gobo", ["dots", "star", "open"]),
@@ -303,7 +308,7 @@ def _document(rng: random.Random, template_id: str, use_preset: bool) -> Templat
 # --- The gate-coverage reviewer's generator (round 6) --------------------------------
 
 
-def _target_grid(rng: random.Random, target: bool) -> BeatGrid:
+def _target_grid(rng: random.Random, target: bool, meter: int = 4) -> BeatGrid:
     beats = [rng.choice([0.0, 7.3, 15.0, 11.0])]
     bars = rng.randint(6, 12)
     kind = "blocks" if target else rng.choice(["steady", "blocks", "jitter"])
@@ -311,16 +316,16 @@ def _target_grid(rng: random.Random, target: bool) -> BeatGrid:
     for _ in range(bars):
         if kind == "blocks" and rng.random() < 0.35:
             tempo = rng.choice([330.0, 400.0, 470.0, 520.0, 600.0, 700.0])
-        for _ in range(4):
+        for _ in range(meter):
             jitter = 0.0 if kind != "jitter" else rng.choice([0.0, 0.0, -40.0, 30.0, 60.0])
             beats.append(beats[-1] + tempo + jitter)
     return BeatGrid(
-        bar_boundaries=beats[::4],
+        bar_boundaries=beats[::meter],
         beat_boundaries=beats,
         eighth_boundaries=BeatGrid._calculate_eighth_boundaries(beats),
         sixteenth_boundaries=BeatGrid._calculate_sixteenth_boundaries(beats),
         tempo_bpm=120.0,
-        beats_per_bar=4,
+        beats_per_bar=meter,
         duration_ms=beats[-1] + rng.choice([0.0, 15.0, 7.3]),
     )
 
@@ -467,18 +472,26 @@ def _target_step(
 
 
 def _target_document(
-    rng: random.Random, template_id: str, presets: bool, target: bool
+    rng: random.Random, template_id: str, presets: bool, target: bool, meter: int = 4
 ) -> TemplateDoc:
     once = rng.random() < 0.2
     cycles = [0.25, 0.5, 0.25, 0.75] if target else [0.5, 0.75, 1.0, 1.0, 1.5, 2.0, 3.0]
     cycle = rng.choice(cycles)
-    beats = round(cycle * 4)
+    # Whole beats at the meter (in 4/4 every drawn cycle already is).
+    beats = max(1, round(cycle * meter))
+    cycle = beats / meter
     count = rng.choice([1, 1, 2, 3]) if beats >= 3 else 1
     cuts = sorted(rng.sample(range(1, beats), min(count - 1, beats - 1))) if beats > 1 else []
     edges = [0, *cuts, beats]
     steps = [
         _target_step(
-            rng, "abc"[i], edges[i] / 4, (edges[i + 1] - edges[i]) / 4, once, presets, target
+            rng,
+            "abc"[i],
+            edges[i] / meter,
+            (edges[i + 1] - edges[i]) / meter,
+            once,
+            presets,
+            target,
         )
         for i in range(len(edges) - 1)
     ]
@@ -671,7 +684,7 @@ def _plan(rng: random.Random, admitted: list[str], bars: int) -> list[tuple[str,
 
 
 def _check_seed(
-    seed: int, on_unplayable: str = "dark", gate: str | None = None
+    seed: int, on_unplayable: str = "dark", gate: str | None = None, meter: int = 4
 ) -> tuple[str, int, int]:
     """P2.4b generator: gate two templates, render a random plan of the admitted ones.
 
@@ -679,13 +692,13 @@ def _check_seed(
     the frames kept dark and authored. `gate` scopes the gate as another `on_unplayable`
     would: a known seed draws its plan over the templates the full gate admitted."""
     rng = random.Random(seed)
-    grid = _grid(rng)
+    grid = _grid(rng, meter)
     rig, ids = _rig(rng)
     use_preset = rig.presets is not None and bool(rig.presets.attributes)
     try:
         documents = (
-            _document(rng, f"gf_{seed}_a", use_preset),
-            _document(rng, f"gf_{seed}_b", use_preset),
+            _document(rng, f"gf_{seed}_a", use_preset, meter),
+            _document(rng, f"gf_{seed}_b", use_preset, meter),
         )
     except ValidationError:
         return "invalid", 0, 0
@@ -697,7 +710,7 @@ def _check_seed(
         if not admitted:
             return "refused", 0, 0
         sections = _plan(rng, admitted, bars)
-        where = f"seed {seed}: plan {sections} under {policy}"
+        where = f"seed {seed} ({meter} beats a bar): plan {sections} under {policy}"
         if on_unplayable == "error":
             try:
                 _render(sections, grid, rig, job)
@@ -712,15 +725,19 @@ def _check_seed(
 
 
 def _check_target_seed(
-    seed: int, target: bool, on_unplayable: str = "dark", gate: str | None = None
+    seed: int,
+    target: bool,
+    on_unplayable: str = "dark",
+    gate: str | None = None,
+    meter: int = 4,
 ) -> tuple[str, int, int]:
     """The gate-coverage reviewer's generator: up to three templates, three random plans."""
     rng = random.Random(seed * 7919 + 13)
-    grid = _target_grid(rng, target)
+    grid = _target_grid(rng, target, meter)
     rig, ids, presets = _target_rig(rng, target)
     try:
         documents = tuple(
-            _target_document(rng, f"md{seed}_{i}", presets, target)
+            _target_document(rng, f"md{seed}_{i}", presets, target, meter)
             for i in range(rng.choice([1, 2, 3]))
         )
     except ValidationError:
@@ -749,7 +766,10 @@ def _check_target_seed(
                     return "failed", 0, 0
                 continue
             pipeline, segments = _render(sections, grid, rig, job)
-            where = f"seed {seed} (target {target}): plan {sections} under {policy}"
+            where = (
+                f"seed {seed} (target {target}, {meter} beats a bar): plan {sections} "
+                f"under {policy}"
+            )
             dark, total = _verify(pipeline, segments, rig, job, where)
             degraded, authored = degraded + dark, authored + total
             if len(ids) >= 2:
@@ -783,9 +803,24 @@ def test_a_once_cycle_cut_short_renders_dark_and_error_still_refuses() -> None:
     assert _check_seed(_ONCE_CUT, on_unplayable="error")[0] == "failed"
 
 
+_METERS = (2, 3, 4, 5, 6)
+
+
+def _meter(seed: int) -> int:
+    """Beats a bar for a sweep seed, by its index, so that even the default sweep plays
+    every meter; a known seed (4/4) replays as found, since only the sweep draws one."""
+    return _METERS[seed % len(_METERS)]
+
+
 def test_every_admitted_plan_renders_honestly() -> None:
-    outcomes = [_check_seed(seed) for seed in range(GATE_FUZZ_SEEDS)]
-    outcomes += [_check_target_seed(seed, target=False) for seed in range(TARGET_FUZZ_SEEDS)]
-    outcomes += [_check_target_seed(seed, target=True) for seed in range(TARGET_FUZZ_SEEDS)]
+    outcomes = [_check_seed(seed, meter=_meter(seed)) for seed in range(GATE_FUZZ_SEEDS)]
+    outcomes += [
+        _check_target_seed(seed, target=False, meter=_meter(seed))
+        for seed in range(TARGET_FUZZ_SEEDS)
+    ]
+    outcomes += [
+        _check_target_seed(seed, target=True, meter=_meter(seed))
+        for seed in range(TARGET_FUZZ_SEEDS)
+    ]
     rendered = [outcome for outcome in outcomes if outcome[0] == "rendered"]
     assert len(rendered) >= len(outcomes) // 4, outcomes

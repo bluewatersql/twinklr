@@ -7,46 +7,98 @@ registry never see them. They live outside `catalog/templates/moving_heads`, who
 documents must stay model-equal to their Python builtins.
 
 Before planning, the render preflight dry-compiles each family with no preset and with
-each preset on the run's rig and song (`check_physical_templates`). A family whose base
-(no preset) fails there is left out of the planner's offer with its presets, and the
-reason is logged and recorded in the render trace (`admission_exclusions`); the run is
-refused only when no template remains. A family whose base passes is offered, and only
-a preset that fails is left out, logged and recorded (`admission_preset_exclusions`); a
-section naming it renders the family without a preset, as for a preset the family does
-not declare. The gate also logs each admitted family's worst-case section-entry dip.
+each preset on the run's rig and song (`check_physical_templates`). A family is offered
+when any of its variants passes there, tried as a ladder: the base (no preset) first,
+then its presets in the order it declares them (`narrow`, then `slow`). The first that
+passes is the family's **effective variant** on this rig and song: a section naming no
+preset renders it, and so does a section naming a preset that was not admitted or that
+the family does not declare (with a warning naming why and what plays instead). A
+section naming an admitted preset renders that preset. Each variant that fails, the
+base included, is logged and recorded in the render trace
+(`admission_preset_exclusions`, `preset_id` null for the base), and each effective
+variant other than the base is recorded as `admission_effective_presets`. A family none
+of whose variants passes is left out of the offer, with every reason, and recorded in
+`admission_exclusions`; the run is refused only when no template remains. When the base
+passes, the family plays exactly as it did before the ladder. The gate also logs each
+admitted family's worst-case section-entry dip, over its admitted variants.
 
 Every family sets explicit start angles and names no rig position preset, authors its
 dimmer, and declares `physical_reposition_fallback: drop_accent` on every step, so a
 job that sets `moving_heads.reposition_fallback: drop_accent` plays a cue it cannot
 reposition into dark. Each declares two variants as presets: `narrow` (less reach) and
-`slow` (half the rate). Both ask for less speed than the base, but a variant can still
-fail where the base plays (see Meter), and the gate checks the base and both variants:
-a failing variant is left out on its own, a failing base leaves the whole family out.
-How any family looks is `PENDING-OWNER`; these are synthetic designs, not accepted
-looks.
+`slow` (half the rate). Both ask for less speed than the base, so on a head too slow for
+the base at the song's tempo, or a beat too short for the flick's mask, the family
+usually still plays through one of them; a variant can also fail where the base plays,
+and is then left out on its own. How any family looks is `PENDING-OWNER`; these are
+synthetic designs, not accepted looks.
 
 ## Meter
 
-The families are authored for 4/4. Periods are in beats and cycles in bars, so the
-continuous families' 2-bar cycles span whole movement periods only when a bar has four
-beats. Measured on a 4-head rig at 500 ms beats:
+The families are authored in 4/4: periods are in beats and cycles in bars, and a 2-bar
+4/4 cycle holds whole movement periods (4 beats, `slow` 8) and the flick's overlay
+(beats 2 to 6). Each cycle restarts its motion, so in another meter such a cycle would
+end mid-path and the head would jump at every cycle boundary. The physical compile
+therefore grows a repeating cycle that would end mid-period, or before its overlay ends,
+with its step, to the smallest whole number of bars that holds them
+(`whole_period_cycle`), for the render and the gate alike. Every family then plays in
+any meter, its motion running on across each cycle boundary; in 4/4 nothing changes.
+What the meter still changes is how many bars a cycle spans (`base`/`narrow`, then
+`slow`):
 
-- 3/4: a 2-bar cycle is 6 beats, which ends `target_orbit`, `mirror_wings` and
-  `zoom_wave` (period 4 beats, `slow` 8) mid-path, so the head would jump at every cycle
-  boundary; all three are left out. The cascades, the snap and the flick play, but differently: a cascade's
-  cycle holds 1.5 periods, so a head lights one or two strokes per cycle depending on
-  its stagger; the flick's sway reverses direction at each cycle boundary, and its flick
-  spans beats 2 to 6 of a 6-beat cycle.
-- 6/8 (six beats a bar): the base periods fit, but the `slow` variants of
-  `target_orbit`, `mirror_wings` and `zoom_wave` (8 beats in a 12-beat cycle) do not, so
-  those families are offered with `narrow` only; the others play with both variants.
+| Meter | Cascades, orbit, wings, zoom wave | Flick | Snap |
+|---|---|---|---|
+| 4/4 | 2, 2 bars | 2, 2 bars | 1 bar, `ONCE` |
+| 2/4 | 2, 4 bars | 4, 4 bars (8 beats, to hold the overlay) | 1 bar |
+| 3/4, 5/4, 7/8 | 4, 8 bars | 4, 8 bars | 1 bar |
+| 6/8 (six beats a bar) | 2, 4 bars | 2, 4 bars | 1 bar |
+
+The flick's overlay plays once per cycle, at beats 2 to 6: every 8 beats in 4/4 and 2/4,
+every 12 in 3/4 and 6/8 (24 under `slow`). A section shorter than a cycle plays
+the cycle's head, as in 4/4. A cycle is never grown past 8 bars: a template whose
+periods meet whole bars only later is refused, naming the cycle it would need (no
+shipped family needs more than 8 bars in any meter). A cycle whose steps
+do not each span it is left as authored, since its motion restarts at each step by
+design.
+
+Each cycle starts on the 20 ms frame nearest its downbeat, so where bars sit at
+varying distances from the frame grid (any detected tempo that drifts), a cycle
+restarting its phase at its own frame would leave the pose a few hundredths of a degree
+off where the previous cycle ended: a jump with no time to travel, which a head near
+its speed limit cannot play. A step's cycles that follow one another without a gap
+therefore continue one musical phase from the first, and meet at the same pose. On a
+grid whose bars all sit at one distance from the frame grid nothing changes.
+
+This is physical renderer revision 2. Revision 1 cut a non-4/4 cycle mid-period, which
+left the orbit, the wings and the zoom wave out in 3/4 and the `slow` variants out in
+6/8 and played a cascade's 1.5 periods per 3/4 cycle, and it restarted each cycle at
+its own frame, which on a drifting grid left heads near their limit out (on the owner's
+rig, the wings' `narrow` variant).
+
+## Head speed
+
+The variants are only narrower or slower, so a head too slow for every one of them
+loses the family. Measured on 2026-11-16 on four heads (20 ms latency, 60 ms settle,
+150 ms wheels) over a minute of beats jittered by 8%, alike in 4/4 and 3/4:
+
+- At 150°/s every family but the zoom wave plays from 50 to 180 BPM; at 200 BPM all but
+  the flick.
+- The cascades need 100°/s at 150 BPM, 120°/s at 180 BPM and 130°/s at 200 BPM, each
+  through `slow` (measured in steps of 5°/s).
+- The flick needs 95°/s at 180 BPM in 4/4 and 110°/s in 3/4, and plays at no speed at
+  200 BPM, where one beat is shorter than its mask needs.
+- The wings, the orbit and the snap play down to 90°/s up to 180 BPM; at 200 BPM the
+  wings need 100°/s, below which only the snap and the orbit remain.
+- Every family plays at 50 BPM down to 90°/s.
+
+No declared variant is slower than `slow` at full reach, so nothing below that plays.
 
 ## Families and what each needs
 
 Every family needs pan and tilt axes whose `travel_speed_per_s`, `latency_ms` and
 `settle_ms` are declared, and each pose below inside the axis limits. Speeds are the
-base's peak at 120 BPM; they scale with tempo (1.5 times at 180 BPM), and the gate
-refuses a family whose motion is faster than the profile declares.
+base's peak at 120 BPM; they scale with tempo (1.5 times at 180 BPM), and where the
+base is faster than the profile declares the gate tries the family's variants. Repeats
+are as authored in 4/4 (see Meter for other meters).
 
 | Family | Motion and light | Repeat | Rig presets | Topology | Other capabilities | Peak speed at 120 BPM |
 |---|---|---|---|---|---|---|
@@ -96,11 +148,11 @@ and how the family looks, is `PENDING-OWNER`.
 
 Measured on 2026-11-16 with the six families on the 8-head synthetic rig: the dip is the
 longest a head may stay dark entering a section of the family, from any pose and wheel
-state an admitted family or the initial state leaves. Admitting more families or presets
-widens that envelope, so another family's dip can grow, and a template entering on a
-wheel state with no known settle time can lose its bound and be left out (a
-`--template-dir` template then refuses the run). Whether these look acceptable is
-`PENDING-OWNER`.
+state an admitted variant of any family or the initial state leaves. Admitting more
+families or variants widens that envelope, so another family's dip can grow, and a
+variant entering on a wheel state with no known settle time can lose its bound and not
+be admitted (a family with no variant left is left out; a `--template-dir` template
+then refuses the run). Whether these look acceptable is `PENDING-OWNER`.
 
 | Profile | 60–120 BPM | 150 BPM | 180 BPM |
 |---|---|---|---|
@@ -110,7 +162,9 @@ wheel state with no known settle time can lose its bound and be left out (a
 
 On the 180°/s profile `masked_wheel_flick` is left out from 120 BPM (its one-beat mask
 is shorter than the 540 ms its wheel change needs), and `fly_out_cascade`,
-`fly_in_cascade` and `mirror_wings` at 180 BPM (motion faster than the profile).
+`fly_in_cascade` and `mirror_wings` at 180 BPM (motion faster than the profile). Those
+exclusions were measured before the variant ladder; a family is now left out only where
+its `narrow` and `slow` variants fail too.
 
 Those rows predate `zoom_wave`, which a zoomless rig leaves out. Measured on 2026-11-16
 on the 8-head zoom pilot rig with all seven families admitted: 500 ms, and 520 ms for

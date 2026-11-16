@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import bisect
 from collections import defaultdict
-from collections.abc import Collection, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
+import functools
+import gc
 import hashlib
 from itertools import pairwise
 import json
@@ -69,10 +71,12 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
     plan_prepositions,
     worst_case_entry_ms,
 )
+from twinklr.core.sequencer.moving_heads.compile.preset import apply_preset
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
     apply_entry_window,
     compile_physical_template,
     compile_template,
+    whole_period_cycle,
 )
 from twinklr.core.sequencer.moving_heads.compile.transition_detector import TransitionDetector
 from twinklr.core.sequencer.moving_heads.compile.transition_planner import TransitionPlanner
@@ -525,22 +529,27 @@ def _wheel_states(
 class TemplateAdmission:
     """What the pre-planning gate offers the planner (`check_physical_templates`).
 
-    `admitted` keeps the order the templates were given in, and `admitted_presets` holds
-    each admitted template's admitted presets in the order it declares them; a section
-    naming any other preset renders without one. `exclusions` holds one
-    `{"template_id", "reason"}` per catalog template left out with its presets, and
-    `preset_exclusions` one `{"template_id", "preset_id", "reason"}` per preset left out
-    of an admitted catalog template. `entry_dips` holds, per admitted template, its
+    A template's rungs are its base (no preset), then each preset it declares, in that
+    order; a template is admitted when any rung passes. `admitted` keeps the order the
+    templates were given in. `effective_preset` holds each admitted template's first
+    passing rung, its effective variant on this rig and song (None for the base): what a
+    section naming no preset, or a preset that is not admitted, renders.
+    `admitted_presets` holds each admitted template's admitted presets in the order it
+    declares them. `exclusions` holds one `{"template_id", "reason"}` per catalog
+    template no rung of which passes, and `preset_exclusions` one
+    `{"template_id", "preset_id", "reason"}` per failing rung of an admitted template,
+    `preset_id` None for the base. `entry_dips` holds, per admitted template, its
     worst-case section-entry dip: the largest `worst_case_entry_ms` over its admitted
-    presets and fixtures, from any pose in the union of every admitted template's and
-    preset's poses and the initial pose, with any of their wheel states held, as
+    rungs and fixtures, from any pose in the union of every admitted rung's poses and
+    the initial pose, with any of their wheel states held, as
     `{"fixture_id", "bound_ms", "beats"}`, `beats` at the song's shortest beat.
     """
 
     admitted: tuple[str, ...]
     admitted_presets: dict[str, tuple[str, ...]]
+    effective_preset: dict[str, str | None]
     exclusions: tuple[dict[str, str], ...]
-    preset_exclusions: tuple[dict[str, str], ...]
+    preset_exclusions: tuple[dict[str, str | None], ...]
     entry_dips: dict[str, dict[str, Any]]
 
 
@@ -548,6 +557,26 @@ _Reach = tuple[dict[ChannelName, tuple[float, float]], dict[ChannelName, set[str
 """Per fixture, the pose range and the wheel states a template's cues hold."""
 
 
+def _gc_paused[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    """Run `function` with the cyclic garbage collector paused. The gate allocates
+    millions of short-lived, acyclic trajectory points, and collection passes over them
+    cost about a quarter of its time without freeing anything; reference counting still
+    frees them. The collector's previous state is restored."""
+
+    @functools.wraps(function)
+    def paused(*args: P.args, **kwargs: P.kwargs) -> R:
+        enabled = gc.isenabled()
+        gc.disable()
+        try:
+            return function(*args, **kwargs)
+        finally:
+            if enabled:
+                gc.enable()
+
+    return paused
+
+
+@_gc_paused
 def check_physical_templates(
     template_ids: Sequence[str],
     *,
@@ -589,19 +618,22 @@ def check_physical_templates(
     fixture and the unknown profile terms. Each admitted template's worst-case dip is
     reported (`TemplateAdmission.entry_dips`, and logged).
 
-    A template in `excludable` (the shipped physical catalog) whose base (no preset)
-    fails is left out of the offer with its presets and the reason instead of refusing
-    the run; one whose base passes is admitted, and only its failing presets are left
-    out, each with its reason. Any other template that fails, with or without a preset,
-    refuses the run.
+    A template is admitted through the first of its rungs that passes, the base (no
+    preset) and then each preset in the order it declares them: that rung is its
+    effective variant, and each failing rung is recorded with its reason. That applies
+    to a template in `excludable` (the shipped physical catalog), which is left out of
+    the offer with the reasons when no rung passes, instead of refusing the run. Any
+    other template that fails on any rung refuses the run, so its effective variant is
+    always its base.
 
     Returns:
-        The admitted templates and presets, the exclusions and the worst-case entry dips.
+        The admitted templates, presets and effective variants, the exclusions and the
+        worst-case entry dips.
 
     Raises:
-        UnsupportedRenderModeError: Naming each template, preset, step, fixture and
-            item that fails, for any template not in `excludable`, or for every
-            exclusion when none remains to admit.
+        UnsupportedRenderModeError: Naming each rung, step, fixture and item that fails,
+            for any template not in `excludable`, or for every exclusion when none
+            remains to admit.
     """
     from twinklr.core.sequencer.moving_heads.compile.physical import PhysicalCompileError
     from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
@@ -637,13 +669,11 @@ def check_physical_templates(
             # Bar 1 over the whole song first, from the initial state. Then every
             # placement class a section can give the template: a repeating cycle at each
             # alignment to the bars, cut short at every bar, and ending in every
-            # remainder at every bar (`_repeating_placements`); a ONCE cycle at every
-            # start bar (added once bar 1 shows how far its motion runs).
+            # remainder at every bar (`_repeating_placements`), for the cycle the compile
+            # plays (`whole_period_cycle`, added once bar 1 compiles); a ONCE cycle at
+            # every start bar (added once bar 1 shows how far its motion runs).
             placements = [(1, max(bars, 1), True)]
-            if repeat.mode != RepeatMode.ONCE:
-                placements += _repeating_placements(
-                    repeat.cycle_bars, bars, section_ends=on_unplayable == "error"
-                )
+            cycle_bars = repeat.cycle_bars
             seen: set[tuple[Any, ...]] = set()
             # A step instance over the same frames compiles the same at every placement.
             # Only placements cut at section ends share instances, so without them the
@@ -711,6 +741,17 @@ def check_physical_templates(
                     break
                 if whole:
                     reach[combination] = _reach(compiled.segments, profiles)
+                    if repeat.mode != RepeatMode.ONCE:
+                        # It compiled, so `whole_period_cycle` gives the cycle it played.
+                        cycle_bars = whole_period_cycle(
+                            apply_preset(document.template, preset)
+                            if preset
+                            else document.template,
+                            beat_grid.beats_per_bar,
+                        ).repeat.cycle_bars
+                        placements += _repeating_placements(
+                            cycle_bars, bars, section_ends=on_unplayable == "error"
+                        )
                 if not plan:
                     continue
                 refusal = _plan_placement(
@@ -718,7 +759,7 @@ def check_physical_templates(
                     profiles,
                     initial_states,
                     section_start_ms=context.start_ms,
-                    first_cycle_end_ms=context.bar_offset_to_ms(repeat.cycle_bars),
+                    first_cycle_end_ms=context.bar_offset_to_ms(cycle_bars),
                     phase_map=phase_map,
                     failure_mode=failure_mode,
                     sequence_end_ms=sequence_end_ms,
@@ -743,23 +784,41 @@ def check_physical_templates(
                         for later in range(2, bars + 1)
                         if bars - later + 1 >= repeat.cycle_bars - 1e-9
                     ]
-    dips = _entry_dips(
-        {
-            combination: per_fixture
-            for combination, per_fixture in reach.items()
-            if combination not in failures and (combination[0], None) not in failures
-        },
-        profiles,
-        initial_states,
-        failures,
-        shortest_beat_ms=min(
-            (later - earlier for earlier, later in pairwise(beat_grid.beat_boundaries)),
-            default=None,
-        ),
+    # A rung without an entry bound fails, and leaves the envelope the other rungs' dips
+    # and bounds are measured from. Rungs that lose their bound together may do so only
+    # through each other: each pass removes those that have none even with every rung
+    # failing in it removed (when none has, all of them), until every rung has one.
+    shortest_beat_ms = min(
+        (later - earlier for earlier, later in pairwise(beat_grid.beat_boundaries)),
+        default=None,
     )
+    rungs = {c: per_fixture for c, per_fixture in reach.items() if c not in failures}
+    while True:
+        dips, unbounded = _entry_dips(rungs, profiles, initial_states, shortest_beat_ms)
+        if not unbounded:
+            break
+        rest = {c: per_fixture for c, per_fixture in rungs.items() if c not in unbounded}
+        certain = {
+            combination: reason
+            for combination, reason in unbounded.items()
+            if combination
+            in _entry_dips(
+                {**rest, combination: rungs[combination]},
+                profiles,
+                initial_states,
+                shortest_beat_ms,
+            )[1]
+        }
+        for combination, reason in (certain or unbounded).items():
+            failures.setdefault(combination, []).append(reason)
+            del rungs[combination]
+    # Each template's rungs, base first, then its presets in declared order.
+    passing = {
+        t: [p for p in (None, *presets_of[t]) if (t, p) not in failures] for t in template_ids
+    }
 
     def reasons(template_id: str) -> list[str]:
-        """Every failure of the template and its presets, base first."""
+        """Every failure of the template's rungs, base first."""
         return [
             reason
             for preset_id in (None, *presets_of[template_id])
@@ -773,24 +832,21 @@ def check_physical_templates(
             "cannot render: " + "; ".join(refused)
         )
     exclusions = tuple(
-        {"template_id": t, "reason": "; ".join(reasons(t))}
-        for t in template_ids
-        if (t, None) in failures
+        {"template_id": t, "reason": "; ".join(reasons(t))} for t in template_ids if not passing[t]
     )
-    admitted = tuple(t for t in template_ids if (t, None) not in failures)
+    admitted = tuple(t for t in template_ids if passing[t])
     if template_ids and not admitted:
         raise UnsupportedRenderModeError(
             "moving_heads.mode 'physical_v2' has no template this rig can render, so no "
             "template remains to offer the planner: "
             + "; ".join(exclusion["reason"] for exclusion in exclusions)
         )
-    admitted_presets = {
-        t: tuple(p for p in presets_of[t] if (t, p) not in failures) for t in admitted
-    }
+    effective_preset = {t: passing[t][0] for t in admitted}
+    admitted_presets = {t: tuple(p for p in passing[t] if p is not None) for t in admitted}
     preset_exclusions = tuple(
         {"template_id": t, "preset_id": p, "reason": "; ".join(failures[t, p])}
         for t in admitted
-        for p in presets_of[t]
+        for p in (None, *presets_of[t])
         if (t, p) in failures
     )
     for exclusion in exclusions:
@@ -799,13 +855,16 @@ def check_physical_templates(
             exclusion["template_id"],
             exclusion["reason"],
         )
-    for exclusion in preset_exclusions:
+    for rung in preset_exclusions:
+        template_id, preset_id = str(rung["template_id"]), rung["preset_id"]
+        effective = effective_preset[template_id]
         logger.warning(
-            "physical_v2: preset %r of template %r is not admitted, so a section naming it "
-            "renders the template without a preset: %s",
-            exclusion["preset_id"],
-            exclusion["template_id"],
-            exclusion["reason"],
+            "physical_v2: %s of template %r is not admitted, so a section naming %s renders %s: %s",
+            "the base" if preset_id is None else f"preset {preset_id!r}",
+            template_id,
+            "no preset" if preset_id is None else "it",
+            "its base" if effective is None else f"its effective variant, preset {effective!r}",
+            rung["reason"],
         )
     for template_id, dip in dips.items():
         logger.info(
@@ -819,6 +878,7 @@ def check_physical_templates(
     return TemplateAdmission(
         admitted=admitted,
         admitted_presets=admitted_presets,
+        effective_preset=effective_preset,
         exclusions=exclusions,
         preset_exclusions=preset_exclusions,
         entry_dips=dips,
@@ -847,17 +907,14 @@ def _entry_dips(
     reach: Mapping[tuple[str, str | None], Mapping[str, _Reach]],
     profiles: Mapping[str, FixtureCapabilities],
     initial_states: Mapping[str, InitialFixtureState],
-    failures: dict[tuple[str, str | None], list[str]],
-    *,
     shortest_beat_ms: float | None,
-) -> dict[str, dict[str, Any]]:
-    """Each template's worst-case section-entry dip, over its base and presets in `reach`
-    (keyed by template and preset id, None for the base, base first). A base or preset
-    without a bound on some fixture gets a failure instead, naming the fixture and the
-    unknown terms: no section entry into it can be sized. A base without one leaves its
-    presets unchecked, since the template is left out with them.
+) -> tuple[dict[str, dict[str, Any]], dict[tuple[str, str | None], str]]:
+    """Each template's worst-case section-entry dip, over its rungs in `reach` (keyed by
+    template and preset id, None for the base), and each rung without a bound on some
+    fixture, with the reason naming the fixture and the unknown terms: no section entry
+    into it can be sized. A rung without a bound adds nothing to its template's dip.
 
-    The predecessor may be any template and preset in `reach` or the initial state: per
+    The predecessor may be any rung in `reach` or the initial state: per
     fixture, the envelope is the union of their pose ranges and the initial pose, and the
     wheels held are the union of their wheel states and the initial ones.
     """
@@ -886,9 +943,8 @@ def _entry_dips(
                 held[fixture_id][channel] |= states
 
     worst: dict[str, tuple[int, str]] = {}
+    unbounded: dict[tuple[str, str | None], str] = {}
     for (template_id, preset_id), per_fixture in reach.items():
-        if (template_id, None) in failures:
-            continue  # the base has no bound, so the template is left out with its presets
         found: tuple[int, str] | None = None
         for fixture_id, (poses, wheels) in sorted(per_fixture.items()):
             profile = profiles[fixture_id]
@@ -904,7 +960,7 @@ def _entry_dips(
                 where = f"template {template_id!r}" + (
                     f", preset {preset_id!r}" if preset_id else ""
                 )
-                failures.setdefault((template_id, preset_id), []).append(
+                unbounded[template_id, preset_id] = (
                     f"{where}: fixture {fixture_id!r} has no worst-case section-entry bound, "
                     "since its profile leaves "
                     + ", ".join(_unknown_bound_terms(profile, wheels, held[fixture_id]))
@@ -916,7 +972,7 @@ def _entry_dips(
         else:
             if found is not None and (template_id not in worst or found[0] > worst[template_id][0]):
                 worst[template_id] = found
-    return {
+    dips = {
         template_id: {
             "fixture_id": fixture_id,
             "bound_ms": bound,
@@ -924,6 +980,7 @@ def _entry_dips(
         }
         for template_id, (bound, fixture_id) in worst.items()
     }
+    return dips, unbounded
 
 
 def _unknown_bound_terms(
@@ -1239,22 +1296,32 @@ def _physical_preset(
     section: PlanSection,
     template_doc: TemplateDoc,
     diagnostics: list[MHDiagnostic],
-    not_admitted: Mapping[tuple[str, str], str],
+    admission: TemplateAdmission | None,
 ) -> TemplatePreset | None:
-    """The preset the template declares under the section's id, or none.
+    """The preset a section renders: the one it names, when the template declares it and
+    the pre-planning gate (`admission`, when it ran) did not leave it out; otherwise the
+    template's effective variant (the base without a gate result), with a warning when
+    the section named a preset.
 
     An undeclared id is not turned into an energy preset under `physical_v2`: that is
-    planner intent, which Phase 1 does not apply, and it would add legacy data. A
-    declared preset the pre-planning gate did not admit (`not_admitted`, its reason by
-    template and preset id) is treated as undeclared.
+    planner intent, which Phase 1 does not apply, and it would add legacy data.
     """
-    if not section.preset_id:
-        return None
     template_id = template_doc.template.template_id
-    reason = not_admitted.get((template_id, section.preset_id))
-    for preset in template_doc.presets:
-        if preset.preset_id == section.preset_id and reason is None:
-            return preset
+    declared = {preset.preset_id: preset for preset in template_doc.presets}
+    fallback = None if admission is None else admission.effective_preset.get(template_id)
+    if not section.preset_id:
+        return None if fallback is None else declared[fallback]
+    reason = next(
+        (
+            exclusion["reason"]
+            for exclusion in (admission.preset_exclusions if admission else ())
+            if (exclusion["template_id"], exclusion["preset_id"])
+            == (template_id, section.preset_id)
+        ),
+        None,
+    )
+    if section.preset_id in declared and reason is None:
+        return declared[section.preset_id]
     diagnostics.append(
         MHDiagnostic(
             code="unsupported_attribute",
@@ -1266,13 +1333,17 @@ def _physical_preset(
                     if reason is None
                     else f"admitted for template {template_id!r} on this rig and song ({reason})"
                 )
-                + "; physical_v2 applies no preset"
+                + (
+                    "; physical_v2 applies no preset"
+                    if fallback is None
+                    else f"; physical_v2 applies its effective variant {fallback!r}"
+                )
             ),
             section_id=section.section_name,
             action="unchanged",
         )
     )
-    return None
+    return None if fallback is None else declared[fallback]
 
 
 class PhysicalRenderError(ValueError):
@@ -1402,10 +1473,12 @@ class RenderingPipeline:
                 trace as evidence. Not render identity: the check passes or refuses
                 and never changes a byte.
             admission: The pre-planning gate's result, when it ran. A `physical_v2`
-                render applies no preset the gate did not admit for its template, as
-                for an undeclared one, and its trace records the gate's exclusions as
-                `admission_exclusions` and `admission_preset_exclusions` when there are
-                any. Not render identity.
+                render plays each template's effective variant in a section naming no
+                preset, or a preset the gate did not admit or the template does not
+                declare (without a result, the base), and its trace records the gate's
+                exclusions as `admission_exclusions` and `admission_preset_exclusions`
+                and each effective variant other than the base as
+                `admission_effective_presets`, when there are any. Not render identity.
 
         Raises:
             UnsupportedRenderModeError: The job's render mode cannot render this rig
@@ -1611,10 +1684,23 @@ class RenderingPipeline:
         """Functional identity of this render; the output path is not part of it.
 
         A `physical_v2` render also hashes its renderer and encoder revisions, the
-        musical phase map built from the detected grid, and any render locks, and leaves
-        out the transition settings it does not apply.
+        musical phase map built from the detected grid, any render locks and, for each
+        section that renders a preset other than the one it names (`_physical_preset`:
+        the effective variant, or none), the preset it renders, and leaves out the
+        transition settings it does not apply.
         """
         physical = self.job_config.moving_heads.mode == "physical_v2"
+        substitutions: list[tuple[str, str | None]] = []
+        if physical:
+            for section in self.iterate_plan_sections(self.choreography_plan):
+                if not section.template_id:
+                    continue
+                preset = _physical_preset(
+                    section, get_template(section.template_id), [], self.admission
+                )
+                rendered = None if preset is None else preset.preset_id
+                if rendered != (section.preset_id or None):
+                    substitutions.append((section.section_name, rendered))
         return render_fingerprint(
             plan=self.choreography_plan,
             beat_grid=self.beat_grid,
@@ -1631,6 +1717,7 @@ class RenderingPipeline:
             ),
             phase_map=build_musical_phase_map(self.beat_grid) if physical else None,
             locks=self.locks,
+            preset_substitutions=substitutions,
         )
 
     def _render_physical(self) -> list[FixtureSegment]:
@@ -1685,10 +1772,6 @@ class RenderingPipeline:
         entry_windows: list[dict[str, Any]] = []
         time_markers: list[TimeMarker] = []
         diagnostics: list[MHDiagnostic] = []
-        not_admitted = {
-            (exclusion["template_id"], exclusion["preset_id"]): exclusion["reason"]
-            for exclusion in (self.admission.preset_exclusions if self.admission else ())
-        }
         fixture_contexts = self._build_fixture_contexts()
         for section in self.iterate_plan_sections(self.choreography_plan):
             if not section.template_id:
@@ -1697,7 +1780,7 @@ class RenderingPipeline:
                 template_doc = get_template(section.template_id)
             except Exception as e:
                 raise ValueError(f"Template not found: {section.template_id}") from e
-            preset = _physical_preset(section, template_doc, diagnostics, not_admitted)
+            preset = _physical_preset(section, template_doc, diagnostics, self.admission)
             context = TemplateCompileContext(
                 section_id=section.section_name,
                 template_id=template_doc.template.template_id,
@@ -1944,8 +2027,8 @@ class RenderingPipeline:
             "diagnostics": [d.model_dump(mode="json") for d in diagnostics],
         }
         if self.admission is not None:
-            # Exclusions are left out when the gate excluded nothing, so earlier traces
-            # keep their keys.
+            # Each key is left out when empty (nothing excluded, every admitted template
+            # playing its base), so earlier traces keep their keys.
             if self.admission.exclusions:
                 self.render_record["admission_exclusions"] = [
                     dict(exclusion) for exclusion in self.admission.exclusions
@@ -1954,6 +2037,13 @@ class RenderingPipeline:
                 self.render_record["admission_preset_exclusions"] = [
                     dict(exclusion) for exclusion in self.admission.preset_exclusions
                 ]
+            varied = {
+                template_id: preset_id
+                for template_id, preset_id in self.admission.effective_preset.items()
+                if preset_id is not None
+            }
+            if varied:
+                self.render_record["admission_effective_presets"] = varied
         omitted = [
             {
                 "section_id": cue.section_id,

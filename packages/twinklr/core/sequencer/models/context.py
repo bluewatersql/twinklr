@@ -123,8 +123,11 @@ class StepCompileContext(BaseModel):
         resolved_components: The step's component references resolved for this
             fixture: its start aim, and held channels that replace the step's own;
             physical compile only, None for a step without references.
-        phase_offset_by_channel: Cycles each phase domain lags the step phase, from
-            the step's distribution over the rig topology; physical compile only.
+        phase_offset_by_channel: Cycles each phase domain lags the step phase: from
+            the step's distribution over the rig topology, plus the shift by which an
+            instance continuing the phase of the step's earlier instances in its
+            section corrects its own frame-grid start (`_phase_shift`); physical
+            compile only.
         pan_sign: Multiplies the pan displacement (not the start aim): -1 or +1 for a
             mirrored wing, 0 at an odd center; physical compile only.
     """

@@ -11,6 +11,7 @@ to end, which turned a template whose steps deliberately overlap (``left_sweep``
 twice as long as the cycle it claimed to fill (P4-F6).
 """
 
+from fractions import Fraction
 import logging
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -21,6 +22,7 @@ from twinklr.core.sequencer.models.template import (
     RepeatContract,
     RepeatMode,
 )
+from twinklr.core.sequencer.timing.musical_phase import exact_decimal
 
 logger = logging.getLogger(__name__)
 
@@ -114,9 +116,14 @@ def schedule_repeats(
     if contract.mode == RepeatMode.ONCE:
         return _schedule_once(placements, contract, duration_bars)
 
-    # Calculate number of complete cycles
-    num_complete_cycles = int(duration_bars // contract.cycle_bars)
-    remainder_bars = duration_bars - (num_complete_cycles * contract.cycle_bars)
+    # Complete cycles, their bounds and the remainder are counted and summed exactly, so
+    # a cycle ends exactly where the next begins and a window of whole cycles leaves no
+    # remainder, whatever decimal the cycle length is (two thirds of a bar, say).
+    cycle = exact_decimal(contract.cycle_bars)
+    window = exact_decimal(duration_bars)
+    num_complete_cycles = int(window // cycle)
+    remainder = window - num_complete_cycles * cycle
+    remainder_bars = float(remainder)
 
     # Window shorter than one cycle (P4-F4). This used to return an empty schedule
     # behind a logger.warning the CLI never surfaced, so a 1-bar section rendered
@@ -134,7 +141,7 @@ def schedule_repeats(
                 placements,
                 contract,
                 cycle_num=0,
-                cycle_start=0.0,
+                cycle_start=Fraction(0),
                 window_end=duration_bars,
                 is_partial=True,
                 is_fade_out=contract.remainder_policy == RemainderPolicy.FADE_OUT,
@@ -153,21 +160,21 @@ def schedule_repeats(
                 placements,
                 contract,
                 cycle_num=cycle_num,
-                cycle_start=cycle_num * contract.cycle_bars,
+                cycle_start=cycle_num * cycle,
                 window_end=duration_bars,
             )
         )
 
     # Handle remainder based on policy
     if remainder_bars > _EPSILON_BARS:
-        remainder_start = num_complete_cycles * contract.cycle_bars
+        remainder_start = num_complete_cycles * cycle
 
         if contract.remainder_policy == RemainderPolicy.HOLD_LAST_POSE:
             instances.extend(
                 _hold_last_pose(
                     instances,
                     remainder_start=remainder_start,
-                    remainder_bars=remainder_bars,
+                    remainder=remainder,
                     cycle_number=num_complete_cycles,
                 )
             )
@@ -206,7 +213,7 @@ def _schedule_once(
     other policy schedules nothing after it.
     """
     instances = _schedule_cycle(
-        placements, contract, cycle_num=0, cycle_start=0.0, window_end=duration_bars
+        placements, contract, cycle_num=0, cycle_start=Fraction(0), window_end=duration_bars
     )
     if duration_bars < contract.cycle_bars - _EPSILON_BARS:
         return ScheduleResult(
@@ -284,20 +291,33 @@ def _schedule_cycle(
     contract: RepeatContract,
     *,
     cycle_num: int,
-    cycle_start: float,
+    cycle_start: Fraction,
     window_end: float,
     is_partial: bool = False,
     is_fade_out: bool = False,
 ) -> list[ScheduledInstance]:
-    """Instantiate one cycle of the loop, dropping steps that start past the window."""
-    instances: list[ScheduledInstance] = []
+    """Instantiate one cycle of the loop, dropping steps that start past the window.
 
-    for step_id, offset, duration in _cycle_order(placements, contract, cycle_num):
-        start_bars = cycle_start + offset
+    A step ending within `_EPSILON_BARS` of another step's start in the cycle, or of the
+    cycle's end, ends exactly there: decimals written for thirds or sixths of a bar
+    do not sum exactly, and a rounding must not make consecutive steps overlap.
+    """
+    instances: list[ScheduledInstance] = []
+    ordered = _cycle_order(placements, contract, cycle_num)
+    bounds = [
+        *(cycle_start + exact_decimal(offset) for _, offset, _ in ordered),
+        cycle_start + exact_decimal(contract.cycle_bars),
+    ]
+
+    for step_id, offset, duration in ordered:
+        start = cycle_start + exact_decimal(offset)
+        start_bars = float(start)
         if start_bars >= window_end - _EPSILON_BARS:
             continue
 
-        end_bars = start_bars + duration
+        end = start + exact_decimal(duration)
+        end = next((bound for bound in bounds if abs(bound - end) <= _EPSILON_BARS), end)
+        end_bars = float(end)
         instances.append(
             ScheduledInstance(
                 step_id=step_id,
@@ -346,8 +366,8 @@ def _cycle_order(
 def _hold_last_pose(
     instances: list[ScheduledInstance],
     *,
-    remainder_start: float,
-    remainder_bars: float,
+    remainder_start: Fraction,
+    remainder: Fraction,
     cycle_number: int,
 ) -> list[ScheduledInstance]:
     """Extend the steps that close the last cycle across the remainder.
@@ -362,7 +382,7 @@ def _hold_last_pose(
     closing = [
         instance
         for instance in instances
-        if abs(instance.end_bars - remainder_start) <= _EPSILON_BARS
+        if abs(instance.end_bars - float(remainder_start)) <= _EPSILON_BARS
     ]
     if not closing:
         closing = [max(instances, key=lambda instance: instance.end_bars)]
@@ -370,8 +390,8 @@ def _hold_last_pose(
     return [
         ScheduledInstance(
             step_id=instance.step_id,
-            start_bars=remainder_start,
-            end_bars=remainder_start + remainder_bars,
+            start_bars=float(remainder_start),
+            end_bars=float(remainder_start + remainder),
             cycle_number=cycle_number,
         )
         for instance in closing

@@ -905,8 +905,10 @@ def test_an_overlay_state_is_named_never_a_byte() -> None:
 
 
 def test_overlay_shape_is_refused_where_it_cannot_follow_the_cycle() -> None:
-    """Under PING_PONG (which mirrors every other cycle), past the cycle end, with both or
-    neither state source, or with masks that leave no flick."""
+    """Under PING_PONG (which mirrors every other cycle), past the end of a cycle whose
+    steps do not each span it (one they span grows to hold the overlay instead:
+    `whole_period_cycle`), with both or neither state source, or with masks that leave
+    no flick."""
     with pytest.raises(ValidationError, match="PING_PONG"):
         physical_template_doc(
             "vis_pp",
@@ -915,7 +917,9 @@ def test_overlay_shape_is_refused_where_it_cannot_follow_the_cycle() -> None:
             overlays=[overlay("gobo", 1, 3, 0.5, "dots")],
         )
     late = physical_template_doc(
-        "vis_late", [hold_step("h", 0.0)], overlays=[overlay("gobo", 3.0, 5.0, 0.5, "dots")]
+        "vis_late",
+        [hold_step("h", 0.0, duration=0.5), hold_step("k", 0.0, start=0.5, duration=0.5)],
+        overlays=[overlay("gobo", 3.0, 5.0, 0.5, "dots")],
     )
     with pytest.raises(PhysicalCompileError, match="ends after its 4-beat cycle"):
         _compile(late.template)

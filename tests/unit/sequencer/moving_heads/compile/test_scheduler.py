@@ -9,6 +9,8 @@ cycle claimed (P4-F6).
 
 from __future__ import annotations
 
+from itertools import pairwise
+
 from twinklr.core.sequencer.models.template import (
     RemainderPolicy,
     RepeatContract,
@@ -138,3 +140,61 @@ def test_hold_last_pose_holds_every_step_that_closes_the_cycle() -> None:
 
 def test_zero_duration_window_schedules_nothing() -> None:
     assert schedule_repeats(_contract(), duration_bars=0.0).instances == []
+
+
+def test_consecutive_cycles_share_their_bound_whatever_the_cycle_length() -> None:
+    """Two beats of 3/4 make a cycle of two thirds of a bar, which no float holds
+    exactly. Each cycle still ends exactly where the next begins, and the held remainder
+    ends at the window's end: summed in floats, `k * c + c` and `(k + 1) * c` differ in
+    the last place for some `k`, and a cue placed from each could overlap its successor
+    by a frame once quantized."""
+    cycle = 2 / 3
+    for policy in (RemainderPolicy.HOLD_LAST_POSE, RemainderPolicy.TRUNCATE):
+        result = schedule_repeats(
+            _contract(
+                mode=RepeatMode.JOINER,
+                cycle_bars=cycle,
+                loop_step_ids=["a"],
+                remainder_policy=policy,
+            ),
+            duration_bars=40.0,
+            step_durations={"a": cycle},
+            step_offsets={"a": 0.0},
+        )
+        instances = result.instances
+        assert len(instances) == 60
+        for before, after in pairwise(instances):
+            assert before.end_bars == after.start_bars, (before, after)
+
+
+def test_a_decimal_cycle_fills_its_window_in_whole_cycles() -> None:
+    """Twenty cycles of 0.05 bars fill one bar exactly. Divided in floats, 1.0 // 0.05
+    is 19, leaving a "remainder" of exactly one cycle; counted exactly, there are twenty
+    complete cycles and no remainder."""
+    result = schedule_repeats(
+        _contract(mode=RepeatMode.JOINER, cycle_bars=0.05, loop_step_ids=["a"]),
+        duration_bars=1.0,
+        step_durations={"a": 0.05},
+        step_offsets={"a": 0.0},
+    )
+    assert result.num_complete_cycles == 20
+    assert result.remainder_bars == 0.0
+    assert len(result.instances) == 20
+
+
+def test_steps_written_in_decimals_meet_exactly() -> None:
+    """Three steps of a sixth of a bar written as decimals: 0.16666666666666666 twice is
+    not 0.3333333333333333, the third step's offset. A step ending within the
+    scheduler's tolerance of the next step's start, or of the cycle's end, ends there,
+    so consecutive steps never overlap by a rounding."""
+    sixth, third = 0.16666666666666666, 0.3333333333333333
+    result = schedule_repeats(
+        _contract(mode=RepeatMode.JOINER, cycle_bars=0.5, loop_step_ids=["a", "b", "c"]),
+        duration_bars=3.0,
+        step_durations={"a": sixth, "b": sixth, "c": sixth},
+        step_offsets={"a": 0.0, "b": sixth, "c": third},
+    )
+    instances = result.instances
+    assert len(instances) == 18
+    for before, after in pairwise(instances):
+        assert before.end_bars == after.start_bars, (before, after)
