@@ -640,6 +640,43 @@ a fix round, a re-review, then three items closed):
 - **Design choices awaiting a look judgment (`PENDING-OWNER`):** the finite sweep's
   cosine easing and the periodic sweep starting at an edge.
 
+P2.4b, 2026-11-15 (reviewed separately from its author; a review with one high finding,
+a fix round and a re-review):
+
+- **The lit window is in pre-transform phase.** It is a time window in each movement
+  period at the head's own P2.2 offset; the path's `transform` does not move it. A
+  transform therefore changes which arc is lit: `reverse` on a finite sweep lit over
+  (0, 0.5) lights the far edge to the centre. This corrects the plan's "follows the
+  path", and P2.4c authors windows on this basis.
+- **Envelope rules beyond the plan.** Pan and tilt must sit in one distribution;
+  distributing the dimmer or shutter on a step with an envelope is refused. A lit
+  window shorter than a frame is refused at compile. For a finite kernel the
+  visibility phase clamps to [0, 1]: a window ending at 1 keeps a `ONCE` hold lit, and
+  a release ramp on such a window is refused; a window ending earlier leaves the hold
+  dark.
+- **Overlay rules beyond the plan.** Refused: an overlay on a `PING_PONG` template, one
+  running past the cycle end, level or ramps without a dimmer axis. An overlay does not
+  apply to a `HOLD_LAST_POSE` remainder. A cue already holding the overlay's state is
+  kept whole (`overlay_unchanged`). An overlay wholly inside an envelope's dark part
+  does nothing. `AttributeOverlay.attribute_preset_id` was added for the flick family.
+- **The plan's red/blue test is refused as written.** With a gobo overlay the base
+  colour changes on a lit frame, which is refused with or without the overlay. The
+  colour-overlay version is tested: the base in force at release resumes.
+- **The honesty check was tightened.** `assert_honest_transactions` rejects any wheel
+  change on a lit frame, cue content included. It flagged nothing in the existing
+  suites and catches the in-cue flick mutant it used to miss.
+- **Drop records** carry the frames actually dropped (`start_ms`, `end_ms`).
+- **Registry.** `discrete.open_state` is now evidenced by its use in a lit slice.
+- **Cost (reviewer, 8 heads, 4-minute song):** gate 1.0–2.3 s per template; at most
+  52,285 effects and 5.9 MB.
+- **Evidence at re-review.** 6,000 fuzz seeds: 2,368 admitted and rendered, no
+  dishonest frame; 767 subset comparisons identical.
+- **Gate gaps found by this review, fixed in a follow-up before P2.4c.** Seven of those
+  seeds failed after gate admission, none caused by this task: a `drop_accent` cascade
+  when a template mixes steps with and without the fallback; a repeating cycle started
+  on a bar the gate never aligned it to; and the boundary into a `HOLD_LAST_POSE`
+  remainder, which the gate never compiles (poses before this task, wheels with it).
+
 ## Phase exit
 
 `physical_v2` accepts grids with silent edges, reports the covered span and holds every fixture dark outside it without inferring tempo; a grid Phase 1 accepted renders the same frames and fingerprint. Legacy session ids, the 16 Phase 0 fingerprints and the Phase 1 request fingerprints are unchanged. Six core families compile deterministically on the synthetic rig matrix and are offered only under `physical_v2`, each only on a rig that can render it; independent phase domains work; missing heads preserve canonical ranks; preset overrides have explicit scope; a `ONCE` hold stays one cue per fixture and holds its terminal pose to the section end; fly-in/out lit directions and dark returns are frame-proven; flicks settle while dark and resume the current base. Each section's entry window is sized at render from a bound the fuzz shows dominates the transaction pass, so section-entry repositioning fits by construction; the dip is skipped where the predecessor ends where the successor begins, and the plan-dependent failures P2.4c lists still surface at render. The zoom pilot is source/synthetic proven with any real-profile acceptance explicitly pending. Legacy regression and clean-tree `make validate` pass. Owner visual acceptance, including whether the remaining section-entry dips look acceptable, is a separate `PENDING-OWNER` record, not a consequence of a new effect name or passing bytes.
