@@ -53,6 +53,7 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
     DiscreteTrajectory,
     PhysicalChannelError,
     PhysicalPoint,
+    RenderLock,
     check_physical_value,
 )
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
@@ -353,6 +354,7 @@ def _plan(
     memo: PrepositionMemo | None,
     *,
     end_ms: int = 8000,
+    locks: tuple[RenderLock, ...] = (),
     **policy: Any,
 ) -> PrepositionResult:
     """Plan MH1's `cues`; `policy` is `failure_mode` and `on_unplayable`."""
@@ -360,7 +362,7 @@ def _plan(
         list(cues),
         {"MH1": profile},
         initial_states={"MH1": initial},
-        locks=(),
+        locks=locks,
         frame_ms=20,
         sequence_end_ms=end_ms,
         memo=memo,
@@ -405,18 +407,24 @@ def test_a_later_entry_reuses_the_rest_of_an_earlier_plan_exactly(
         pytest.param("profile", _profile(travel_speed_per_s=60.0, settle_ms=40), id="slow_profile"),
         pytest.param("profile", _profile(travel_speed_per_s=360.0, settle_ms=400), id="settle"),
         pytest.param("end_ms", 9000, id="sequence_end"),
+        pytest.param(
+            "locks",
+            (RenderLock(start_ms=3000, end_ms=4000, fixture_ids=("MH1",), channels=(_PAN,)),),
+            id="lock",
+        ),
     ],
 )
 def test_the_memo_never_reuses_a_plan_made_with_another_profile_or_end(
     change: str, value: Any
 ) -> None:
-    """The same cue objects planned on another profile, or to another end, after the memo
-    holds their plan: each result is its own memo-free plan, and differs from the one in
-    the memo (a stale reuse would return that)."""
+    """The same cue objects planned on another profile, to another end, or with a lock on
+    the pan over cue c's dark move, after the memo holds their plan: each result is its
+    own memo-free plan, and differs from the one in the memo (a stale reuse would return
+    that)."""
     profile = _profile(travel_speed_per_s=360.0, settle_ms=40)
     memo: PrepositionMemo = {}
     remembered = _plan(_CUES, profile, _initial(0.0), memo)
-    kwargs: dict[str, Any] = {"end_ms": value} if change == "end_ms" else {}
+    kwargs: dict[str, Any] = {} if change == "profile" else {change: value}
     other = value if change == "profile" else profile
     with_memo = _plan(_CUES, other, _initial(0.0), memo, **kwargs)
     fresh = _plan(_CUES, other, _initial(0.0), None, **kwargs)
@@ -554,9 +562,9 @@ def test_a_cue_after_a_substitution_is_never_given_the_plan_after_the_cue_itself
 
 
 def test_motion_settling_within_a_frame_of_a_cue_end_is_planned_again() -> None:
-    """From the song start the pan settles 2 ms after one-frame cue w ends, so cue x waits
-    a frame; entered at w, from a head already there, it waits for nothing."""
-    profile = _profile(travel_speed_per_s=100.0, settle_ms=40)
+    """From the song start the pan settles under 1 ms after one-frame cue w ends, so cue x
+    waits a frame; entered at w, from a head already there, it waits for nothing."""
+    profile = _profile(travel_speed_per_s=100.0, settle_ms=39)
     last = 10.0 * 980 / 1000  # v's pan on its last frame
     v = _cue("v", 1000, 2000, (0.0, 10.0))
     w = _cue("w", 2000, 2020, (last, last))

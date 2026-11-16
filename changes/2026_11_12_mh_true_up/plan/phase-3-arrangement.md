@@ -288,3 +288,43 @@ Revised order:
 Work that does not depend on the owner's viewing (T1–T3a on the planner side) proceeds
 single-contract while C0 is pending; nothing is deleted from the old renderer before
 acceptance.
+
+## Execution record
+
+### Gate-time cut — 2026-11-16 (commits `3113d062` and the test follow-up)
+
+Done before any Phase 3 task, on owner direction. Implemented by one agent; reviewed
+by a second (approve with fixes: one medium on test strength, five low), fixed by a
+third, re-reviewed by a fourth (approve with two low test gaps, closed in the
+follow-up).
+
+- **What changed.** Preposition plans are remembered across one placement's section
+  entries (`plan_prepositions(memo=...)`); heads of one step instance with the same
+  profile and offsets share channel trajectories (`compile_physical_step(shared=...)`);
+  phase, path and DMX-word arithmetic on the hot path is done in exact integers; plan
+  grouping compares instead of hashing. `evaluate_physical_path` is now the single
+  path implementation (phase passed as `n / d`); its `Fraction` wrapper is gone.
+- **Measured (8 heads, 4-minute synthetic song, first reviewer, load average 3–5 on 18
+  cores).** Zoom rig, 21 combinations: 57.5 s → 17.0 s variable tempo, 52.3 s → 15.7 s
+  steady. Zoomless, 18 combinations: 11.9 s and 10.8 s after (author's before: 40.0 s
+  and 36.7 s). With four gates running at once the author measured 19.4 s and 18.1 s on
+  the zoom rig. The 20 s target is met; the margin under heavy load is thin.
+- **Output unchanged.** Against a pristine `7356b376`: the author's 360-configuration
+  matrix (13,338 comparisons) and gate fuzz (59,499), rerun after the fix round; the
+  first reviewer's 192 mixed-profile configurations (4,944 comparisons); the
+  re-reviewer's 96. Zero differences in all. The 16 Phase 0 and two Phase 1
+  fingerprints match. No golden or regression file changed.
+- **Test strength.** The first review found eight mutations of the memo and checks
+  that no test caught, one of which (dropping `known_dark` from the memo's view)
+  produces a wrong plan. A seeded memo-against-memo-free property test and targeted
+  cases now kill them.
+- **Equivalent mutants, recorded not tested.** Dropping `start`, `dimmer_dark_since`
+  or `shutter_dark_since` from the memo's view, or `frame_ms` from its key, cannot
+  change a plan: the first three follow from `source` and the profile, and a frame
+  other than 20 ms is refused before the memo is used. They stay in the view and key
+  so its definition remains "the whole state, past times collapsed" (integrator
+  decision on the re-reviewer's recommendation).
+- **Remaining cost.** Garbage collection is about 4 s of 17 s. Pausing collection
+  around the gate would remove most of it but is a process-wide change; not done.
+- **Validation.** `make validate` on `3113d062`: 6832 passed, 39 skipped, tree clean
+  before and after.
