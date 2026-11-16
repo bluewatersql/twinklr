@@ -350,3 +350,13 @@ and `initial_states` fields can default safely (timings, default bytes, a dark i
 state) and which a rig must state (channel offsets, ranges, model name). Defaulted
 timings are chosen, not measured; the trace says which values were defaulted. This
 survives the cutover and adds no second path, so it may be built before acceptance.
+
+### Viewing render stopped at the gate — 2026-11-16
+
+The first real-audio gate on the owner's rig admitted one family of seven
+([evidence](../evidence/2026-11-16-p3-real-audio-gate/README.md)). Owner decisions the
+same day: fix robustness before any viewing (a sane beat grid when meter confidence is
+low or tempo is doubled; families adapt to tempo and fixture speed instead of being
+excluded), and use 150°/s, the layout's limit, for the rig's profile. A read-only
+diagnosis and design precedes the implementation tasks, which are added here when it
+reports.
