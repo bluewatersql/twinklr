@@ -724,6 +724,54 @@ author over three rounds, the last two approving):
   encoded words across the two bar-1 entries.
 - **Whether a dark cue is an acceptable look is `PENDING-OWNER`.**
 
+P2.4c, 2026-11-16 (commit `ec30c1e9`; reviewed separately from its author: a review
+with two medium findings, a fix round and an approving re-review):
+
+- **An unknown entry bound fails any template (integrator decision).** A catalog
+  family is excluded; a `--template-dir` template refuses the run before planning,
+  naming fixture and term. The author's first version admitted a user template with a
+  warning, and review showed it then rendered a whole section dark.
+- **Families are admitted or excluded whole.** Each family's two presets (`narrow`,
+  `slow`) are only narrower or slower than its base, so a preset rarely removes a
+  family the base can play. Per-preset eligibility is carried to P3-T2.
+- **Families are authored for 4/4; no re-authoring for other meters.** In 3/4,
+  `target_orbit` and `mirror_wings` are excluded (their cycle does not hold whole
+  movement periods); in 6/8 their `slow` preset fails, which excludes both. Fitting
+  all three meters needs 8-bar cycles and a longer gate. The catalog README and user
+  guide say so and a test pins it.
+- **No family names a position preset.** A preset patch cannot add a reference and a
+  reference the rig lacks always fails, so families use explicit angles; only
+  `masked_wheel_flick` needs a rig attribute preset. Four families need a shutter
+  state named exactly `open`; a rig without it is offered only the two cascades.
+- **`apply_preset` dropped `physical_overlays`; fixed.** Overlays did not exist on
+  `main`, so no released output changes.
+- **Registry hygiene.** `admit_physical_catalog` is idempotent and a legacy job
+  removes the catalog again (`TemplateRegistry.unregister`, catalog-sourced entries
+  only), so a legacy run after a physical one in the same process still sees 37
+  templates.
+- **Derived topology and a missing head.** With a derived (one-row) topology,
+  removing the highest-index head can change other heads' phases; a declared topology
+  keeps ranks. Documented; P2.2 behaviour, not changed here.
+- **Measured entry dips (author, 8 heads, 60–180 BPM).** Synthetic 720°/s profile:
+  1 beat, 1–2 beats at 180 BPM. 360°/s: 1 beat, up to 2 beats from 150 BPM. 180°/s
+  with a 300 ms wheel settle: 1–2 beats, and the flick is excluded from 120 BPM and
+  fly-in, fly-out and wings at 180 BPM. Every dip is under one bar, so no family range
+  was narrowed.
+- **Gate time is well over target.** 18 combinations, 8 heads, 4-minute song
+  (reviewer, machine under load): 36.1 s steady, 51.4 s variable tempo, against 20 s.
+  About half is compiling (path evaluation in exact fractions) and half the planner's
+  per-frame follow. A word and travel-time cache was added (bytes identical in 140
+  with/without comparisons). A known safe cut, caching path and phase values for
+  periodic kernels, is not done; carried to Phase 3 with the exit record.
+- **Emission** of an 8-head, 4-minute family render: 2.4 s for about 52,600 effects.
+- **Evidence at re-review.** 420 multi-section family renders and 90 ordered-pair
+  cases: no exception, no dishonest frame, deterministic; no cue dropped as unplayable
+  under the default policy and 0.07% of cue frames dropped by entry windows. 28
+  mutations, all caught after the fix round.
+- **Left open (low).** `_predecessor`'s unknown-follow return is reachable only by a
+  plan that skips the gate (a checkpoint) and is not exercised by a test.
+- **How the families look is `PENDING-OWNER`.**
+
 ## Phase exit
 
 `physical_v2` accepts grids with silent edges, reports the covered span and holds every fixture dark outside it without inferring tempo; a grid Phase 1 accepted renders the same frames and fingerprint. Legacy session ids, the 16 Phase 0 fingerprints and the Phase 1 request fingerprints are unchanged. Six core families compile deterministically on the synthetic rig matrix and are offered only under `physical_v2`, each only on a rig that can render it; independent phase domains work; missing heads preserve canonical ranks; preset overrides have explicit scope; a `ONCE` hold stays one cue per fixture and holds its terminal pose to the section end; fly-in/out lit directions and dark returns are frame-proven; flicks settle while dark and resume the current base. Each section's entry window is sized at render from a bound the fuzz shows dominates the transaction pass, so section-entry repositioning fits by construction; the dip is skipped where the predecessor ends where the successor begins, and the plan-dependent failures P2.4c lists still surface at render. The zoom pilot is source/synthetic proven with any real-profile acceptance explicitly pending. Legacy regression and clean-tree `make validate` pass. Owner visual acceptance, including whether the remaining section-entry dips look acceptable, is a separate `PENDING-OWNER` record, not a consequence of a new effect name or passing bytes.
