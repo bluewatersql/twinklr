@@ -416,3 +416,21 @@ Next actions, in order:
 Open for the owner: bar placement by ear on their songs; the three songs left at
 147.7 BPM; whether to keep a tempo-change detector (removed as unused); the integrator
 decisions listed in the Phase 3 plan.
+
+### Update, later on 2026-11-16
+
+Everything listed as in progress above is committed on `feat/mh-true-up-p3`: the family
+adaptation (`068f9971`), profile defaults (`dcc14ddf`), with `make validate` passing on
+`dcc14ddf` (7048 passed, 39 skipped) and old-renderer output verified byte-identical.
+The viewing render and the old-renderer reference for Need A Favor exist
+([record](../evidence/2026-11-16-p3-viewing-render/README.md)); xLights reproduced
+every physical byte.
+
+**The change is now waiting on the owner:** look acceptance of the physical render
+(`PENDING-OWNER`). Until it is given, nothing is deleted from the old renderer and the
+planner tasks T1–T5 do not start. The branch is not merged or pushed.
+
+Next action after acceptance: the cutover, in the order
+[cutover-inventory.md](cutover-inventory.md) gives. Work that could proceed without
+it: the four findings in the viewing-render record (the provider rejecting the plan
+schema is the one with a cost).
