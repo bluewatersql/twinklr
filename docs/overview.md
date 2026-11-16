@@ -37,9 +37,9 @@ Twinklr currently supports:
   20 ms frames as constant DMX effects over model-relative channels 1-48 (the xLights
   DMX effect's limit), 16-bit pan/tilt as coarse/fine byte pairs, and dark
   repositioning planned between cues. None of the 37 builtins carries physical data;
-  a `physical_v2` run instead loads six physical families from
-  `catalog/templates/moving_heads_physical` and offers the planner those the rig can
-  render. Planner intent is not applied on that path. See
+  a `physical_v2` run instead loads seven physical families from
+  `catalog/templates/moving_heads_physical` (one of them, `zoom_wave`, a synthetic
+  pilot of a zoom axis) and offers the planner those the rig can render. Planner intent is not applied on that path. See
   `packages/twinklr/core/sequencer/moving_heads/compile/physical.py` and
   `packages/twinklr/core/sequencer/moving_heads/compile/preposition.py`.
 - **Display sequencer** — RGB/pixel effects for outline, tree, and other display elements (`packages/twinklr/core/sequencer/display/`).

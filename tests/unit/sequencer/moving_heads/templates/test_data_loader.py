@@ -221,7 +221,7 @@ def test_physical_catalog_is_admitted_only_under_physical_v2() -> None:
     loaded = admit_physical_catalog(physical, registry=registry)
 
     assert loaded == [path.stem for path in sorted(PHYSICAL_TEMPLATE_DIR.glob("*.json"))]
-    assert len(loaded) == 6
+    assert len(loaded) == 7  # six P2.4c families and the P2.5 zoom pilot
     for template_id in loaded:
         source = Path(registry.source(template_id).removeprefix("data:"))
         assert source.parent == PHYSICAL_TEMPLATE_DIR
@@ -229,7 +229,7 @@ def test_physical_catalog_is_admitted_only_under_physical_v2() -> None:
 
     # A later run in the same process: again physical keeps them, legacy withdraws them.
     assert admit_physical_catalog(physical, registry=registry) == loaded
-    assert len(registry.list_all()) == 6
+    assert len(registry.list_all()) == 7
     assert admit_physical_catalog(JobConfig(), registry=registry) == []
     assert registry.list_all() == []
 

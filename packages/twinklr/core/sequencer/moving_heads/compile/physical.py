@@ -1,8 +1,9 @@
 """Physical step compilation for the physical_v2 renderer.
 
 `compile_physical_step` turns a template step's explicit physical data into a
-`FixtureSegment` whose channels hold typed trajectories: pan/tilt in degrees, the
-dimmer as a normalized level, the shutter and color and gobo wheels as named states.
+`FixtureSegment` whose channels hold typed trajectories: pan/tilt and the zoom's beam
+angle in degrees, the dimmer as a normalized level, the shutter and color and gobo
+wheels as named states.
 A named state selects only the byte the profile declares for it
 (`resolve_discrete_state`); a wheel change is one event, never a sweep through the
 states between, and an undeclared state or wheel is rejected, never replaced by open
@@ -37,6 +38,7 @@ from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.models.context import StepCompileContext
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import (
+    AXIS_KEYS,
     DISCRETE_KEYS,
     ContinuousTrajectory,
     DiscretePoint,
@@ -137,11 +139,17 @@ def compile_physical_step(
         the step end), DIMMER and SHUTTER when the step declares their pulses, and
         SHUTTER, COLOR and GOBO as one held event when it declares a static state,
         and DIMMER as one held level when a referenced attribute preset supplies it.
-        `metadata["phase_origin_ms"]` records the origin.
+        On a profile with a zoom axis, ZOOM always: the step's `physical_zoom` sampled
+        as pan is, or, without one, the profile's default word held through the step,
+        so the transaction pass holds the zoom between cues. Without a zoom axis a step
+        whose zoom declares `omit_optional_zoom` gets none and
+        `metadata["omitted_optional"]` is `"zoom"`. `metadata["phase_origin_ms"]`
+        records the origin.
 
     Raises:
         PhysicalCompileError: For a legacy step, legacy data on a physical step, a
-            fixture without a physical profile, or a start angle nothing sets.
+            fixture without a physical profile, a start angle nothing sets, or a zoom
+            on a profile without a zoom axis that is not optional.
         PhysicalChannelError: For a value, rate or state change the profile cannot honor,
             including a state or wheel the profile does not declare.
         OffGridTimeError: For a step bound or sample time off the frame grid.
@@ -195,6 +203,8 @@ def compile_physical_step(
         )
         _add(segment, channel, trajectory, profile)
         _check_travel_rate(context.fixture_id, channel, trajectory, profile)
+
+    _add_zoom(step, context, segment, profile, times, t1_ms)
 
     dimmer = step.dimmer.physical
     if dimmer is not None:
@@ -254,6 +264,71 @@ def compile_physical_step(
             _add(segment, channel, held, profile)
 
     return segment
+
+
+def _add_zoom(
+    step: TemplateStep,
+    context: StepCompileContext,
+    segment: FixtureSegment,
+    profile: FixtureCapabilities,
+    times: tuple[int, ...],
+    t1_ms: int,
+) -> None:
+    """The step's ZOOM on a profile with a zoom axis; see `compile_physical_step`."""
+    zoom = step.physical_zoom
+    axis = profile.axes.get("zoom")
+    if axis is None:
+        if zoom is None:
+            return
+        if zoom.if_unsupported != "omit_optional_zoom":
+            raise PhysicalCompileError(
+                MHDiagnostic(
+                    code="unsupported_attribute",
+                    severity="error",
+                    message=(
+                        f"step {step.step_id!r} of template {context.template_id!r} sets "
+                        f"physical_zoom, but profile {profile.profile_id!r} declares no zoom "
+                        "axis; declare one, or make the zoom optional with "
+                        "if_unsupported 'omit_optional_zoom'"
+                    ),
+                    fixture_id=context.fixture_id,
+                    section_id=context.section_id,
+                    action="rejected",
+                )
+            )
+        segment.add_metadata("omitted_optional", "zoom")
+        return
+    if zoom is None or zoom.shape == "hold":
+        # Unauthored, the encoder would write the default byte between and inside cues;
+        # held explicitly, the same bytes, the transaction pass keeps it through gaps.
+        value = (
+            axis.word_center(axis.default_word(profile.defaults))
+            if zoom is None
+            else zoom.start_deg
+        )
+        points: tuple[PhysicalPoint, ...] = (
+            PhysicalPoint(t_ms=times[0], value=value),
+            PhysicalPoint(t_ms=t1_ms, value=value),
+        )
+    else:
+        movement = step.movement.physical
+        phase_map = context.phase_map
+        # Both checked: a zoom sine needs a periodic movement; the compile, a phase map.
+        assert movement is not None and movement.period_beats is not None
+        assert phase_map is not None
+        period = movement.period_beats
+        offset = context.phase_offset_by_channel.get(ChannelName.PAN, Fraction(0))
+
+        def wave(time_ms: int) -> float:
+            phase = musical_phase_fraction(
+                phase_map, time_ms, origin_ms=times[0], period_beats=period
+            )
+            return zoom.start_deg + zoom.extent_deg * math.sin(2 * math.pi * float(phase - offset))
+
+        points = tuple(PhysicalPoint(t_ms=t, value=wave(t)) for t in (*times, t1_ms))
+    trajectory = ContinuousTrajectory(unit="degree", points=points, interpolation="linear")
+    _add(segment, ChannelName.ZOOM, trajectory, profile)
+    _check_travel_rate(context.fixture_id, ChannelName.ZOOM, trajectory, profile)
 
 
 def resolve_discrete_state(capability: DiscreteCapability, state: str) -> int:
@@ -727,7 +802,7 @@ def _check_travel_rate(
     profile: FixtureCapabilities,
 ) -> None:
     """Reject travel between consecutive points faster than the configured speed."""
-    axis = profile.axes["pan" if channel is ChannelName.PAN else "tilt"]
+    axis = profile.axes[AXIS_KEYS[channel]]
     speed = axis.travel_speed_per_s
     for earlier, later in pairwise(trajectory.points):
         delta = abs(later.value - earlier.value)

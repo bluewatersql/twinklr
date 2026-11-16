@@ -12,6 +12,7 @@ profile never claims a current pose. Nothing renders from either model until the
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from fractions import Fraction
 from itertools import pairwise
 from typing import Annotated, Literal
@@ -21,18 +22,25 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 MAX_DMX_EFFECT_CHANNELS = 48
 """Model-relative channels the xLights DMX effect addresses (`DMXEffect.h`)."""
 
-AxisName = Literal["pan", "tilt", "dimmer"]
+AxisName = Literal["pan", "tilt", "dimmer", "zoom"]
 DiscreteName = Literal["shutter", "color", "gobo"]
 
-_AXIS_UNITS: dict[str, str] = {"pan": "degree", "tilt": "degree", "dimmer": "normalized"}
+_AXIS_UNITS: dict[str, str] = {
+    "pan": "degree",
+    "tilt": "degree",
+    "dimmer": "normalized",
+    "zoom": "degree",
+}
+"""Each axis' unit; `zoom` is the beam angle."""
 
 
 class AxisCapability(BaseModel):
     """A continuous attribute and its calibrated physical-value-to-DMX-word mapping.
 
     `physical_min`/`physical_max` are the calibrated endpoints, in fixture-local
-    unwrapped units, mapped to DMX word 0 and the full word. `allowed_min`/`allowed_max`
-    restrict operation inside that mapping without rescaling it.
+    unwrapped units, mapped to DMX words `dmx_min` and `dmx_max` (by default 0 and the
+    full word). `allowed_min`/`allowed_max` restrict operation inside that mapping
+    without rescaling it.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -53,6 +61,19 @@ class AxisCapability(BaseModel):
     coarse_offset: int = Field(ge=1, le=MAX_DMX_EFFECT_CHANNELS)
     fine_offset: int | None = Field(default=None, ge=1, le=MAX_DMX_EFFECT_CHANNELS)
     inverted: bool = False
+    # Left out of dumps at their defaults, so existing profiles dump as before.
+    dmx_min: int = Field(
+        default=0,
+        ge=0,
+        exclude_if=lambda value: value == 0,
+        description="Word the calibrated minimum maps to; default 0",
+    )
+    dmx_max: int | None = Field(
+        default=None,
+        ge=1,
+        exclude_if=lambda value: value is None,
+        description="Word the calibrated maximum maps to; default the full word",
+    )
     travel_speed_per_s: float | None = Field(
         default=None,
         gt=0,
@@ -77,6 +98,13 @@ class AxisCapability(BaseModel):
                 "allowed_min/allowed_max must be ordered and lie within "
                 f"[{self.physical_min}, {self.physical_max}]"
             )
+        if self.dmx_max is not None and self.dmx_max > self.full_word:
+            raise ValueError(
+                f"dmx_max {self.dmx_max} must not exceed the full word {self.full_word}"
+            )
+        word_min, word_max = self.word_range
+        if word_min >= word_max:
+            raise ValueError(f"dmx_min {word_min} must be below dmx_max {word_max}")
         return self
 
     @property
@@ -90,6 +118,12 @@ class AxisCapability(BaseModel):
         """The largest DMX word: 65535 with a fine channel, else 255."""
         return 65535 if self.fine_offset is not None else 255
 
+    @property
+    def word_range(self) -> tuple[int, int]:
+        """The words the calibrated range maps over: `(dmx_min, dmx_max)`, by default
+        `(0, full_word)`."""
+        return self.dmx_min, self.full_word if self.dmx_max is None else self.dmx_max
+
     def admits(self, value: float | Fraction) -> bool:
         low, high = self.operable_range
         return low <= value <= high
@@ -97,9 +131,11 @@ class AxisCapability(BaseModel):
     def dmx_word(self, value: float | Fraction) -> int:
         """Encode an admitted physical value as an integer DMX word.
 
-        Maps over the full calibrated range, never the allowed window, to 0..255 or,
-        with a fine channel, 0..65535; rounds half up in exact arithmetic, then applies
-        inversion once. A `Fraction` is mapped exactly, with no float rounding first.
+        Maps over the full calibrated range, never the allowed window, to the word range
+        (`dmx_min` + the normalized value times `dmx_max - dmx_min`; by default 0..255
+        or, with a fine channel, 0..65535); rounds half up in exact arithmetic, then
+        applies inversion once, reflecting the word about `dmx_min + dmx_max`. A
+        `Fraction` is mapped exactly, with no float rounding first.
 
         Raises:
             ValueError: If the value is outside the operable range.
@@ -107,14 +143,46 @@ class AxisCapability(BaseModel):
         if not self.admits(value):
             raise ValueError(f"{value} is outside the operable range {self.operable_range}")
         word = self._uninverted_word(Fraction(value))
-        return self.full_word - word if self.inverted else word
+        return self._invert(word)
+
+    def word_center(self, word: int) -> float:
+        """A value that encodes to `word` with margin: the word's center, kept in the
+        allowed window, so no float rounding lands on a DMX rounding tie.
+
+        Raises:
+            ValueError: If no admitted value encodes to `word` exactly.
+        """
+        low, high = (Fraction(bound) for bound in self.operable_range)
+        value = float(min(max(self._word_value(self._invert(word)), low), high))
+        if not self.admits(value) or self.dmx_word(value) != word:
+            raise ValueError(f"word {word} cannot be commanded exactly")
+        return value
+
+    def default_word(self, defaults: Mapping[int, int]) -> int:
+        """The word the default bytes encode: coarse, or coarse << 8 | fine."""
+        word = defaults[self.coarse_offset]
+        if self.fine_offset is not None:
+            word = word << 8 | defaults[self.fine_offset]
+        return word
+
+    def _invert(self, word: int) -> int:
+        """Inversion, its own inverse: the word reflected about `dmx_min + dmx_max`."""
+        word_min, word_max = self.word_range
+        return word_min + word_max - word if self.inverted else word
 
     def _uninverted_word(self, value: Fraction) -> int:
         low = Fraction(self.physical_min)
-        scaled = (value - low) * self.full_word / (Fraction(self.physical_max) - low)
-        return (2 * scaled.numerator + scaled.denominator) // (2 * scaled.denominator)
+        word_min, word_max = self.word_range
+        scaled = (value - low) * (word_max - word_min) / (Fraction(self.physical_max) - low)
+        return word_min + (2 * scaled.numerator + scaled.denominator) // (2 * scaled.denominator)
 
-    def check_default_word(self, name: str, defaults: dict[int, int]) -> None:
+    def _word_value(self, uninverted: int) -> Fraction:
+        """The exact calibrated value an uninverted word encodes, at its center."""
+        word_min, word_max = self.word_range
+        span = Fraction(self.physical_max) - Fraction(self.physical_min)
+        return Fraction(self.physical_min) + span * (uninverted - word_min) / (word_max - word_min)
+
+    def check_default_word(self, name: str, defaults: Mapping[int, int]) -> None:
         """Reject default bytes whose word no admitted value encodes to.
 
         Inversion is undone first; with a fine channel the word is coarse << 8 | fine.
@@ -125,18 +193,15 @@ class AxisCapability(BaseModel):
         offsets = [self.coarse_offset]
         if self.fine_offset is not None:
             offsets.append(self.fine_offset)
-        word = 0
-        for offset in offsets:
-            word = word << 8 | defaults[offset]
-        uninverted = self.full_word - word if self.inverted else word
+        word = self.default_word(defaults)
+        uninverted = self._invert(word)
         low, high = self.operable_range
         if (
             not self._uninverted_word(Fraction(low))
             <= uninverted
             <= self._uninverted_word(Fraction(high))
         ):
-            span = Fraction(self.physical_max) - Fraction(self.physical_min)
-            decoded = float(self.physical_min + span * uninverted / self.full_word)
+            decoded = float(self._word_value(uninverted))
             raise ValueError(
                 f"{name} default word {word} at offsets {'/'.join(map(str, offsets))} "
                 f"decodes to {decoded:g}, outside the allowed window [{low:g}, {high:g}]"
@@ -316,14 +381,14 @@ class FixtureCapabilities(BaseModel):
         if state is None:
             return ("initial state is unknown: the run supplies no initial state for this fixture",)
         problems: list[str] = []
-        pose: tuple[tuple[AxisName, float], ...] = (
-            ("pan", state.pan_deg),
-            ("tilt", state.tilt_deg),
-        )
-        for axis_name, value in pose:
+        for axis_name, value in state.pose.items():
             axis = self.axes.get(axis_name)
-            if axis is not None and not axis.admits(value):
+            if axis is None and axis_name == "zoom":
+                problems.append("initial zoom names an axis the profile does not declare")
+            elif axis is not None and not axis.admits(value):
                 problems.append(f"initial {axis_name} {value} is outside the operable range")
+        if "zoom" in self.axes and state.zoom_deg is None:
+            problems.append("no initial zoom")
         if "dimmer" in self.axes and state.dimmer is None:
             problems.append("no initial dimmer level")
         for wheel_name, wheel in self.discrete.items():
@@ -356,9 +421,24 @@ class InitialFixtureState(BaseModel):
 
     pan_deg: float = Field(allow_inf_nan=False, description="Unwrapped fixture-local pan")
     tilt_deg: float = Field(allow_inf_nan=False, description="Unwrapped fixture-local tilt")
+    # Left out of dumps when absent, so existing initial states dump as before.
+    zoom_deg: float | None = Field(
+        default=None,
+        allow_inf_nan=False,
+        exclude_if=lambda value: value is None,
+        description="Beam angle; required exactly when the profile declares a zoom axis",
+    )
     dimmer: float | None = Field(default=None, ge=0, le=1, description="Normalized level")
     discrete_states: dict[DiscreteName, str] = Field(
         default_factory=dict, description="Semantic state of each discrete channel"
     )
     settled: bool = Field(description="Run evidence that pose and wheels have settled")
     dark: bool = Field(description="Run evidence that the fixture emits no light")
+
+    @property
+    def pose(self) -> dict[AxisName, float]:
+        """The pose axes' values: pan and tilt, and the zoom when given."""
+        pose: dict[AxisName, float] = {"pan": self.pan_deg, "tilt": self.tilt_deg}
+        if self.zoom_deg is not None:
+            pose["zoom"] = self.zoom_deg
+        return pose

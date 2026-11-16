@@ -803,9 +803,10 @@ The live schema defaults to version 3.0 and also accepts 3.1, which is required 
 select the opt-in `physical_v2` moving-head render mode. A physical job is refused when
 its fixtures load, before any analysis, unless every fixture declares a
 `physical_profile` and has a usable `moving_heads.initial_states` entry, and the
-planner is offered only templates with physical data: the six families in
-`catalog/templates/moving_heads_physical`, which a physical run loads after the
-builtins, plus any `--template-dir` documents. The moving-head pipeline's
+planner is offered only templates with physical data: the seven families in
+`catalog/templates/moving_heads_physical` (six P2.4c families and the `zoom_wave`
+zoom pilot, which needs a zoom axis), which a physical run loads after the builtins,
+plus any `--template-dir` documents. The moving-head pipeline's
 `render_preflight` stage repeats those checks right after audio analysis, before any
 planner, dry-compiles every offered template (and each declared preset) on the rig, and
 refuses a song whose detected beats cannot establish a musical phase (fewer than two,

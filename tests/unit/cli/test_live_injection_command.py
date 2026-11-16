@@ -11,7 +11,7 @@ import pytest
 
 from tests.golden.harness import RIGS, build_fixture_group
 from tests.support.mh_physical import (
-    FAMILY_IDS,
+    CATALOG_IDS,
     SUBSET_TEMPLATE_ID,
     TEMPLATE_ID,
     physical_catalog,
@@ -298,7 +298,7 @@ async def test_run_offers_the_planner_only_physical_templates(tmp_path, monkeypa
 
     (call,) = calls
     assert sorted(call["available_templates"]) == sorted(
-        [TEMPLATE_ID, SUBSET_TEMPLATE_ID, *FAMILY_IDS]
+        [TEMPLATE_ID, SUBSET_TEMPLATE_ID, *CATALOG_IDS]
     )
 
 

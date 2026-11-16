@@ -2,10 +2,11 @@
 
 `plan_prepositions` authors every fixture explicitly over the whole sequence: in the
 span before each cue a transaction commands darkness, waits until the fixture is
-optically dark, turns changed wheels and lets them settle, moves pan/tilt no faster
-than the configured speed, waits for the head to arrive and settle, then reveals on the
-cue's own aligned frame; after the last cue the fixture parks dark at its last aim.
-An unauthored channel would return to its default byte, so nothing is left unauthored.
+optically dark, turns changed wheels and lets them settle, moves pan/tilt (and the zoom,
+on a profile with a zoom axis) no faster than the configured speed, waits for the head
+to arrive and settle, then reveals on the cue's own aligned frame; after the last cue
+the fixture parks dark at its last aim. An unauthored channel would return to its
+default byte, so nothing is left unauthored: the zoom is held through every gap.
 
 Darkness comes only from the profile's visibility declaration (dimmer at normalized
 zero when `dimmer_zero_extinguishes`, or a shutter state listed in
@@ -13,8 +14,9 @@ zero when `dimmer_zero_extinguishes`, or a shutter state listed in
 `settle_ms` when the shutter is the mechanism), or from the run's initial-state
 evidence. Default bytes never establish it and an unknown latency never does.
 
-Motion is judged on the encoded DMX words, as the fixture receives them. The head
-follows its commands: a word change at frame time `c` is reached at
+Motion is judged on the encoded DMX words, as the fixture receives them. The head (its
+pan, tilt and zoom, the pose axes) follows its commands: a word change at frame time `c`
+is reached at
 `max(previous arrival, c + latency_ms) + word distance / travel_speed_per_s` and is
 settled `settle_ms` later; a wheel settles its new state's `settle_ms` after the change.
 That covers motion from every source (a cue's own trajectory, a transaction, the
@@ -42,6 +44,7 @@ from pydantic import BaseModel, ConfigDict
 
 from twinklr.core.config.fixtures.capabilities import (
     AxisCapability,
+    AxisName,
     FixtureCapabilities,
     InitialFixtureState,
 )
@@ -74,7 +77,8 @@ FALLBACK_METADATA_KEY = "preposition_fallback"
 TRANSACTION_METADATA_KEY = "preposition_target"
 """Metadata on an authored segment: the id of the cue it prepares, empty for a park."""
 
-_POSE = (ChannelName.PAN, ChannelName.TILT)
+_POSE = (ChannelName.PAN, ChannelName.TILT, ChannelName.ZOOM)
+"""The pose axes: each moves only in the dark and settles before a reveal."""
 _WHEELS = (ChannelName.COLOR, ChannelName.GOBO)
 
 type _Motion = tuple[Fraction, Fraction] | None
@@ -129,7 +133,7 @@ def plan_prepositions(
 
     Args:
         segments: Every fixture's physical cues, on the frame grid, each authoring the
-            pan and tilt its profile declares, all ending by `sequence_end_ms`.
+            pan, tilt and zoom its profile declares, all ending by `sequence_end_ms`.
         capabilities: Each physical fixture's profile. A fixture without cues parks
             dark at its initial state over the whole sequence.
         initial_states: Run-supplied time-zero states; a missing fixture is unknown,
@@ -140,9 +144,9 @@ def plan_prepositions(
         failure_mode: The most this pass may substitute when a reposition needs more
             time than it has or an unknown speed, latency or settle. A cue gets it only
             when its own `metadata[FALLBACK_METADATA_KEY]` names the same mode.
-            `preserve_aim` plays the cue at the aim the head holds (pan/tilt held
-            there, everything else as authored); `drop_accent` keeps the cue dark at
-            that aim and plans later cues from there. Neither applies to unknown initial
+            `preserve_aim` plays the cue at the aim the head holds (pan, tilt and
+            zoom held there, everything else as authored); `drop_accent` keeps the cue
+            dark at that aim and plans later cues from there. Neither applies to unknown initial
             state, unknown visibility latency, a missing darkness guarantee, an
             unencodable value or a lock.
         on_unplayable: `dark` keeps a cue that still cannot be played after its
@@ -161,7 +165,7 @@ def plan_prepositions(
     Raises:
         ValueError: If `frame_ms` is not the effect grid, `sequence_end_ms` is off the
             grid, a fixture has no profile, or a cue is off the grid, empty, overlaps
-            another of its fixture, ends after the sequence or omits its pan or tilt.
+            another of its fixture, ends after the sequence or omits a pose axis.
         PhysicalChannelError: If a cue holds a value its profile cannot honor.
     """
     if frame_ms != EFFECT_GRID_MS:
@@ -476,7 +480,8 @@ def _word_ms(axis: AxisCapability) -> Fraction:
     """Time to travel one encoded word at the configured speed."""
     assert axis.travel_speed_per_s is not None
     span = Fraction(axis.physical_max) - Fraction(axis.physical_min)
-    return span / axis.full_word * 1000 / Fraction(axis.travel_speed_per_s)
+    word_min, word_max = axis.word_range
+    return span / (word_max - word_min) * 1000 / Fraction(axis.travel_speed_per_s)
 
 
 class _InfeasibleError(Exception):
@@ -1128,23 +1133,16 @@ class _FixturePlanner:
             **{**dict(target), "channels": channels, "metadata": dict(target.metadata)}
         )
 
-    def _center(self, key: Literal["pan", "tilt", "dimmer"], word: int) -> float:
-        """A value that encodes to `word` with margin: the word's center, kept in the window.
+    def _center(self, key: AxisName, word: int) -> float:
+        """A value that encodes to `word` with margin (`AxisCapability.word_center`).
 
         Planner-authored values are always word centers, so no float rounding can land
         on a DMX rounding tie and move the head between two frames that should hold.
         """
-        axis = self.profile.axes[key]
-        uninverted = axis.full_word - word if axis.inverted else word
-        low, high = (Fraction(bound) for bound in axis.operable_range)
-        minimum = Fraction(axis.physical_min)
-        exact = minimum + (Fraction(axis.physical_max) - minimum) * uninverted / axis.full_word
-        value = float(min(max(exact, low), high))
-        if not axis.admits(value) or axis.dmx_word(value) != word:
-            raise _InfeasibleError(
-                "infeasible_transition", f"{key} word {word} cannot be commanded exactly"
-            )
-        return value
+        try:
+            return self.profile.axes[key].word_center(word)
+        except ValueError as error:
+            raise _InfeasibleError("infeasible_transition", f"{key} {error}") from error
 
     def _dark_commands(self, state: _State) -> tuple[int | None, str | None]:
         """The dimmer word and shutter state a transaction holds: every declared darkness.
@@ -1222,11 +1220,11 @@ class _FixturePlanner:
         if initial is None:
             return _Head(_Values({}, None, None, None, None, {}), {}, None)
         states = initial.discrete_states
-        pose = {ChannelName.PAN: initial.pan_deg, ChannelName.TILT: initial.tilt_deg}
+        pose = initial.pose
         dimmer = self.profile.axes.get("dimmer")
         level = None if initial.dimmer is None else Fraction(initial.dimmer)
         values = _Values(
-            words={ch: self._axis(ch).dmx_word(pose[ch]) for ch in self.pose_channels},
+            words={ch: self._axis(ch).dmx_word(pose[AXIS_KEYS[ch]]) for ch in self.pose_channels},
             dimmer=level,
             dimmer_word=(
                 dimmer.dmx_word(level)
@@ -1287,6 +1285,13 @@ class _FixturePlanner:
         for channel in self.pose_channels:
             physical = segment.channels[channel].physical
             assert isinstance(physical, ContinuousTrajectory)
+            first = physical.points[0]
+            if (
+                first.t_ms <= segment.t0_ms
+                and all(point.value == first.value for point in physical.points)
+                and self._word(channel, Fraction(first.value)) == head.values.words[channel]
+            ):
+                continue  # held at the word the head already has: no command moves it
             commands = (
                 (t, self._word(channel, value))
                 for t, value in _frame_levels(physical, segment.t0_ms, segment.t1_ms, self.frame_ms)
@@ -1437,17 +1442,17 @@ class _FixturePlanner:
             axis = self._axis(channel)
             assert axis.travel_speed_per_s is not None
             span = Fraction(axis.physical_max) - Fraction(axis.physical_min)
-            travel[words] = words * span / axis.full_word * 1000 / Fraction(axis.travel_speed_per_s)
+            word_min, word_max = axis.word_range
+            travel[words] = (
+                words * span / (word_max - word_min) * 1000 / Fraction(axis.travel_speed_per_s)
+            )
         return travel[words]
 
     def _wheel_settle(self, channel: ChannelName, state: str) -> int | None:
         return self.profile.discrete[DISCRETE_KEYS[channel]].states[state].settle_ms
 
     def _default_word(self, axis: AxisCapability) -> int:
-        word = self.profile.defaults[axis.coarse_offset]
-        if axis.fine_offset is not None:
-            word = word << 8 | self.profile.defaults[axis.fine_offset]
-        return word
+        return axis.default_word(self.profile.defaults)
 
     def _ceil(self, value: Fraction | int) -> int:
         return math.ceil(Fraction(value) / self.frame_ms) * self.frame_ms
@@ -1456,11 +1461,11 @@ class _FixturePlanner:
         parts = []
         for channel, word in state.head.values.words.items():
             axis = self._axis(channel)
-            uninverted = axis.full_word - word if axis.inverted else word
+            word_min, word_max = axis.word_range
+            uninverted = word_min + word_max - word if axis.inverted else word
             span = axis.physical_max - axis.physical_min
-            parts.append(
-                f"{channel.value} {axis.physical_min + span * uninverted / axis.full_word:g}"
-            )
+            value = axis.physical_min + span * (uninverted - word_min) / (word_max - word_min)
+            parts.append(f"{channel.value} {value:g}")
         return ", ".join(parts)
 
     # --- Reports ----------------------------------------------------------------------

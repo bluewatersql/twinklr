@@ -5,7 +5,8 @@ This module defines all template-related models:
 - Step components: Geometry, Movement, Dimmer, StepTiming, TemplateStep
 - Physical renderer step data: PhysicalMovementSpec and its PathTransform,
   PhysicalPulseSpec and its dimmer and shutter forms, named shutter, color and gobo
-  states, ComponentRefs, PhaseDistribution and the VisibilityEnvelope
+  states, ComponentRefs, PhaseDistribution, the VisibilityEnvelope and the
+  PhysicalZoomSpec
 - Template structure: Template (with its physical AttributeOverlays), TemplatePreset,
   TemplateDoc
 
@@ -347,6 +348,33 @@ class VisibilityEnvelope(BaseModel):
         return self
 
 
+class PhysicalZoomSpec(BaseModel):
+    """The beam angle of a physical step on the fixture's zoom axis, in degrees.
+
+    Template-owned renderer data, never an LLM control. `hold` keeps `start_deg`;
+    `sine` adds `extent_deg * sin(2*pi*phase)`, where the phase is the step's movement
+    phase (`movement.physical.period_beats`) at the head's pan distribution offset, so
+    the beam follows the path's own rate and wave. A fixture whose profile declares no
+    zoom axis refuses the step, unless `if_unsupported` is `omit_optional_zoom`: the step
+    then plays without its zoom, and the render trace records that.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    shape: Literal["hold", "sine"]
+    start_deg: float = Field(allow_inf_nan=False)
+    extent_deg: float = Field(default=0.0, allow_inf_nan=False)
+    if_unsupported: Literal["error", "omit_optional_zoom"] = "error"
+
+    @model_validator(mode="after")
+    def _validate_kernel(self) -> "PhysicalZoomSpec":
+        if self.shape == "hold" and self.extent_deg:
+            raise ValueError("a zoom hold takes no extent_deg")
+        if self.shape == "sine" and not self.extent_deg:
+            raise ValueError("a zoom sine needs a nonzero extent_deg")
+        return self
+
+
 class AttributeOverlay(BaseModel):
     """A temporary wheel state over part of every cycle of a physical template.
 
@@ -608,6 +636,11 @@ class TemplateStep(BaseModel):
     physical_visibility: VisibilityEnvelope | None = Field(
         default=None, exclude_if=lambda value: value is None
     )
+    # Physical renderer only; left out of dumps when absent. The beam angle on a
+    # profile's zoom axis.
+    physical_zoom: PhysicalZoomSpec | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
     @property
     def has_physical_data(self) -> bool:
@@ -623,6 +656,7 @@ class TemplateStep(BaseModel):
             or self.component_refs is not None
             or bool(self.physical_distribution)
             or self.physical_visibility is not None
+            or self.physical_zoom is not None
         )
 
     @model_validator(mode="after")
@@ -684,6 +718,22 @@ class TemplateStep(BaseModel):
             raise ValueError(
                 f"step {self.step_id!r}: physical_visibility follows the movement phase; "
                 f"distributing {light} would do nothing"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_zoom(self) -> "TemplateStep":
+        """A zoom sine waves on the movement phase, so it needs a periodic movement."""
+        zoom = self.physical_zoom
+        movement = self.movement.physical
+        if (
+            zoom is not None
+            and zoom.shape == "sine"
+            and (movement is None or movement.mode != "periodic" or movement.period_beats is None)
+        ):
+            raise ValueError(
+                f"step {self.step_id!r}: a physical_zoom sine waves on the movement phase, so "
+                "it needs a periodic movement.physical with a period"
             )
         return self
 

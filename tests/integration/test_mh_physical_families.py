@@ -24,9 +24,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from tests.support.mh_physical import (
+    CATALOG_IDS,
     FAMILY_IDS,
     TEMPLATE_DIR,
     TEMPLATE_ID,
+    ZOOM_FAMILY_ID,
     assert_honest_transactions,
     family_job,
     family_rig,
@@ -38,6 +40,8 @@ from tests.support.mh_physical import (
     physical_sections,
     physical_template_doc,
     registered_templates,
+    zoom_job,
+    zoom_rig,
 )
 from twinklr.cli.main import _run_pipeline_async
 from twinklr.core.agents.sequencer.moving_heads.deterministic_selector import (
@@ -78,12 +82,12 @@ _STRICT = {"reposition_fallback": "error", "on_unplayable": "error"}
 # --- The documents ---------------------------------------------------------------------
 
 
-def test_catalog_holds_the_six_families_each_physical_explicit_and_degradable() -> None:
-    """Each family lints, is physical on every step, sets both start angles (no rig
-    position preset is required), authors its dimmer, declares `drop_accent` and
-    declares reach and rate variants as presets."""
+def test_catalog_holds_the_families_each_physical_explicit_and_degradable() -> None:
+    """Each family (the six of P2.4c and the P2.5 zoom pilot) lints, is physical on
+    every step, sets both start angles (no rig position preset is required), authors its
+    dimmer, declares `drop_accent` and declares reach and rate variants as presets."""
     paths = sorted(PHYSICAL_TEMPLATE_DIR.glob("*.json"))
-    assert tuple(path.stem for path in paths) == FAMILY_IDS
+    assert tuple(path.stem for path in paths) == CATALOG_IDS
     for path in paths:
         document = load_template_document(path)
         validate_template_document(document)
@@ -165,7 +169,7 @@ async def test_physical_run_offers_the_families_and_template_dir_documents(
     with physical_catalog(admit=False):
         offered = await _cli_offer(tmp_path, family_job(HEADS), family_rig(HEADS), TEMPLATE_DIR)
 
-    assert sorted(offered) == sorted([*FAMILY_IDS, TEMPLATE_ID])
+    assert sorted(offered) == sorted([*CATALOG_IDS, TEMPLATE_ID])
 
 
 @pytest.mark.parametrize(
@@ -188,7 +192,7 @@ async def test_template_dir_naming_the_physical_catalog_loads_nothing_twice(
     ):
         offered = await _cli_offer(tmp_path, family_job(HEADS), family_rig(HEADS), spelling)
 
-    assert tuple(sorted(offered)) == FAMILY_IDS
+    assert tuple(sorted(offered)) == CATALOG_IDS
     # Rich wraps long paths; the words survive with their spacing normalized.
     assert "already admitted" in " ".join(capsys.readouterr().out.split())
 
@@ -205,7 +209,7 @@ async def test_runs_in_one_process_admit_the_catalog_once_and_a_legacy_run_withd
         candidates = set(DeterministicSelector(seed=7)._documents)
         for _ in range(2):
             offered = await _cli_offer(tmp_path, family_job(HEADS), family_rig(HEADS))
-            assert tuple(sorted(offered)) == FAMILY_IDS
+            assert tuple(sorted(offered)) == CATALOG_IDS
         offered = await _cli_offer(tmp_path, JobConfig(), physical_rig())
 
         assert offered == builtins
@@ -328,6 +332,33 @@ def test_outside_four_four_the_orbit_and_wings_are_left_out(
         assert "jumps across the cue" in reason and "preset 'slow'" in reason, exclusion
         base = f"template {exclusion['template_id']!r}: dark repositioning"
         assert (base in reason) is not slow_only, exclusion
+
+
+@pytest.mark.parametrize(
+    ("beats_per_bar", "slow_only"),
+    [pytest.param(3, False, id="3-4"), pytest.param(6, True, id="6-8")],
+)
+def test_outside_four_four_the_zoom_wave_is_left_out_on_a_zoom_rig(
+    beats_per_bar: int, slow_only: bool
+) -> None:
+    """`zoom_wave` has the orbit's 4-beat period in a 2-bar cycle, so on a zoom rig it is
+    left out in 3/4 (the base, and the slow variant) and in 6/8 (the slow variant only)."""
+    job = zoom_job(HEADS)
+    with physical_catalog():
+        admission = _gate(
+            [ZOOM_FAMILY_ID, "finite_snap_hold"],
+            _meter_grid(beats_per_bar, 500.0, 6),
+            zoom_rig(HEADS),
+            job,
+        )
+
+    assert admission.admitted == ("finite_snap_hold",)
+    [exclusion] = admission.exclusions
+    reason = exclusion["reason"]
+    assert exclusion["template_id"] == ZOOM_FAMILY_ID
+    assert "jumps across the cue" in reason and "preset 'slow'" in reason, reason
+    base = f"template {ZOOM_FAMILY_ID!r}: dark repositioning"
+    assert (base in reason) is not slow_only, reason
 
 
 _FAST_BEAT_MS = 340.0

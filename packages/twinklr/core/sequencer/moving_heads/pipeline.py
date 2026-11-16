@@ -263,7 +263,7 @@ def physical_cue_limits(phase_map: MusicalPhaseMap, duration_ms: int) -> tuple[i
     return int(start), int(min(duration_ms // EFFECT_GRID_MS * EFFECT_GRID_MS, covered_end))
 
 
-_POSE = (ChannelName.PAN, ChannelName.TILT)
+_POSE = (ChannelName.PAN, ChannelName.TILT, ChannelName.ZOOM)
 _WHEELS = (ChannelName.COLOR, ChannelName.GOBO)
 
 
@@ -456,10 +456,11 @@ def _predecessor(
         if fixed:
             break
     else:
-        if initial is None:
-            return None
-        pose = {ChannelName.PAN: initial.pan_deg, ChannelName.TILT: initial.tilt_deg}
-        poses.append({ch: (pose[ch], pose[ch]) for ch in channels})
+        if profile.check_initial_state(initial):
+            return None  # unknown: no state, or one the profile cannot take (no zoom)
+        assert initial is not None  # checked above
+        pose = initial.pose
+        poses.append({ch: (pose[AXIS_KEYS[ch]], pose[AXIS_KEYS[ch]]) for ch in channels})
         for channel in _WHEELS:
             key = DISCRETE_KEYS[channel]
             if key in profile.discrete:
@@ -804,11 +805,14 @@ def _entry_dips(
     envelope: dict[str, dict[ChannelName, tuple[float, float]]] = {}
     held: dict[str, dict[ChannelName, set[str]]] = defaultdict(lambda: defaultdict(set))
     for fixture_id, initial in initial_states.items():
-        if fixture_id not in profiles:
+        # An unknown initial state already fails every template at its bar-1 placement.
+        if fixture_id not in profiles or profiles[fixture_id].check_initial_state(initial):
             continue
-        pose = {ChannelName.PAN: initial.pan_deg, ChannelName.TILT: initial.tilt_deg}
+        pose = initial.pose
         envelope[fixture_id] = {
-            ch: (pose[ch], pose[ch]) for ch in _POSE if AXIS_KEYS[ch] in profiles[fixture_id].axes
+            ch: (pose[AXIS_KEYS[ch]], pose[AXIS_KEYS[ch]])
+            for ch in _POSE
+            if AXIS_KEYS[ch] in profiles[fixture_id].axes
         }
         for channel in _WHEELS:
             state = initial.discrete_states.get(DISCRETE_KEYS[channel])
@@ -1018,10 +1022,10 @@ def _revealing_state(
     cue: FixtureSegment, profile: FixtureCapabilities, initial: InitialFixtureState
 ) -> InitialFixtureState:
     """The run's dark initial state moved to `cue`'s first pose and wheel states."""
-    pose = {"pan_deg": initial.pan_deg, "tilt_deg": initial.tilt_deg}
-    for channel, field in ((ChannelName.PAN, "pan_deg"), (ChannelName.TILT, "tilt_deg")):
+    pose = {}
+    for channel in _POSE:
         if AXIS_KEYS[channel] in profile.axes:
-            pose[field] = _pose_points(cue, channel)[0].value
+            pose[f"{AXIS_KEYS[channel]}_deg"] = _pose_points(cue, channel)[0].value
     wheels = dict(initial.discrete_states)
     for channel in _WHEELS:
         key = DISCRETE_KEYS[channel]
@@ -1048,7 +1052,7 @@ def _once_window_bars(
     """
     last_ms = section_start_ms
     for segment in segments:
-        for channel in _POSE:
+        for channel in (ch for ch in _POSE if ch in segment.channels):
             points = _pose_points(segment, channel)
             moving = [point.t_ms for point in points if point.value != points[-1].value]
             if moving:
@@ -1819,6 +1823,22 @@ class RenderingPipeline:
         if self.admission_exclusions:
             # Left out when the gate excluded nothing, so earlier traces keep their keys.
             self.render_record["admission_exclusions"] = list(self.admission_exclusions)
+        omitted = [
+            {
+                "section_id": cue.section_id,
+                "step_id": cue.step_id,
+                "fixture_id": cue.fixture_id,
+                "t0_ms": cue.t0_ms,
+                "attribute": cue.metadata["omitted_optional"],
+                "alternative": f"omit_optional_{cue.metadata['omitted_optional']}",
+            }
+            for cue in cues
+            if "omitted_optional" in cue.metadata
+        ]
+        if omitted:
+            # Each cue played without an optional attribute its fixture lacks, by the
+            # step's declared alternative; left out when none was, like the exclusions.
+            self.render_record["omitted_optional"] = omitted
         if self.output_path:
             xsq = build_physical_sequence(
                 requests,

@@ -2597,6 +2597,8 @@ _PHYSICAL_PROFILE_FIELDS = {
     "axes.coarse_offset": _PHYSICAL_FRAMES,
     "axes.fine_offset": _PHYSICAL_WORDS,
     "axes.inverted": _PHYSICAL_WORDS,
+    "axes.dmx_min": _PHYSICAL_WORDS,
+    "axes.dmx_max": _PHYSICAL_WORDS,
     "axes.travel_speed_per_s": _PHYSICAL_PREPOSITION,
     "axes.latency_ms": _PHYSICAL_PREPOSITION,
     "axes.settle_ms": _PHYSICAL_PREPOSITION,
@@ -2631,6 +2633,7 @@ for _field, _note in {
     "": _PHYSICAL_CHECK,
     "pan_deg": _PHYSICAL_CHECK,
     "tilt_deg": _PHYSICAL_CHECK,
+    "zoom_deg": _PHYSICAL_CHECK,
     "dimmer": _PHYSICAL_CHECK,
     "discrete_states": _PHYSICAL_CHECK,
     "settled": _PHYSICAL_PREPOSITION,
@@ -2893,6 +2896,25 @@ for _profile_root in (
         "tests/unit/sequencer/moving_heads/compile/test_visibility.py::"
         f"test_open_state_changes_the_lit_shutter[{_open_state_path}]",
         _PHYSICAL_TEMPLATE_COMPILED,
+    )
+
+# P2.5 zoom pilot: a step's beam angle on a profile's zoom axis. It feeds only the opt-in
+# physical compile; each exact path mutates its field and must change the cues compiled
+# on a zoom rig and a zoomless one, or be refused (`if_unsupported` back at `error` on the
+# zoomless rig). The profile's `axes.dmx_min`/`dmx_max` and the initial state's
+# `zoom_deg` are evidenced with the other profile and initial-state paths above.
+for _zoom_path, _note in {
+    "template.template.steps.physical_zoom": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_zoom.shape": _PHYSICAL_TEMPLATE_REJECTED,
+    "template.template.steps.physical_zoom.start_deg": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_zoom.extent_deg": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_zoom.if_unsupported": _PHYSICAL_TEMPLATE_REJECTED,
+}.items():
+    CONFIG_EFFECTS[_zoom_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/export/test_optical_axis.py::"
+        f"test_zoom_field_changes_compile[{_zoom_path}]",
+        _note,
     )
 
 # Exact App/Job discriminators. These overrides prevent stale generic smoke-test

@@ -2,7 +2,8 @@
 physical fixture segments, the P1.6 pipeline case (rig, grid, job, plan and the
 test-only template), rig presets with steps that reference them, multi-head rigs
 with a topology, steps on relative paths, visibility envelopes and attribute overlays,
-and the physical family catalog with a rig and job for it.
+the physical family catalog with a rig and job for it, and the synthetic 16-channel zoom
+pilot profile with a rig and job for it.
 
 In-memory payloads only; no owner profile or measured data.
 """
@@ -301,7 +302,11 @@ FAMILY_IDS = (
     "mirror_wings",
     "target_orbit",
 )
-"""The physical family catalog (`PHYSICAL_TEMPLATE_DIR`), sorted."""
+"""The physical families a zoomless rig can be offered (P2.4c), sorted."""
+ZOOM_FAMILY_ID = "zoom_wave"
+"""The zoom pilot family (P2.5), left out on a rig without a zoom axis."""
+CATALOG_IDS = tuple(sorted((*FAMILY_IDS, ZOOM_FAMILY_ID)))
+"""The whole physical family catalog (`PHYSICAL_TEMPLATE_DIR`), sorted."""
 
 
 @contextmanager
@@ -345,6 +350,58 @@ def family_rig(
 def family_job(fixture_ids: Sequence[str], **policy: Any) -> JobConfig:
     """`physical_job` with every head of `fixture_ids` in the known dark initial state."""
     return physical_job(initial_states=dict.fromkeys(fixture_ids, PHYSICAL_INITIAL_STATE), **policy)
+
+
+ZOOM_INITIAL_STATE = {**PHYSICAL_INITIAL_STATE, "zoom_deg": 10.0}
+"""`PHYSICAL_INITIAL_STATE` with the zoom at its narrowest, for a rig with a zoom axis."""
+
+
+def zoom_pilot_profile_payload(*, inverted: bool = False) -> dict[str, Any]:
+    """SYNTHETIC zoom pilot profile, prepared for future owner validation (P2.5).
+
+    Not a real fixture: no manufacturer or measured value is in it. It is laid out for
+    a 16-channel DMX model, as the owner's moving-head models are, with every offset in
+    1-16: 16-bit pan 1/2 and tilt 3/4, dimmer 5, shutter 6, color 7, gobo 8, and an
+    8-bit zoom on 9 whose 10°-40° beam angle maps over bytes 20-220 (`dmx_min`/`dmx_max`)
+    at a configured 90°/s with 40 ms settle; 10-16 are spare. Otherwise it is
+    `physical_head_profile`. Accepting it for a real fixture is `PENDING-OWNER`.
+    """
+    payload = physical_head_profile(inverted=False)
+    payload.update(profile_id="synthetic_zoom_pilot_16ch", footprint=16)
+    payload["defaults"] = dict.fromkeys(range(1, 17), 0) | {
+        1: 128,
+        3: 128,
+        6: 64,  # shutter closed
+        9: 20,  # zoom at 10°
+    }
+    payload["discrete"]["shutter"]["offset"] = 6
+    payload["discrete"]["gobo"]["offset"] = 8
+    payload["axes"]["zoom"] = {
+        "unit": "degree",
+        "physical_min": 10.0,
+        "physical_max": 40.0,
+        "dmx_min": 20,
+        "dmx_max": 220,
+        "coarse_offset": 9,
+        "inverted": inverted,
+        "travel_speed_per_s": 90.0,
+        "latency_ms": 0,
+        "settle_ms": 40,
+    }
+    return payload
+
+
+def zoom_rig(fixture_ids: Sequence[str], *, topology: bool = True) -> FixtureGroup:
+    """`family_rig` of `fixture_ids` with every head on `zoom_pilot_profile_payload`."""
+    payload = family_rig(fixture_ids, topology=topology).model_dump(mode="json")
+    for fixture in payload["fixtures"]:
+        fixture["config"]["physical_profile"] = zoom_pilot_profile_payload()
+    return FixtureGroup.model_validate(payload)
+
+
+def zoom_job(fixture_ids: Sequence[str], **policy: Any) -> JobConfig:
+    """`physical_job` with every head of `fixture_ids` in `ZOOM_INITIAL_STATE`."""
+    return physical_job(initial_states=dict.fromkeys(fixture_ids, ZOOM_INITIAL_STATE), **policy)
 
 
 def physical_grid() -> BeatGrid:
@@ -808,7 +865,7 @@ def assert_honest_transactions(
 ) -> None:
     """Check one fixture of a planned result from its encoded bytes and the profile alone.
 
-    The head follows its commands: a pan/tilt word change at frame time `c` is reached
+    The head follows its commands: a pan, tilt or zoom word change at frame time `c` is reached
     at `max(previous arrival, c + latency_ms) + word distance / travel_speed_per_s` and
     settled `settle_ms` later; a wheel change settles its new state's `settle_ms` after
     `c`; an unknown value never settles. A frame is optically lit unless it is
@@ -826,7 +883,9 @@ def assert_honest_transactions(
     transaction, a park or a substituted cue; not a following cue's own dark frames) is a
     leak; back-to-back cues
     step within one frame's travel and keep their wheels; a lit cue after a transaction
-    reveals on its own frame; no locked frame differs from the cues alone.
+    reveals on its own frame; no locked frame differs from the cues alone. A zoom axis is
+    held through every gap between cues, moving only toward the next cue's first word,
+    and is settled, like pan and tilt, before any reveal.
     """
     assert not result.has_errors, result.diagnostics
     outputs = [s for s in result.segments if s.fixture_id == fixture_id]
@@ -947,17 +1006,43 @@ def assert_honest_transactions(
             assert hit is None, f"{what} motion from {change} ms in {cue.segment_id} leaks to {hit}"
 
     initial_words: dict[int, int] = {}
+    pose = {"pan": initial.pan_deg, "tilt": initial.tilt_deg, "zoom": initial.zoom_deg}
     for name, axis in profile.axes.items():
-        if name in ("pan", "tilt"):
-            word = axis.dmx_word(initial.pan_deg if name == "pan" else initial.tilt_deg)
-            initial_words |= _split(axis, word)
+        if name in pose:
+            value = pose[name]
+            assert value is not None, f"the initial state gives no {name}"
+            initial_words |= _split(axis, axis.dmx_word(value))
     for name, wheel in profile.discrete.items():
         initial_words[wheel.offset] = wheel.resolve(initial.discrete_states[name])
 
+    zoom = profile.axes.get("zoom")
+    if zoom is not None:
+        # Held through every gap: between cues the zoom only moves monotonically from where
+        # the last frame left it toward the next cue's first word, never to its default byte.
+        index = 0
+        while index < count:
+            if cue_at[index] is not None:
+                index += 1
+                continue
+            end = next((i for i in range(index, count) if cue_at[i] is not None), count)
+            before = _word(out[index - 1] if index else initial_words, zoom)
+            after = before if end == count else _word(out[end], zoom)
+            low, high = min(before, after), max(before, after)
+            words = [_word(out[i], zoom) for i in range(index, end)]
+            assert all(low <= w <= high for w in words), (
+                f"zoom leaves [{low}, {high}] in the gap at {times[index]} ms: {sorted(set(words))}"
+            )
+            assert words == sorted(words) or words == sorted(words, reverse=True), (
+                f"zoom turns back in the gap at {times[index]} ms"
+            )
+            index = end
+
     for name, axis in profile.axes.items():
-        if name not in ("pan", "tilt"):
+        if name not in pose:
             continue
-        per_word = (Fraction(axis.physical_max) - Fraction(axis.physical_min)) / axis.full_word
+        low_word, high_word = axis.word_range
+        span = Fraction(axis.physical_max) - Fraction(axis.physical_min)
+        per_word = span / (high_word - low_word)
         speed, latency, settle = axis.travel_speed_per_s, axis.latency_ms, axis.settle_ms
         arrival = Fraction(0)
         previous = _word(initial_words, axis)
@@ -999,7 +1084,11 @@ def assert_honest_transactions(
             hit = lit_between(Fraction(times[index]), settle_at)
             assert hit is None, f"{name} turns at {times[index]} ms and is lit at {hit} ms"
 
-    pose_offsets = [o for c in (ChannelName.PAN, ChannelName.TILT) for o in _offsets(profile, c)]
+    pose_offsets = [
+        o
+        for c in (ChannelName.PAN, ChannelName.TILT, ChannelName.ZOOM)
+        for o in _offsets(profile, c)
+    ]
     for cue in cues:
         span = range(cue.t0_ms // EFFECT_GRID_MS, cue.t1_ms // EFFECT_GRID_MS)
         cue_status = status.get(cue.t0_ms)
