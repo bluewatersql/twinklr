@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -10,8 +11,10 @@ import pytest
 
 from tests.golden.harness import RIGS, build_fixture_group
 from tests.support.mh_physical import (
+    CATALOG_IDS,
     SUBSET_TEMPLATE_ID,
     TEMPLATE_ID,
+    physical_catalog,
     physical_job,
     physical_layout_xml,
     physical_rig,
@@ -27,6 +30,14 @@ from twinklr.core.caching.identity import hash_file_content
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.pipeline.result import PipelineResult
+
+
+@pytest.fixture(autouse=True)
+def _restore_template_registry() -> Iterator[None]:
+    """`twinklr run` admits the physical catalog into the shared registry for a
+    physical_v2 job; each test removes what its run registered."""
+    with physical_catalog(admit=False):
+        yield
 
 
 def test_live_injection_commands_parse() -> None:
@@ -255,8 +266,10 @@ async def test_run_refuses_a_physical_job_when_no_template_has_physical_data(
     tmp_path, monkeypatch, capsys
 ) -> None:
     """A prepared physical job is refused before any analysis when none of the loaded
-    templates could render under the physical renderer."""
+    templates could render under the physical renderer (here, without the physical
+    catalog, which otherwise always supplies some)."""
     calls = _prepared_physical_run(monkeypatch, physical_job(), physical_rig())
+    monkeypatch.setattr(cli_main, "admit_physical_catalog", lambda _: [])
 
     exit_code = await cli_main.run_pipeline_async(
         audio_path=tmp_path / "song.wav",
@@ -284,7 +297,9 @@ async def test_run_offers_the_planner_only_physical_templates(tmp_path, monkeypa
         )
 
     (call,) = calls
-    assert sorted(call["available_templates"]) == sorted([TEMPLATE_ID, SUBSET_TEMPLATE_ID])
+    assert sorted(call["available_templates"]) == sorted(
+        [TEMPLATE_ID, SUBSET_TEMPLATE_ID, *CATALOG_IDS]
+    )
 
 
 def test_run_accepts_an_optional_layout() -> None:

@@ -275,6 +275,12 @@ class TemplateRegistry:
             allow_override=allow_override,
         )
 
+    def unregister(self, template_id: str) -> None:
+        """Remove a registered template and every alias that points to it."""
+        if template_id not in self._factories_by_id:
+            raise TemplateNotFoundError(f"Unknown template: {template_id}")
+        self._remove_registration(template_id)
+
     def _remove_registration(self, template_id: str) -> None:
         """Remove one registration and every alias that points to it."""
         self._factories_by_id.pop(template_id, None)
@@ -298,6 +304,14 @@ class TemplateRegistry:
         t = factory()
 
         return t.model_copy(deep=True) if deep_copy else t
+
+    def source(self, key: str) -> str:
+        """The `source` a template was registered with (`data:<path>` for a document a
+        directory load registered), looked up as `get` looks it up."""
+        tid = self._aliases.get(_norm_key(key), key)
+        if tid not in self._source_by_id:
+            raise TemplateNotFoundError(f"Unknown template: {key}")
+        return self._source_by_id[tid]
 
     def list_all(self) -> list[TemplateInfo]:
         """List all registered templates sorted by category and name."""

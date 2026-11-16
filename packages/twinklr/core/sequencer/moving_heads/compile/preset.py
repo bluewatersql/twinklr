@@ -158,6 +158,7 @@ def apply_preset(
         defaults=new_defaults,
         steps=new_steps,
         metadata=template.metadata,
+        physical_overlays=template.physical_overlays,
     )
 
     if return_provenance:

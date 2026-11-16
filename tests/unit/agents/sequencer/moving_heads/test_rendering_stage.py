@@ -11,11 +11,16 @@ import pytest
 from tests.golden.harness import RIGS, build_beat_grid, build_fixture_group, build_plan
 from tests.support.mh_physical import (
     PHYSICAL_INITIAL_STATE,
+    hold_step,
+    physical_bars_grid,
     physical_grid,
     physical_job,
     physical_plan,
     physical_rig,
+    physical_sections,
+    physical_template_doc,
     physical_test_templates,
+    registered_templates,
 )
 from twinklr.core.agents.sequencer.moving_heads.rendering_stage import MovingHeadRenderingStage
 from twinklr.core.audio.models.metadata import EmbeddedMetadata, MetadataBundle
@@ -219,3 +224,30 @@ async def test_physical_refusal_fails_the_stage_and_delivers_nothing(tmp_path: P
     assert "MH1: moving_heads.initial_states['MH1']: initial state is not settled" in result.error
     assert list(tmp_path.iterdir()) == []
     assert context.get_state("delivery_artifacts") is None
+
+
+@pytest.mark.asyncio
+async def test_the_stage_keeps_the_warning_about_cues_kept_dark(tmp_path: Path) -> None:
+    """A plan placing a cue where it cannot play renders dark under the default
+    `on_unplayable`; the stage keeps the render's one warning for the run's summary."""
+    jump = physical_template_doc(
+        "stage_jump",
+        [hold_step("l", -90.0, duration=0.5), hold_step("r", 90.0, start=0.5, duration=0.5)],
+    )
+    stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
+    context = _physical_context()
+    context.set_state("beat_grid", physical_bars_grid(*[500.0] * 4))
+
+    with (
+        registered_templates(jump),
+        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=physical_rig()),
+    ):
+        result = await stage.execute(
+            {"moving_heads": physical_sections(("stage_jump", 1, 4))}, context
+        )
+
+    assert result.success, result.error
+    warning = context.get_state("unplayable_warning")
+    assert warning is not None and "cannot play honestly" in warning
+    trace = json.loads(context.get_state("delivery_artifacts").trace_path.read_text())
+    assert trace["render"]["unplayable_totals"]["infeasible_transition"]["cues"] > 0

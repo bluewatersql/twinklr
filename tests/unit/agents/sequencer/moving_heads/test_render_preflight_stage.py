@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from contextlib import contextmanager, nullcontext
+import json
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -13,20 +14,32 @@ import pytest
 
 from tests.golden.harness import RIGS, build_fixture_group
 from tests.support.mh_physical import (
+    FAMILY_IDS,
     PHYSICAL_INITIAL_STATE,
     SUBSET_TEMPLATE_ID,
     TEMPLATE_DIR,
     TEMPLATE_ID,
+    family_job,
+    family_rig,
+    hold_step,
+    physical_bars_grid,
+    physical_catalog,
     physical_grid,
     physical_job,
     physical_rig,
+    physical_sections,
+    physical_template_doc,
     physical_test_templates,
+    registered_templates,
 )
 from twinklr.core.agents.audio.lyrics.stage import LyricsStage
 from twinklr.core.agents.audio.profile.stage import AudioProfileStage
 from twinklr.core.agents.audio.stages.analysis import AudioAnalysisStage
 from twinklr.core.agents.sequencer.macro_planner.stage import MacroPlannerStage
-from twinklr.core.agents.sequencer.moving_heads.rendering_stage import RenderPreflightStage
+from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
+    MovingHeadRenderingStage,
+    RenderPreflightStage,
+)
 from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import JobConfig
@@ -109,10 +122,13 @@ async def test_physical_job_offered_a_template_without_physical_data_is_refused(
 
 
 @pytest.mark.asyncio
-async def test_physical_job_whose_song_has_an_uncovered_tail_is_refused() -> None:
-    """Two silent seconds after the last beat leave the phase undefined there; the
-    renderer never infers tempo, so the job is refused before planning."""
-    with physical_test_templates():
+async def test_physical_job_whose_song_has_an_uncovered_tail_is_accepted(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Two silent seconds after the last beat are outside the covered span: the render
+    holds the heads dark there instead of inferring tempo, so the job passes and the
+    gate logs the span it will cover."""
+    with physical_test_templates(), caplog.at_level("INFO"):
         result, _ = await _run(
             physical_job(),
             templates=[TEMPLATE_ID],
@@ -120,9 +136,31 @@ async def test_physical_job_whose_song_has_an_uncovered_tail_is_refused() -> Non
             beat_grid=_long_tail_grid(),
         )
 
+    assert result.success, result.error
+    # One 400 ms interval past the last beat at 3615 ms; the song runs to 5615 ms.
+    assert "covered span [0.0, 4015.0] ms of the song's [0, 5615.0] ms" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_physical_job_whose_grid_has_one_beat_is_refused() -> None:
+    """One observed beat gives no interval to measure phase by; nothing is inferred."""
+    grid = physical_grid()
+    one_beat = grid.model_copy(
+        update={
+            "bar_boundaries": grid.bar_boundaries[:1],
+            "beat_boundaries": grid.beat_boundaries[:1],
+            "eighth_boundaries": grid.eighth_boundaries[:1],
+            "sixteenth_boundaries": grid.sixteenth_boundaries[:1],
+        }
+    )
+    with physical_test_templates():
+        result, _ = await _run(
+            physical_job(), templates=[TEMPLATE_ID], rig=physical_rig(), beat_grid=one_beat
+        )
+
     assert not result.success
     assert "musical phase" in (result.error or "")
-    assert "tail" in (result.error or "")
+    assert "no adjacent observed interval" in (result.error or "")
 
 
 @pytest.mark.asyncio
@@ -308,6 +346,186 @@ async def test_template_the_rig_cannot_render_is_refused_before_planning(
         assert item in error, (item, error)
     for planner in planners.values():
         planner.assert_not_awaited()
+
+
+_JUMP_ID = "p24a_preflight_jump"
+
+
+def _jump_template(fallback: str | None) -> TemplateDoc:
+    """Two lit steps per cycle back to back at -90 and +90 degrees: the second cannot
+    continue the first, whatever the plan does around the template."""
+    extra = {} if fallback is None else {"physical_reposition_fallback": fallback}
+    return physical_template_doc(
+        _JUMP_ID,
+        [
+            hold_step("left", -90.0, duration=0.5, **extra),
+            hold_step("right", 90.0, start=0.5, duration=0.5, **extra),
+        ],
+    )
+
+
+@pytest.mark.parametrize(
+    ("declared", "policy", "admitted"),
+    [
+        pytest.param("drop_accent", None, False, id="error-policy-refuses"),
+        pytest.param(None, "drop_accent", False, id="undeclared-fallback-refuses"),
+        pytest.param("drop_accent", "drop_accent", True, id="declared-fallback-admits"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_template_whose_own_cycles_cannot_reposition_is_refused_before_planning(
+    declared: str | None, policy: str | None, admitted: bool
+) -> None:
+    """The gate plans the dark repositioning between a template's own cues: under the
+    default `error` a template that cannot reposition inside itself is refused before
+    any planner runs; under a fallback the template declares, it is admitted."""
+    job = physical_job(reposition_fallback=policy) if policy else physical_job()
+    with physical_test_templates(), registered_templates(_jump_template(declared)):
+        result, _ = await _run(
+            job, templates=[_JUMP_ID], rig=physical_rig(), beat_grid=physical_grid()
+        )
+
+    assert result.success is admitted, result.error
+    if not admitted:
+        error = result.error or ""
+        assert f"template {_JUMP_ID!r}" in error
+        assert "repositioning" in error and "jumps across the cue" in error
+
+
+_HEADS = ("MH1", "MH2", "MH3", "MH4")
+_FAMILY_GRID = physical_bars_grid(500.0, 500.0, 430.0, 500.0)
+_NO_TOPOLOGY = "declares no topology"
+_NO_FLICK = "attribute preset 'flick', which the fixture group does not declare"
+
+
+@pytest.mark.parametrize(
+    ("topology", "excluded"),
+    [
+        pytest.param(True, {"masked_wheel_flick": _NO_FLICK}, id="preset-less"),
+        pytest.param(
+            False,
+            {
+                "fly_in_cascade": _NO_TOPOLOGY,
+                "fly_out_cascade": _NO_TOPOLOGY,
+                "masked_wheel_flick": _NO_FLICK,
+                "mirror_wings": _NO_TOPOLOGY,
+            },
+            id="preset-and-topology-less",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_rig_is_offered_every_family_it_can_render_and_told_why_not_the_rest(
+    topology: bool, excluded: dict[str, str], caplog: pytest.LogCaptureFixture
+) -> None:
+    """A catalog family the rig cannot render is left out of the offer with its reason;
+    the run goes on with the rest, which the gate publishes for the planner, logging
+    each exclusion and each admitted family's worst-case entry dip."""
+    with physical_catalog(), caplog.at_level("INFO"):
+        result, context = await _run(
+            family_job(_HEADS),
+            templates=list(FAMILY_IDS),
+            rig=family_rig(_HEADS, topology=topology, presets=False),
+            beat_grid=_FAMILY_GRID,
+        )
+
+    assert result.success, result.error
+    admission = context.get_state("template_admission")
+    assert admission.admitted == tuple(t for t in FAMILY_IDS if t not in excluded)
+    reasons = {exclusion["template_id"]: exclusion["reason"] for exclusion in admission.exclusions}
+    assert reasons.keys() == excluded.keys()
+    for template_id, needle in excluded.items():
+        assert needle in reasons[template_id], reasons[template_id]
+        assert f"template {template_id!r} is left out of the planner's offer" in caplog.text
+    assert admission.entry_dips.keys() == set(admission.admitted)
+    for template_id in admission.admitted:
+        assert f"template {template_id!r} enters a section dark for up to" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_a_rig_without_a_shutter_state_named_open_is_offered_only_the_cascades() -> None:
+    """Four families hold the shutter in the state named `open`; a profile that names
+    its open state otherwise leaves them out, naming the missing state. The cascades
+    open the shutter through the profile's `open_state` and stay."""
+    payload = family_rig(_HEADS).model_dump(mode="json")
+    for fixture in payload["fixtures"]:
+        _rename_open_state(fixture["config"]["physical_profile"])
+    with physical_catalog():
+        result, context = await _run(
+            family_job(_HEADS),
+            templates=list(FAMILY_IDS),
+            rig=FixtureGroup.model_validate(payload),
+            beat_grid=_FAMILY_GRID,
+        )
+
+    assert result.success, result.error
+    admission = context.get_state("template_admission")
+    assert admission.admitted == ("fly_in_cascade", "fly_out_cascade")
+    assert len(admission.exclusions) == 4
+    for exclusion in admission.exclusions:
+        assert "state 'open'" in exclusion["reason"], exclusion
+
+
+@pytest.mark.asyncio
+async def test_render_stage_records_the_gates_exclusions_in_the_trace(tmp_path: Path) -> None:
+    rig = family_rig(_HEADS, presets=False)
+    with physical_catalog():
+        _, context = await _run(
+            family_job(_HEADS), templates=list(FAMILY_IDS), rig=rig, beat_grid=_FAMILY_GRID
+        )
+        context.set_state("live_fixture_group", rig)
+        stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "show.xsq")
+        result = await stage.execute(
+            {"moving_heads": physical_sections(("target_orbit", 1, 2))}, context
+        )
+
+    assert result.success, result.error
+    trace = json.loads((tmp_path / "show.xsq.trace.json").read_text(encoding="utf-8"))
+    [exclusion] = trace["render"]["admission_exclusions"]
+    assert exclusion["template_id"] == "masked_wheel_flick"
+    assert _NO_FLICK in exclusion["reason"]
+
+
+@pytest.mark.asyncio
+async def test_rig_that_can_render_no_family_is_refused() -> None:
+    """Every family aims above a 5° tilt limit: none remains, so the run is refused,
+    naming each family and why."""
+    payload = family_rig(_HEADS).model_dump(mode="json")
+    for fixture in payload["fixtures"]:
+        tilt = fixture["config"]["physical_profile"]["axes"]["tilt"]
+        tilt.update(physical_min=-5.0, physical_max=5.0)
+    with physical_catalog():
+        result, context = await _run(
+            family_job(_HEADS),
+            templates=list(FAMILY_IDS),
+            rig=FixtureGroup.model_validate(payload),
+            beat_grid=_FAMILY_GRID,
+        )
+
+    assert not result.success
+    error = result.error or ""
+    assert "no template remains" in error
+    for template_id in FAMILY_IDS:
+        assert f"{template_id!r}" in error, template_id
+    assert context.get_state("template_admission") is None
+
+
+@pytest.mark.asyncio
+async def test_template_dir_template_that_fails_still_refuses_the_run() -> None:
+    """Exclusion is only for the shipped catalog: a user template that fails the gate
+    refuses the run although every family would be admitted."""
+    with physical_catalog(), registered_templates(_jump_template(None)):
+        result, _ = await _run(
+            family_job(_HEADS),
+            templates=[*FAMILY_IDS, _JUMP_ID],
+            rig=family_rig(_HEADS),
+            beat_grid=_FAMILY_GRID,
+        )
+
+    assert not result.success
+    error = result.error or ""
+    assert f"template {_JUMP_ID!r}" in error and "repositioning" in error
+    assert not any(f"{template_id!r}" in error for template_id in FAMILY_IDS)
 
 
 @pytest.mark.asyncio

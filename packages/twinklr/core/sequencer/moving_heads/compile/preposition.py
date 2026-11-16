@@ -2,10 +2,11 @@
 
 `plan_prepositions` authors every fixture explicitly over the whole sequence: in the
 span before each cue a transaction commands darkness, waits until the fixture is
-optically dark, turns changed wheels and lets them settle, moves pan/tilt no faster
-than the configured speed, waits for the head to arrive and settle, then reveals on the
-cue's own aligned frame; after the last cue the fixture parks dark at its last aim.
-An unauthored channel would return to its default byte, so nothing is left unauthored.
+optically dark, turns changed wheels and lets them settle, moves pan/tilt (and the zoom,
+on a profile with a zoom axis) no faster than the configured speed, waits for the head
+to arrive and settle, then reveals on the cue's own aligned frame; after the last cue
+the fixture parks dark at its last aim. An unauthored channel would return to its
+default byte, so nothing is left unauthored: the zoom is held through every gap.
 
 Darkness comes only from the profile's visibility declaration (dimmer at normalized
 zero when `dimmer_zero_extinguishes`, or a shutter state listed in
@@ -13,8 +14,9 @@ zero when `dimmer_zero_extinguishes`, or a shutter state listed in
 `settle_ms` when the shutter is the mechanism), or from the run's initial-state
 evidence. Default bytes never establish it and an unknown latency never does.
 
-Motion is judged on the encoded DMX words, as the fixture receives them. The head
-follows its commands: a word change at frame time `c` is reached at
+Motion is judged on the encoded DMX words, as the fixture receives them. The head (its
+pan, tilt and zoom, the pose axes) follows its commands: a word change at frame time `c`
+is reached at
 `max(previous arrival, c + latency_ms) + word distance / travel_speed_per_s` and is
 settled `settle_ms` later; a wheel settles its new state's `settle_ms` after the change.
 That covers motion from every source (a cue's own trajectory, a transaction, the
@@ -31,9 +33,10 @@ into `preserve_aim` or `drop_accent` (see `plan_prepositions`).
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterable, Iterator, Mapping, Sequence
-from dataclasses import dataclass, replace
+from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from fractions import Fraction
+from itertools import pairwise
 import math
 from typing import Literal
 
@@ -41,6 +44,7 @@ from pydantic import BaseModel, ConfigDict
 
 from twinklr.core.config.fixtures.capabilities import (
     AxisCapability,
+    AxisName,
     FixtureCapabilities,
     InitialFixtureState,
 )
@@ -65,6 +69,7 @@ from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, Fix
 from twinklr.core.sequencer.moving_heads.compile.physical import shutter_changes
 
 FailureMode = Literal["error", "preserve_aim", "drop_accent"]
+UnplayableMode = Literal["dark", "error"]
 
 FALLBACK_METADATA_KEY = "preposition_fallback"
 """Cue metadata naming the failure mode its effect opts into; the pass mode must match."""
@@ -72,7 +77,8 @@ FALLBACK_METADATA_KEY = "preposition_fallback"
 TRANSACTION_METADATA_KEY = "preposition_target"
 """Metadata on an authored segment: the id of the cue it prepares, empty for a park."""
 
-_POSE = (ChannelName.PAN, ChannelName.TILT)
+_POSE = (ChannelName.PAN, ChannelName.TILT, ChannelName.ZOOM)
+"""The pose axes: each moves only in the dark and settles before a reveal."""
 _WHEELS = (ChannelName.COLOR, ChannelName.GOBO)
 
 type _Motion = tuple[Fraction, Fraction] | None
@@ -92,6 +98,10 @@ class PrepositionResult(BaseModel):
     segments: tuple[FixtureSegment, ...]
     diagnostics: tuple[TransitionDiagnostic, ...]
     dependencies: tuple[TransitionDependency, ...]
+    unplayable: tuple[dict[str, str | int], ...] = ()
+    """Under `on_unplayable="dark"`, one record per cue kept dark because it could not
+    be played: its fixture, section, template, step and frames, and the diagnostic's
+    code and reason."""
 
     @property
     def has_errors(self) -> bool:
@@ -107,6 +117,7 @@ def plan_prepositions(
     frame_ms: int,
     sequence_end_ms: int,
     failure_mode: FailureMode = "error",
+    on_unplayable: UnplayableMode = "error",
 ) -> PrepositionResult:
     """Author every fixture over `[0, sequence_end_ms)`, transactions before each cue.
 
@@ -122,7 +133,7 @@ def plan_prepositions(
 
     Args:
         segments: Every fixture's physical cues, on the frame grid, each authoring the
-            pan and tilt its profile declares, all ending by `sequence_end_ms`.
+            pan, tilt and zoom its profile declares, all ending by `sequence_end_ms`.
         capabilities: Each physical fixture's profile. A fixture without cues parks
             dark at its initial state over the whole sequence.
         initial_states: Run-supplied time-zero states; a missing fixture is unknown,
@@ -133,11 +144,19 @@ def plan_prepositions(
         failure_mode: The most this pass may substitute when a reposition needs more
             time than it has or an unknown speed, latency or settle. A cue gets it only
             when its own `metadata[FALLBACK_METADATA_KEY]` names the same mode.
-            `preserve_aim` plays the cue at the aim the head holds (pan/tilt held
-            there, everything else as authored); `drop_accent` keeps the cue dark at
-            that aim and plans later cues from there. Neither applies to unknown initial
+            `preserve_aim` plays the cue at the aim the head holds (pan, tilt and
+            zoom held there, everything else as authored); `drop_accent` keeps the cue
+            dark at that aim and plans later cues from there. Neither applies to unknown initial
             state, unknown visibility latency, a missing darkness guarantee, an
             unencodable value or a lock.
+        on_unplayable: `dark` keeps a cue that still cannot be played after its
+            fallback dark, as `drop_accent` does (status `drop_accent`, listed in
+            `unplayable`): a cue whose transaction fails for any reason but an unknown
+            initial state or a lock, and a cue that a shutter state too short to take
+            effect, or a park that cannot follow, lies in. Each fixture is replanned
+            with the cues found so far kept dark until nothing more is found; every
+            replan keeps at least one more cue dark, so it ends, at worst with every
+            cue dark and the fixture parked. `error` reports them as errors.
 
     Returns:
         The cues with their transactions and parks, ordered by fixture and time, or no
@@ -146,7 +165,7 @@ def plan_prepositions(
     Raises:
         ValueError: If `frame_ms` is not the effect grid, `sequence_end_ms` is off the
             grid, a fixture has no profile, or a cue is off the grid, empty, overlaps
-            another of its fixture, ends after the sequence or omits its pan or tilt.
+            another of its fixture, ends after the sequence or omits a pose axis.
         PhysicalChannelError: If a cue holds a value its profile cannot honor.
     """
     if frame_ms != EFFECT_GRID_MS:
@@ -160,6 +179,7 @@ def plan_prepositions(
     planned: list[FixtureSegment] = []
     diagnostics: list[TransitionDiagnostic] = []
     dependencies: list[TransitionDependency] = []
+    unplayable: list[dict[str, str | int]] = []
     for fixture_id in sorted(by_fixture.keys() | capabilities.keys()):
         profile = capabilities.get(fixture_id)
         if profile is None:
@@ -172,19 +192,296 @@ def plan_prepositions(
             frame_ms,
             sequence_end_ms,
             failure_mode,
+            on_unplayable,
         )
-        out, fixture_diagnostics, fixture_dependencies = planner.plan(by_fixture[fixture_id])
-        if not any(diagnostic.status == "error" for diagnostic in fixture_diagnostics):
-            fixture_diagnostics += planner.shutter_timing(out)
+        dark: dict[int, _InfeasibleError] = {}
+        while True:
+            out, fixture_diagnostics, fixture_dependencies, kept_dark = planner.plan(
+                by_fixture[fixture_id], dark
+            )
+            errors = [d for d in fixture_diagnostics if d.status == "error"]
+            if not errors:
+                errors = planner.shutter_timing(out)
+                fixture_diagnostics += errors
+            found = {} if on_unplayable == "error" else planner.culprits(out, errors)
+            if not found.keys() - dark.keys():
+                break
+            dark |= found
         planned.extend(out)
         diagnostics.extend(sorted(fixture_diagnostics, key=lambda diagnostic: diagnostic.cue_ms))
         dependencies.extend(fixture_dependencies)
+        unplayable.extend(kept_dark)
 
     if any(diagnostic.status == "error" for diagnostic in diagnostics):
         planned = []
     return PrepositionResult(
-        segments=tuple(planned), diagnostics=tuple(diagnostics), dependencies=tuple(dependencies)
+        segments=tuple(planned),
+        diagnostics=tuple(diagnostics),
+        dependencies=tuple(dependencies),
+        unplayable=tuple(unplayable),
     )
+
+
+def worst_case_entry_ms(
+    profile: FixtureCapabilities,
+    *,
+    entry_pose: Mapping[ChannelName, tuple[float, float]],
+    entry_wheels: Mapping[ChannelName, Collection[str]],
+    pose_envelope: Mapping[ChannelName, tuple[float, float]],
+    frame_ms: int,
+    held_wheels: Mapping[ChannelName, Collection[str]] | None = None,
+    residual_ms: Fraction | int | None = None,
+) -> int | None:
+    """The most time a transaction into a cue may need, from any predecessor in an envelope.
+
+    The cue starts anywhere in `entry_pose` (per pose axis, an inclusive min/max range; a
+    single pose is a range with equal ends) with each wheel in one of `entry_wheels`
+    (a wheel left out may hold only its default state). The predecessor's commanded
+    pose lies anywhere in `pose_envelope`, its shutter in any state and each wheel in
+    one of `held_wheels` (any state where that is not given). The sum of the terms
+    `plan_prepositions` times, each rounded up to whole frames:
+
+    - darkness: `close_latency_ms`, plus the slowest extinguishing shutter settle when
+      only the shutter extinguishes;
+    - wheels: the slowest settle of an entry wheel state the predecessor may not already
+      hold, and at least one frame;
+    - travel between the farthest envelope and entry words at `travel_speed_per_s`;
+    - the slowest axis' `latency_ms` plus `settle_ms`;
+    - predecessor motion still under way after its last frame: `residual_ms` when the
+      caller followed the actual predecessor (`follow_cues`), else once more latency
+      plus settle and one word's travel. That suffices for a predecessor cue the
+      physical compile admits (`follow_lag` finds nothing) entered settled; a wheel
+      change inside a cue is covered only by `residual_ms`.
+
+    Returns:
+        The bound in ms on the frame grid, or None when a needed term is unknown or the
+        profile cannot guarantee darkness from every predecessor state; None is never
+        feasible.
+    """
+    visibility = profile.visibility
+    close = visibility.close_latency_ms
+    if close is None:
+        return None
+    dark: int = close
+    if not visibility.dimmer_zero_extinguishes:
+        # The transaction holds an extinguishing shutter state, or switches to the closed
+        # state when the predecessor holds another; it may hold any of them.
+        shutter = profile.discrete.get("shutter")
+        if shutter is None or shutter.closed_state not in visibility.extinguishing_shutter_states:
+            return None
+        settles = [shutter.states[s].settle_ms for s in visibility.extinguishing_shutter_states]
+        if None in settles:
+            return None
+        dark += max(s for s in settles if s is not None)
+
+    wheel = frame_ms
+    for channel in _WHEELS:
+        capability = profile.discrete.get(DISCRETE_KEYS[channel])
+        if capability is None:
+            continue
+        held = None if held_wheels is None else set(held_wheels.get(channel, ()))
+        for state in entry_wheels.get(channel, (capability.default_state,)):
+            if held == {state}:
+                continue  # already selected: no change to settle
+            settle = capability.states[state].settle_ms
+            if settle is None:
+                return None
+            wheel = max(wheel, settle)
+
+    travel = follow = predecessor = Fraction(0)
+    for channel in _POSE:
+        axis = profile.axes.get(AXIS_KEYS[channel])
+        if axis is None:
+            continue
+        speed, latency, settle = axis.travel_speed_per_s, axis.latency_ms, axis.settle_ms
+        if speed is None or latency is None or settle is None:
+            return None
+        word_ms = _word_ms(axis)
+        # `dmx_word` is monotonic, so the farthest words are at the range ends.
+        entry = [axis.dmx_word(value) for value in entry_pose[channel]]
+        envelope = [axis.dmx_word(value) for value in pose_envelope[channel]]
+        distance = max(abs(a - b) for a in entry for b in envelope)
+        travel = max(travel, distance * word_ms)
+        follow = max(follow, Fraction(latency + settle))
+        predecessor = max(predecessor, latency + settle + word_ms)
+    if residual_ms is not None:
+        predecessor = Fraction(residual_ms)
+
+    def ceil(value: Fraction | int) -> int:
+        return math.ceil(Fraction(value) / frame_ms) * frame_ms
+
+    return ceil(dark) + ceil(wheel) + ceil(travel) + ceil(follow) + ceil(predecessor)
+
+
+@dataclass(frozen=True)
+class HeadFollow:
+    """A fixture's head over a cue's last frame, as this pass's head model follows it."""
+
+    segment: FixtureSegment
+    settled_ms: Fraction | None
+    """When every pose axis and wheel has settled after the cue's commands; None when
+    unknown."""
+    state: _State = field(repr=False)
+
+
+def follow_cues(
+    segments: Sequence[FixtureSegment],
+    profile: FixtureCapabilities,
+    *,
+    frame_ms: int,
+    after: HeadFollow | None = None,
+) -> list[HeadFollow]:
+    """Follow one fixture's cues, in time order, as `plan_prepositions` would play them.
+
+    A cue right after the previous one (or `after`) continues its motion; any other cue
+    starts settled at its own first values, as a transaction leaves it. Each cue is
+    followed with the planner's own head model (`_end_state`), so its result is the
+    state a transaction or continuation after the cue starts from.
+    """
+    out: list[HeadFollow] = []
+    previous = after
+    for segment in sorted(segments, key=lambda segment: segment.t0_ms):
+        planner = _FixturePlanner(
+            segment.fixture_id, profile, None, (), frame_ms, segment.t1_ms, "error"
+        )
+        if previous is not None and previous.segment.t1_ms == segment.t0_ms:
+            head = previous.state.head
+        else:
+            start = Fraction(segment.t0_ms)
+            rest: dict[ChannelName, _Motion] = dict.fromkeys(planner.pose_channels, (start, start))
+            head = _Head(planner._values_at(segment, segment.t0_ms), rest, start)
+        state = planner._end_state(segment, head)
+        times = [state.head.wheels_settled]
+        times += [None if motion is None else motion[1] for motion in state.head.motion.values()]
+        settled = None if None in times else max(t for t in times if t is not None)
+        previous = HeadFollow(segment, settled, state)
+        out.append(previous)
+    return out
+
+
+def entry_feasible(
+    segment: FixtureSegment,
+    profile: FixtureCapabilities,
+    *,
+    after: HeadFollow | None,
+    initial: InitialFixtureState | None,
+    locks: Sequence[RenderLock],
+    frame_ms: int,
+) -> bool:
+    """Whether `plan_prepositions` in `error` mode plays `segment` as authored right after
+    `after` (or, without it, from the run's initial state): its transaction or
+    continuation fits, and every shutter change from the predecessor's last frame to the
+    segment's own first change takes effect in time (`shutter_timing`)."""
+    planner = _FixturePlanner(
+        segment.fixture_id, profile, initial, locks, frame_ms, segment.t1_ms, "error"
+    )
+    if after is not None:
+        state = after.state
+    elif initial is None or not initial.settled or profile.check_initial_state(initial):
+        return False
+    else:
+        state = _State(0, planner._head(initial), None, None, planner._evidence(), None)
+    try:
+        plan = planner._transaction(state, segment)
+    except _InfeasibleError:
+        return False
+    previous = None if after is None else after.segment
+    authored = [s for s in (previous, plan.segment, segment) if s is not None]
+    return all(problem.cue_ms < state.start_ms for problem in planner.shutter_timing(authored))
+
+
+def follow_lag(
+    segment: FixtureSegment, profile: FixtureCapabilities, *, frame_ms: int
+) -> tuple[ChannelName, int, str] | None:
+    """Where the head falls more than one encoded word behind a cue's pose commands.
+
+    Followed from rest at the cue's start with this pass's head model, a command at frame
+    `c` should be reached by the next frame's command, `c + latency_ms + frame_ms`; a
+    head still more than one word's travel short of it then is chasing motion finer
+    than the axis can follow. Axes with unknown speed, latency or settle are skipped.
+
+    Returns:
+        The axis, the frame and a reason naming the word-space rates, or None.
+    """
+    planner = _FixturePlanner(
+        segment.fixture_id, profile, None, (), frame_ms, segment.t1_ms, "error"
+    )
+    for channel in planner.pose_channels:
+        axis = planner._axis(channel)
+        speed, latency = axis.travel_speed_per_s, axis.latency_ms
+        if speed is None or latency is None or axis.settle_ms is None:
+            continue
+        physical = segment.channels[channel].physical
+        assert isinstance(physical, ContinuousTrajectory)
+        word_ms = _word_ms(axis)
+        # One frame's commands travel at most its degrees plus one word of rounding; while
+        # that fits in a frame the head never trails by more than the frame itself. The
+        # float screen keeps a margin far wider than its rounding error.
+        steepest = max(
+            (abs(b.value - a.value) / (b.t_ms - a.t_ms) for a, b in pairwise(physical.points)),
+            default=0.0,
+        )
+        if steepest * frame_ms * 1000 / speed + float(word_ms) <= frame_ms * (1 - 1e-6):
+            continue
+        start = Fraction(segment.t0_ms)
+        motion: _Motion = (start, start)
+        word: int | None = None
+        changes = 0
+        for time_ms, level in _frame_levels(physical, segment.t0_ms, segment.t1_ms, frame_ms):
+            commanded = axis.dmx_word(level)
+            if word is None:
+                word = commanded
+                continue
+            changes += abs(commanded - word)
+            motion, word = planner._follow(channel, motion, word, ((time_ms, commanded),))
+            assert motion is not None
+            behind = motion[0] - (time_ms + latency + frame_ms)
+            if behind > word_ms:
+                seconds = Fraction(time_ms + frame_ms - segment.t0_ms, 1000)
+                return (
+                    channel,
+                    time_ms,
+                    f"trails its commands by {float(behind / word_ms):.3g} words at "
+                    f"{time_ms} ms: it commands {float(changes / seconds):.4g} word "
+                    f"changes/s where {speed:g} {axis.unit}/s follows "
+                    f"{float(1000 / word_ms):.4g} words/s; motion finer than the axis "
+                    "can follow is not rendered",
+                )
+    return None
+
+
+def dark_throughout(segment: FixtureSegment, profile: FixtureCapabilities, start_ms: int) -> bool:
+    """Whether every frame of `segment` from `start_ms` commands darkness: an authored
+    dimmer at zero the profile declares extinguishing, or an extinguishing shutter state."""
+    visibility = profile.visibility
+    dimmer = segment.channels.get(ChannelName.DIMMER)
+    levels: dict[int, Fraction] = {}
+    if (
+        visibility.dimmer_zero_extinguishes
+        and dimmer is not None
+        and isinstance(dimmer.physical, ContinuousTrajectory)
+    ):
+        levels = dict(_frame_levels(dimmer.physical, start_ms, segment.t1_ms, EFFECT_GRID_MS))
+    shutter = segment.channels.get(ChannelName.SHUTTER)
+    for time_ms in range(start_ms, segment.t1_ms, EFFECT_GRID_MS):
+        if levels.get(time_ms) == 0:
+            continue
+        if (
+            shutter is not None
+            and isinstance(shutter.physical, DiscreteTrajectory)
+            and _state_at(shutter.physical, time_ms) in visibility.extinguishing_shutter_states
+        ):
+            continue
+        return False
+    return True
+
+
+def _word_ms(axis: AxisCapability) -> Fraction:
+    """Time to travel one encoded word at the configured speed."""
+    assert axis.travel_speed_per_s is not None
+    span = Fraction(axis.physical_max) - Fraction(axis.physical_min)
+    word_min, word_max = axis.word_range
+    return span / (word_max - word_min) * 1000 / Fraction(axis.travel_speed_per_s)
 
 
 class _InfeasibleError(Exception):
@@ -276,6 +573,7 @@ class _FixturePlanner:
         frame_ms: int,
         end_ms: int,
         failure_mode: FailureMode,
+        on_unplayable: UnplayableMode = "error",
     ) -> None:
         self.fixture_id = fixture_id
         self.profile = profile
@@ -283,6 +581,7 @@ class _FixturePlanner:
         self.frame_ms = frame_ms
         self.end_ms = end_ms
         self.failure_mode = failure_mode
+        self.on_unplayable = on_unplayable
         self.pose_channels = tuple(ch for ch in _POSE if AXIS_KEYS[ch] in profile.axes)
         self.wheel_channels = tuple(ch for ch in _WHEELS if DISCRETE_KEYS[ch] in profile.discrete)
         self.channels = tuple(
@@ -300,18 +599,38 @@ class _FixturePlanner:
             for lock in locks
             if fixture_id in lock.fixture_ids
         )
+        # Encoded pose words by commanded value (`_word`) and travel times by word
+        # distance (`_travel_ms`), reused wherever a value recurs, as on every cycle of
+        # a periodic cue; both are exact and pure.
+        self._words: dict[ChannelName, dict[Fraction, int]] = {
+            channel: {} for channel in self.pose_channels
+        }
+        self._travel: dict[ChannelName, dict[int, Fraction]] = {
+            channel: {} for channel in self.pose_channels
+        }
 
     # --- Planning ---------------------------------------------------------------------
 
     def plan(
-        self, segments: Sequence[FixtureSegment]
-    ) -> tuple[list[FixtureSegment], list[TransitionDiagnostic], list[TransitionDependency]]:
+        self,
+        segments: Sequence[FixtureSegment],
+        dark: Mapping[int, _InfeasibleError] | None = None,
+    ) -> tuple[
+        list[FixtureSegment],
+        list[TransitionDiagnostic],
+        list[TransitionDependency],
+        list[dict[str, str | int]],
+    ]:
+        """Plan the fixture's cues in time order; `dark` maps the start of each cue to
+        keep dark (`on_unplayable="dark"`) to the failure found for it."""
         ordered = self._checked(segments)
+        dark = dark or {}
         out: list[FixtureSegment] = []
         diagnostics: list[TransitionDiagnostic] = []
         dependencies: list[TransitionDependency] = []
+        kept_dark: list[dict[str, str | int]] = []
         if not ordered and self.end_ms == 0:
-            return out, diagnostics, dependencies
+            return out, diagnostics, dependencies, kept_dark
 
         def fail(state: _State, target: FixtureSegment | None, failure: _InfeasibleError) -> None:
             cue_ms = state.start_ms if target is None else target.t0_ms
@@ -339,7 +658,7 @@ class _FixturePlanner:
                 ordered[0] if ordered else None,
                 _InfeasibleError("unknown_initial_state", reason),
             )
-            return out, diagnostics, dependencies
+            return out, diagnostics, dependencies, kept_dark
 
         state = _State(0, self._head(self.initial), None, None, self._evidence(), None)
         last: FixtureSegment | None = None
@@ -347,44 +666,55 @@ class _FixturePlanner:
             available = target.t0_ms - state.start_ms
             status: TransitionStatus = "feasible"
             code: TransitionCode | None = None
-            try:
-                plan = self._transaction(state, target)
-            except _InfeasibleError as failure:
-                mode = self._fallback(target, failure)
-                if mode is None:
-                    fail(state, target, failure)
-                    return out, diagnostics, dependencies
-                status, code = mode, failure.code
+            failure = dark.get(target.t0_ms)
+            if failure is None:
+                try:
+                    plan = self._transaction(state, target)
+                except _InfeasibleError as error:
+                    failure = error
+            if failure is not None:
+                mode = None if target.t0_ms in dark else self._fallback(target, failure)
                 aim = self._aim(state)
-                if mode == "drop_accent":
+                if mode == "preserve_aim":
+                    try:
+                        held = self._hold_aim(target, state.head.values.words)
+                        self._check_locks(held.t0_ms, held.t1_ms, _POSE, failure.required_ms)
+                        plan = self._transaction(state, held)
+                    except _InfeasibleError as second:
+                        second.reason = (
+                            f"{failure.reason}; preserve_aim cannot apply: {second.reason}"
+                        )
+                        failure, mode = second, None
+                    else:
+                        target, status, code = held, mode, failure.code
+                        plan = replace(
+                            plan,
+                            required_ms=failure.required_ms,
+                            reason=f"{failure.reason}; preserve_aim holds pan/tilt at the "
+                            f"settled aim {aim} through the cue; {plan.reason}",
+                        )
+                if mode != "preserve_aim":
+                    degrade = mode is None
+                    if degrade and not self._degrades(failure):
+                        fail(state, target, failure)
+                        return out, diagnostics, dependencies, kept_dark
+                    why = "on_unplayable 'dark'" if degrade else "drop_accent"
                     diagnostics.append(
                         self._diagnostic(
                             target.t0_ms,
-                            status,
-                            code,
+                            "drop_accent",
+                            failure.code,
                             failure.required_ms,
                             available,
-                            f"{failure.reason}; drop_accent keeps the cue dark at the aim "
+                            f"{failure.reason}; {why} keeps the cue dark at the aim "
                             f"{aim} and plans the next cue from there",
                         )
                     )
                     dependencies.append(self._dependency(state, target, target.t1_ms))
+                    if degrade:
+                        kept_dark.append(self._kept_dark(target, failure))
                     last = target
                     continue
-                try:
-                    target = self._hold_aim(target, state.head.values.words)
-                    self._check_locks(target.t0_ms, target.t1_ms, _POSE, failure.required_ms)
-                    plan = self._transaction(state, target)
-                except _InfeasibleError as second:
-                    second.reason = f"{failure.reason}; preserve_aim cannot apply: {second.reason}"
-                    fail(state, target, second)
-                    return out, diagnostics, dependencies
-                plan = replace(
-                    plan,
-                    required_ms=failure.required_ms,
-                    reason=f"{failure.reason}; preserve_aim holds pan/tilt at the settled aim "
-                    f"{aim} through the cue; {plan.reason}",
-                )
             diagnostics.append(
                 self._diagnostic(
                     target.t0_ms,
@@ -421,9 +751,58 @@ class _FixturePlanner:
             except _InfeasibleError as failure:
                 failure.reason = f"cannot park {'after ' + last.segment_id if last else 'the fixture'}: {failure.reason}"
                 fail(state, None, failure)
-                return out, diagnostics, dependencies
+                return out, diagnostics, dependencies, kept_dark
             out.append(park)
-        return out, diagnostics, dependencies
+        return out, diagnostics, dependencies, kept_dark
+
+    def culprits(
+        self, out: Sequence[FixtureSegment], errors: Sequence[TransitionDiagnostic]
+    ) -> dict[int, _InfeasibleError]:
+        """The cue to keep dark for each error a dark cue could clear, by its start.
+
+        A shutter state too short to take effect lies in a cue, a transaction (its cue
+        then) or the park (the last cue played then); a park that cannot follow is
+        the last cue's. An unknown initial state or a lock is never cleared so."""
+        found: dict[int, _InfeasibleError] = {}
+        cues = [segment for segment in out if TRANSACTION_METADATA_KEY not in segment.metadata]
+        for error in errors:
+            if error.code is None or error.code in ("unknown_initial_state", "lock_conflict"):
+                continue
+            where = next((s for s in out if s.t0_ms <= error.cue_ms < s.t1_ms), None)
+            if where is None:  # a park that could not be authored, after its cue
+                where = next((s for s in cues if s.t1_ms == error.cue_ms), None)
+            if where is not None and TRANSACTION_METADATA_KEY in where.metadata:
+                if where.metadata[TRANSACTION_METADATA_KEY]:
+                    where = next((s for s in cues if s.t0_ms == where.t1_ms), None)
+                else:
+                    where = next((s for s in cues if s.t1_ms == where.t0_ms), None)
+            if where is not None:
+                found[where.t0_ms] = _InfeasibleError(
+                    error.code, error.reason, error.required_ms, substitutable=True
+                )
+        return found
+
+    def _degrades(self, failure: _InfeasibleError) -> bool:
+        """Whether `on_unplayable` keeps a cue dark that cannot be played for `failure`:
+        never for an unknown initial state or a lock."""
+        return self.on_unplayable == "dark" and failure.code not in (
+            "unknown_initial_state",
+            "lock_conflict",
+        )
+
+    def _kept_dark(self, cue: FixtureSegment, failure: _InfeasibleError) -> dict[str, str | int]:
+        return {
+            "fixture_id": cue.fixture_id,
+            "section_id": cue.section_id,
+            "template_id": cue.template_id,
+            "step_id": cue.step_id,
+            "start_ms": cue.t0_ms,
+            "end_ms": cue.t1_ms,
+            "frames": (cue.t1_ms - cue.t0_ms) // self.frame_ms,
+            "reason": "unplayable",
+            "code": failure.code,
+            "detail": failure.reason,
+        }
 
     def _transaction(self, state: _State, target: FixtureSegment) -> _Plan:
         g0, g1 = state.start_ms, target.t0_ms
@@ -462,6 +841,17 @@ class _FixturePlanner:
             else:
                 held = (dimmer_dark, dark_commands[1])
             dark_from = self._dark_from(state, *held)
+            lit = not self._commanded_dark(goal.dimmer, goal.shutter)
+            if dark_from is None and dark_commands is None and lit and self._can_darken(state):
+                # A lit cue at time zero that must change first: dropping it is safe, so a
+                # fallback may apply.
+                names = "/".join(ch.value for ch in (*moving, *changed))
+                raise _InfeasibleError(
+                    "infeasible_transition",
+                    f"a lit cue at time zero changes {names} from the initial state, and "
+                    "nothing is pre-rolled before time zero to darken and change it",
+                    substitutable=True,
+                )
             if dark_from is None:
                 raise _InfeasibleError(
                     "infeasible_transition",
@@ -743,23 +1133,16 @@ class _FixturePlanner:
             **{**dict(target), "channels": channels, "metadata": dict(target.metadata)}
         )
 
-    def _center(self, key: Literal["pan", "tilt", "dimmer"], word: int) -> float:
-        """A value that encodes to `word` with margin: the word's center, kept in the window.
+    def _center(self, key: AxisName, word: int) -> float:
+        """A value that encodes to `word` with margin (`AxisCapability.word_center`).
 
         Planner-authored values are always word centers, so no float rounding can land
         on a DMX rounding tie and move the head between two frames that should hold.
         """
-        axis = self.profile.axes[key]
-        uninverted = axis.full_word - word if axis.inverted else word
-        low, high = (Fraction(bound) for bound in axis.operable_range)
-        minimum = Fraction(axis.physical_min)
-        exact = minimum + (Fraction(axis.physical_max) - minimum) * uninverted / axis.full_word
-        value = float(min(max(exact, low), high))
-        if not axis.admits(value) or axis.dmx_word(value) != word:
-            raise _InfeasibleError(
-                "infeasible_transition", f"{key} word {word} cannot be commanded exactly"
-            )
-        return value
+        try:
+            return self.profile.axes[key].word_center(word)
+        except ValueError as error:
+            raise _InfeasibleError("infeasible_transition", f"{key} {error}") from error
 
     def _dark_commands(self, state: _State) -> tuple[int | None, str | None]:
         """The dimmer word and shutter state a transaction holds: every declared darkness.
@@ -837,11 +1220,11 @@ class _FixturePlanner:
         if initial is None:
             return _Head(_Values({}, None, None, None, None, {}), {}, None)
         states = initial.discrete_states
-        pose = {ChannelName.PAN: initial.pan_deg, ChannelName.TILT: initial.tilt_deg}
+        pose = initial.pose
         dimmer = self.profile.axes.get("dimmer")
         level = None if initial.dimmer is None else Fraction(initial.dimmer)
         values = _Values(
-            words={ch: self._axis(ch).dmx_word(pose[ch]) for ch in self.pose_channels},
+            words={ch: self._axis(ch).dmx_word(pose[AXIS_KEYS[ch]]) for ch in self.pose_channels},
             dimmer=level,
             dimmer_word=(
                 dimmer.dmx_word(level)
@@ -902,9 +1285,15 @@ class _FixturePlanner:
         for channel in self.pose_channels:
             physical = segment.channels[channel].physical
             assert isinstance(physical, ContinuousTrajectory)
-            axis = self._axis(channel)
+            first = physical.points[0]
+            if (
+                first.t_ms <= segment.t0_ms
+                and all(point.value == first.value for point in physical.points)
+                and self._word(channel, Fraction(first.value)) == head.values.words[channel]
+            ):
+                continue  # held at the word the head already has: no command moves it
             commands = (
-                (t, axis.dmx_word(value))
+                (t, self._word(channel, value))
                 for t, value in _frame_levels(physical, segment.t0_ms, segment.t1_ms, self.frame_ms)
             )
             motion[channel], _ = self._follow(
@@ -1000,6 +1389,16 @@ class _FixturePlanner:
             evidence.add("shutter")
         return frozenset(evidence)
 
+    def _can_darken(self, state: _State) -> bool:
+        """Whether a transaction from `state` could establish darkness at all: a declared
+        mechanism with a known close latency (and shutter settle)."""
+        try:
+            _, shutter = self._dark_commands(state)
+        except _InfeasibleError:
+            return False
+        dimmer_dark = self.profile.visibility.dimmer_zero_extinguishes
+        return self._dark_from(state, dimmer_dark, shutter) is not None
+
     def _commanded_dark(self, dimmer: Fraction | None, shutter: str | None) -> bool:
         visibility = self.profile.visibility
         return (visibility.dimmer_zero_extinguishes and dimmer == 0) or (
@@ -1028,21 +1427,32 @@ class _FixturePlanner:
             ("settle_ms", axis.settle_ms),
         ]
 
+    def _word(self, channel: ChannelName, value: Fraction) -> int:
+        """The axis' `dmx_word` for a commanded value."""
+        words = self._words[channel]
+        if value not in words:
+            words[value] = self._axis(channel).dmx_word(value)
+        return words[value]
+
     def _travel_ms(self, channel: ChannelName, start: int, end: int) -> Fraction:
         """Time to travel between two encoded words at the configured speed."""
-        axis = self._axis(channel)
-        assert axis.travel_speed_per_s is not None
-        span = Fraction(axis.physical_max) - Fraction(axis.physical_min)
-        return abs(end - start) * span / axis.full_word * 1000 / Fraction(axis.travel_speed_per_s)
+        travel = self._travel[channel]
+        words = abs(end - start)
+        if words not in travel:
+            axis = self._axis(channel)
+            assert axis.travel_speed_per_s is not None
+            span = Fraction(axis.physical_max) - Fraction(axis.physical_min)
+            word_min, word_max = axis.word_range
+            travel[words] = (
+                words * span / (word_max - word_min) * 1000 / Fraction(axis.travel_speed_per_s)
+            )
+        return travel[words]
 
     def _wheel_settle(self, channel: ChannelName, state: str) -> int | None:
         return self.profile.discrete[DISCRETE_KEYS[channel]].states[state].settle_ms
 
     def _default_word(self, axis: AxisCapability) -> int:
-        word = self.profile.defaults[axis.coarse_offset]
-        if axis.fine_offset is not None:
-            word = word << 8 | self.profile.defaults[axis.fine_offset]
-        return word
+        return axis.default_word(self.profile.defaults)
 
     def _ceil(self, value: Fraction | int) -> int:
         return math.ceil(Fraction(value) / self.frame_ms) * self.frame_ms
@@ -1051,11 +1461,11 @@ class _FixturePlanner:
         parts = []
         for channel, word in state.head.values.words.items():
             axis = self._axis(channel)
-            uninverted = axis.full_word - word if axis.inverted else word
+            word_min, word_max = axis.word_range
+            uninverted = word_min + word_max - word if axis.inverted else word
             span = axis.physical_max - axis.physical_min
-            parts.append(
-                f"{channel.value} {axis.physical_min + span * uninverted / axis.full_word:g}"
-            )
+            value = axis.physical_min + span * (uninverted - word_min) / (word_max - word_min)
+            parts.append(f"{channel.value} {value:g}")
         return ", ".join(parts)
 
     # --- Reports ----------------------------------------------------------------------

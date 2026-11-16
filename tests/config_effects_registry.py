@@ -2597,6 +2597,8 @@ _PHYSICAL_PROFILE_FIELDS = {
     "axes.coarse_offset": _PHYSICAL_FRAMES,
     "axes.fine_offset": _PHYSICAL_WORDS,
     "axes.inverted": _PHYSICAL_WORDS,
+    "axes.dmx_min": _PHYSICAL_WORDS,
+    "axes.dmx_max": _PHYSICAL_WORDS,
     "axes.travel_speed_per_s": _PHYSICAL_PREPOSITION,
     "axes.latency_ms": _PHYSICAL_PREPOSITION,
     "axes.settle_ms": _PHYSICAL_PREPOSITION,
@@ -2609,7 +2611,6 @@ _PHYSICAL_PROFILE_FIELDS = {
     "discrete.states.settle_ms": _PHYSICAL_CHANGES,
     "discrete.default_state": _PHYSICAL_CHANGES,
     "discrete.closed_state": _PHYSICAL_PREPOSITION,
-    "discrete.open_state": _PHYSICAL_IDENTITY_ONLY,
     "visibility": _PHYSICAL_PREPOSITION,
     "visibility.dimmer_zero_extinguishes": _PHYSICAL_DARKNESS,
     "visibility.extinguishing_shutter_states": _PHYSICAL_DARKNESS,
@@ -2632,6 +2633,7 @@ for _field, _note in {
     "": _PHYSICAL_CHECK,
     "pan_deg": _PHYSICAL_CHECK,
     "tilt_deg": _PHYSICAL_CHECK,
+    "zoom_deg": _PHYSICAL_CHECK,
     "dimmer": _PHYSICAL_CHECK,
     "discrete_states": _PHYSICAL_CHECK,
     "settled": _PHYSICAL_PREPOSITION,
@@ -2757,6 +2759,162 @@ for _field in ("physical_shutter_state", "physical_color", "physical_gobo"):
         "tests/unit/sequencer/moving_heads/compile/test_physical_discrete.py::"
         f"test_physical_discrete_field_changes_compile[{_physical_template_path}]",
         _PHYSICAL_TEMPLATE_COMPILED,
+    )
+
+# P2.4a reposition fallbacks: a step's opt-in and the job's policy, both required. Each
+# exact path is evidenced by a physical render whose cue that cannot be repositioned is
+# kept dark with both set and refused once that one path is back at its default.
+for _fallback_path in (
+    "template.template.steps.physical_reposition_fallback",
+    "job.moving_heads.reposition_fallback",
+):
+    CONFIG_EFFECTS[_fallback_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/compile/test_entry_window.py::"
+        f"test_reposition_fallback_field_changes_preposition[{_fallback_path}]",
+        _PHYSICAL_PREPOSITION,
+    )
+
+# What a physical render does with a cue the plan placed where it cannot play. Evidenced
+# by a render that keeps such a cue dark at the default and is refused under `error`.
+CONFIG_EFFECTS["job.moving_heads.on_unplayable"] = ConfigDisposition(
+    ConfigDispositionKind.EFFECT_TEST,
+    "tests/unit/sequencer/moving_heads/compile/test_unplayable.py::"
+    "test_on_unplayable_field_changes_the_render",
+    "exact path changes whether an unplayable cue is kept dark or the render is refused",
+)
+
+# P2.1 named rig components: a fixture group's position and attribute presets and the
+# step references that name them. They feed only the opt-in physical compile; each
+# exact path mutates its field and must either change `compile_physical_template`'s
+# result or be refused by validation or compile (a reference that no longer resolves).
+for _component_path, _note in {
+    "fixture.presets": _PHYSICAL_TEMPLATE_REJECTED,
+    "fixture.presets.positions": _PHYSICAL_TEMPLATE_REJECTED,
+    "fixture.presets.positions.fixtures": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.positions.fixtures.pan_deg": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.positions.fixtures.tilt_deg": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.positions.fallback": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.attributes": _PHYSICAL_TEMPLATE_REJECTED,
+    "fixture.presets.attributes.fixtures": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.attributes.fixtures.shutter": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.attributes.fixtures.color": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.attributes.fixtures.gobo": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.attributes.fixtures.dimmer": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets.attributes.fallback": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.component_refs": _PHYSICAL_TEMPLATE_REJECTED,
+    "template.template.steps.component_refs.position_id": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.component_refs.attribute_preset_ids": _PHYSICAL_TEMPLATE_COMPILED,
+}.items():
+    CONFIG_EFFECTS[_component_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/compile/test_component_presets.py::"
+        f"test_component_preset_field_changes_compile[{_component_path}]",
+        _note,
+    )
+
+# P2.2 rig topology and phase distribution: a fixture group's canonical rig and the step
+# distributions that spread phase over it. They feed only the opt-in physical compile;
+# each exact path mutates its field and must either change the compiled pan, tilt,
+# dimmer or shutter values or be refused (a distribution on a rig left without topology).
+for _topology_path, _note in {
+    "fixture.topology": _PHYSICAL_TEMPLATE_REJECTED,
+    "fixture.topology.members": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.topology.members.fixture_id": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.topology.members.row": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.topology.members.column": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.topology.members.ordinal": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_distribution": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_distribution.domains": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_distribution.block_size": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_distribution.group_count": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_distribution.wings": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_distribution.spread_cycles": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_distribution.direction": _PHYSICAL_TEMPLATE_COMPILED,
+}.items():
+    CONFIG_EFFECTS[_topology_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/compile/test_topology_phase.py::"
+        f"test_topology_field_changes_compile[{_topology_path}]",
+        _note,
+    )
+
+# P2.3 relative paths: the template-owned transform of a circle, lissajous or sweep and
+# the lissajous frequency ratio. They feed only the opt-in physical compile; each exact
+# path mutates its field and must change the compiled pan and tilt values. The `ONCE`
+# repeat value has no path of its own: `template.template.repeat.mode` keeps its legacy
+# discriminator, and ONCE's physical scheduling is tested in the same module.
+for _path_field in (
+    "transform",
+    "transform.rotation_deg",
+    "transform.reverse",
+    "transform.phase_cycles",
+    "lissajous_ratio",
+):
+    _path_path = f"template.template.steps.movement.physical.{_path_field}"
+    CONFIG_EFFECTS[_path_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/compile/test_physical_paths.py::"
+        f"test_path_field_changes_compile[{_path_path}]",
+        _PHYSICAL_TEMPLATE_COMPILED,
+    )
+
+# P2.4b visibility envelopes and attribute overlays: a step's lit window and the
+# template's temporary wheel states. They feed only the opt-in physical compile; each
+# exact path mutates its field and must change the compiled cues or be refused. The
+# profile's `discrete.open_state`, identity-only until now, is what an envelope step
+# without a static shutter state is lit through; its records are repointed here.
+for _visibility_path, _note in {
+    "template.template.steps.physical_visibility": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_visibility.visible_phase_start": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_visibility.visible_phase_end": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_visibility.attack_beats": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_visibility.release_beats": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_visibility.level": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.physical_overlays": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.physical_overlays.start_beats": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.physical_overlays.end_beats": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.physical_overlays.mask_beats": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.physical_overlays.channel": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.physical_overlays.state": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.physical_overlays.attribute_preset_id": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.physical_overlays.release": _PHYSICAL_TEMPLATE_REJECTED,
+}.items():
+    CONFIG_EFFECTS[_visibility_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/compile/test_visibility.py::"
+        f"test_visibility_field_changes_compile[{_visibility_path}]",
+        _note,
+    )
+for _profile_root in (
+    "fixture.fixtures[FixtureInstance].config.physical_profile",
+    "fixture.base_config.physical_profile",
+):
+    _open_state_path = f"{_profile_root}.discrete.open_state"
+    CONFIG_EFFECTS[_open_state_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/compile/test_visibility.py::"
+        f"test_open_state_changes_the_lit_shutter[{_open_state_path}]",
+        _PHYSICAL_TEMPLATE_COMPILED,
+    )
+
+# P2.5 zoom pilot: a step's beam angle on a profile's zoom axis. It feeds only the opt-in
+# physical compile; each exact path mutates its field and must change the cues compiled
+# on a zoom rig and a zoomless one, or be refused (`if_unsupported` back at `error` on the
+# zoomless rig). The profile's `axes.dmx_min`/`dmx_max` and the initial state's
+# `zoom_deg` are evidenced with the other profile and initial-state paths above.
+for _zoom_path, _note in {
+    "template.template.steps.physical_zoom": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_zoom.shape": _PHYSICAL_TEMPLATE_REJECTED,
+    "template.template.steps.physical_zoom.start_deg": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_zoom.extent_deg": _PHYSICAL_TEMPLATE_COMPILED,
+    "template.template.steps.physical_zoom.if_unsupported": _PHYSICAL_TEMPLATE_REJECTED,
+}.items():
+    CONFIG_EFFECTS[_zoom_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/export/test_optical_axis.py::"
+        f"test_zoom_field_changes_compile[{_zoom_path}]",
+        _note,
     )
 
 # Exact App/Job discriminators. These overrides prevent stale generic smoke-test

@@ -27,6 +27,7 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
     PhysicalPoint,
     RenderLock,
     TransitionDiagnostic,
+    TransitionStatus,
 )
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
@@ -34,6 +35,7 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
     TRANSACTION_METADATA_KEY,
     FailureMode,
     PrepositionResult,
+    follow_lag,
     plan_prepositions,
 )
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
@@ -653,6 +655,51 @@ def test_visible_cue_at_time_zero_needs_the_initial_state_to_already_match() -> 
     assert _at(_plan(dark_cue, profile, _initial()), 0).status == "feasible"
 
 
+@pytest.mark.parametrize("dark", [True, False])
+def test_a_lit_cue_at_time_zero_that_needs_a_move_is_dropped_under_drop_accent(
+    dark: bool,
+) -> None:
+    """Nothing is pre-rolled before time zero, so a lit cue there that must move first
+    cannot play; the reason says so, and dropping it keeps the head dark, which is safe."""
+    profile = _profile()
+    initial = _initial(dark=dark)
+    cues = [_opt_in(_cue("A", 0, 200, pan=45.0), "drop_accent"), _cue("B", 1200, 1400, pan=45.0)]
+
+    refused = _plan(cues, profile, initial)
+    assert _at(refused, 0).code == "infeasible_transition"
+    assert "time zero" in _at(refused, 0).reason
+    assert "darkness is never established" not in _at(refused, 0).reason
+
+    result = _plan(cues, profile, initial, mode="drop_accent")
+    assert _at(result, 0).status == "drop_accent"
+    assert _at(result, 1200).status == "feasible"
+    assert_honest_transactions(result, cues, profile, initial)
+
+
+@pytest.mark.parametrize(
+    "visibility",
+    [
+        pytest.param({"close_latency_ms": None}, id="unknown-close-latency"),
+        pytest.param(
+            {"dimmer_zero_extinguishes": False, "extinguishing_shutter_states": []},
+            id="no-darkness",
+        ),
+    ],
+)
+def test_a_lit_cue_at_time_zero_is_never_dropped_where_darkness_cannot_be_established(
+    visibility: dict[str, Any],
+) -> None:
+    """Dropping a time-zero cue is safe only when darkness can follow; without it the
+    failure stays the non-substitutable missing-darkness one."""
+    profile = _profile(visibility=visibility)
+    cues = [_opt_in(_cue("A", 0, 200, pan=45.0), "drop_accent")]
+
+    result = _plan(cues, profile, _initial(dark=False), mode="drop_accent")
+
+    assert _at(result, 0).status == "error"
+    assert "time zero" not in _at(result, 0).reason
+
+
 def test_unknown_initial_state_is_never_planned_around() -> None:
     profile = _profile()
     cue = _opt_in(_cue("A", 1000, 1200, pan=90.0), "drop_accent")
@@ -936,3 +983,208 @@ def test_a_cue_without_its_pose_is_rejected() -> None:
 
     with pytest.raises(ValueError, match="tilt"):
         _plan([cue], _profile(), _initial())
+
+
+def _coarse_pan(word_ms: float) -> FixtureCapabilities:
+    """`_profile` with an 8-bit pan whose one word takes `word_ms` to travel."""
+
+    def coarse(payload: dict[str, Any]) -> None:
+        pan = payload["axes"]["pan"]
+        pan.pop("fine_offset")
+        pan["travel_speed_per_s"] = 540 / 255 * 1000 / word_ms
+
+    return _profile(edit=coarse)
+
+
+def _pan_path(values: list[float]) -> FixtureSegment:
+    t1 = 20 * len(values)
+    points = (*(PhysicalPoint(t_ms=20 * i, value=v) for i, v in enumerate(values)),)
+    points += (PhysicalPoint(t_ms=t1, value=values[-1]),)
+    pan = ContinuousTrajectory(unit="degree", points=points, interpolation="linear")
+    return physical_segment({_PAN: pan, _TILT: _line(0.0, 0, t1)}, t0_ms=0, t1_ms=t1)
+
+
+@pytest.mark.parametrize(
+    ("word_ms", "shape", "refused"),
+    [
+        pytest.param(21.0, "wobble", True, id="wobble-word-just-over-a-frame"),
+        pytest.param(19.0, "wobble", False, id="wobble-word-just-under-a-frame"),
+        pytest.param(20.5, "jump", True, id="two-words-just-over-one-behind"),
+        pytest.param(19.0, "jump", False, id="two-words-just-under-one-behind"),
+    ],
+)
+def test_follow_lag_refuses_only_motion_the_head_falls_a_word_behind(
+    word_ms: float, shape: str, refused: bool
+) -> None:
+    """At the boundary: straddling a word edge every frame trails by one more millisecond
+    a frame when a word takes 21 ms and never when it takes 19 ms; a two-word step in one
+    frame leaves the head 21 ms behind the next frame (more than a 20.5 ms word) or 18 ms
+    (less than a 19 ms one)."""
+    profile = _coarse_pan(word_ms)
+    axis = profile.axes["pan"]
+    if shape == "wobble":
+        low, high = 0.0, 5.0  # the first word edge above 0 degrees
+        while high - low > 1e-9:
+            middle = (low + high) / 2
+            low, high = (
+                (middle, high) if axis.dmx_word(middle) == axis.dmx_word(0.0) else (low, middle)
+            )
+        values = [low - 0.01 if i % 2 else high + 0.01 for i in range(40)]
+    else:
+        values = [0.0] + [2 * 540 / 255] * 5  # one word apart from the next word
+        assert axis.dmx_word(values[1]) - axis.dmx_word(0.0) == 2
+    lag = follow_lag(_pan_path(values), profile, frame_ms=20)
+    assert (lag is not None) == refused, lag
+    if lag is not None:
+        assert lag[0] == _PAN and "words/s" in lag[2]
+
+
+# --- Authored darkness across a continuation (P2.2 review M2) ----------------------------
+
+
+def _moving(
+    name: str, t0: int, t1: int, start: float, end: float, levels: tuple[tuple[int, float], ...]
+) -> FixtureSegment:
+    """A lit-shutter cue panning linearly from `start` to `end` with dimmer `levels`."""
+    pan = ContinuousTrajectory(
+        unit="degree",
+        points=(PhysicalPoint(t_ms=t0, value=start), PhysicalPoint(t_ms=t1, value=end)),
+        interpolation="linear",
+    )
+    dimmer = ContinuousTrajectory(
+        unit="normalized",
+        points=tuple(PhysicalPoint(t_ms=t, value=v) for t, v in levels),
+        interpolation="hold",
+    )
+    return physical_segment(
+        {
+            _PAN: pan,
+            _TILT: _line(0.0, t0, t1),
+            _DIMMER: dimmer,
+            _SHUTTER: _states((t0, "open")),
+            _COLOR: _states((t0, "white")),
+        },
+        t0_ms=t0,
+        t1_ms=t1,
+        segment_id=name,
+        section_id=name,
+    )
+
+
+_SETTLING = {"settle_ms": 40}
+"""720 degrees/s with a 40 ms settle: a frame's command at 1380 ms settles at 1427."""
+
+
+def test_a_continuation_dark_by_its_own_dimmer_relights_on_its_authored_motion() -> None:
+    """A pans at 250 degrees/s and goes dark at 1300 ms; B continues the pan back to back,
+    dark on its own first frame and lit from 1420 ms. At 1420 the head is still settling
+    from A's 1380 ms command, but nothing hid anything: no transaction ran, the head only
+    followed the cues' own continuous path, exactly as it would had the dimmer stayed lit.
+    The oracle accepts it (it once rejected it: "pan motion from 1380 ms leaks to 1420")."""
+    profile = _profile(pan=_SETTLING)
+    a = _moving("A", 1000, 1400, 0.0, 100.0, ((1000, 1.0), (1300, 0.0)))
+    b = _moving("B", 1400, 1800, 100.0, 200.0, ((1400, 0.0), (1420, 1.0)))
+
+    result = _plan([a, b], profile, _initial())
+
+    assert _at(result, 1400).reason == "continues the previous cue without a gap"
+    assert_honest_transactions(result, [a, b], profile, _initial())
+
+
+def _doctored(
+    planned: PrepositionResult,
+    segments: tuple[FixtureSegment, ...],
+    statuses: dict[int, TransitionStatus],
+) -> PrepositionResult:
+    """`planned` with other segments and one diagnostic per cue start in `statuses`."""
+    template = planned.diagnostics[0]
+    diagnostics = tuple(
+        template.model_copy(update={"cue_ms": cue_ms, "status": status, "code": None})
+        for cue_ms, status in statuses.items()
+    )
+    return planned.model_copy(update={"segments": segments, "diagnostics": diagnostics})
+
+
+def _dark_hold(t0: int, t1: int, pan: float) -> FixtureSegment:
+    return physical_segment(
+        {
+            _PAN: _line(pan, t0, t1),
+            _TILT: _line(0.0, t0, t1),
+            _DIMMER: ContinuousTrajectory(
+                unit="normalized", points=(PhysicalPoint(t_ms=t0, value=0.0),), interpolation="hold"
+            ),
+            _SHUTTER: _states((t0, "closed")),
+            _COLOR: _states((t0, "white")),
+        },
+        t0_ms=t0,
+        t1_ms=t1,
+        segment_id="T/preposition",
+        section_id="T",
+    )
+
+
+def test_a_dark_gap_that_hides_the_previous_cues_settling_is_still_a_leak() -> None:
+    """The nearest real leak: the same pan A, then a one-frame dark transaction holding its
+    aim, then B lit at 1420 ms at that aim while A's last command is still settling. The
+    darkness is the planner's, so the relight shows travel nobody authored as lit."""
+    profile = _profile(pan=_SETTLING)
+    a = _moving("A", 1000, 1400, 0.0, 100.0, ((1000, 1.0), (1300, 0.0)))
+    b = _moving("B", 1420, 1800, 95.0, 95.0, ((1420, 1.0),))
+    planned = _plan([a, b], profile, _initial())  # the planner itself waits: B is refused
+    assert planned.has_errors
+    before = _plan([a], profile, _initial(), end_ms=1400)  # the transaction into A, and A
+    assert [s.segment_id for s in before.segments] == ["A/preposition", "A"]
+    doctored = _doctored(
+        before,
+        (*before.segments, _dark_hold(1400, 1420, 95.0), b),
+        {1000: "feasible", 1420: "feasible"},
+    )
+
+    with pytest.raises(AssertionError, match="leaks to 1420"):
+        assert_honest_transactions(doctored, [a, b], profile, _initial())
+
+
+def test_a_dropped_cue_that_hides_the_previous_cues_settling_is_still_a_leak() -> None:
+    """As above, but the dark frame is a back-to-back cue the planner dropped: its frames
+    are dark by the planner's substitution, not by its own content."""
+    profile = _profile(pan=_SETTLING)
+    a = _moving("A", 1000, 1400, 0.0, 100.0, ((1000, 1.0), (1300, 0.0)))
+    dropped = _opt_in(_cue("D", 1400, 1420, pan=150.0), "drop_accent")
+    c = _moving("C", 1420, 1800, 95.0, 95.0, ((1420, 1.0),))
+    before = _plan([a], profile, _initial(), end_ms=1400)
+    doctored = _doctored(
+        before,
+        (*before.segments, _dark_hold(1400, 1420, 95.0), c),
+        {1000: "feasible", 1400: "drop_accent", 1420: "feasible"},
+    )
+
+    with pytest.raises(AssertionError, match="leaks to 1420"):
+        assert_honest_transactions(doctored, [a, dropped, c], profile, _initial())
+
+
+def test_a_wheel_turning_inside_a_lit_cue_is_dishonest() -> None:
+    """One lit cue whose own content turns the colour wheel at 1100 ms: the planner leaves
+    a cue's content as authored, so the oracle must reject the lit turn itself (it once
+    checked a cue's own wheel changes only for a later relight)."""
+    profile = _profile(edit=lambda p: p["discrete"]["color"]["states"]["red"].update(settle_ms=40))
+    level = ContinuousTrajectory(
+        unit="normalized", points=(PhysicalPoint(t_ms=1000, value=1.0),), interpolation="hold"
+    )
+    cue = physical_segment(
+        {
+            _PAN: _line(0.0, 1000, 1400),
+            _TILT: _line(0.0, 1000, 1400),
+            _DIMMER: level,
+            _SHUTTER: _states((1000, "open")),
+            _COLOR: _states((1000, "white"), (1100, "red")),
+        },
+        t0_ms=1000,
+        t1_ms=1400,
+        segment_id="A",
+        section_id="A",
+    )
+    result = _plan([cue], profile, _initial())
+    assert _at(result, 1000).status == "feasible"
+
+    with pytest.raises(AssertionError, match="color turns at 1100 ms and is lit at 1100 ms"):
+        assert_honest_transactions(result, [cue], profile, _initial())

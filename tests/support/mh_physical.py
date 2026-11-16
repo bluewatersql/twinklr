@@ -1,6 +1,9 @@
 """Synthetic physical-renderer inputs: a fixture profile, a known initial state,
-physical fixture segments, and the P1.6 pipeline case (rig, grid, job, plan and the
-test-only template).
+physical fixture segments, the P1.6 pipeline case (rig, grid, job, plan and the
+test-only template), rig presets with steps that reference them, multi-head rigs
+with a topology, steps on relative paths, visibility envelopes and attribute overlays,
+the physical family catalog with a rig and job for it, and the synthetic 16-channel zoom
+pilot profile with a rig and job for it.
 
 In-memory payloads only; no owner profile or measured data.
 """
@@ -9,6 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+import copy
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
@@ -30,6 +34,7 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
     PhysicalValue,
     RenderLock,
 )
+from twinklr.core.sequencer.models.template import TemplateDoc
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.preposition import PrepositionResult
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
@@ -38,6 +43,7 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
 )
 from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
+    PHYSICAL_TEMPLATE_DIR,
     load_template_document,
     load_templates_from_directory,
 )
@@ -288,6 +294,116 @@ def physical_test_templates() -> Iterator[None]:
             REGISTRY._remove_registration(template_id)
 
 
+FAMILY_IDS = (
+    "finite_snap_hold",
+    "fly_in_cascade",
+    "fly_out_cascade",
+    "masked_wheel_flick",
+    "mirror_wings",
+    "target_orbit",
+)
+"""The physical families a zoomless rig can be offered (P2.4c), sorted."""
+ZOOM_FAMILY_ID = "zoom_wave"
+"""The zoom pilot family (P2.5), left out on a rig without a zoom axis."""
+CATALOG_IDS = tuple(sorted((*FAMILY_IDS, ZOOM_FAMILY_ID)))
+"""The whole physical family catalog (`PHYSICAL_TEMPLATE_DIR`), sorted."""
+
+
+@contextmanager
+def physical_catalog(*, admit: bool = True) -> Iterator[list[str]]:
+    """Admit the physical family catalog to the shared registry for one test (with
+    `admit=False`, leave that to the code under test) and restore the registry on exit:
+    every template registered inside the block is removed again."""
+    load_builtin_templates()
+    before = {info.template_id for info in REGISTRY.list_all()}
+    try:
+        yield load_templates_from_directory(PHYSICAL_TEMPLATE_DIR) if admit else []
+    finally:
+        for info in REGISTRY.list_all():
+            if info.template_id not in before:
+                REGISTRY._remove_registration(info.template_id)
+
+
+def family_rig(
+    fixture_ids: Sequence[str], *, topology: bool = True, presets: bool = True
+) -> FixtureGroup:
+    """`topology_rig` of `fixture_ids` with a declared topology and the `flick` attribute
+    preset `masked_wheel_flick` names (red, else blue on every other head), or without."""
+    library = {
+        "positions": {},
+        "attributes": {
+            "flick": {
+                "fixtures": {
+                    fixture_id: {"color": "red" if index % 2 == 0 else "blue"}
+                    for index, fixture_id in enumerate(fixture_ids)
+                }
+            }
+        },
+    }
+    return topology_rig(
+        fixture_ids,
+        topology=topology_payload(fixture_ids) if topology else None,
+        presets=library if presets else None,
+    )
+
+
+def family_job(fixture_ids: Sequence[str], **policy: Any) -> JobConfig:
+    """`physical_job` with every head of `fixture_ids` in the known dark initial state."""
+    return physical_job(initial_states=dict.fromkeys(fixture_ids, PHYSICAL_INITIAL_STATE), **policy)
+
+
+ZOOM_INITIAL_STATE = {**PHYSICAL_INITIAL_STATE, "zoom_deg": 10.0}
+"""`PHYSICAL_INITIAL_STATE` with the zoom at its narrowest, for a rig with a zoom axis."""
+
+
+def zoom_pilot_profile_payload(*, inverted: bool = False) -> dict[str, Any]:
+    """SYNTHETIC zoom pilot profile, prepared for future owner validation (P2.5).
+
+    Not a real fixture: no manufacturer or measured value is in it. It is laid out for
+    a 16-channel DMX model, as the owner's moving-head models are, with every offset in
+    1-16: 16-bit pan 1/2 and tilt 3/4, dimmer 5, shutter 6, color 7, gobo 8, and an
+    8-bit zoom on 9 whose 10°-40° beam angle maps over bytes 20-220 (`dmx_min`/`dmx_max`)
+    at a configured 90°/s with 40 ms settle; 10-16 are spare. Otherwise it is
+    `physical_head_profile`. Accepting it for a real fixture is `PENDING-OWNER`.
+    """
+    payload = physical_head_profile(inverted=False)
+    payload.update(profile_id="synthetic_zoom_pilot_16ch", footprint=16)
+    payload["defaults"] = dict.fromkeys(range(1, 17), 0) | {
+        1: 128,
+        3: 128,
+        6: 64,  # shutter closed
+        9: 20,  # zoom at 10°
+    }
+    payload["discrete"]["shutter"]["offset"] = 6
+    payload["discrete"]["gobo"]["offset"] = 8
+    payload["axes"]["zoom"] = {
+        "unit": "degree",
+        "physical_min": 10.0,
+        "physical_max": 40.0,
+        "dmx_min": 20,
+        "dmx_max": 220,
+        "coarse_offset": 9,
+        "inverted": inverted,
+        "travel_speed_per_s": 90.0,
+        "latency_ms": 0,
+        "settle_ms": 40,
+    }
+    return payload
+
+
+def zoom_rig(fixture_ids: Sequence[str], *, topology: bool = True) -> FixtureGroup:
+    """`family_rig` of `fixture_ids` with every head on `zoom_pilot_profile_payload`."""
+    payload = family_rig(fixture_ids, topology=topology).model_dump(mode="json")
+    for fixture in payload["fixtures"]:
+        fixture["config"]["physical_profile"] = zoom_pilot_profile_payload()
+    return FixtureGroup.model_validate(payload)
+
+
+def zoom_job(fixture_ids: Sequence[str], **policy: Any) -> JobConfig:
+    """`physical_job` with every head of `fixture_ids` in `ZOOM_INITIAL_STATE`."""
+    return physical_job(initial_states=dict.fromkeys(fixture_ids, ZOOM_INITIAL_STATE), **policy)
+
+
 def physical_grid() -> BeatGrid:
     """P0's variable-tempo grid (500 ms beats, then 400 ms), moved off the frame grid."""
     tempo = synthetic_case("tempo").beat_grid
@@ -300,6 +416,221 @@ def physical_grid() -> BeatGrid:
         tempo_bpm=tempo.tempo_bpm,
         beats_per_bar=tempo.beats_per_bar,
         duration_ms=tempo.duration_ms + GRID_SHIFT_MS,
+    )
+
+
+def physical_edge_grid(
+    *, lead_in_ms: float, tail_ms: float, grid: BeatGrid | None = None
+) -> BeatGrid:
+    """`grid` (default `physical_grid()`) with silent song edges: its beats and bars move
+    `lead_in_ms` later and the song ends `tail_ms` after its last beat."""
+    grid = grid or physical_grid()
+    beats = [beat + lead_in_ms for beat in grid.beat_boundaries]
+    return grid.model_copy(
+        update={
+            "bar_boundaries": [bar + lead_in_ms for bar in grid.bar_boundaries],
+            "beat_boundaries": beats,
+            "eighth_boundaries": BeatGrid._calculate_eighth_boundaries(beats),
+            "sixteenth_boundaries": BeatGrid._calculate_sixteenth_boundaries(beats),
+            "duration_ms": beats[-1] + tail_ms,
+        }
+    )
+
+
+def physical_bars_grid(*beat_ms: float) -> BeatGrid:
+    """A 4/4 grid moved `GRID_SHIFT_MS` off the frame grid, whose nth bar has four beats of
+    `beat_ms[n]`; the song ends `GRID_SHIFT_MS` after its last beat."""
+    beats = [GRID_SHIFT_MS]
+    for interval in beat_ms:
+        beats += [beats[-1] + interval * (index + 1) for index in range(4)]
+    return BeatGrid(
+        bar_boundaries=beats[::4],
+        beat_boundaries=beats,
+        eighth_boundaries=BeatGrid._calculate_eighth_boundaries(beats),
+        sixteenth_boundaries=BeatGrid._calculate_sixteenth_boundaries(beats),
+        tempo_bpm=60_000 / beat_ms[0],
+        beats_per_bar=4,
+        duration_ms=beats[-1] + GRID_SHIFT_MS,
+    )
+
+
+def hold_step(
+    step_id: str,
+    pan: float,
+    *,
+    tilt: float = 0.0,
+    start: float = 0.0,
+    duration: float = 1.0,
+    **fields: Any,
+) -> dict[str, Any]:
+    """A lit physical step holding one aim over `duration` bars from `start` bars."""
+    return {
+        "step_id": step_id,
+        "timing": {"base_timing": {"start_offset_bars": start, "duration_bars": duration}},
+        "geometry": {},
+        "movement": {
+            "physical": {
+                "shape": "hold",
+                "mode": "periodic",
+                "start_pan_deg": pan,
+                "start_tilt_deg": tilt,
+            }
+        },
+        "dimmer": {"physical": {"period_beats": 4.0, "duty_cycle": 1.0, "low": 0.0, "high": 1.0}},
+        "physical_shutter_state": "open",
+        **fields,
+    }
+
+
+def sweep_step(
+    step_id: str, pan: float, extent: float, *, period_beats: float = 4.0, **fields: Any
+) -> dict[str, Any]:
+    """`hold_step` whose pan moves linearly by `extent` over `period_beats`, then holds."""
+    step = hold_step(step_id, pan, **fields)
+    step["movement"]["physical"].update(
+        shape="linear", mode="finite", pan_extent_deg=extent, period_beats=period_beats
+    )
+    return step
+
+
+def path_step(
+    step_id: str,
+    shape: str,
+    *,
+    pan: float = 0.0,
+    tilt: float = 0.0,
+    pan_extent: float = 20.0,
+    tilt_extent: float | None = None,
+    period_beats: float = 4.0,
+    mode: str = "periodic",
+    transform: dict[str, Any] | None = None,
+    **fields: Any,
+) -> dict[str, Any]:
+    """`hold_step` moving on a relative `circle`, `lissajous` or `sweep` path about its aim,
+    with an optional path `transform`. The tilt extent defaults to 10, or 0 for a sweep,
+    which moves along pan."""
+    step = hold_step(step_id, pan, tilt=tilt, **fields)
+    if tilt_extent is None:
+        tilt_extent = 0.0 if shape == "sweep" else 10.0
+    step["movement"]["physical"].update(
+        shape=shape,
+        mode=mode,
+        pan_extent_deg=pan_extent,
+        tilt_extent_deg=tilt_extent,
+        period_beats=period_beats,
+    )
+    if transform is not None:
+        step["movement"]["physical"]["transform"] = transform
+    return step
+
+
+def envelope_step(
+    step_id: str,
+    pan: float,
+    extent: float,
+    *,
+    lit: tuple[float, float],
+    attack: float = 0.0,
+    release: float = 0.0,
+    level: float = 1.0,
+    period_beats: float = 4.0,
+    **fields: Any,
+) -> dict[str, Any]:
+    """`sine_step` lit only over the movement phases `lit` by a visibility envelope, which
+    replaces its dimmer; the shutter holds `open`."""
+    step = sine_step(step_id, pan, extent, period_beats=period_beats, **fields)
+    step["dimmer"] = {}
+    step["physical_visibility"] = {
+        "visible_phase_start": lit[0],
+        "visible_phase_end": lit[1],
+        "attack_beats": attack,
+        "release_beats": release,
+        "level": level,
+    }
+    return step
+
+
+def overlay(
+    channel: str, start: float, end: float, mask: float, state: str | None = None, **fields: Any
+) -> dict[str, Any]:
+    """An attribute overlay on `channel` over beats `[start, end)` of each cycle."""
+    payload = {
+        "channel": channel,
+        "start_beats": start,
+        "end_beats": end,
+        "mask_beats": mask,
+        **fields,
+    }
+    if state is not None:
+        payload["state"] = state
+    return payload
+
+
+def physical_template_doc(
+    template_id: str,
+    steps: Sequence[dict[str, Any]],
+    *,
+    cycle_bars: float = 1.0,
+    mode: str = "JOINER",
+    remainder_policy: str = "HOLD_LAST_POSE",
+    overlays: Sequence[dict[str, Any]] = (),
+) -> TemplateDoc:
+    """A physical template looping every step once per `cycle_bars` (JOINER by default),
+    with optional attribute `overlays`."""
+    template: dict[str, Any] = {
+        "template_id": template_id,
+        "version": 1,
+        "name": template_id,
+        "category": "low_energy",
+        "repeat": {
+            "mode": mode,
+            "cycle_bars": cycle_bars,
+            "loop_step_ids": [step["step_id"] for step in steps],
+            "remainder_policy": remainder_policy,
+        },
+        "steps": list(steps),
+        "metadata": {
+            "tags": ["test_only", "physical_v2"],
+            "recommended_sections": ["verse"],
+            "energy_range": [0, 100],
+            "description": "Test-only physical template, never in the catalog.",
+        },
+    }
+    if overlays:
+        template["physical_overlays"] = list(overlays)
+    return TemplateDoc.model_validate({"template": template})
+
+
+@contextmanager
+def registered_templates(*documents: TemplateDoc) -> Iterator[None]:
+    """Register test-only template documents for one test, then remove them again."""
+    load_builtin_templates()
+    added: list[str] = []
+    try:
+        for document in documents:
+            if REGISTRY.register_document(document):
+                added.append(document.template.template_id)
+        yield
+    finally:
+        for template_id in added:
+            REGISTRY._remove_registration(template_id)
+
+
+def physical_sections(*sections: tuple[str, int, int]) -> ChoreographyPlan:
+    """A plan of `(template_id, start_bar, end_bar)` sections, no planner intent."""
+    return ChoreographyPlan(
+        sections=[
+            PlanSection.model_validate(
+                {
+                    "section_name": f"s{index}",
+                    "start_bar": start,
+                    "end_bar": end,
+                    "template_id": template_id,
+                    "preset_id": None,
+                }
+            )
+            for index, (template_id, start, end) in enumerate(sections, start=1)
+        ]
     )
 
 
@@ -321,6 +652,145 @@ def physical_rig(*, mh1_pan_max: float = 270.0) -> FixtureGroup:
             inverted=not mh1, pan_max=mh1_pan_max if mh1 else 270.0
         )
     return FixtureGroup.model_validate(payload)
+
+
+def preset_library_payload() -> dict[str, Any]:
+    """Rig presets for `physical_rig`'s two heads, in its profile's state names.
+
+    `front` and `wash` declare MH1 only and fall back to `home` and `wash_all` for MH2;
+    `side` and `cool` declare both heads.
+    """
+    return {
+        "positions": {
+            "front": {
+                "fixtures": {"MH1": {"pan_deg": -30.0, "tilt_deg": 20.0}},
+                "fallback": "home",
+            },
+            "home": {
+                "fixtures": {
+                    "MH1": {"pan_deg": 0.0, "tilt_deg": 0.0},
+                    "MH2": {"pan_deg": 10.0, "tilt_deg": 5.0},
+                }
+            },
+            "side": {
+                "fixtures": {
+                    "MH1": {"pan_deg": 60.0, "tilt_deg": 30.0},
+                    "MH2": {"pan_deg": -60.0, "tilt_deg": 30.0},
+                }
+            },
+        },
+        "attributes": {
+            "wash": {
+                "fixtures": {
+                    "MH1": {"shutter": "open", "color": "red", "gobo": "dots", "dimmer": 0.8}
+                },
+                "fallback": "wash_all",
+            },
+            "wash_all": {
+                "fixtures": {
+                    "MH1": {"shutter": "open", "color": "white", "gobo": "open", "dimmer": 1.0},
+                    "MH2": {"shutter": "open", "color": "blue", "gobo": "star", "dimmer": 0.6},
+                }
+            },
+            "cool": {"fixtures": {"MH1": {"color": "blue"}, "MH2": {"color": "white"}}},
+        },
+    }
+
+
+def physical_preset_rig(presets: dict[str, Any] | None = None) -> FixtureGroup:
+    """`physical_rig` carrying `presets` (default `preset_library_payload()`)."""
+    payload = physical_rig().model_dump(mode="python")
+    payload["presets"] = preset_library_payload() if presets is None else presets
+    return FixtureGroup.model_validate(payload)
+
+
+def referencing_step(
+    step_id: str = "look",
+    *,
+    position_id: str | None = "front",
+    attribute_preset_ids: Sequence[str] = ("wash",),
+    start: float = 0.0,
+    duration: float = 1.0,
+    **fields: Any,
+) -> dict[str, Any]:
+    """A physical hold step whose aim and held states come from rig presets alone."""
+    return {
+        "step_id": step_id,
+        "timing": {"base_timing": {"start_offset_bars": start, "duration_bars": duration}},
+        "geometry": {},
+        "movement": {"physical": {"shape": "hold", "mode": "periodic"}},
+        "dimmer": {},
+        "component_refs": {
+            "position_id": position_id,
+            "attribute_preset_ids": list(attribute_preset_ids),
+        },
+        **fields,
+    }
+
+
+def topology_payload(
+    fixture_ids: Sequence[str], *, rows: Sequence[int] | None = None
+) -> dict[str, Any]:
+    """A topology listing `fixture_ids` in canonical order: column and ordinal are each
+    head's index, row is 0 or `rows[index]`."""
+    return {
+        "members": [
+            {
+                "fixture_id": fixture_id,
+                "row": 0 if rows is None else rows[index],
+                "column": index,
+                "ordinal": index,
+            }
+            for index, fixture_id in enumerate(fixture_ids)
+        ]
+    }
+
+
+def topology_rig(
+    fixture_ids: Sequence[str],
+    *,
+    topology: dict[str, Any] | None = None,
+    position_indexes: Sequence[int] | None = None,
+    presets: dict[str, Any] | None = None,
+) -> FixtureGroup:
+    """A rig of `fixture_ids` heads, each `physical_rig`'s MH1 (one non-inverted profile),
+    with an optional declared `topology`, `position.position_index` per head and presets."""
+    payload = physical_rig().model_dump(mode="python")
+    head = payload["fixtures"][0]
+    fixtures = []
+    for index, fixture_id in enumerate(fixture_ids):
+        fixture = copy.deepcopy(head)
+        fixture["fixture_id"] = fixture["config"]["fixture_id"] = fixture_id
+        fixture["xlights_model_name"] = f"Dmx {fixture_id}"
+        if position_indexes is not None:
+            fixture["config"]["position"] = {"position_index": position_indexes[index]}
+        fixtures.append(fixture)
+    payload["fixtures"] = fixtures
+    if topology is not None:
+        payload["topology"] = topology
+    if presets is not None:
+        payload["presets"] = presets
+    return FixtureGroup.model_validate(payload)
+
+
+def sine_step(
+    step_id: str,
+    pan: float,
+    extent: float,
+    *,
+    period_beats: float = 4.0,
+    distribution: Sequence[dict[str, Any]] = (),
+    **fields: Any,
+) -> dict[str, Any]:
+    """`hold_step` whose pan swings `extent * sin(2*pi*phase)` over `period_beats`, with
+    an optional `physical_distribution`."""
+    step = hold_step(step_id, pan, **fields)
+    step["movement"]["physical"].update(
+        shape="sine_pan", mode="periodic", pan_extent_deg=extent, period_beats=period_beats
+    )
+    if distribution:
+        step["physical_distribution"] = list(distribution)
+    return step
 
 
 def physical_job(**policy: Any) -> JobConfig:
@@ -395,7 +865,7 @@ def assert_honest_transactions(
 ) -> None:
     """Check one fixture of a planned result from its encoded bytes and the profile alone.
 
-    The head follows its commands: a pan/tilt word change at frame time `c` is reached
+    The head follows its commands: a pan, tilt or zoom word change at frame time `c` is reached
     at `max(previous arrival, c + latency_ms) + word distance / travel_speed_per_s` and
     settled `settle_ms` later; a wheel change settles its new state's `settle_ms` after
     `c`; an unknown value never settles. A frame is optically lit unless it is
@@ -406,11 +876,16 @@ def assert_honest_transactions(
 
     Asserted: the result encodes with the full footprint and covers every frame up to
     its end; a feasible cue's frames equal the cue encoded alone, a `preserve_aim` cue
-    changes only its held pose, a dropped cue is commanded dark; no change outside a
-    cue's own content moves or settles in a lit frame; a cue's own motion still under
-    way when light returns after it went dark past its end is a leak; back-to-back cues
+    changes only its held pose, a dropped cue is commanded dark; no wheel turns or
+    settles in a lit frame, inside a cue or not; no pose change outside a cue's own
+    content moves or settles in a lit frame; a cue's own motion still under
+    way when light returns after the planner darkened the fixture past its end (a
+    transaction, a park or a substituted cue; not a following cue's own dark frames) is a
+    leak; back-to-back cues
     step within one frame's travel and keep their wheels; a lit cue after a transaction
-    reveals on its own frame; no locked frame differs from the cues alone.
+    reveals on its own frame; no locked frame differs from the cues alone. A zoom axis is
+    held through every gap between cues, moving only toward the next cue's first word,
+    and is settled, like pan and tilt, before any reveal.
     """
     assert not result.has_errors, result.diagnostics
     outputs = [s for s in result.segments if s.fixture_id == fixture_id]
@@ -504,13 +979,17 @@ def assert_honest_transactions(
         return "transition"
 
     def relit_after(cue: FixtureSegment) -> int | None:
-        """The first lit frame after a commanded-dark frame, both at or after the cue's end."""
+        """The first lit frame after a frame the planner darkened, both at or after the
+        cue's end. A frame a cue played as authored commands dark itself hides nothing:
+        there the head follows the cues' own path, as it would were the frame lit."""
         seen_dark = False
         for index in range(cue.t1_ms // EFFECT_GRID_MS, count):
-            if commanded_dark[index]:
+            here = cue_at[index]
+            if not commanded_dark[index]:
+                if seen_dark:
+                    return times[index]
+            elif here is None or status.get(here.t0_ms) != "feasible":
                 seen_dark = True
-            elif seen_dark:
-                return times[index]
         return None
 
     def check_busy(index: int, busy_end: Fraction, what: str) -> None:
@@ -527,17 +1006,43 @@ def assert_honest_transactions(
             assert hit is None, f"{what} motion from {change} ms in {cue.segment_id} leaks to {hit}"
 
     initial_words: dict[int, int] = {}
+    pose = {"pan": initial.pan_deg, "tilt": initial.tilt_deg, "zoom": initial.zoom_deg}
     for name, axis in profile.axes.items():
-        if name in ("pan", "tilt"):
-            word = axis.dmx_word(initial.pan_deg if name == "pan" else initial.tilt_deg)
-            initial_words |= _split(axis, word)
+        if name in pose:
+            value = pose[name]
+            assert value is not None, f"the initial state gives no {name}"
+            initial_words |= _split(axis, axis.dmx_word(value))
     for name, wheel in profile.discrete.items():
         initial_words[wheel.offset] = wheel.resolve(initial.discrete_states[name])
 
+    zoom = profile.axes.get("zoom")
+    if zoom is not None:
+        # Held through every gap: between cues the zoom only moves monotonically from where
+        # the last frame left it toward the next cue's first word, never to its default byte.
+        index = 0
+        while index < count:
+            if cue_at[index] is not None:
+                index += 1
+                continue
+            end = next((i for i in range(index, count) if cue_at[i] is not None), count)
+            before = _word(out[index - 1] if index else initial_words, zoom)
+            after = before if end == count else _word(out[end], zoom)
+            low, high = min(before, after), max(before, after)
+            words = [_word(out[i], zoom) for i in range(index, end)]
+            assert all(low <= w <= high for w in words), (
+                f"zoom leaves [{low}, {high}] in the gap at {times[index]} ms: {sorted(set(words))}"
+            )
+            assert words == sorted(words) or words == sorted(words, reverse=True), (
+                f"zoom turns back in the gap at {times[index]} ms"
+            )
+            index = end
+
     for name, axis in profile.axes.items():
-        if name not in ("pan", "tilt"):
+        if name not in pose:
             continue
-        per_word = (Fraction(axis.physical_max) - Fraction(axis.physical_min)) / axis.full_word
+        low_word, high_word = axis.word_range
+        span = Fraction(axis.physical_max) - Fraction(axis.physical_min)
+        per_word = span / (high_word - low_word)
         speed, latency, settle = axis.travel_speed_per_s, axis.latency_ms, axis.settle_ms
         arrival = Fraction(0)
         previous = _word(initial_words, axis)
@@ -569,15 +1074,21 @@ def assert_honest_transactions(
             previous = frame[wheel.offset]
             assert kind(index) != "continuation", f"{name} changes between back-to-back cues"
             selected = next(s for s in wheel.states.values() if s.value == previous)
-            # A wheel is masked when it turns, so even an instant one needs a dark frame.
+            # A wheel is masked when it turns, so even an instant one needs a dark frame;
+            # that holds inside a cue's own content too.
             settle_at = (
                 infinite
                 if selected.settle_ms is None
                 else Fraction(times[index] + max(selected.settle_ms, 1))
             )
-            check_busy(index, settle_at, name)
+            hit = lit_between(Fraction(times[index]), settle_at)
+            assert hit is None, f"{name} turns at {times[index]} ms and is lit at {hit} ms"
 
-    pose_offsets = [o for c in (ChannelName.PAN, ChannelName.TILT) for o in _offsets(profile, c)]
+    pose_offsets = [
+        o
+        for c in (ChannelName.PAN, ChannelName.TILT, ChannelName.ZOOM)
+        for o in _offsets(profile, c)
+    ]
     for cue in cues:
         span = range(cue.t0_ms // EFFECT_GRID_MS, cue.t1_ms // EFFECT_GRID_MS)
         cue_status = status.get(cue.t0_ms)

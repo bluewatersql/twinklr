@@ -693,6 +693,31 @@ class MHRenderPolicy(BaseModel):
             "Physical output only. A non-default value is part of render identity."
         ),
     )
+    # Left out of dumps at its default so legacy render fingerprints are unchanged.
+    reposition_fallback: Literal["error", "preserve_aim", "drop_accent"] = Field(
+        default="error",
+        exclude_if=lambda value: value == "error",
+        description=(
+            "What a physical render does with a cue whose dark repositioning cannot be "
+            "planned. `error` refuses the render; `preserve_aim` plays the cue at the aim "
+            "the head holds; `drop_accent` keeps it dark. A fallback applies only to cues "
+            "of steps that declare the same `physical_reposition_fallback`. A non-default "
+            "value is part of render identity."
+        ),
+    )
+    # Left out of dumps at its default so physical render fingerprints are unchanged.
+    on_unplayable: Literal["dark", "error"] = Field(
+        default="dark",
+        exclude_if=lambda value: value == "dark",
+        description=(
+            "What a physical render does with a cue the plan placed where it cannot play "
+            "honestly, after any reposition fallback the cue and the job both declare. "
+            "`dark` leaves the fixture dark over that cue, lists it in the trace's "
+            "dropped_cues and logs one warning with the counts; `error` refuses the "
+            "render. It never applies to what is refused before planning. A non-default "
+            "value is part of render identity."
+        ),
+    )
 
 
 class JobConfig(ConfigBase):

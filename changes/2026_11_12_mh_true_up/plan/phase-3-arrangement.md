@@ -68,6 +68,8 @@ One P3 implementer owns new `packages/twinklr/core/agents/sequencer/moving_heads
 
 ### P3-T2 — Capability projection and cache isolation
 
+Carried from Phase 2 kickoff, 2026-11-14 ([P2 carry-forwards](phase-2-composition.md#phase-1-carry-forwards)): under `physical_v2` a preset id the template does not declare applies no preset (`moving_heads/pipeline.py:295-321`); the projection exposes only declared family/variant pairs so the planner cannot name one. P2.4c's rig-aware admission already excludes templates the rig cannot render; the projection builds on its admitted list.
+
 **Files:** create `packages/twinklr/core/agents/sequencer/moving_heads/capability_projection.py`; modify `context.py`, `stage.py`, `orchestrator.py`; test `tests/unit/agents/sequencer/moving_heads/test_capability_projection.py`.
 
 **Interfaces:** `project_template_capabilities(documents:Sequence[TemplateDoc], capabilities:Mapping[str,FixtureCapabilities], *, presets:RigPresetLibrary, target_fixtures:Mapping[str,tuple[str,...]]) -> CapabilityProjection`. Keys of `target_fixtures` are named P2 position targets; each value explicitly identifies the fixtures intended to realize that target. Check each target exists in `presets` and supplies the required pose for every selected fixture. Reject unknown/empty fixture selections. Eligibility is evaluated per target/fixture set, not from an anonymous capabilities list.
@@ -82,6 +84,8 @@ Define frozen types in `packages/twinklr/core/agents/sequencer/moving_heads/capa
 - [ ] Integrator commits `feat: constrain moving-head planning to rig capabilities`; fresh review inspects exclusion/fallback semantics.
 
 ### P3-T3 — Motif resolution, restrained signals and compilation
+
+Carried from Phase 2 kickoff, 2026-11-14 ([P2 carry-forwards](phase-2-composition.md#phase-1-carry-forwards)): (1) bind planner intensity on the physical path, which Phase 1 and Phase 2 leave unapplied with a trace warning (`moving_heads/pipeline.py:736-749`), through the reach/rate variants P2.4c families declare as presets; (2) feed render feasibility (section-length-dependent failures such as a `ONCE` cycle cut by a short section) into heuristic validation so the refinement loop revises the plan instead of failing at render; (3) produce the typed section overrides P2.1 dropped from its precedence, through `apply_arrangement_to_step`.
 
 **Files:** create `packages/twinklr/core/agents/sequencer/moving_heads/arrangement.py`, `packages/twinklr/core/sequencer/moving_heads/compile/arrangement.py`; modify `packages/twinklr/core/config/models.py`, `heuristic_validator.py`, planner/judge prompts and pipeline integration; test `tests/unit/agents/sequencer/moving_heads/test_arrangement.py`.
 

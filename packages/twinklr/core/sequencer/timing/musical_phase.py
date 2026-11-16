@@ -2,10 +2,12 @@
 
 A `MusicalPhaseMap` maps time to a fractional beat index by piecewise-linear
 interpolation between knots. Observed beat starts are knots with indexes 0..n-1, kept
-verbatim. A `BeatGrid` stores beat starts, not a guaranteed song start or end, so the
-map covers `[0, duration_ms]` with labelled boundary knots: one adjacent observed
-interval may extend each edge (`adjacent_interval`); anything longer needs a
-caller-supplied `explicit` knot. No average tempo is ever inferred.
+verbatim. A `BeatGrid` stores beat starts, not a guaranteed song start or end, so each
+edge gets a labelled boundary knot: one adjacent observed interval beyond the outermost
+beat (`adjacent_interval`), at the song's edge when that is nearer, or a caller-supplied
+`explicit` knot. The map is defined only over its covered span, from its first knot to
+its last, inside `[0, duration_ms]`; a silent song edge beyond it has no phase. No
+average tempo is ever inferred.
 
 Phase is computed in exact rational arithmetic, inferred edges included, so phase at an
 observed beat is an exact integer. A knot's public `beat_index` is a float for
@@ -16,7 +18,7 @@ from __future__ import annotations
 
 import bisect
 from fractions import Fraction
-from functools import cached_property
+import functools
 from itertools import pairwise
 import math
 from typing import Literal
@@ -42,28 +44,65 @@ class PhaseKnot(BaseModel):
     provenance: PhaseProvenance
 
 
+class _PhaseCache:
+    """Exact values derived from one tuple of knots, filled as they are evaluated.
+
+    Every head and channel of a physical compile evaluates the same frame times. The
+    cache is not part of a map's value: it compares equal to any other, and a map whose
+    knots are not the ones it was built from (a `model_copy` with new knots shares the
+    original's private attributes) gets a fresh one.
+    """
+
+    __slots__ = ("beats", "by_time", "knots", "phases", "times")
+
+    def __init__(self, knots: tuple[PhaseKnot, ...]) -> None:
+        self.knots = knots
+        self.times = tuple(knot.time_ms for knot in knots)
+        # Exact beat index per knot: an inferred edge (e.g. -1/3) is not a float.
+        self.beats: tuple[Fraction, ...] | None = None
+        self.by_time: dict[float, Fraction] = {}
+        self.phases: dict[tuple[float, float, float], Fraction] = {}
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, _PhaseCache)
+
+    __hash__ = None  # type: ignore[assignment]
+
+
 class MusicalPhaseMap(BaseModel):
-    """Knots covering `[0, duration_ms]`, strictly increasing in time and beat index."""
+    """Knots within `[0, duration_ms]`, strictly increasing in time and beat index.
+
+    The covered span runs from the first knot to the last; phase is defined only there.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     knots: tuple[PhaseKnot, ...] = Field(min_length=2)
     duration_ms: float = Field(gt=0, allow_inf_nan=False)
-    # Exact beat index per knot: an inferred edge (e.g. -1/3) is not a float.
-    _exact_beats: tuple[Fraction, ...] | None = PrivateAttr(default=None)
+    _cache: _PhaseCache = PrivateAttr(default_factory=lambda: _PhaseCache(()))
 
     @model_validator(mode="after")
     def _validate_knots(self) -> MusicalPhaseMap:
-        if self.knots[0].time_ms != 0 or self.knots[-1].time_ms != self.duration_ms:
-            raise ValueError(f"knots must span exactly [0, {self.duration_ms}]")
+        if self.knots[0].time_ms < 0 or self.knots[-1].time_ms > self.duration_ms:
+            raise ValueError(f"knots must lie within [0, {self.duration_ms}]")
         for earlier, later in pairwise(self.knots):
             if later.time_ms <= earlier.time_ms or later.beat_index <= earlier.beat_index:
                 raise ValueError("knots must strictly increase in time and beat index")
         return self
 
-    @cached_property
+    @property
     def knot_times_ms(self) -> tuple[float, ...]:
-        return tuple(knot.time_ms for knot in self.knots)
+        return _cache(self).times
+
+    @property
+    def covered_start_ms(self) -> float:
+        """The first time phase is defined at: the first knot's."""
+        return self.knots[0].time_ms
+
+    @property
+    def covered_end_ms(self) -> float:
+        """The last time phase is defined at: the last knot's."""
+        return self.knots[-1].time_ms
 
 
 def build_musical_phase_map(
@@ -74,9 +113,11 @@ def build_musical_phase_map(
     Pass the detected grid, never `BeatGrid.extended_to_duration()`, whose appended
     average-tempo beats would pass as observed.
 
-    Each edge left uncovered by observed beats and `boundary_knots` is extended to time
-    0 (head) or `duration_ms` (tail) by the adjacent observed interval, only when that
-    edge is no longer than the interval and both of its beats are observed.
+    An edge bounded by an explicit knot stays there. An edge whose outermost two knots
+    are observed beats gets one `adjacent_interval` knot: at time 0 (head) or
+    `duration_ms` (tail) when that gap is no longer than their interval, otherwise
+    exactly one interval beyond the outermost beat, leaving the rest of the edge
+    uncovered.
 
     Args:
         grid: Detected beat grid; its beat starts become observed knots.
@@ -84,12 +125,12 @@ def build_musical_phase_map(
             last observed beat, within `[0, duration_ms]`.
 
     Returns:
-        A phase map covering `[0, grid.duration_ms]`.
+        A phase map covering the detected span of `grid`, within `[0, grid.duration_ms]`.
 
     Raises:
         MusicalPhaseError: If observed beats or knots fall outside the domain, an
             explicit knot sits on or between observed beats, phase would not increase,
-            or an edge is uncovered and cannot be inferred.
+            or an edge has neither an explicit knot nor two observed beats to extend.
     """
     duration = grid.duration_ms
     if not (math.isfinite(duration) and duration > 0):
@@ -123,11 +164,11 @@ def build_musical_phase_map(
             )
 
     exact = [Fraction(knot.beat_index) for knot in knots]
-    if not knots or knots[0].time_ms > 0:
+    if not knots or (knots[0].time_ms > 0 and knots[0].provenance != "explicit"):
         knot, beat_index = _adjacent_knot(knots, exact, edge="head", target_ms=0.0)
         knots.insert(0, knot)
         exact.insert(0, beat_index)
-    if knots[-1].time_ms < duration:
+    if knots[-1].time_ms < duration and knots[-1].provenance != "explicit":
         knot, beat_index = _adjacent_knot(knots, exact, edge="tail", target_ms=duration)
         knots.append(knot)
         exact.append(beat_index)
@@ -135,7 +176,7 @@ def build_musical_phase_map(
         phase_map = MusicalPhaseMap(knots=tuple(knots), duration_ms=duration)
     except ValueError as error:
         raise MusicalPhaseError(str(error)) from error
-    phase_map._exact_beats = tuple(exact)
+    _cache(phase_map).beats = tuple(exact)
     return phase_map
 
 
@@ -149,8 +190,8 @@ def _adjacent_knot(
     pair = knots[:2] if edge == "head" else knots[-2:]
     if len(pair) < 2 or any(knot.provenance != "observed" for knot in pair):
         raise MusicalPhaseError(
-            f"the {edge} up to {target_ms} ms is uncovered and has no adjacent observed "
-            "interval; supply explicit boundary knots"
+            f"the {edge} has no adjacent observed interval to extend phase from: it needs "
+            "two observed beats at that edge; supply explicit boundary knots"
         )
     first, second = pair
     interval = Fraction(second.time_ms) - Fraction(first.time_ms)
@@ -159,10 +200,11 @@ def _adjacent_knot(
     )
     gap = Fraction(target_ms) - Fraction(anchor_time)
     if abs(gap) > interval:
-        raise MusicalPhaseError(
-            f"the {edge} gap of {float(abs(gap))} ms exceeds the adjacent observed interval "
-            f"of {float(interval)} ms; supply explicit boundary knots"
-        )
+        # A silent edge: cover one interval beyond the beat and leave the rest uncovered.
+        # The knot time is stored as a float, so the gap is taken from the stored time
+        # (within an ulp of one interval) and the beat follows it exactly.
+        target_ms = float(Fraction(anchor_time) + (interval if edge == "tail" else -interval))
+        gap = Fraction(target_ms) - Fraction(anchor_time)
     beat_index = anchor_beat + gap / interval
     knot = PhaseKnot(
         time_ms=target_ms, beat_index=float(beat_index), provenance="adjacent_interval"
@@ -170,6 +212,7 @@ def _adjacent_knot(
     return knot, beat_index
 
 
+@functools.cache
 def exact_decimal(value: float) -> Fraction:
     """An authored decimal (a period, duty or phase shift) as the exact value it spells.
 
@@ -188,11 +231,17 @@ def musical_phase_fraction(
     decimal value (`exact_decimal`).
 
     Raises:
-        MusicalPhaseError: If either time lies outside `[0, duration_ms]`.
+        MusicalPhaseError: If either time lies outside the covered span.
         ValueError: If `period_beats` is not a positive finite number.
     """
-    period = _period(period_beats)
-    return (_beat_index(phase_map, time_ms) - _beat_index(phase_map, origin_ms)) / period
+    phases = _cache(phase_map).phases
+    key = (time_ms, origin_ms, period_beats)
+    phase = phases.get(key)
+    if phase is None:
+        period = _period(period_beats)
+        phase = (_beat_index(phase_map, time_ms) - _beat_index(phase_map, origin_ms)) / period
+        phases[key] = phase
+    return phase
 
 
 def musical_phase_at(
@@ -201,7 +250,7 @@ def musical_phase_at(
     """`musical_phase_fraction` as a float.
 
     Raises:
-        MusicalPhaseError: If either time lies outside `[0, duration_ms]`, or the phase
+        MusicalPhaseError: If either time lies outside the covered span, or the phase
             is too large to represent.
         ValueError: If `period_beats` is not a positive finite number.
     """
@@ -224,15 +273,16 @@ def musical_time_at(
     The inverse of `musical_phase_fraction`.
 
     Raises:
-        MusicalPhaseError: If the origin or the resulting time lies outside the domain.
+        MusicalPhaseError: If the origin or the resulting time lies outside the covered
+            span.
         ValueError: If `period_beats` is not a positive finite number.
     """
     target = _beat_index(phase_map, origin_ms) + cycles * _period(period_beats)
     beats = _knot_beats(phase_map)
     if not beats[0] <= target <= beats[-1]:
         raise MusicalPhaseError(
-            f"{float(cycles)} cycles from {origin_ms} ms lie outside the phase domain "
-            f"[0, {phase_map.duration_ms}]"
+            f"{float(cycles)} cycles from {origin_ms} ms lie outside the covered phase "
+            f"domain {_span(phase_map)}"
         )
     index = bisect.bisect_right(beats, target) - 1
     left_time = Fraction(phase_map.knots[index].time_ms)
@@ -250,16 +300,39 @@ def _period(period_beats: float) -> Fraction:
     return exact_decimal(period_beats)
 
 
+def _cache(phase_map: MusicalPhaseMap) -> _PhaseCache:
+    cache = phase_map._cache
+    if cache.knots is not phase_map.knots:
+        cache = phase_map._cache = _PhaseCache(phase_map.knots)
+    return cache
+
+
 def _knot_beats(phase_map: MusicalPhaseMap) -> tuple[Fraction, ...]:
-    if phase_map._exact_beats is None:
-        phase_map._exact_beats = tuple(Fraction(knot.beat_index) for knot in phase_map.knots)
-    return phase_map._exact_beats
+    cache = _cache(phase_map)
+    if cache.beats is None:
+        cache.beats = tuple(Fraction(knot.beat_index) for knot in phase_map.knots)
+    return cache.beats
+
+
+def _span(phase_map: MusicalPhaseMap) -> str:
+    return (
+        f"[{phase_map.covered_start_ms}, {phase_map.covered_end_ms}] of the song's "
+        f"[0, {phase_map.duration_ms}]"
+    )
 
 
 def _beat_index(phase_map: MusicalPhaseMap, time_ms: float) -> Fraction:
-    if not 0 <= time_ms <= phase_map.duration_ms:
+    by_time = _cache(phase_map).by_time
+    cached = by_time.get(time_ms)
+    if cached is None:
+        cached = by_time[time_ms] = _interpolated_beat(phase_map, time_ms)
+    return cached
+
+
+def _interpolated_beat(phase_map: MusicalPhaseMap, time_ms: float) -> Fraction:
+    if not phase_map.covered_start_ms <= time_ms <= phase_map.covered_end_ms:
         raise MusicalPhaseError(
-            f"{time_ms} ms lies outside the phase domain [0, {phase_map.duration_ms}]"
+            f"{time_ms} ms lies outside the covered phase domain {_span(phase_map)}"
         )
     knots = phase_map.knots
     beats = _knot_beats(phase_map)

@@ -1,8 +1,9 @@
 """Typed physical channel values for the physical moving-head renderer.
 
 Trajectories carry absolute integer-millisecond times and explicit units: degrees for
-pan/tilt, normalized values for the dimmer, named states for shutter and wheels. A
-degree zero and a DMX zero are different things; nothing here is a DMX byte.
+pan/tilt and the zoom's beam angle, normalized values for the dimmer, named states for
+shutter and wheels. A degree zero and a DMX zero are different things; nothing here is
+a DMX byte.
 """
 
 from __future__ import annotations
@@ -70,6 +71,7 @@ CONTINUOUS_UNITS: dict[ChannelName, str] = {
     ChannelName.PAN: "degree",
     ChannelName.TILT: "degree",
     ChannelName.DIMMER: "normalized",
+    ChannelName.ZOOM: "degree",
 }
 """Continuous channels and their unit; every other channel takes discrete states."""
 
@@ -77,6 +79,7 @@ AXIS_KEYS: dict[ChannelName, AxisName] = {
     ChannelName.PAN: "pan",
     ChannelName.TILT: "tilt",
     ChannelName.DIMMER: "dimmer",
+    ChannelName.ZOOM: "zoom",
 }
 """Each continuous channel's key in `FixtureCapabilities.axes`."""
 

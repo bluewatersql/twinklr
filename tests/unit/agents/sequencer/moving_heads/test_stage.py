@@ -348,6 +348,39 @@ class TestMovingHeadStageExecute:
         )
         assert planning_context.beat_grid is shared_grid
 
+    @pytest.mark.asyncio
+    async def test_execute_offers_only_the_templates_the_physical_gate_admitted(
+        self, stage: MovingHeadStage, mock_context: MagicMock, valid_input: dict
+    ) -> None:
+        """A template the render preflight left out of the offer is neither offered nor
+        described to the planner."""
+        from twinklr.core.sequencer.moving_heads.pipeline import TemplateAdmission
+
+        admission = TemplateAdmission(
+            admitted=("circle_fan_hold",),
+            exclusions=({"template_id": "sweep_lr_fan_pulse", "reason": "test"},),
+            entry_dips={},
+        )
+        mock_context.get_state.side_effect = lambda key, default=None: (
+            admission if key == "template_admission" else default
+        )
+
+        with patch(
+            "twinklr.core.pipeline.execution.execute_step",
+            new=AsyncMock(return_value=MagicMock(success=True)),
+        ):
+            await stage.execute(valid_input, mock_context)
+
+        planning_context = next(
+            call.args[1]
+            for call in mock_context.set_state.call_args_list
+            if call.args[0] == "mh_planning_context"
+        )
+        assert planning_context.available_templates == ["circle_fan_hold"]
+        assert [d.template_id for d in planning_context.template_descriptions] == [
+            "circle_fan_hold"
+        ]
+
 
 class TestMovingHeadStageStateHandler:
     """Tests for MovingHeadStage state handler."""

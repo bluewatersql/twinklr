@@ -2,7 +2,7 @@
 type: context
 status: active
 area: overview
-updated: 2026-11-14
+updated: 2026-11-16
 ---
 
 # Twinklr — Current State
@@ -45,11 +45,14 @@ See [product/overview.md](product/overview.md).
   the 2026-08 clean-up; seven clean-up render changes were reverted on 2026-11-12
   ([decision](../memories/decisions/mh-render-matches-pre-cleanup-look.md)).
   An opt-in `physical_v2` moving-head mode (job schema `3.1`) renders calibrated
-  fixture profiles to complete DMX frames with dark repositioning; it has no production
-  templates and refuses most real audio. xLights 2026.19 reproduces its bytes in a
-  headless render; no hardware or look result exists yet
-  ([evidence](../changes/2026_11_12_mh_true_up/evidence/2026-11-14-p1-exit/README.md),
-  [xLights result](../changes/2026_11_12_mh_true_up/evidence/2026-11-14-p1-xlights-result/README.md)).
+  fixture profiles to complete DMX frames with dark repositioning. It offers the planner
+  seven physical template families, each only on a rig that can render it, holds silent
+  song edges dark, and renders a cue it cannot play honestly as dark. Its pre-planning
+  check is slow (36–62 s on eight heads) and its families are written for 4/4. xLights
+  reproduces its bytes; no hardware or look result exists, and no full run with a live
+  planner or real audio has used it
+  ([evidence](../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p2-exit/README.md),
+  [xLights result](../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p2-xlights-result/README.md)).
   Display output keeps every section lit: a brightness floor, a beat grid extended to the
   end of the song, and a foundation-coverage rule in the group planner
   ([decision](../memories/decisions/display-stays-lit.md)).

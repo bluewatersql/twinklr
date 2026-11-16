@@ -24,6 +24,7 @@ from tests.support.mh_physical import (
     SUBSET_TEMPLATE_ID,
     TEMPLATE_ID,
     assert_honest_transactions,
+    physical_edge_grid,
     physical_grid,
     physical_job,
     physical_plan,
@@ -31,6 +32,7 @@ from tests.support.mh_physical import (
     physical_test_templates,
 )
 from twinklr.cli.main import build_run_pipeline
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
 from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
 from twinklr.core.caching import derive_session_id
 from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup, InitialFixtureState
@@ -445,6 +447,121 @@ def test_step_starting_in_the_last_partial_frame_is_dropped_with_a_record(
     ]
     assert all(d["end_limit_ms"] == 2820 for d in dropped)
     assert {d["cue_ms"] for d in pipeline.render_record["transactions"]} == {1020}
+
+
+def test_silent_song_edges_are_held_dark_outside_the_covered_span(
+    tmp_path: Path,
+    physical_templates: None,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Three silent seconds before the first beat and four after the last: the render
+    covers 2515-7015 ms (one observed interval past each outermost beat), holds every
+    head dark outside it, and infers no tempo."""
+
+    def no_tempo_inference(self: BeatGrid) -> BeatGrid:
+        raise AssertionError("the physical path extended the beat grid")
+
+    monkeypatch.setattr(BeatGrid, "extended_to_duration", no_tempo_inference)
+    caplog.set_level("WARNING")
+    grid = physical_edge_grid(lead_in_ms=3000, tail_ms=4000)
+    # Bars 1-3: bar 3 starts on the last observed beat, so its reveal lies past the span.
+    plan = ChoreographyPlan(
+        sections=[
+            PlanSection.model_validate(
+                {
+                    "section_name": "verse",
+                    "start_bar": 1,
+                    "end_bar": 3,
+                    "template_id": TEMPLATE_ID,
+                    "preset_id": None,
+                }
+            )
+        ]
+    )
+    output = tmp_path / "show.xsq"
+    pipeline = RenderingPipeline(
+        choreography_plan=plan,
+        beat_grid=grid,
+        fixture_group=physical_rig(),
+        job_config=physical_job(),
+        output_path=output,
+        media_file="song.wav",
+    )
+    segments = pipeline.render()
+    render = json.loads(Path(f"{output}.trace.json").read_text(encoding="utf-8"))["render"]
+
+    assert render["covered_span"] == {"start_ms": 2515.0, "end_ms": 7015.0}
+    assert render["longest_beat_interval_ms"] == 500.0
+    assert render["phase_boundaries"] == [
+        {"time_ms": 2515.0, "beat_index": -1.0, "provenance": "adjacent_interval"},
+        {"time_ms": 7015.0, "beat_index": 9.0, "provenance": "adjacent_interval"},
+    ]
+    assert [(d["fixture_id"], d["requested_start_ms"]) for d in render["dropped_cues"]] == [
+        ("MH1", 7515),
+        ("MH2", 7515),
+    ]
+    assert all(
+        (d["start_limit_ms"], d["end_limit_ms"]) == (2520, 7000) for d in render["dropped_cues"]
+    )
+    warnings = [r.getMessage() for r in caplog.records if "dropped" in r.getMessage()]
+    assert warnings == [
+        "physical_v2: 2 cue(s) start outside the frames 2520-7000 ms that the covered phase "
+        "span and the song allow and are dropped (held dark); the trace's dropped_cues "
+        "lists them"
+    ]
+    assert render["frame_grid"]["frame_count"] == 531
+
+    rig = physical_rig()
+    cues = _cues(segments)
+    assert sorted({(c.t0_ms, c.t1_ms) for c in cues}) == [(4020, 5020), (5820, 6620)]
+    decoded = _decoded_frames(output)
+    times = frame_times(int(grid.duration_ms))
+    job = physical_job()
+    initial = InitialFixtureState.model_validate(PHYSICAL_INITIAL_STATE)
+    profiles = {f.fixture_id: f.config.physical_profile for f in rig.expand_fixtures()}
+    for fixture in rig.expand_fixtures():
+        profile = profiles[fixture.fixture_id]
+        assert profile is not None
+        frames = decoded[fixture.xlights_model_name]
+        assert sorted(frames) == list(times)
+        pan, tilt = profile.axes["pan"], profile.axes["tilt"]
+
+        def pose(t: int, frames: dict[int, dict[int, int]] = frames) -> tuple[int, int]:
+            return _word(frames[t], 1, 2), _word(frames[t], 3, 4)
+
+        def dark(t: int, frames: dict[int, dict[int, int]] = frames) -> bool:
+            # Every darkness the profile declares: shutter closed (byte 64) and dimmer zero.
+            return frames[t][17] == 64 and frames[t][5] == 0
+
+        # Before the first cue (so before the covered start at 2520 ms) and from the
+        # last cue's end (so from the covered end at 7000 ms) on, every frame is dark.
+        assert all(dark(t) for t in times if t < 4020 or t >= 6620)
+        # From the declared initial pose, one dark move (starting at frame 0, since the
+        # initial state is dark) to the first cue's aim, held until the cue; after the
+        # last cue, the aim its last frame (6600 ms) commanded.
+        initial_pose = (pan.dmx_word(initial.pan_deg), tilt.dmx_word(initial.tilt_deg))
+        first_aim = (pan.dmx_word(-45.0), tilt.dmx_word(10.0))
+        before = [pose(t) for t in times if t < 4020]
+        for axis in (0, 1):
+            path = [initial_pose[axis], *(p[axis] for p in before)]
+            assert path == sorted(path, reverse=path[0] > first_aim[axis])
+        assert before[-1] == first_aim
+        assert pose(6600)[1] == tilt.dmx_word(10.0)
+        assert {pose(t) for t in times if t >= 6620} == {pose(6600)}
+
+    result = plan_prepositions(
+        cues,
+        profiles,  # type: ignore[arg-type]
+        initial_states=job.moving_heads.initial_states,
+        locks=(),
+        frame_ms=EFFECT_GRID_MS,
+        sequence_end_ms=len(times) * EFFECT_GRID_MS,
+    )
+    assert list(result.segments) == segments
+    for fixture_id, profile in profiles.items():
+        assert profile is not None
+        assert_honest_transactions(result, cues, profile, initial, fixture_id=fixture_id)
 
 
 def test_unchecked_models_are_reported(

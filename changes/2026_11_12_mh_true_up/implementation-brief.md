@@ -5,14 +5,16 @@ area: engineering
 change: 2026_11_12_mh_true_up
 owner: Christopher Price
 created: 2026-11-13
-updated: 2026-11-14
+updated: 2026-11-16
 ---
 
 # Moving-head true-up — implementation brief
 
 Phase 0 ran on `feat/mh-true-up-p0` (cut from `main` at `b498ed9`) and merged to `main`
-as `bb78227` on 2026-11-13. Phase 1 runs on `feat/mh-true-up-p1` in worktree
-`twinklr-mh-true-up`, cut from `main` at `bb78227` on 2026-11-13.
+as `bb78227` on 2026-11-13. Phase 1 ran on `feat/mh-true-up-p1` in worktree
+`twinklr-mh-true-up`, cut from `main` at `bb78227`, and merged to `main` as `52191b15`
+on 2026-11-14. Phase 2 ran on `feat/mh-true-up-p2` in the same worktree, cut from
+`main` at `d6096254` on 2026-11-14, and merged to `main` on 2026-11-16.
 
 ## Goal
 
@@ -69,6 +71,40 @@ Phase 1 (met from offline evidence 2026-11-14; evidence in
   evidence record. xLights transport proof, hardware accuracy and changed-look
   acceptance are recorded as `PENDING-OWNER`, not inferred.
 
+Phase 2 (met from offline evidence 2026-11-16; evidence in
+[evidence/2026-11-16-p2-exit](evidence/2026-11-16-p2-exit/README.md); tasks in
+[plan/phase-2-composition.md](plan/phase-2-composition.md)):
+
+- [x] P2.0, P2.1–P2.3, P2.4a–c and P2.5 merged to the phase branch, each reviewed in a
+  context separate from its author. Test-first with one disclosed exception: the
+  `on_unplayable` follow-up wrote production code before its tests and proved them by
+  mutation.
+- [x] `make validate` passes on the phase branch after the last code commit.
+- [x] No golden or regression file changed; `legacy_v1` output, legacy planner session
+  ids, the 16 Phase 0 render fingerprints and the two Phase 1 request fingerprints are
+  unchanged, and a beat grid Phase 1 accepted renders the same physical frames (its trace
+  gains only the keys P2.0 lists).
+- [x] `physical_v2` accepts the 961-grid silent-edge sweep with the covered span
+  reported, holds every fixture dark outside it and never infers tempo.
+- [x] The six physical families compile deterministically on the synthetic rig matrix,
+  are offered only under `physical_v2` and only on a rig that can render them (a rig
+  lacking what one family needs still gets the others), and the 37-entry registry
+  assertions are unchanged.
+- [x] Each section's entry window is sized from a bound the fuzz shows dominates the
+  transaction pass, the dip is skipped where eligible, and the plan-dependent failures
+  the plan lists are documented, not claimed solved. Whether the remaining dips look
+  acceptable is `PENDING-OWNER`.
+- [x] Every added config field has a live inventory record and a documented row.
+- [x] Each Phase 1 carry-forward is closed in the P2 task the plan names, or remains
+  deferred to the later phase it names. Exception, disclosed: the gate dry-compile cost
+  (carry 1) was measured and reduced but is over its 20 s target; carried to Phase 3.
+- [x] The phase-exit conditions in the plan are met from offline evidence, with a dated
+  evidence record that includes the measured pre-planning gate time. xLights transport
+  of the six families passed on owner authorization
+  ([result](evidence/2026-11-16-p2-xlights-result/README.md)); hardware accuracy, the
+  zoom pilot's real-profile result and changed-look acceptance are recorded as
+  `PENDING-OWNER`, not inferred.
+
 ## Constraints
 
 - [Execution guardrails](../shared/agent_guardrails.md) and the global requirements in
@@ -95,6 +131,9 @@ Phase 1 (met from offline evidence 2026-11-14; evidence in
 | xLights test of the Phase 1 physical output | Owner authorization, 2026-11-14 ("test in xlights as previous"): the expendable-show render in [the request](evidence/2026-11-13-p1-xlights-request/README.md), run the way earlier xLights checks in this repository were run. Expendable show folder or scratch sequence only |
 | Default `max_effects` of 1,000,000 | Owner approval, 2026-11-14 ("1,000,000 budget approved") |
 | Begin Phase 2 implementation | Owner go-ahead, 2026-11-14 ("then proceed to phase 2"). Covers Phase 2's offline work; its owner-gated steps need their own authorization |
+| Run Phase 2 to completion without check-ins | Owner direction, 2026-11-15 ("continue with autoplot and ultraqwork without stopping until finished"). Covers Phase 2's offline tasks and closeout; integrator decisions made under it are recorded in the Phase 2 plan for the owner to reverse |
+| Merge Phase 2 to `main` and push when complete | Owner direction, 2026-11-16 ("continue. commit. merge and push when completer"). Applies once Phase 2's tasks are reviewed, committed and `make validate` passes. Does not cover xLights runs, hardware, look verdicts or starting Phase 3 |
+| xLights test and recording of the Phase 2 families | Owner authorization, 2026-11-16 ("run the test in xlights as screen record the results"). Run on a scratch show; [result](evidence/2026-11-16-p2-xlights-result/README.md). Does not cover hardware or a look verdict |
 | Phase 0 keeps `identity.py` (render fingerprint) | Kept as planned. Its Phase 0 consumer is the evidence record; say so if it should move to Phase 1 instead |
 
 ## Kickoff checklist

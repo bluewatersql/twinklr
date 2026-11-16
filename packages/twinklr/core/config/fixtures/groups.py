@@ -18,6 +18,8 @@ from twinklr.core.config.fixtures.physical import (
     PanTiltRange,
     drop_retired_fields,
 )
+from twinklr.core.config.fixtures.presets import RigPresetLibrary
+from twinklr.core.sequencer.models.moving_heads.topology import FixtureTopology
 
 
 class BaseFixtureConfig(BaseModel):
@@ -156,6 +158,22 @@ class FixtureGroup(BaseModel):
         description="Semantic group name -> xLights group model name (e.g., 'LEFT': 'GROUP - MH LEFT')",
     )
 
+    # Named components physical_v2 templates refer to. Left out of dumps when empty so
+    # legacy render fingerprints are unchanged.
+    presets: RigPresetLibrary = Field(
+        default_factory=RigPresetLibrary,
+        exclude_if=lambda value: value.is_empty,
+        description="Position and attribute presets physical_v2 template steps name by id",
+    )
+
+    # The canonical full rig physical_v2 phase distributions rank heads in. Left out of
+    # dumps when absent so legacy render fingerprints are unchanged.
+    topology: FixtureTopology | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Where each head sits in the full rig, for physical_v2 phase distribution",
+    )
+
     @model_validator(mode="before")
     @classmethod
     def surface_invalid_physical_profiles(cls, value: object) -> object:
@@ -174,6 +192,29 @@ class FixtureGroup(BaseModel):
                 if isinstance(holder, dict) and holder.get("physical_profile") is not None:
                     _validated_profile(fixture.get("fixture_id"), holder["physical_profile"])
         return value
+
+    @model_validator(mode="after")
+    def _validate_presets(self) -> FixtureGroup:
+        """Check the presets against the group's fixtures and their physical profiles."""
+        if not self.presets.is_empty:
+            self.presets.check_rig(
+                {
+                    fixture.fixture_id: fixture.config.physical_profile
+                    for fixture in self.expand_fixtures()
+                }
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_topology(self) -> FixtureGroup:
+        """Every fixture of the group has a place in the topology. A member the group
+        lacks is a missing head: its slot stays empty."""
+        if self.topology is not None:
+            members = set(self.topology.canonical_ids)
+            unplaced = [f.fixture_id for f in self.fixtures if f.fixture_id not in members]
+            if unplaced:
+                raise ValueError(f"fixtures {unplaced} have no place in the group's topology")
+        return self
 
     def is_semantic(self) -> bool:
         """Check if this is a semantic group (no xLights mapping).

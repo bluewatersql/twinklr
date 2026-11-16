@@ -75,6 +75,10 @@ from twinklr.core.sequencer.moving_heads.templates import (
     load_builtin_templates,
     load_templates_from_directory,
 )
+from twinklr.core.sequencer.moving_heads.templates.data_loader import (
+    PHYSICAL_TEMPLATE_DIR,
+    admit_physical_catalog,
+)
 from twinklr.core.sequencer.moving_heads.templates.library import list_templates
 from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
@@ -316,7 +320,9 @@ async def _run_pipeline_async(
         session_id: Optional session ID override. When omitted, the ID is
             derived from the audio content and configs so an identical re-run
             reuses cached LLM work.
-        template_dir: Optional directory of strict JSON moving-head templates.
+        template_dir: Optional directory of strict JSON moving-head templates, loaded
+            after the builtins and, under physical_v2, after the physical family
+            catalog; a directory that is the catalog is not loaded twice.
         allow_template_overrides: Whether data documents may explicitly shadow
             colliding Python builtin IDs.
         layout_path: Optional xLights layout; a physical_v2 job's fixture models are
@@ -354,7 +360,22 @@ async def _run_pipeline_async(
     # Load templates
     console.print("[bold]Loading templates...[/bold]")
     load_builtin_templates()
-    if template_dir is not None:
+    try:
+        catalog_ids = admit_physical_catalog(job_config)
+    except (OSError, ValueError) as error:
+        console.print(f"[red]ERROR: Could not load the physical template catalog: {error}[/red]")
+        return 1
+    if catalog_ids:
+        console.print(
+            f"[green]📄 Physical templates loaded:[/green] {len(catalog_ids)} "
+            f"from {PHYSICAL_TEMPLATE_DIR}"
+        )
+    if template_dir is not None and catalog_ids and template_dir.resolve() == PHYSICAL_TEMPLATE_DIR:
+        console.print(
+            f"[dim]--template-dir {template_dir} is the physical catalog, already admitted; "
+            "not loaded again[/dim]"
+        )
+    elif template_dir is not None:
         try:
             loaded_ids = load_templates_from_directory(
                 template_dir,
@@ -589,6 +610,9 @@ async def _run_pipeline_async(
                 console.print(f"   trace    {artifacts.trace_path.name}")
             else:
                 console.print(f"   {result.outputs['render']}")
+            unplayable = pipeline_context.get_state("unplayable_warning")
+            if unplayable:
+                console.print(f"\n[yellow]⚠ {unplayable}[/yellow]")
 
         console.print(f"\n[green]📁 All artifacts saved to:[/green] {artifact_dir}")
         return 0

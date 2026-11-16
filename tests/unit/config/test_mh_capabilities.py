@@ -666,6 +666,8 @@ _PROFILE_MUTATIONS: dict[str, Mutation] = {
     ),
     "axes.fine_offset": ("words", lambda p: _set(p, ("axes", "pan", "fine_offset"), None)),
     "axes.inverted": ("words", lambda p: _set(p, ("axes", "pan", "inverted"), True)),
+    "axes.dmx_min": ("words", lambda p: _set(p, ("axes", "pan", "dmx_min"), 1000)),
+    "axes.dmx_max": ("words", lambda p: _set(p, ("axes", "pan", "dmx_max"), 60000)),
     "axes.travel_speed_per_s": (
         "preposition",
         lambda p: _set(p, ("axes", "pan", "travel_speed_per_s"), 90.0),
@@ -702,10 +704,6 @@ _PROFILE_MUTATIONS: dict[str, Mutation] = {
         "preposition",
         lambda p: _set(p, ("discrete", "shutter", "closed_state"), None),
     ),
-    "discrete.open_state": (
-        "fingerprint",
-        lambda p: _set(p, ("discrete", "shutter", "open_state"), None),
-    ),
     "visibility": ("preposition", lambda p: _set(p, ("visibility",), {})),
     "visibility.dimmer_zero_extinguishes": (
         "darkness",
@@ -731,6 +729,7 @@ _INITIAL_STATE_MUTATIONS: dict[str, Mutation] = {
     "": ("check", lambda s: s.clear()),
     "pan_deg": ("check", lambda s: _set(s, ("pan_deg",), 300.0)),
     "tilt_deg": ("check", lambda s: _set(s, ("tilt_deg",), -140.0)),
+    "zoom_deg": ("check", lambda s: _set(s, ("zoom_deg",), 20.0)),
     "dimmer": ("check", lambda s: _set(s, ("dimmer",), None)),
     "discrete_states": ("check", lambda s: _set(s, ("discrete_states", "shutter"), "half")),
     "settled": ("preposition", lambda s: _set(s, ("settled",), False)),

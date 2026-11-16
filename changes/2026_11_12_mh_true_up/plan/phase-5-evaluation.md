@@ -270,6 +270,8 @@ returns per-case coverage, comparisons, failures and unavailable claims.
 
 ### P5-T4 — Read-only report generation and feature-level release gates
 
+Carried from Phase 2 kickoff, 2026-11-14 ([P2 carry-forwards](phase-2-composition.md#phase-1-carry-forwards)): `physical_v2` does not apply the job's `transitions` config and refuses the `FADE_OUT` remainder policy; dark repositioning replaces them. The feature-level release decision records whether a section-transition mapping is required before `physical_v2` could become the default.
+
 **Files:** Create `packages/twinklr/core/reporting/evaluation/mh_true_up_cli.py` and
 `tests/unit/reporting/evaluation/test_mh_true_up_cli.py`; produce JSON/Markdown
 reports under the run's ignored artifact directory. Update accepted context/docs

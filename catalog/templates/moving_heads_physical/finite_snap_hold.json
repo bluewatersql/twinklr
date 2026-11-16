@@ -1,0 +1,97 @@
+{
+  "template": {
+    "template_id": "finite_snap_hold",
+    "version": 1,
+    "name": "Finite Snap Hold",
+    "category": "high_energy",
+    "repeat": {
+      "mode": "ONCE",
+      "cycle_bars": 1.0,
+      "loop_step_ids": [
+        "snap"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "snap",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 1.0
+          }
+        },
+        "geometry": {},
+        "movement": {
+          "physical": {
+            "shape": "linear",
+            "mode": "finite",
+            "start_pan_deg": 0.0,
+            "start_tilt_deg": 10.0,
+            "pan_extent_deg": 0.0,
+            "tilt_extent_deg": 45.0,
+            "period_beats": 1.0
+          }
+        },
+        "dimmer": {
+          "physical": {
+            "period_beats": 4.0,
+            "duty_cycle": 1.0,
+            "low": 0.0,
+            "high": 1.0
+          }
+        },
+        "physical_shutter_state": "open",
+        "physical_reposition_fallback": "drop_accent"
+      }
+    ],
+    "metadata": {
+      "tags": [
+        "physical_v2",
+        "snap",
+        "hold",
+        "accent",
+        "finite"
+      ],
+      "recommended_sections": [
+        "drop",
+        "chorus",
+        "outro"
+      ],
+      "energy_range": [
+        60,
+        100
+      ],
+      "description": "Every head lifts in one beat and holds its terminal aim, lit, to the section end; one move per section."
+    }
+  },
+  "presets": [
+    {
+      "preset_id": "narrow",
+      "name": "Narrow",
+      "step_patches": {
+        "snap": {
+          "movement": {
+            "physical": {
+              "tilt_extent_deg": 25.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "slow",
+      "name": "Slow",
+      "step_patches": {
+        "snap": {
+          "movement": {
+            "physical": {
+              "period_beats": 2.0
+            }
+          }
+        }
+      }
+    }
+  ]
+}

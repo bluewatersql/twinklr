@@ -1,10 +1,13 @@
-from typing import Any
+from fractions import Fraction
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.config.fixtures.capabilities import FixtureCapabilities
+from twinklr.core.config.fixtures.presets import PoseDegrees, RigPresetLibrary
 from twinklr.core.curves.registry import CurveRegistry
-from twinklr.core.sequencer.models.enum import Intensity
+from twinklr.core.sequencer.models.enum import ChannelName, Intensity
+from twinklr.core.sequencer.models.moving_heads.topology import FixtureTopology
 from twinklr.core.sequencer.moving_heads.handlers.registry import (
     ColorRegistry,
     DimmerRegistry,
@@ -76,6 +79,26 @@ class FixtureContext(BaseModel):
     physical_profile: FixtureCapabilities | None = None
 
 
+class ResolvedStepComponents(BaseModel):
+    """One fixture's physical settings for a step that names rig presets.
+
+    `pose` is the start aim, per axis from the step or its position reference. Each
+    held channel is the step's own static state or the referenced attribute preset's,
+    and None where the step drives the channel with a pulse or nothing sets it.
+    `provenance` records, per channel, `{"source": "step"}` or the referenced preset,
+    the preset its fallback chain resolved to and the SHA-256 of the entry used.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    pose: PoseDegrees
+    shutter: str | None = None
+    color: str | None = None
+    gobo: str | None = None
+    dimmer: float | None = Field(default=None, ge=0, le=1)
+    provenance: dict[str, dict[str, str]]
+
+
 class StepCompileContext(BaseModel):
     """Context for compiling a single step.
 
@@ -97,6 +120,13 @@ class StepCompileContext(BaseModel):
         dimmer_registry: Registry of dimmer handlers.
         physical_profile: The fixture's physical profile; physical compile only.
         phase_map: The song's musical phase map; physical compile only.
+        resolved_components: The step's component references resolved for this
+            fixture: its start aim, and held channels that replace the step's own;
+            physical compile only, None for a step without references.
+        phase_offset_by_channel: Cycles each phase domain lags the step phase, from
+            the step's distribution over the rig topology; physical compile only.
+        pan_sign: Multiplies the pan displacement (not the start aim): -1 or +1 for a
+            mirrored wing, 0 at an odd center; physical compile only.
     """
 
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
@@ -124,6 +154,9 @@ class StepCompileContext(BaseModel):
     gobo_registry: GoboRegistry = Field(default_factory=_default_gobo_registry)
     physical_profile: FixtureCapabilities | None = None
     phase_map: MusicalPhaseMap | None = None
+    resolved_components: ResolvedStepComponents | None = None
+    phase_offset_by_channel: dict[ChannelName, Fraction] = Field(default_factory=dict)
+    pan_sign: Literal[-1, 0, 1] = 1
 
 
 class TemplateCompileContext(BaseModel):
@@ -153,6 +186,12 @@ class TemplateCompileContext(BaseModel):
     shutter_registry: ShutterRegistry = Field(default_factory=_default_shutter_registry)
     gobo_registry: GoboRegistry = Field(default_factory=_default_gobo_registry)
     intent: SectionRenderIntent = Field(default_factory=SectionRenderIntent)
+    # The fixture group's named components; physical compile only.
+    presets: RigPresetLibrary = Field(default_factory=RigPresetLibrary)
+    # The rig's canonical topology (declared or derived), and the fixture group a
+    # distribution that finds none is reported against; physical compile only.
+    topology: FixtureTopology | None = None
+    fixture_group_id: str | None = None
 
     @property
     def bpm(self) -> float:

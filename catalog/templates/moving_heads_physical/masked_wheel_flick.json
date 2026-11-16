@@ -1,0 +1,104 @@
+{
+  "template": {
+    "template_id": "masked_wheel_flick",
+    "version": 1,
+    "name": "Masked Wheel Flick",
+    "category": "medium_energy",
+    "repeat": {
+      "mode": "JOINER",
+      "cycle_bars": 2.0,
+      "loop_step_ids": [
+        "sway"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "sway",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 2.0
+          }
+        },
+        "geometry": {},
+        "movement": {
+          "physical": {
+            "shape": "sine_pan",
+            "mode": "periodic",
+            "start_pan_deg": 0.0,
+            "start_tilt_deg": 30.0,
+            "pan_extent_deg": 20.0,
+            "tilt_extent_deg": 0.0,
+            "period_beats": 4.0
+          }
+        },
+        "dimmer": {
+          "physical": {
+            "period_beats": 4.0,
+            "duty_cycle": 1.0,
+            "low": 0.0,
+            "high": 1.0
+          }
+        },
+        "physical_shutter_state": "open",
+        "physical_reposition_fallback": "drop_accent"
+      }
+    ],
+    "physical_overlays": [
+      {
+        "start_beats": 2.0,
+        "end_beats": 6.0,
+        "mask_beats": 1.0,
+        "channel": "color",
+        "attribute_preset_id": "flick"
+      }
+    ],
+    "metadata": {
+      "tags": [
+        "physical_v2",
+        "flick",
+        "color",
+        "sway"
+      ],
+      "recommended_sections": [
+        "verse",
+        "chorus"
+      ],
+      "energy_range": [
+        30,
+        80
+      ],
+      "description": "Heads sway gently, lit; mid-cycle the color wheel flicks to the rig's 'flick' attribute preset, masked dark while it turns each way, then returns to the base color."
+    }
+  },
+  "presets": [
+    {
+      "preset_id": "narrow",
+      "name": "Narrow",
+      "step_patches": {
+        "sway": {
+          "movement": {
+            "physical": {
+              "pan_extent_deg": 10.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "slow",
+      "name": "Slow",
+      "step_patches": {
+        "sway": {
+          "movement": {
+            "physical": {
+              "period_beats": 8.0
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -36,11 +36,15 @@ class MovingHeadRenderingStage:
         - "choreography_plan": ChoreographyPlan (set by MovingHeadStage)
         - "layout_models", "layout_sha256": the xLights layout `twinklr run --layout`
           loaded, if any; only a physical render uses them
+        - "template_admission": the render preflight's result, if any; a physical
+          render traces its exclusions
 
     State stored:
         - "xsq_output_path": Path to generated XSQ file
         - "delivery_artifacts": DeliveryArtifacts (.xsq, .xtiming files, .xmap)
         - "rendered_segment_count": Number of segments rendered
+        - "unplayable_warning": a physical render's warning about the cues it kept
+          dark under `on_unplayable`, when it kept any
 
     Example:
         >>> stage = MovingHeadRenderingStage(
@@ -102,7 +106,10 @@ class MovingHeadRenderingStage:
         from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
             UnsupportedRigShapeError,
         )
-        from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
+        from twinklr.core.sequencer.moving_heads.pipeline import (
+            RenderingPipeline,
+            TemplateAdmission,
+        )
 
         try:
             choreography_plan, _extras = resolve_typed_input(
@@ -133,6 +140,9 @@ class MovingHeadRenderingStage:
             # Build timeline tracks from audio data
             timeline_tracks = self._build_timeline_tracks(beat_grid, context)
             media_file, song, artist = self._resolve_media_metadata(context)
+            admission = context.get_state("template_admission")
+            if not isinstance(admission, TemplateAdmission):
+                admission = None
 
             # Create and run rendering pipeline
             pipeline = RenderingPipeline(
@@ -147,6 +157,7 @@ class MovingHeadRenderingStage:
                 artist=artist,
                 layout_models=context.get_state("layout_models"),
                 layout_sha256=context.get_state("layout_sha256"),
+                admission_exclusions=admission.exclusions if admission is not None else (),
             )
 
             # Render to segments and write the delivery
@@ -159,6 +170,8 @@ class MovingHeadRenderingStage:
             context.set_state("delivery_artifacts", pipeline.artifacts)
             context.set_state("rendered_segment_count", len(segments))
             context.set_state("rendered_segments", tuple(segments))
+            if pipeline.unplayable_warning is not None:
+                context.set_state("unplayable_warning", pipeline.unplayable_warning)
 
             # Track metrics
             context.add_metric("mh_render_segments", len(segments))
@@ -305,10 +318,16 @@ class RenderPreflightStage:
     `legacy_v1` job passes through untouched. A `physical_v2` job is checked against
     the fixtures the render stage will load (`preflight_render_policy`), the templates
     the planner will be offered (`offered_template_ids`; every one must carry physical
-    data, and each must dry-compile on this rig: `check_physical_templates`), the
+    data, and each must dry-compile on this rig and plan the dark repositioning between
+    its own cues under the job's `reposition_fallback`, at the placements its
+    `on_unplayable` leaves to the gate: `check_physical_templates`; a template of the
+    shipped physical catalog that fails is left out of the offer instead, unless none
+    remains, and the result is stored in state as `template_admission`, which the
+    planner offers and the render traces), the
     song's musical phase map, built from the detected BeatGrid, which the renderer
-    needs over the whole song and never infers, and, when the run supplies an xLights
-    layout (`layout_models` in state), every fixture's model (`check_physical_models`).
+    never infers (it holds every fixture dark outside the map's covered span, which
+    is logged), and, when the run supplies an xLights layout (`layout_models` in
+    state), every fixture's model (`check_physical_models`).
 
     Input and output: the audio stage's SongBundle, unchanged.
     """
@@ -338,6 +357,9 @@ class RenderPreflightStage:
             check_physical_templates,
             offered_template_ids,
         )
+        from twinklr.core.sequencer.moving_heads.templates.data_loader import (
+            in_physical_catalog,
+        )
         from twinklr.core.sequencer.timing.musical_phase import (
             MusicalPhaseError,
             build_musical_phase_map,
@@ -364,18 +386,34 @@ class RenderPreflightStage:
                 )
             beat_grid = resolve_beat_grid(context, input)
             try:
-                build_musical_phase_map(beat_grid)
+                phase_map = build_musical_phase_map(beat_grid)
             except MusicalPhaseError as error:
                 raise UnsupportedRenderModeError(
-                    "moving_heads.mode 'physical_v2' needs the song's musical phase from "
-                    f"its first to its last millisecond, and this beat grid leaves it "
-                    f"undefined: {error}. The renderer does not infer tempo there"
+                    "moving_heads.mode 'physical_v2' needs a musical phase over the song's "
+                    f"detected beats, and this beat grid gives none: {error}. The renderer "
+                    "does not infer tempo"
                 ) from error
-            check_physical_templates(offered, beat_grid=beat_grid, fixture_group=fixture_group)
+            logger.info(
+                "physical_v2 renders the covered span [%s, %s] ms of the song's [0, %s] ms; "
+                "every fixture is held dark outside it",
+                phase_map.covered_start_ms,
+                phase_map.covered_end_ms,
+                phase_map.duration_ms,
+            )
+            admission = check_physical_templates(
+                offered,
+                beat_grid=beat_grid,
+                fixture_group=fixture_group,
+                initial_states=job_config.moving_heads.initial_states,
+                failure_mode=job_config.moving_heads.reposition_fallback,
+                on_unplayable=job_config.moving_heads.on_unplayable,
+                excludable=[t for t in offered if in_physical_catalog(t)],
+            )
             layout_models = context.get_state("layout_models")
             if layout_models is not None:
                 check_physical_models(fixture_group.expand_fixtures(), layout_models)
         except (UnsupportedRenderModeError, PhysicalOutputError) as error:
             logger.error("Render preflight refused the job: %s", error)
             return failure_result(str(error), stage_name=self.name)
+        context.set_state("template_admission", admission)
         return success_result(input, stage_name=self.name)
