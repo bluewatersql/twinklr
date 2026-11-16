@@ -17,6 +17,36 @@ from twinklr.core.agents.prompts.sanitize import sanitize_metadata_field
 from twinklr.core.audio.models import SongBundle
 
 
+def _shape_beat_grid(features: dict[str, Any]) -> dict[str, Any] | None:
+    """Meter confidence, bar-placement confidence and method, and any tempo halving.
+
+    ``meter_confidence`` is the share of shuffled-beat arrangements the detected bar
+    accent beats; ``downbeat_confidence`` is 1 minus the largest p-value of the evidence
+    that placed bar 1 (0.0 when the placement is a ``fallback`` guess). The tempo-octave
+    note is present only when the analysis halved the beat tracker's tempo.
+    """
+    time_signature = features.get("time_signature")
+    downbeat_meta = features.get("rhythm", {}).get("downbeat_meta")
+    if not isinstance(time_signature, dict) or not isinstance(downbeat_meta, dict):
+        return None
+    octave = time_signature.get("tempo_octave") or {}
+    halved = bool(octave) and float(octave["chosen_bpm"]) < float(octave["tracker_bpm"])
+    return {
+        "meter_confidence": float(time_signature.get("confidence", 0.0)),
+        "downbeat_confidence": float(downbeat_meta.get("phase_confidence", 0.0)),
+        "downbeat_method": str(downbeat_meta.get("method", "unknown")),
+        "tempo_octave": (
+            {
+                "tracker_bpm": float(octave["tracker_bpm"]),
+                "chosen_bpm": float(octave["chosen_bpm"]),
+                "reason": str(octave["reason"]),
+            }
+            if halved
+            else None
+        ),
+    }
+
+
 def shape_context(bundle: SongBundle) -> dict[str, Any]:
     """Shape SongBundle into minimal context for AudioProfile agent.
 
@@ -31,6 +61,14 @@ def shape_context(bundle: SongBundle) -> dict[str, Any]:
             "audio_path": str,
             "duration_ms": int,
             "tempo": {"bpm": float, "confidence": float, "time_signature": str},
+            "beat_grid": {
+                "meter_confidence": float,
+                "downbeat_confidence": float,
+                "downbeat_method": str,
+                "tempo_octave": {"tracker_bpm": float, "chosen_bpm": float, "reason": str}
+                | None,
+            }
+            | None,
             "key": {"key": str, "mode": str, "confidence": float},
             "sections": [{"type": str, "start_ms": int, "end_ms": int, ...}],
             "energy": {
@@ -170,6 +208,8 @@ def shape_context(bundle: SongBundle) -> dict[str, Any]:
             vocals_statistics.get("vocal_coverage_pct", 0.0),
         ),
     }
+
+    context["beat_grid"] = _shape_beat_grid(features)
 
     # Lyrics (metadata only, no full text)
     context["lyrics"] = _shape_lyrics(bundle.lyrics)

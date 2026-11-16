@@ -14,6 +14,8 @@ from typing import Any, Protocol, cast
 import librosa
 import numpy as np
 
+from twinklr.core.audio.harmonic.hpss import compute_hpss
+from twinklr.core.audio.harmonic.key import extract_chroma
 from twinklr.core.audio.rhythm.beats import (
     compute_beats,
     detect_downbeats_phase_aligned,
@@ -122,6 +124,15 @@ class DSPSource:
     version = "twinklr-dsp-v2"
 
     def analyze_rhythm(self, inputs: MIRInput) -> RhythmAnalysis:
+        # Chord-change evidence (tempo octave, downbeat phase) is read from the chroma of
+        # the harmonic component only: full-mix chroma picks up drum timbre, which then
+        # looks like a chord change on every kick or snare.
+        harmonic = (
+            inputs.harmonic_audio
+            if inputs.harmonic_audio is not None
+            else compute_hpss(inputs.audio).harmonic
+        )
+        harmonic_chroma = extract_chroma(harmonic, inputs.sample_rate, hop_length=inputs.hop_length)
         tracker_bpm, tracker_frames = compute_beats(
             onset_env=inputs.onset_envelope,
             sr=inputs.sample_rate,
@@ -131,7 +142,7 @@ class DSPSource:
             tempo_bpm=tracker_bpm,
             beat_frames=tracker_frames,
             onset_env=inputs.onset_envelope,
-            chroma_cqt=inputs.chroma,
+            chroma_cqt=harmonic_chroma,
         )
         signature = detect_time_signature(beat_frames=beat_frames, onset_env=inputs.onset_envelope)
         signature["tempo_octave"] = octave
@@ -141,7 +152,7 @@ class DSPSource:
             sr=inputs.sample_rate,
             hop_length=inputs.hop_length,
             onset_env=inputs.onset_envelope,
-            chroma_cqt=inputs.chroma,
+            chroma_cqt=harmonic_chroma,
             beats_per_bar=beats_per_bar,
         )
         beats_s = librosa.frames_to_time(

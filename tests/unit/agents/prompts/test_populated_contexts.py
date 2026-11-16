@@ -310,6 +310,26 @@ def _pack_cases() -> list[tuple[str, Path, str, dict[str, Any]]]:
             },
             "lyrics": {"has_plain_lyrics": True, "has_timed_words": True, "lyric_confidence": 0.95},
             "phonemes": {"available": True, "confidence": 0.88},
+            "stem_signals": {
+                "status": "available",
+                "model_name": "htdemucs",
+                "rhythm_source": "drum_stem",
+                "beat_confidence": 0.9,
+                "accent_confidence": 0.82,
+                "build_drop_source": "bass_stem",
+                "vocals_source": "vocal_stem",
+                "vocal_presence_pct": 0.6,
+            },
+            "beat_grid": {
+                "meter_confidence": 0.99,
+                "downbeat_confidence": 0.0,
+                "downbeat_method": "fallback",
+                "tempo_octave": {
+                    "tracker_bpm": 156.6,
+                    "chosen_bpm": 78.3,
+                    "reason": "halved: backbeat accent two beats from the chord change",
+                },
+            },
         },
     }
     group_planner = {
@@ -641,6 +661,33 @@ def test_every_pack_renders_against_populated_context(
         assert "Longing grows into celebration." in rendered["user"]
         assert "light the way home" in rendered["user"]
         assert "chorus-home" in rendered["user"]
+
+
+def test_audio_profile_states_meter_bar_placement_and_tempo_octave() -> None:
+    """The planner sees each rhythm confidence under its own label, and the halving."""
+    cases = {case_id: (path, pack, variables) for case_id, path, pack, variables in _pack_cases()}
+    path, pack, variables = cases["audio_profile"]
+
+    user = PromptPackLoader(base_path=path).load_and_render(pack, variables)["user"]
+
+    assert "Beat / accent confidence" not in user
+    assert "**Meter confidence:** 0.99" in user
+    assert "**Bar placement (downbeat) confidence:** 0.0 (method: fallback)" in user
+    assert "Low confidence in bar placement" in user
+    assert "beat tracker read 156.6 BPM" in user
+    assert "halved it to 78.3 BPM" in user
+    assert "**Drum-stem beat alignment:** 0.82" in user
+
+    placed = deepcopy(variables)
+    placed["shaped_context"]["beat_grid"].update(
+        {"downbeat_confidence": 0.98, "downbeat_method": "harmonic_change", "tempo_octave": None}
+    )
+    placed["shaped_context"]["stem_signals"]["rhythm_source"] = "full_mix"
+    user = PromptPackLoader(base_path=path).load_and_render(pack, placed)["user"]
+
+    assert "Low confidence in bar placement" not in user
+    assert "beat tracker read" not in user
+    assert "Drum-stem beat alignment" not in user
 
 
 def test_phantom_lyric_fields_are_absent_from_runtime_tree() -> None:

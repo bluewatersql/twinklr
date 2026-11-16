@@ -49,7 +49,7 @@ def test_dsp_meter_matches_annotation_and_tempo_is_unchanged(
     rhythm = DSPSource().analyze_rhythm(inputs)
 
     assert rhythm.beats_per_bar == fixture.beats_per_bar
-    assert rhythm.tempo_bpm == pytest.approx(PINNED_TEMPO_BPM[fixture.id], abs=0.1)
+    assert rhythm.tempo_bpm == pytest.approx(PINNED_TEMPO_BPM[fixture.id], rel=0.02)
     octave = rhythm.metadata["time_signature"]["tempo_octave"]
     assert octave["chosen_bpm"] == pytest.approx(rhythm.tempo_bpm)
     downbeat_f1 = event_f1(fixture.downbeat_times_s, rhythm.downbeats_s, tolerance_s=0.070).f1

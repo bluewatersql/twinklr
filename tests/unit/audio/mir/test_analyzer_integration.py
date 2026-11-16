@@ -53,6 +53,66 @@ class _StructureSource:
         )
 
 
+class _HalvedRhythmSource:
+    """A grid the octave step halved from 156.6 to 78.3 BPM."""
+
+    name = "beat_this"
+
+    def analyze_rhythm(self, inputs: object) -> RhythmAnalysis:
+        beats = [0.25 + index * 60.0 / 78.3 for index in range(24)]
+        return RhythmAnalysis(
+            tempo_bpm=78.3,
+            beats_s=beats,
+            downbeats_s=beats[::4],
+            beats_per_bar=4,
+            beat_confidence=0.99,
+            downbeat_confidence=0.98,
+            source=self.name,
+            source_version="test",
+            metadata={
+                "time_signature": {"time_signature": "4/4", "confidence": 0.99},
+                "downbeat_meta": {
+                    "phase": 0,
+                    "phase_confidence": 0.98,
+                    "method": "harmonic_change+onset",
+                },
+            },
+        )
+
+
+def test_tempo_analysis_and_downbeat_method_follow_the_resolved_grid(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sample_rate = 22050
+    audio_path = tmp_path / "song.wav"
+    rng = np.random.default_rng(0)
+    sf.write(
+        audio_path, 0.1 * rng.standard_normal(20 * sample_rate).astype(np.float32), sample_rate
+    )
+    monkeypatch.setattr(
+        "twinklr.core.audio.analyzer.create_rhythm_source", lambda name: _HalvedRhythmSource()
+    )
+    monkeypatch.setattr(
+        "twinklr.core.audio.analyzer.create_structure_source", lambda name: _StructureSource()
+    )
+    analyzer = _analyzer_with_sources(RhythmSourceName.BEAT_THIS, StructureSourceName.ALLINONE)
+
+    result = analyzer._process_audio(str(audio_path))
+
+    tempo_analysis = result["tempo_analysis"]
+    assert result["tempo_bpm"] == pytest.approx(78.3)
+    assert tempo_analysis["average_tempo_bpm"] == pytest.approx(78.3, rel=0.01)
+    assert all(
+        point["tempo_bpm"] == pytest.approx(78.3, rel=0.01)
+        for point in tempo_analysis["tempo_curve"]
+    )
+    assert result["rhythm"]["downbeat_meta"] == {
+        "phase": 0,
+        "phase_confidence": 0.98,
+        "method": "harmonic_change+onset",
+    }
+
+
 def _write_short_audio(tmp_path: Path) -> Path:
     sample_rate = 22050
     audio_path = tmp_path / "short.wav"

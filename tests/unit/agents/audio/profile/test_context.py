@@ -84,6 +84,79 @@ def test_shape_context_surfaces_stem_signals_to_planners():
     }
 
 
+def _beat_grid_bundle(*, tempo_octave: dict, downbeat_method: str):
+    from twinklr.core.audio.models import SongBundle, SongTiming
+
+    return SongBundle(
+        schema_version="3.0",
+        audio_path="/test/song.mp3",
+        recording_id="test_123",
+        features={
+            "duration_ms": 10_000,
+            "tempo_bpm": tempo_octave["chosen_bpm"],
+            "time_signature": {
+                "time_signature": "4/4",
+                "confidence": 0.99,
+                "method": "accent_pattern",
+                "tempo_octave": tempo_octave,
+            },
+            "rhythm": {
+                "source": "full_mix",
+                "beat_confidence": 0.99,
+                "accent_confidence": 0.99,
+                "downbeat_meta": {"phase": 2, "phase_confidence": 0.0, "method": downbeat_method},
+            },
+        },
+        timing=SongTiming(sr=22_050, hop_length=512, duration_s=10.0, duration_ms=10_000),
+    )
+
+
+def test_shape_context_reports_meter_bar_placement_and_halving():
+    from twinklr.core.agents.audio.profile.context import shape_context
+
+    bundle = _beat_grid_bundle(
+        tempo_octave={
+            "tracker_bpm": 156.6,
+            "half_bpm": 78.3,
+            "chosen_bpm": 78.3,
+            "reason": "halved: backbeat accent two beats from the chord change",
+        },
+        downbeat_method="fallback",
+    )
+
+    context = shape_context(bundle)
+
+    assert context["beat_grid"] == {
+        "meter_confidence": 0.99,
+        "downbeat_confidence": 0.0,
+        "downbeat_method": "fallback",
+        "tempo_octave": {
+            "tracker_bpm": 156.6,
+            "chosen_bpm": 78.3,
+            "reason": "halved: backbeat accent two beats from the chord change",
+        },
+    }
+
+
+def test_shape_context_omits_the_octave_note_when_the_tracker_tempo_was_kept():
+    from twinklr.core.agents.audio.profile.context import shape_context
+
+    bundle = _beat_grid_bundle(
+        tempo_octave={
+            "tracker_bpm": 129.2,
+            "half_bpm": 64.6,
+            "chosen_bpm": 129.2,
+            "reason": "kept tracker tempo: no significant 4-beat accent and chord phase",
+        },
+        downbeat_method="harmonic_change",
+    )
+
+    context = shape_context(bundle)
+
+    assert context["beat_grid"]["tempo_octave"] is None
+    assert context["beat_grid"]["downbeat_method"] == "harmonic_change"
+
+
 def test_shape_context_energy_compression():
     """Test energy curve is compressed per-section."""
     from twinklr.core.agents.audio.profile.context import shape_context

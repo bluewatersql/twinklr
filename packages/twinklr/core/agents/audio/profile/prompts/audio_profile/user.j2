@@ -15,13 +15,28 @@ Analyze the following song and produce a complete AudioProfileModel.
 - **Tempo Confidence:** {{ shaped_context.tempo.confidence | round(2) }}
 {% endif %}
 
+{% if shaped_context.beat_grid is defined and shaped_context.beat_grid %}
+## Beat Grid
+
+- **Meter confidence:** {{ shaped_context.beat_grid.meter_confidence | round(2) }} (share of shuffled-beat arrangements the detected bar accent beats; below 0.95 the accent pattern cannot be told from chance)
+- **Bar placement (downbeat) confidence:** {{ shaped_context.beat_grid.downbeat_confidence | round(2) }} (method: {{ shaped_context.beat_grid.downbeat_method }})
+{% if shaped_context.beat_grid.downbeat_method == "fallback" %}
+- **Low confidence in bar placement:** no significant chord-change or accent evidence was found, so bar 1 is a guess and bar lines may be off by one or more beats.
+{% endif %}
+{% if shaped_context.beat_grid.tempo_octave %}
+- **Tempo octave:** the beat tracker read {{ shaped_context.beat_grid.tempo_octave.tracker_bpm | round(1) }} BPM; the analysis halved it to {{ shaped_context.beat_grid.tempo_octave.chosen_bpm | round(1) }} BPM ({{ shaped_context.beat_grid.tempo_octave.reason }}). A double-time reading at {{ shaped_context.beat_grid.tempo_octave.tracker_bpm | round(1) }} BPM exists.
+{% endif %}
+{% endif %}
+
 {% if shaped_context.stem_signals is defined and shaped_context.stem_signals %}
 ## Source-Separation Signals
 
 - **Status:** {{ shaped_context.stem_signals.status }}
 - **Model:** {{ shaped_context.stem_signals.model_name or "None (full-mix fallback)" }}
 - **Rhythm source:** {{ shaped_context.stem_signals.rhythm_source }}
-- **Beat / accent confidence:** {{ shaped_context.stem_signals.beat_confidence | round(2) }} / {{ shaped_context.stem_signals.accent_confidence | round(2) }}
+{% if shaped_context.stem_signals.rhythm_source == "drum_stem" %}
+- **Drum-stem beat alignment:** {{ shaped_context.stem_signals.accent_confidence | round(2) }}
+{% endif %}
 - **Build/drop source:** {{ shaped_context.stem_signals.build_drop_source }}
 - **Vocal source / presence:** {{ shaped_context.stem_signals.vocals_source }} / {{ shaped_context.stem_signals.vocal_presence_pct | round(2) }}
 {% endif %}

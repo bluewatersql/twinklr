@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import pytest
+
+from twinklr.core.audio.rhythm.tempo import detect_tempo_changes
 from twinklr.core.feature_engineering.alignment import TemporalAlignmentEngine
 from twinklr.core.feature_engineering.models import AlignmentStatus
 
@@ -78,3 +81,47 @@ def test_alignment_marks_no_audio_when_features_missing() -> None:
 
     assert len(rows) == 1
     assert rows[0].alignment_status is AlignmentStatus.NO_AUDIO
+
+
+def test_alignment_beat_counts_follow_a_halved_grid() -> None:
+    """Local tempo and beat positions agree when the grid was halved to 78.3 BPM."""
+    beat_s = 60.0 / 78.3
+    beats = [0.25 + i * beat_s for i in range(150)]
+    features = {
+        "duration_s": 120.0,
+        "assumptions": {"beats_per_bar": 4},
+        "beats_s": beats,
+        "bars_s": beats[::4],
+        "tempo_analysis": detect_tempo_changes(beats, duration_s=120.0),
+    }
+    events = [
+        {
+            "effect_event_id": "evt-1",
+            "target_name": "Tree",
+            "layer_index": 0,
+            "effect_type": "On",
+            "start_ms": round(beats[8] * 1000) + 1,
+            "end_ms": round(beats[12] * 1000),
+        },
+        {
+            "effect_event_id": "evt-2",
+            "target_name": "Tree",
+            "layer_index": 0,
+            "effect_type": "On",
+            "start_ms": round(beats[14] * 1000) + 1,
+            "end_ms": round(beats[16] * 1000),
+        },
+    ]
+
+    first, second = TemporalAlignmentEngine().align_events(
+        package_id="pkg-1",
+        sequence_file_id="seq-1",
+        events=events,
+        audio_features=features,
+    )
+
+    assert first.start_beat_index == 8
+    assert first.bar_index == 2
+    assert first.duration_beats == pytest.approx(4.0, abs=0.01)
+    assert second.local_tempo_bpm == pytest.approx(78.3, rel=0.01)
+    assert second.silence_before_beats == pytest.approx(2.0, abs=0.02)

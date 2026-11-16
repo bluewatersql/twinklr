@@ -765,7 +765,7 @@ class AudioAnalyzer:
             "boundary_times_s": structure_analysis.boundary_times_s,
             "meta": structure_analysis.metadata,
         }
-        tempo_changes = detect_tempo_changes(y, sr, hop_length=hop_length)
+        tempo_changes = detect_tempo_changes(beats_s, duration_s=duration)
 
         # Tension curve
         tension = compute_tension_curve(
@@ -827,6 +827,7 @@ class AudioAnalyzer:
                 "downbeat_meta": {
                     "phase": int(downbeat_result.get("phase", 0)),
                     "phase_confidence": rhythm_analysis.downbeat_confidence,
+                    "method": str(downbeat_result.get("method", rhythm_analysis.source)),
                 },
             },
             "analysis_sources": {

@@ -145,43 +145,13 @@ tempo_bpm, beat_frames = compute_beats(
 beat_times_s = frames_to_time(beat_frames, sr=sr, hop_length=hop_length)
 ```
 
-And here’s the kind of correction logic we ended up layering on top in the analysis pipeline, simplified but faithful to the actual idea:
+The current pipeline settles this in `resolve_tempo_octave()` in `packages/twinklr/core/audio/rhythm/beats.py` with one musical test. On the tracker's grid it finds the strongest every-four-beats onset accent and the strongest every-four-beats chord change, and keeps each only if it beats shuffled beats (p < 0.05). If the accent lands exactly two tracker beats after the chord change, it is a backbeat (snare on 2 and 4, chords on 1 and 3) and the tracker has been counting eighth notes, so the tempo is halved. An accent that lines up with the chord change is a downbeat and the tracker's tempo stands, as it does whenever the evidence is weaker. Halving is only considered when the tracker reads at or above its 120 BPM prior, and the tempo is never doubled. The chord change is read from the chroma of the harmonic (HPSS) component, so drum timbre cannot pose as a chord change. The candidates, the evidence, and the reason are recorded under `time_signature.tempo_octave` in the analysis output.
 
-```python
-def correct_tempo_octave(
-    tempo_bpm: float,
-    beat_times_s: np.ndarray,
-    beats_per_bar: int,
-) -> float:
-    candidates = [tempo_bpm, tempo_bpm / 2.0, tempo_bpm * 2.0]
-    candidates = [t for t in candidates if 45.0 <= t <= 220.0]
+Known and accepted limits of that rule:
 
-    best_tempo = tempo_bpm
-    best_score = -1.0
-
-    intervals = np.diff(beat_times_s)
-    if len(intervals) == 0:
-        return tempo_bpm
-
-    for candidate in candidates:
-        beat_period = 60.0 / candidate
-
-        # How well do observed beat intervals match this candidate?
-        interval_error = np.mean(np.abs(intervals - beat_period))
-
-        # In the full pipeline we also cross-check bar stability and downbeat alignment.
-        phrase_score = 1.0 / (1e-6 + interval_error)
-
-        if phrase_score > best_score:
-            best_score = phrase_score
-            best_tempo = candidate
-
-    return best_tempo
-```
-
-Was this mathematically pure? Absolutely not. Was it better than letting the tracker gaslight the entire choreography stack? Very much yes.
-
-The current pipeline settles this in `resolve_tempo_octave()` in `packages/twinklr/core/audio/rhythm/beats.py` with one musical test. On the tracker's grid it finds the strongest every-four-beats onset accent and the strongest every-four-beats chord change, and keeps each only if it beats shuffled beats (p < 0.05). If the accent lands exactly two tracker beats after the chord change, it is a backbeat (snare on 2 and 4, chords on 1 and 3) and the tracker has been counting eighth notes, so the tempo is halved. An accent that lines up with the chord change is a downbeat and the tracker's tempo stands, as it does whenever the evidence is weaker. Halving is only considered when the tracker reads at or above its 120 BPM prior, and the tempo is never doubled. The candidates, the evidence, and the reason are recorded under `time_signature.tempo_octave` in the analysis output.
+- Half-time-feel material at a fast nominal tempo (trap, drum and bass, half-time choruses) is reported at the felt half tempo, because the snare lands two beats from the chord change.
+- A slow ballad that the tracker reads at double time below the prior (for example 55 BPM read as 110) is not halved.
+- The tracker's own slow-side errors are never corrected, because the tempo is never doubled.
 
 We also cross-checked tempo hypotheses against downbeat patterns. If the “126 BPM” interpretation produced bar starts that never lined up with stronger accents, while the “63 BPM” version did, that was a huge clue that the tracker was hearing subdivisions instead of the real pulse.
 
@@ -263,7 +233,7 @@ def choose_downbeat_phase(
 
 That’s not the whole production version, but it captures the shape of it: test each phase, reward the one whose “first beats” are strongest.
 
-The current `detect_downbeats_phase_aligned()` in `packages/twinklr/core/audio/rhythm/beats.py` turns that order around, because loudest-beat-wins puts the bar on the snare in backbeat music. Chord change comes first: each bar (or half-bar) votes for the beat that holds its biggest chord change, and the vote counts only if it beats shuffled beats (p < 0.05) with at least eight winning bars. In 4/4 the half-bar vote says “beats 1 and 3”; chord change then picks between them if it can, and otherwise the louder of the two breaks the tie (so beat 1 versus beat 3 can stay genuinely uncertain). Without usable chord evidence the onset-accent vote decides, and without that the loudest phase is a labelled fallback. `phase_confidence` is 1 minus the largest p-value among the votes that decided, and 0.0 for the fallback.
+The current `detect_downbeats_phase_aligned()` in `packages/twinklr/core/audio/rhythm/beats.py` turns that order around, because loudest-beat-wins puts the bar on the snare in backbeat music. Chord change comes first: each bar (or half-bar) votes for the beat that holds its biggest chord change in the harmonic-component chroma (at least 0.05, 1 minus cosine), and the vote counts only if it beats shuffled beats (p < 0.05) with at least eight winning bars. In 4/4 the half-bar vote says “beats 1 and 3”; chord change then picks between them if it can, and otherwise the louder of the two breaks the tie (so beat 1 versus beat 3 is settled by kick loudness and can stay genuinely uncertain). Without usable chord evidence the onset-accent vote decides, and without that the loudest phase is a labelled fallback. `phase_confidence` is 1 minus the largest p-value among the votes that decided, and 0.0 for the fallback.
 
 ![Beat strip grouped into 1-2-3-4 with downbeats highlighted](assets/illustrations/ILL-01-03.png)
 
@@ -298,7 +268,7 @@ def _grouping_score(z: np.ndarray, n: int, phase: int) -> float:
 # excess[n] = best-phase score - mean best-phase score over 100 seeded shuffles
 ```
 
-The answer is **4/4** unless the triple evidence (3/4 or 6/8) beats the duple evidence by more than 0.10. Accents alone cannot tell **2/4** from **4/4**, so duple meters are reported as 4/4. The reported confidence is the share of shuffled-beat arrangements the winning grouping beats: 0.5 is chance, and 0.95 or more is a significant bar accent.
+The answer is **4/4** unless the triple evidence (the better of 3/4 and 6/8) both beats the duple evidence (the better of 2/4 and 4/4) by more than 0.10 and is itself above 0.10. Accents alone cannot tell **2/4** from **4/4**, so duple meters are reported as 4/4, and a weakly accented 3/4 can read as 4/4. The reported confidence is the share of shuffled-beat arrangements the winning grouping beats (1 minus its permutation p-value). With no real accent pattern that share is equally likely to be anything from 0 to 1, so values below 0.95 mean the pattern cannot be told from chance, not a graded "somewhat confident"; 0.95 or more is a significant bar accent.
 
 The point isn’t to become a full musicology engine. The point is to avoid dumb mistakes.
 

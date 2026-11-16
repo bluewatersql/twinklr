@@ -51,15 +51,15 @@ def compute_beats(
 _NULL_SHUFFLES = 100
 _NULL_SEED = 0
 # A triple meter must beat the duple evidence by this much chance-corrected score.
-TRIPLE_METER_MARGIN = 0.10
+_TRIPLE_METER_MARGIN = 0.10
 # Fewest tracker beats (eight 4-beat cycles) on which the octave evidence is tested.
 _OCTAVE_MIN_BEATS = 32
 # Fewest winning bars for downbeat evidence to decide (eight bars, as above): a handful
 # of outsized chord changes, such as section changes, cannot place the bar alone.
 _MIN_EVIDENCE_GROUPS = 8
-# Smallest chroma change (1 - cosine) counted as a chord change. Two triads sharing two
-# notes differ by 1/3; the timbre-only chroma flicker in the MIR fixtures stays below
-# 0.05 and section changes reach ~0.97.
+# Smallest harmonic-component chroma change (1 - cosine) counted as a chord change. Two
+# triads sharing two notes differ by 1/3; in the MIR fixtures the click-driven chroma
+# flicker of the harmonic component stays below 0.05 while section changes reach ~0.97.
 _MIN_CHORD_CHANGE = 0.05
 
 
@@ -154,11 +154,16 @@ def resolve_tempo_octave(
     tempo is only considered when it stays within one octave of the tracker prior
     (``tempo_bpm >= start_bpm``). The tempo is never doubled.
 
+    Known and accepted: half-time-feel material at a fast nominal tempo (trap, drum and
+    bass, half-time choruses) is reported at the felt half tempo; a slow song the tracker
+    reads at double time below the prior (55 BPM read as 110) is not halved.
+
     Args:
         tempo_bpm: Tempo from ``compute_beats``
         beat_frames: Beat frames from ``compute_beats``
         onset_env: Onset strength envelope
-        chroma_cqt: Chroma features (12 x n_frames)
+        chroma_cqt: Chroma of the harmonic (HPSS) component (12 x n_frames); full-mix
+            chroma lets drum timbre pass for chord changes
         start_bpm: The tracker prior used by ``compute_beats``
 
     Returns:
@@ -206,13 +211,16 @@ def detect_time_signature(
     For each grouping n in (2, 3, 4, 6), the score is how well beats fall into n-beat bars
     with a strong first beat, at the best of the n bar phases, minus the same best-phase
     score averaged over shuffled beats. Small groupings score higher by chance alone,
-    which this subtraction removes. The result is 4/4 unless the triple evidence
-    (3/4 or 6/8) beats the duple evidence (2/4 or 4/4) by ``TRIPLE_METER_MARGIN``; duple
-    evidence is reported as 4/4 because accents alone do not separate 2/4 from 4/4.
+    which this subtraction removes. The result is 4/4 unless the triple evidence (the
+    better of 3/4 and 6/8) both beats the duple evidence (the better of 2/4 and 4/4) by
+    ``_TRIPLE_METER_MARGIN`` and exceeds ``_TRIPLE_METER_MARGIN`` itself. Duple evidence
+    is reported as 4/4 because accents alone do not separate 2/4 from 4/4; a weakly
+    accented 3/4 can also read as 4/4 (known and accepted).
 
     ``confidence`` is 1 minus the permutation p-value of the deciding grouping: the share
-    of shuffled-beat arrangements whose best-phase score the observed score exceeds
-    (0.5 is chance; 0.95 or more means a significant bar accent at p < 0.05).
+    of shuffled-beat arrangements whose best-phase score the observed score exceeds.
+    Without a real accent pattern it is spread evenly over 0 to 1, so values below 0.95
+    mean "not distinguishable from chance"; 0.95 or more is a significant bar accent.
 
     Args:
         beat_frames: Beat frame indices
@@ -245,8 +253,8 @@ def detect_time_signature(
     duple_n = 4 if excess[4] >= excess[2] else 2
     triple_n = 3 if excess[3] >= excess[6] else 6
     if (
-        excess[triple_n] > excess[duple_n] + TRIPLE_METER_MARGIN
-        and excess[triple_n] > TRIPLE_METER_MARGIN
+        excess[triple_n] > excess[duple_n] + _TRIPLE_METER_MARGIN
+        and excess[triple_n] > _TRIPLE_METER_MARGIN
     ):
         signature, deciding = ("3/4" if triple_n == 3 else "6/8"), triple_n
     else:
@@ -256,7 +264,7 @@ def detect_time_signature(
     return {
         "time_signature": signature,
         "confidence": round(beaten[deciding], 3),
-        "method": "accent_pattern" if best > TRIPLE_METER_MARGIN else "default",
+        "method": "accent_pattern" if best > _TRIPLE_METER_MARGIN else "default",
         "all_scores": {
             label: round(excess[n], 3)
             for label, n in (("2/4", 2), ("3/4", 3), ("4/4", 4), ("6/8", 6))
@@ -357,13 +365,15 @@ def detect_downbeats_phase_aligned(
     only from ``_MIN_CHORD_CHANGE``.
     ``phase_confidence`` is 1 minus the largest p-value among the tests that decided
     the phase (0.95 or more: every deciding test significant), and 0.0 for the fallback.
+    Known and accepted: when chords change equally on beats 1 and 3, kick loudness
+    decides between them.
 
     Args:
         beat_frames: Beat frame indices
         sr: Sample rate
         hop_length: Hop length
         onset_env: Onset strength envelope
-        chroma_cqt: Chroma features (12 x n_frames)
+        chroma_cqt: Chroma of the harmonic (HPSS) component (12 x n_frames)
         beats_per_bar: Number of beats per bar
 
     Returns:

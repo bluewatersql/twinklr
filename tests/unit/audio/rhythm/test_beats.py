@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from itertools import pairwise
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import numpy as np
 import pytest
 
 from twinklr.core.audio.rhythm.beats import (
+    _TRIPLE_METER_MARGIN,
     compute_beats,
     detect_downbeats_phase_aligned,
     detect_time_signature,
@@ -588,11 +589,13 @@ def _bar_grid(
     chords: list[tuple[int, ...]],
     n_bars: int = 24,
     seed: int = 0,
+    drift: tuple[float, ...] = (),
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Beat frames, onset envelope and chroma for bars of ``len(onset_pattern)`` beats.
 
     The bar starts at beat index ``downbeat_phase``. The chord advances through
-    ``chords`` on every bar position in ``chord_positions``.
+    ``chords`` on every bar position in ``chord_positions``. ``drift`` adds that much
+    energy at pitch class D on each bar position (a sub-chord-change chroma wobble).
     """
     rng = np.random.default_rng(seed)
     beats_per_bar = len(onset_pattern)
@@ -609,6 +612,8 @@ def _bar_grid(
             chord_index += 1
         for pitch in chords[chord_index % len(chords)]:
             chroma[pitch, frame : frame + 21] += 1.0
+        if drift:
+            chroma[2, frame : frame + 21] += drift[position]
     return beat_frames, onset_env, chroma
 
 
@@ -822,3 +827,180 @@ class TestResolveTempoOctave:
         assert first[2] == second[2]
         assert np.array_equal(first[3], second[3])
         assert first[4] == second[4]
+
+
+def _event_frames(bpm: float, n_events: int) -> np.ndarray:
+    """The exact event frames of ``_drum_track`` without jitter (a perfect tracker grid)."""
+    return np.round((0.5 + np.arange(n_events) * 60.0 / bpm) * FPS).astype(int)
+
+
+def _resolve(
+    tempo_bpm: float, frames: np.ndarray, onset_env: np.ndarray, chroma: np.ndarray
+) -> tuple[float, np.ndarray, dict[str, Any]]:
+    return resolve_tempo_octave(
+        tempo_bpm=tempo_bpm, beat_frames=frames, onset_env=onset_env, chroma_cqt=chroma
+    )
+
+
+class TestOctaveRulesArePinned:
+    """Each case fails if one named part of the octave rule is removed or loosened."""
+
+    HALF_TIME_FEEL: ClassVar[list[float]] = [0.8, 0.6, 1.0, 0.6]
+
+    def test_fast_rock_with_snare_on_2_and_4_and_chords_on_1_stays_fast(self) -> None:
+        # Accent on beats 2 and 4, chord change on 1: offset 1 or 3, never 2.
+        onset_env, chroma = _drum_track(bpm=160.0, pattern=[0.7, 1.0, 0.7, 1.0], chord_every=4)
+        tempo, frames = compute_beats(onset_env=onset_env, sr=SR, hop_length=HOP)
+
+        resolved, resolved_frames, record = _resolve(tempo, frames, onset_env, chroma)
+
+        assert tempo == pytest.approx(160.0, rel=0.03)
+        assert resolved == tempo
+        assert np.array_equal(resolved_frames, frames)
+        assert (record["accent"]["phase"] - record["harmonic_change"]["phase"]) % 4 in (1, 3)
+
+    @pytest.mark.parametrize(("tracker_bpm", "halved"), [(110.0, False), (130.0, True)])
+    def test_backbeat_evidence_halves_only_at_or_above_the_prior(
+        self, tracker_bpm: float, halved: bool
+    ) -> None:
+        onset_env, chroma = _drum_track(bpm=158.0, pattern=self.HALF_TIME_FEEL, chord_every=8)
+        frames = _event_frames(158.0, 192)
+
+        resolved, _, record = _resolve(tracker_bpm, frames, onset_env, chroma)
+
+        assert (resolved == tracker_bpm / 2.0) is halved
+        assert ("prior" in record["reason"]) is not halved
+
+    def test_offset_two_without_significant_evidence_keeps_the_tracker_tempo(self) -> None:
+        # Random accents and chroma (seed 16) land two beats apart by chance only.
+        rng = np.random.default_rng(16)
+        frames = np.arange(64, dtype=int) * 16 + 10
+        n_frames = int(frames[-1]) + 30
+        onset_env = np.zeros(n_frames, dtype=np.float32)
+        onset_env[frames] = rng.random(64).astype(np.float32)
+        chroma = np.repeat(rng.random((12, 66)).astype(np.float32), 16, axis=1)[:, :n_frames]
+
+        resolved, _, record = _resolve(160.0, frames, onset_env, chroma)
+
+        assert (record["accent"]["phase"] - record["harmonic_change"]["phase"]) % 4 == 2
+        assert not (record["accent"]["significant"] and record["harmonic_change"]["significant"])
+        assert resolved == 160.0
+
+    @pytest.mark.parametrize(("n_beats", "halved"), [(31, False), (32, True)])
+    def test_octave_needs_32_beats(self, n_beats: int, halved: bool) -> None:
+        onset_env, chroma = _drum_track(bpm=158.0, pattern=self.HALF_TIME_FEEL, chord_every=8)
+        frames = _event_frames(158.0, 192)[:n_beats]
+
+        resolved, _, _ = _resolve(158.0, frames, onset_env, chroma)
+
+        assert (resolved == 79.0) is halved
+
+
+class TestMeterRulesArePinned:
+    """Random accents (fixed seeds) whose labels depend on one named part of the meter rule."""
+
+    @staticmethod
+    def _random_strength_grid(seed: int) -> tuple[np.ndarray, np.ndarray]:
+        strengths = np.random.default_rng(seed).random(72).astype(np.float32)
+        beat_frames = np.arange(72, dtype=int) * 21 + 10
+        onset_env = np.zeros(int(beat_frames[-1]) + 30, dtype=np.float32)
+        onset_env[beat_frames] = strengths
+        return beat_frames, onset_env
+
+    def test_triple_slightly_ahead_of_duple_is_still_4_4(self) -> None:
+        beat_frames, onset_env = self._random_strength_grid(1)
+
+        result = detect_time_signature(beat_frames=beat_frames, onset_env=onset_env)
+        scores = result["all_scores"]
+        triple = max(scores["3/4"], scores["6/8"])
+        duple = max(scores["2/4"], scores["4/4"])
+
+        assert 0.0 < triple - duple < _TRIPLE_METER_MARGIN
+        assert result["time_signature"] == "4/4"
+
+    def test_chance_baseline_takes_the_best_phase_of_each_shuffle(self) -> None:
+        # Six phases give a 6-beat grouping more chances than a 2-beat one; a baseline
+        # scored at phase 0 only would hand this accentless grid to 6/8.
+        beat_frames, onset_env = self._random_strength_grid(10)
+
+        result = detect_time_signature(beat_frames=beat_frames, onset_env=onset_env)
+
+        assert result["time_signature"] == "4/4"
+        assert all(score < _TRIPLE_METER_MARGIN for score in result["all_scores"].values())
+
+
+_FS, _DSM = (6, 10, 1), (3, 6, 10)  # F# major, D# minor: no notes shared with C or A minor
+
+
+class TestChordChangeFloor:
+    """Chroma wobble smaller than any chord change cannot place the bar."""
+
+    @pytest.mark.parametrize("downbeat_phase", range(4))
+    def test_sub_floor_wobble_on_beat_2_does_not_beat_the_accent(self, downbeat_phase: int) -> None:
+        # One held chord; a little D (change ~0.026, under the 0.05 floor) appears on
+        # beat 2 and fades, so beat 2 always holds the bar's largest chroma change.
+        beat_frames, onset_env, chroma = _bar_grid(
+            onset_pattern=[1.0, 0.45, 0.65, 0.45],
+            chord_positions=set(),
+            downbeat_phase=downbeat_phase,
+            chords=[_C],
+            drift=(0.0, 0.4, 0.2, 0.1),
+        )
+
+        result = detect_downbeats_phase_aligned(
+            beat_frames=beat_frames,
+            sr=SR,
+            hop_length=HOP,
+            onset_env=onset_env,
+            chroma_cqt=chroma,
+            beats_per_bar=4,
+        )
+
+        assert result["phase"] == downbeat_phase
+        assert result["method"] == "onset_accent"
+
+
+class TestDownbeatEvidenceNeedsEightBars:
+    """Fewer than eight winning bars never decide the bar, however consistent."""
+
+    def _downbeats(
+        self, beat_frames: np.ndarray, onset_env: np.ndarray, chroma: np.ndarray
+    ) -> dict[str, Any]:
+        return detect_downbeats_phase_aligned(
+            beat_frames=beat_frames,
+            sr=SR,
+            hop_length=HOP,
+            onset_env=onset_env,
+            chroma_cqt=chroma,
+            beats_per_bar=4,
+        )
+
+    def test_six_bars_of_chord_changes_fall_back(self) -> None:
+        beat_frames, onset_env, chroma = _bar_grid(
+            onset_pattern=[0.6, 1.0, 0.6, 1.0],
+            chord_positions={0},
+            downbeat_phase=1,
+            chords=[_C, _F, _G, _AM],
+            n_bars=6,
+        )
+
+        result = self._downbeats(beat_frames, onset_env, chroma)
+
+        assert result["method"] == "fallback"
+        assert result["phase_confidence"] == 0.0
+
+    def test_seven_bars_cannot_split_beat_1_from_beat_3_by_chord_alone(self) -> None:
+        # Big chord change on beat 1, small one on beat 3 in all seven bars (sign test
+        # p = 0.016, but only seven wins); the louder kick on beat 3 breaks the tie.
+        beat_frames, onset_env, chroma = _bar_grid(
+            onset_pattern=[0.55, 1.0, 0.75, 1.0],
+            chord_positions={0, 2},
+            downbeat_phase=1,
+            chords=[_DSM, _C, _AM, _FS],
+            n_bars=7,
+        )
+
+        result = self._downbeats(beat_frames, onset_env, chroma)
+
+        assert result["method"] == "harmonic_change+onset"
+        assert result["phase"] == 3

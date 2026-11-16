@@ -1,4 +1,4 @@
-"""Tests for tempo change detection."""
+"""Tests for tempo change detection over the resolved beat grid."""
 
 from __future__ import annotations
 
@@ -8,6 +8,10 @@ import pytest
 from twinklr.core.audio.rhythm.tempo import detect_tempo_changes
 
 
+def _beats(bpm: float, duration_s: float, start_s: float = 0.25) -> list[float]:
+    return [float(t) for t in np.arange(start_s, duration_s, 60.0 / bpm)]
+
+
 def test_package_exports_live_tempo_change_detector() -> None:
     from twinklr.core.audio.rhythm import detect_tempo_changes as exported_detector
 
@@ -15,195 +19,82 @@ def test_package_exports_live_tempo_change_detector() -> None:
 
 
 class TestDetectTempoChanges:
-    """Tests for detect_tempo_changes function."""
+    """The tempo curve is read from the same beats that the grid uses."""
 
-    def test_returns_expected_structure(
-        self,
-        sine_wave_440hz: np.ndarray,
-        sample_rate: int,
-        hop_length: int,
-    ) -> None:
-        """Function returns expected dictionary structure."""
-        result = detect_tempo_changes(
-            sine_wave_440hz,
-            sample_rate,
-            hop_length=hop_length,
+    def test_returns_expected_structure(self) -> None:
+        result = detect_tempo_changes(_beats(120.0, 30.0), duration_s=30.0)
+
+        assert set(result) == {
+            "tempo_curve",
+            "tempo_changes",
+            "average_tempo_bpm",
+            "tempo_std",
+            "is_stable",
+        }
+        point = result["tempo_curve"][0]
+        assert set(point) == {"time_s", "tempo_bpm"}
+
+    def test_halved_grid_reports_the_halved_tempo(self) -> None:
+        """A grid resolved to 78.3 BPM must not be reported at the tracker's 156.6 BPM."""
+        result = detect_tempo_changes(_beats(78.3, 120.0), duration_s=120.0)
+
+        assert result["average_tempo_bpm"] == pytest.approx(78.3, rel=0.01)
+        assert all(
+            point["tempo_bpm"] == pytest.approx(78.3, rel=0.01) for point in result["tempo_curve"]
         )
+        assert result["is_stable"] is True
+        assert result["tempo_changes"] == []
 
-        assert "tempo_curve" in result
-        assert "tempo_changes" in result
-        assert "average_tempo_bpm" in result
-        assert "tempo_std" in result
-        assert "is_stable" in result
+    def test_tempo_step_is_reported_as_a_change(self) -> None:
+        beats = _beats(100.0, 30.0) + [30.0 + t for t in _beats(140.0, 30.0, start_s=0.0)]
 
-    def test_short_audio_returns_single_tempo(
-        self,
-        very_short_audio: np.ndarray,
-        sample_rate: int,
-        hop_length: int,
-    ) -> None:
-        """Audio shorter than window size returns single tempo point."""
-        result = detect_tempo_changes(
-            very_short_audio,
-            sample_rate,
-            hop_length=hop_length,
-            window_size_s=10.0,  # Audio is 5s
-        )
+        result = detect_tempo_changes(beats, duration_s=60.0)
 
-        # Either returns one tempo or empty curve
-        assert len(result["tempo_curve"]) <= 1
+        tempos = [point["tempo_bpm"] for point in result["tempo_curve"]]
+        assert tempos[0] == pytest.approx(100.0, rel=0.02)
+        assert tempos[-1] == pytest.approx(140.0, rel=0.02)
+        assert result["tempo_changes"]
+        change = result["tempo_changes"][0]
+        assert set(change) == {"time_s", "from_bpm", "to_bpm", "change_pct"}
+        assert result["is_stable"] is False
+
+    def test_window_hop_is_half_the_window(self) -> None:
+        result = detect_tempo_changes(_beats(120.0, 30.0), duration_s=30.0, window_size_s=10.0)
+
+        assert [point["time_s"] for point in result["tempo_curve"]] == [0.0, 5.0, 10.0, 15.0]
+
+    def test_smaller_window_gives_more_points(self) -> None:
+        beats = _beats(120.0, 30.0)
+
+        large = detect_tempo_changes(beats, duration_s=30.0, window_size_s=15.0)
+        small = detect_tempo_changes(beats, duration_s=30.0, window_size_s=5.0)
+
+        assert len(small["tempo_curve"]) > len(large["tempo_curve"])
+
+    def test_average_is_the_mean_of_the_curve(self) -> None:
+        beats = _beats(100.0, 30.0) + [30.0 + t for t in _beats(140.0, 30.0, start_s=0.0)]
+
+        result = detect_tempo_changes(beats, duration_s=60.0)
+
+        tempos = [point["tempo_bpm"] for point in result["tempo_curve"]]
+        assert result["average_tempo_bpm"] == pytest.approx(float(np.mean(tempos)))
+        assert result["tempo_std"] == pytest.approx(float(np.std(tempos)), abs=1e-6)
+
+    def test_audio_shorter_than_the_window_gives_one_point(self) -> None:
+        result = detect_tempo_changes(_beats(90.0, 5.0), duration_s=5.0, window_size_s=10.0)
+
+        assert len(result["tempo_curve"]) == 1
+        assert result["average_tempo_bpm"] == pytest.approx(90.0, rel=0.01)
         assert result["is_stable"] is True
 
-    def test_long_audio_has_multiple_tempo_points(
-        self,
-        long_audio: np.ndarray,
-        sample_rate: int,
-        hop_length: int,
-    ) -> None:
-        """Audio longer than window size has multiple tempo curve points."""
-        result = detect_tempo_changes(
-            long_audio,
-            sample_rate,
-            hop_length=hop_length,
-            window_size_s=5.0,
-        )
+    @pytest.mark.parametrize("beats", [[], [1.0]], ids=["no_beats", "one_beat"])
+    def test_too_few_beats_give_an_empty_curve(self, beats: list[float]) -> None:
+        result = detect_tempo_changes(beats, duration_s=30.0)
 
-        # 30s audio with 5s window, 50% overlap = multiple points
-        assert len(result["tempo_curve"]) > 1
-
-    def test_tempo_curve_structure(
-        self,
-        long_audio: np.ndarray,
-        sample_rate: int,
-        hop_length: int,
-    ) -> None:
-        """Each tempo curve point has time_s and tempo_bpm."""
-        result = detect_tempo_changes(
-            long_audio,
-            sample_rate,
-            hop_length=hop_length,
-            window_size_s=5.0,
-        )
-
-        if result["tempo_curve"]:
-            point = result["tempo_curve"][0]
-            assert "time_s" in point
-            assert "tempo_bpm" in point
-
-    def test_average_tempo_is_mean(
-        self,
-        long_audio: np.ndarray,
-        sample_rate: int,
-        hop_length: int,
-    ) -> None:
-        """Average tempo equals mean of tempo curve values."""
-        result = detect_tempo_changes(
-            long_audio,
-            sample_rate,
-            hop_length=hop_length,
-            window_size_s=5.0,
-        )
-
-        if result["tempo_curve"]:
-            tempos = [p["tempo_bpm"] for p in result["tempo_curve"]]
-            expected_avg = np.mean(tempos)
-            assert result["average_tempo_bpm"] == pytest.approx(expected_avg, rel=0.01)
-
-    def test_stable_tempo_detection(
-        self,
-        sample_rate: int,
-        hop_length: int,
-    ) -> None:
-        """Stable tempo (low std) is correctly identified."""
-        # Create 30s of consistent audio
-        duration = 30.0
-        t = np.linspace(0, duration, int(sample_rate * duration), dtype=np.float32)
-        stable_audio = np.sin(2 * np.pi * 440 * t).astype(np.float32)
-
-        result = detect_tempo_changes(
-            stable_audio,
-            sample_rate,
-            hop_length=hop_length,
-            window_size_s=5.0,
-        )
-
-        # Should be stable (low tempo_std) unless detection fails
-        # Note: Stability depends on librosa's tempo estimation consistency
-        assert "is_stable" in result
-
-    def test_tempo_changes_structure(
-        self,
-        long_audio: np.ndarray,
-        sample_rate: int,
-        hop_length: int,
-    ) -> None:
-        """Tempo changes have expected structure."""
-        result = detect_tempo_changes(
-            long_audio,
-            sample_rate,
-            hop_length=hop_length,
-            window_size_s=5.0,
-        )
-
-        if result["tempo_changes"]:
-            change = result["tempo_changes"][0]
-            assert "time_s" in change
-            assert "from_bpm" in change
-            assert "to_bpm" in change
-            assert "change_pct" in change
-
-    def test_tempo_std_non_negative(
-        self,
-        long_audio: np.ndarray,
-        sample_rate: int,
-        hop_length: int,
-    ) -> None:
-        """Tempo standard deviation is non-negative."""
-        result = detect_tempo_changes(
-            long_audio,
-            sample_rate,
-            hop_length=hop_length,
-        )
-
-        assert result["tempo_std"] >= 0.0
-
-    def test_custom_window_size(
-        self,
-        long_audio: np.ndarray,
-        sample_rate: int,
-        hop_length: int,
-    ) -> None:
-        """Custom window size affects number of tempo points."""
-        result_large = detect_tempo_changes(
-            long_audio,
-            sample_rate,
-            hop_length=hop_length,
-            window_size_s=15.0,  # Large window
-        )
-
-        result_small = detect_tempo_changes(
-            long_audio,
-            sample_rate,
-            hop_length=hop_length,
-            window_size_s=5.0,  # Small window
-        )
-
-        # Smaller window should produce more tempo points
-        assert len(result_small["tempo_curve"]) >= len(result_large["tempo_curve"])
-
-    def test_empty_audio_handled(
-        self,
-        sample_rate: int,
-        hop_length: int,
-    ) -> None:
-        """Empty audio is handled gracefully."""
-        empty_audio = np.array([], dtype=np.float32)
-
-        result = detect_tempo_changes(
-            empty_audio,
-            sample_rate,
-            hop_length=hop_length,
-        )
-
-        assert isinstance(result, dict)
-        assert result["is_stable"] is True
+        assert result == {
+            "tempo_curve": [],
+            "tempo_changes": [],
+            "average_tempo_bpm": 0.0,
+            "tempo_std": 0.0,
+            "is_stable": True,
+        }

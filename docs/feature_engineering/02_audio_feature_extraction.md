@@ -164,48 +164,37 @@ Without a shared musical timebase, downstream logic turns into a swamp of millis
 
 So rhythm analysis does more than estimate BPM. It builds the canonical ruler we use everywhere else.
 
-In `analyzer.py`, the rhythm stage pulls together:
+In `analyzer.py`, the rhythm stage (the DSP source in `audio/mir/sources.py`) pulls together:
 
 - beat tracking
-- tempo estimation
-- tempo change detection
-- downbeat detection
+- tempo-octave resolution (halving a double-time tracker reading on backbeat evidence)
 - time signature inference
+- downbeat detection
+- tempo change detection over the resolved beats
 
-The core calls look roughly like this:
+The core calls look like this:
 
 ```python
-beats = compute_beats(percussive_y, sr, hop_length=hop_length)
+tracker_bpm, tracker_frames = compute_beats(onset_env=onset_env, sr=sr, hop_length=hop_length)
+tempo_bpm, beat_frames, tempo_octave = resolve_tempo_octave(
+    tempo_bpm=tracker_bpm,
+    beat_frames=tracker_frames,
+    onset_env=onset_env,
+    chroma_cqt=harmonic_chroma,  # chroma of the HPSS harmonic component
+)
+time_sig = detect_time_signature(beat_frames=beat_frames, onset_env=onset_env)
 downbeats = detect_downbeats_phase_aligned(
-    beat_times_s=beats["beats_s"],
-    onset_env=onset_env,
+    beat_frames=beat_frames,
     sr=sr,
     hop_length=hop_length,
-)
-time_sig = detect_time_signature(
-    beat_times_s=beats["beats_s"],
-    downbeat_times_s=downbeats["downbeats_s"],
-)
-tempo_changes = detect_tempo_changes(
     onset_env=onset_env,
-    sr=sr,
-    hop_length=hop_length,
+    chroma_cqt=harmonic_chroma,
+    beats_per_bar=int(time_sig["time_signature"].split("/")[0]),
 )
+tempo_changes = detect_tempo_changes(beats_s, duration_s=duration_s)
 ```
 
-Those outputs get folded into `SongTiming`, which is effectively our beat grid in structured form.
-
-```python
-SongTiming(
-    duration_s=duration_s,
-    tempo_bpm=beats["tempo_bpm"],
-    beats_s=beats["beats_s"],
-    downbeats_s=downbeats["downbeats_s"],
-    bars_s=downbeats["downbeats_s"],  # simplified bar anchors
-    time_signature=time_sig["time_signature"],
-    tempo_changes=tempo_changes["segments"],
-)
-```
+Those outputs land in the features as `tempo_bpm`, `beats_s`, `bars_s` (the downbeats), `time_signature` (with the `tempo_octave` record), `rhythm.downbeat_meta` and `tempo_analysis`, which is the beat grid every later stage reads.
 
 Why be so religious about this? Because almost every later decision wants musical time, not raw wall-clock time.
 
