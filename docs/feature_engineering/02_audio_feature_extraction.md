@@ -170,7 +170,7 @@ In `analyzer.py`, the rhythm stage (the DSP source in `audio/mir/sources.py`) pu
 - tempo-octave resolution (halving a double-time tracker reading on backbeat evidence)
 - time signature inference
 - downbeat detection
-- tempo change detection over the resolved beats
+- a local-tempo curve read from the resolved beats
 
 The core calls look like this:
 
@@ -191,10 +191,10 @@ downbeats = detect_downbeats_phase_aligned(
     chroma_cqt=harmonic_chroma,
     beats_per_bar=int(time_sig["time_signature"].split("/")[0]),
 )
-tempo_changes = detect_tempo_changes(beats_s, duration_s=duration_s)
+tempo_analysis = local_tempo_curve(beats_s, duration_s=duration_s)
 ```
 
-Those outputs land in the features as `tempo_bpm`, `beats_s`, `bars_s` (the downbeats), `time_signature` (with the `tempo_octave` record), `rhythm.downbeat_meta` and `tempo_analysis`, which is the beat grid every later stage reads.
+Those outputs land in the features as `tempo_bpm`, `beats_s`, `bars_s` (the downbeats), `time_signature` (with the `tempo_octave` record), `rhythm.downbeat_meta` and `tempo_analysis` (the local-tempo curve with its average and spread; there is no separate tempo-change detection), which is the beat grid every later stage reads.
 
 Why be so religious about this? Because almost every later decision wants musical time, not raw wall-clock time.
 

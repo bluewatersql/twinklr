@@ -123,7 +123,9 @@ class TestHpssStatusOnBundle:
 
         assert features["harmonic"]["hpss"]["separated"] is False
         assert features["harmonic"]["hpss"]["error"] == "boom"
-        assert any("HPSS separation failed" in w for w in features["warnings"])
+        warning = next(w for w in features["warnings"] if "HPSS separation failed" in w)
+        assert "tempo-octave" in warning
+        assert "downbeat" in warning
 
 
 class TestDetectedParametersAreThreaded:

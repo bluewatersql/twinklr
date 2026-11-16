@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from twinklr.core.audio.rhythm.tempo import detect_tempo_changes
+from twinklr.core.audio.rhythm.tempo import local_tempo_curve
 from twinklr.core.feature_engineering.alignment import TemporalAlignmentEngine
 from twinklr.core.feature_engineering.models import AlignmentStatus
 
@@ -92,7 +92,7 @@ def test_alignment_beat_counts_follow_a_halved_grid() -> None:
         "assumptions": {"beats_per_bar": 4},
         "beats_s": beats,
         "bars_s": beats[::4],
-        "tempo_analysis": detect_tempo_changes(beats, duration_s=120.0),
+        "tempo_analysis": local_tempo_curve(beats, duration_s=120.0),
     }
     events = [
         {

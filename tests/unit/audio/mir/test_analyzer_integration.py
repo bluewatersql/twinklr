@@ -101,6 +101,7 @@ def test_tempo_analysis_and_downbeat_method_follow_the_resolved_grid(
 
     tempo_analysis = result["tempo_analysis"]
     assert result["tempo_bpm"] == pytest.approx(78.3)
+    assert set(tempo_analysis) == {"tempo_curve", "average_tempo_bpm", "tempo_std"}
     assert tempo_analysis["average_tempo_bpm"] == pytest.approx(78.3, rel=0.01)
     assert all(
         point["tempo_bpm"] == pytest.approx(78.3, rel=0.01)

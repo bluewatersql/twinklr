@@ -14,6 +14,7 @@ Key transformations:
 from typing import Any
 
 from twinklr.core.agents.prompts.sanitize import sanitize_metadata_field
+from twinklr.core.audio.mir.sources import DSPSource
 from twinklr.core.audio.models import SongBundle
 
 
@@ -23,27 +24,35 @@ def _shape_beat_grid(features: dict[str, Any]) -> dict[str, Any] | None:
     ``meter_confidence`` is the share of shuffled-beat arrangements the detected bar
     accent beats; ``downbeat_confidence`` is 1 minus the largest p-value of the evidence
     that placed bar 1 (0.0 when the placement is a ``fallback`` guess). The tempo-octave
-    note is present only when the analysis halved the beat tracker's tempo.
+    note is present only when the analysis halved the beat tracker's tempo. Only the
+    DSP rhythm source computes these values; other sources report fixed confidences, so
+    they get no beat-grid block.
     """
+    sources = features.get("analysis_sources") or {}
+    if (sources.get("rhythm") or {}).get("name") != DSPSource.name:
+        return None
     time_signature = features.get("time_signature")
-    downbeat_meta = features.get("rhythm", {}).get("downbeat_meta")
+    downbeat_meta = (features.get("rhythm") or {}).get("downbeat_meta")
     if not isinstance(time_signature, dict) or not isinstance(downbeat_meta, dict):
         return None
     octave = time_signature.get("tempo_octave") or {}
-    halved = bool(octave) and float(octave["chosen_bpm"]) < float(octave["tracker_bpm"])
+    tracker_bpm, chosen_bpm = octave.get("tracker_bpm"), octave.get("chosen_bpm")
+    tempo_octave = None
+    if (
+        tracker_bpm is not None
+        and chosen_bpm is not None
+        and float(chosen_bpm) < float(tracker_bpm)
+    ):
+        tempo_octave = {
+            "tracker_bpm": float(tracker_bpm),
+            "chosen_bpm": float(chosen_bpm),
+            "reason": str(octave.get("reason", "")),
+        }
     return {
         "meter_confidence": float(time_signature.get("confidence", 0.0)),
         "downbeat_confidence": float(downbeat_meta.get("phase_confidence", 0.0)),
         "downbeat_method": str(downbeat_meta.get("method", "unknown")),
-        "tempo_octave": (
-            {
-                "tracker_bpm": float(octave["tracker_bpm"]),
-                "chosen_bpm": float(octave["chosen_bpm"]),
-                "reason": str(octave["reason"]),
-            }
-            if halved
-            else None
-        ),
+        "tempo_octave": tempo_octave,
     }
 
 
@@ -60,7 +69,7 @@ def shape_context(bundle: SongBundle) -> dict[str, Any]:
         {
             "audio_path": str,
             "duration_ms": int,
-            "tempo": {"bpm": float, "confidence": float, "time_signature": str},
+            "tempo": {"bpm": float, "time_signature": str},
             "beat_grid": {
                 "meter_confidence": float,
                 "downbeat_confidence": float,
@@ -107,7 +116,6 @@ def shape_context(bundle: SongBundle) -> dict[str, Any]:
         # Nested structure (tests)
         context["tempo"] = {
             "bpm": tempo_nested.get("bpm"),
-            "confidence": tempo_nested.get("confidence", 1.0),
             "time_signature": tempo_nested.get("time_signature", "4/4"),
         }
     else:
@@ -120,7 +128,6 @@ def shape_context(bundle: SongBundle) -> dict[str, Any]:
 
         context["tempo"] = {
             "bpm": features.get("tempo_bpm"),
-            "confidence": 1.0,
             "time_signature": time_sig_str,
         }
 
@@ -193,7 +200,7 @@ def shape_context(bundle: SongBundle) -> dict[str, Any]:
     context["energy"] = _shape_energy(energy_data, context["sections"])
 
     stems_data = features.get("stems", {})
-    rhythm_data = features.get("rhythm", {})
+    rhythm_data = features.get("rhythm") or {}
     vocals_statistics = features.get("vocals_statistics", {})
     context["stem_signals"] = {
         "status": stems_data.get("status", "disabled_full_mix_fallback"),

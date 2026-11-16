@@ -366,7 +366,8 @@ def detect_downbeats_phase_aligned(
     ``phase_confidence`` is 1 minus the largest p-value among the tests that decided
     the phase (0.95 or more: every deciding test significant), and 0.0 for the fallback.
     Known and accepted: when chords change equally on beats 1 and 3, kick loudness
-    decides between them.
+    decides between them; and the confidence assumes the beat grid is right, so when
+    the tracker's tempo is wrong the placement can be confidently wrong.
 
     Args:
         beat_frames: Beat frame indices

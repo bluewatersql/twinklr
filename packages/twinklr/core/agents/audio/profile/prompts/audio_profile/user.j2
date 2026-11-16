@@ -12,7 +12,6 @@ Analyze the following song and produce a complete AudioProfileModel.
 
 - **BPM:** {{ shaped_context.tempo.bpm or "Unknown" }}
 - **Time Signature:** {{ shaped_context.tempo.time_signature or "4/4" }}
-- **Tempo Confidence:** {{ shaped_context.tempo.confidence | round(2) }}
 {% endif %}
 
 {% if shaped_context.beat_grid is defined and shaped_context.beat_grid %}
@@ -20,8 +19,14 @@ Analyze the following song and produce a complete AudioProfileModel.
 
 - **Meter confidence:** {{ shaped_context.beat_grid.meter_confidence | round(2) }} (share of shuffled-beat arrangements the detected bar accent beats; below 0.95 the accent pattern cannot be told from chance)
 - **Bar placement (downbeat) confidence:** {{ shaped_context.beat_grid.downbeat_confidence | round(2) }} (method: {{ shaped_context.beat_grid.downbeat_method }})
+{% if shaped_context.beat_grid.downbeat_confidence < 0.95 %}
 {% if shaped_context.beat_grid.downbeat_method == "fallback" %}
 - **Low confidence in bar placement:** no significant chord-change or accent evidence was found, so bar 1 is a guess and bar lines may be off by one or more beats.
+{% elif shaped_context.beat_grid.downbeat_method == "harmonic_change+onset" %}
+- **Low confidence in bar placement:** chord changes put bar 1 on one of two beats half a bar apart; which one is uncertain, so bar lines may be off by two beats.
+{% else %}
+- **Low confidence in bar placement:** the evidence that placed bar 1 is not significant, so bar lines may be off by one or more beats.
+{% endif %}
 {% endif %}
 {% if shaped_context.beat_grid.tempo_octave %}
 - **Tempo octave:** the beat tracker read {{ shaped_context.beat_grid.tempo_octave.tracker_bpm | round(1) }} BPM; the analysis halved it to {{ shaped_context.beat_grid.tempo_octave.chosen_bpm | round(1) }} BPM ({{ shaped_context.beat_grid.tempo_octave.reason }}). A double-time reading at {{ shaped_context.beat_grid.tempo_octave.tracker_bpm | round(1) }} BPM exists.

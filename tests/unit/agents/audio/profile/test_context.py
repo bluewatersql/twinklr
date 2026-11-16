@@ -84,7 +84,7 @@ def test_shape_context_surfaces_stem_signals_to_planners():
     }
 
 
-def _beat_grid_bundle(*, tempo_octave: dict, downbeat_method: str):
+def _beat_grid_bundle(*, tempo_octave: dict, downbeat_method: str, rhythm_source: str = "dsp"):
     from twinklr.core.audio.models import SongBundle, SongTiming
 
     return SongBundle(
@@ -93,7 +93,11 @@ def _beat_grid_bundle(*, tempo_octave: dict, downbeat_method: str):
         recording_id="test_123",
         features={
             "duration_ms": 10_000,
-            "tempo_bpm": tempo_octave["chosen_bpm"],
+            "tempo_bpm": tempo_octave.get("chosen_bpm", 120.0),
+            "analysis_sources": {
+                "rhythm": {"name": rhythm_source, "version": "test"},
+                "structure": {"name": "dsp", "version": "test"},
+            },
             "time_signature": {
                 "time_signature": "4/4",
                 "confidence": 0.99,
@@ -155,6 +159,45 @@ def test_shape_context_omits_the_octave_note_when_the_tracker_tempo_was_kept():
 
     assert context["beat_grid"]["tempo_octave"] is None
     assert context["beat_grid"]["downbeat_method"] == "harmonic_change"
+
+
+def test_shape_context_beat_grid_only_for_the_dsp_rhythm_source():
+    """Other sources report fixed 1.0 confidences that are not permutation shares."""
+    from twinklr.core.agents.audio.profile.context import shape_context
+
+    bundle = _beat_grid_bundle(
+        tempo_octave={"tracker_bpm": 120.0, "chosen_bpm": 120.0, "reason": "kept"},
+        downbeat_method="beat_this",
+        rhythm_source="beat_this",
+    )
+
+    assert shape_context(bundle)["beat_grid"] is None
+
+
+def test_shape_context_tolerates_a_partial_octave_record_and_missing_rhythm():
+    from twinklr.core.agents.audio.profile.context import shape_context
+
+    partial = _beat_grid_bundle(tempo_octave={"tracker_bpm": 156.6}, downbeat_method="fallback")
+    no_rhythm = _beat_grid_bundle(
+        tempo_octave={"tracker_bpm": 120.0, "chosen_bpm": 120.0, "reason": "kept"},
+        downbeat_method="fallback",
+    )
+    no_rhythm.features["rhythm"] = None
+
+    assert shape_context(partial)["beat_grid"]["tempo_octave"] is None
+    assert shape_context(no_rhythm)["beat_grid"] is None
+
+
+def test_shape_context_reports_no_tempo_confidence():
+    """No source computes a tempo confidence; the profile must not invent one."""
+    from twinklr.core.agents.audio.profile.context import shape_context
+
+    bundle = _beat_grid_bundle(
+        tempo_octave={"tracker_bpm": 120.0, "chosen_bpm": 120.0, "reason": "kept"},
+        downbeat_method="harmonic_change",
+    )
+
+    assert "confidence" not in shape_context(bundle)["tempo"]
 
 
 def test_shape_context_energy_compression():

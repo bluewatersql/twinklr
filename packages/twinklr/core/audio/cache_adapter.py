@@ -40,7 +40,10 @@ T = TypeVar("T", bound=BaseModel)
 # "6" — DSP meter detection is phase-aware and chance-corrected, the tempo octave is
 # resolved from backbeat evidence (recorded as time_signature.tempo_octave), and the
 # downbeat phase follows chord changes (DSP source twinklr-dsp-v2).
-AUDIO_FEATURES_CACHE_VERSION = "6"
+# "7" — octave and downbeat chord evidence read harmonic-component chroma,
+# tempo_analysis is the local-tempo curve of the resolved beats (no tempo_changes or
+# is_stable), and rhythm.downbeat_meta records the method.
+AUDIO_FEATURES_CACHE_VERSION = "7"
 
 _MIR_SOURCE_VERSIONS = {
     "dsp": "twinklr-dsp-v2",

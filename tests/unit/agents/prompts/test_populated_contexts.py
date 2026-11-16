@@ -294,7 +294,7 @@ def _pack_cases() -> list[tuple[str, Path, str, dict[str, Any]]]:
         "shaped_context": {
             "audio_path": "fixtures/song.wav",
             "duration_ms": 8_000,
-            "tempo": {"bpm": 128.0, "confidence": 0.96, "time_signature": "4/4"},
+            "tempo": {"bpm": 128.0, "time_signature": "4/4"},
             "key": {"key": "C", "mode": "major", "confidence": 0.91},
             "sections": base["audio_profile"]["structure"]["sections"],
             "energy": {
@@ -671,6 +671,7 @@ def test_audio_profile_states_meter_bar_placement_and_tempo_octave() -> None:
     user = PromptPackLoader(base_path=path).load_and_render(pack, variables)["user"]
 
     assert "Beat / accent confidence" not in user
+    assert "Tempo Confidence" not in user
     assert "**Meter confidence:** 0.99" in user
     assert "**Bar placement (downbeat) confidence:** 0.0 (method: fallback)" in user
     assert "Low confidence in bar placement" in user
@@ -688,6 +689,25 @@ def test_audio_profile_states_meter_bar_placement_and_tempo_octave() -> None:
     assert "Low confidence in bar placement" not in user
     assert "beat tracker read" not in user
     assert "Drum-stem beat alignment" not in user
+
+    tie = deepcopy(variables)
+    tie["shaped_context"]["beat_grid"].update(
+        {"downbeat_confidence": 0.6, "downbeat_method": "harmonic_change+onset"}
+    )
+    user = PromptPackLoader(base_path=path).load_and_render(pack, tie)["user"]
+
+    assert "Low confidence in bar placement" in user
+    assert "one of two beats half a bar apart" in user
+    assert "off by two beats" in user
+
+    weak = deepcopy(variables)
+    weak["shaped_context"]["beat_grid"].update(
+        {"downbeat_confidence": 0.9, "downbeat_method": "onset_accent"}
+    )
+    user = PromptPackLoader(base_path=path).load_and_render(pack, weak)["user"]
+
+    assert "Low confidence in bar placement" in user
+    assert "not significant" in user
 
 
 def test_phantom_lyric_fields_are_absent_from_runtime_tree() -> None:

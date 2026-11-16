@@ -55,7 +55,7 @@ from twinklr.core.audio.models import (
 from twinklr.core.audio.models.enums import StageStatus
 from twinklr.core.audio.models.metadata import EmbeddedMetadata
 from twinklr.core.audio.phonemes.bundle import build_phoneme_bundle
-from twinklr.core.audio.rhythm.tempo import detect_tempo_changes
+from twinklr.core.audio.rhythm.tempo import local_tempo_curve
 from twinklr.core.audio.spectral.bands import extract_dynamic_features
 from twinklr.core.audio.spectral.basic import extract_spectral_features
 from twinklr.core.audio.spectral.vocals import detect_vocals
@@ -728,7 +728,8 @@ class AudioAnalyzer:
         drops = stem_consumers["energy"]["drops"]
         vocal_regions = stem_consumers["vocals"]
 
-        # Harmonic analysis (chroma already computed above for downbeat detection)
+        # Harmonic analysis on the full-mix chroma computed above (the DSP rhythm source
+        # reads its own chroma of the harmonic component for octave and downbeat evidence)
         key_result = detect_musical_key(y, sr, hop_length=hop_length, chroma=chroma)
         chords = detect_chords(
             chroma_cqt=chroma,
@@ -765,7 +766,7 @@ class AudioAnalyzer:
             "boundary_times_s": structure_analysis.boundary_times_s,
             "meta": structure_analysis.metadata,
         }
-        tempo_changes = detect_tempo_changes(beats_s, duration_s=duration)
+        tempo_analysis = local_tempo_curve(beats_s, duration_s=duration)
 
         # Tension curve
         tension = compute_tension_curve(
@@ -866,7 +867,7 @@ class AudioAnalyzer:
                 "hpss": {"separated": hpss_separated, "error": hpss_error},
             },
             "structure": sections,
-            "tempo_analysis": tempo_changes,
+            "tempo_analysis": tempo_analysis,
             "tension": tension,
             "timeline": timeline_export["timeline"],  # Extract timeline from export result
             "composites": timeline_export["composites"],  # Add composites at top level
@@ -878,7 +879,9 @@ class AudioAnalyzer:
         analysis_warnings.extend(active_stems.warnings)
         if not hpss_separated:
             analysis_warnings.append(
-                f"HPSS separation failed ({hpss_error}) - harmonic ratios are unreliable"
+                f"HPSS separation failed ({hpss_error}) - harmonic ratios are unreliable, "
+                "and the tempo-octave and downbeat chord evidence (read from the harmonic "
+                "component) sees the full mix"
             )
         analysis_warnings.extend(validate_features(features))
         if analysis_warnings:
