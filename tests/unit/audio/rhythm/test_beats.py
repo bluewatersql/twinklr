@@ -2,13 +2,91 @@
 
 from __future__ import annotations
 
+from itertools import pairwise
+from typing import ClassVar
+
 import numpy as np
+import pytest
 
 from twinklr.core.audio.rhythm.beats import (
     compute_beats,
     detect_downbeats_phase_aligned,
     detect_time_signature,
+    resolve_tempo_octave,
 )
+
+SR = 22050
+HOP = 512
+FPS = SR / HOP
+
+
+def _accent_grid(
+    pattern: list[float], *, downbeat_phase: int, n_beats: int = 72, seed: int = 0
+) -> tuple[np.ndarray, np.ndarray]:
+    """Regular beat frames whose onset strengths repeat ``pattern`` from ``downbeat_phase``.
+
+    Accents carry Gaussian noise (sd 0.15) so that a single bar is not always decisive.
+    """
+    rng = np.random.default_rng(seed)
+    beat_frames = np.arange(n_beats, dtype=int) * 21 + 10
+    onset_env = np.zeros(int(beat_frames[-1]) + 30, dtype=np.float32)
+    for index, frame in enumerate(beat_frames):
+        accent = pattern[(index - downbeat_phase) % len(pattern)]
+        onset_env[frame] = max(0.0, accent + rng.normal(0.0, 0.15))
+    return beat_frames, onset_env
+
+
+_THREE_FOUR = [1.0, 0.4, 0.4]
+_FOUR_FOUR = [1.0, 0.45, 0.7, 0.45]
+_SIX_EIGHT = [1.0, 0.4, 0.4, 0.6, 0.4, 0.4]
+_TWO_FOUR = [1.0, 0.4]
+# 2/4 accents cannot be told from 4/4 by accent evidence alone (the tempo-change MIR
+# fixture is 4/4 yet shows a larger 2-beat than 4-beat excess); duple meters report 4/4.
+_METER_CASES = [
+    (pattern, phase, expected)
+    for pattern, expected in (
+        (_THREE_FOUR, "3/4"),
+        (_FOUR_FOUR, "4/4"),
+        (_SIX_EIGHT, "6/8"),
+        (_TWO_FOUR, "4/4"),
+    )
+    for phase in range(len(pattern))
+]
+
+
+def _drum_track(
+    *,
+    bpm: float,
+    pattern: list[float],
+    chord_every: int,
+    chord_phase: int = 0,
+    n_events: int = 192,
+    jitter_s: float = 0.0,
+    seed: int = 0,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Onset envelope and chroma for events on a ``bpm`` grid.
+
+    ``pattern`` cycles the event accents; the chord changes on every ``chord_every``-th
+    event starting at ``chord_phase``, cycling C, F, G, A minor.
+    """
+    rng = np.random.default_rng(seed)
+    step_s = 60.0 / bpm
+    times = 0.5 + np.arange(n_events) * step_s + rng.normal(0.0, jitter_s, n_events)
+    n_frames = int((times[-1] + 1.0) * FPS)
+    onset_env = rng.random(n_frames).astype(np.float32) * 0.02
+    for index, time_s in enumerate(times):
+        frame = round(time_s * FPS)
+        accent = max(0.0, pattern[index % len(pattern)] + rng.normal(0.0, 0.04))
+        onset_env[frame] += accent
+        onset_env[frame + 1] += 0.4 * accent
+    triads = [(0, 4, 7), (5, 9, 0), (7, 11, 2), (9, 0, 4)]
+    chroma = rng.random((12, n_frames)).astype(np.float32) * 0.05
+    change_frames = [round(times[i] * FPS) for i in range(chord_phase, n_events, chord_every)]
+    bounds = [0, *change_frames, n_frames]
+    for chord_index, (start, end) in enumerate(pairwise(bounds)):
+        for pitch in triads[chord_index % len(triads)]:
+            chroma[pitch, start:end] += 1.0
+    return onset_env, chroma
 
 
 class TestComputeBeats:
@@ -444,3 +522,130 @@ class TestTimeSignatureEdgeCases:
 
         # Should default to 4/4 with low confidence
         assert result["time_signature"] == "4/4"
+
+
+class TestMeterIsPhaseAwareAndChanceCorrected:
+    """Meter detection scores every bar phase and subtracts the shuffled-beat baseline."""
+
+    @pytest.mark.parametrize(("pattern", "downbeat_phase", "expected"), _METER_CASES)
+    def test_accent_pattern_at_every_downbeat_phase(
+        self, pattern: list[float], downbeat_phase: int, expected: str
+    ) -> None:
+        beat_frames, onset_env = _accent_grid(pattern, downbeat_phase=downbeat_phase)
+
+        result = detect_time_signature(beat_frames=beat_frames, onset_env=onset_env)
+
+        assert result["time_signature"] == expected
+        assert result["method"] == "accent_pattern"
+
+    def test_no_accent_structure_scores_near_zero_and_defaults_to_4_4(self) -> None:
+        rng = np.random.default_rng(3)
+        beat_frames = np.arange(72, dtype=int) * 21 + 10
+        onset_env = np.zeros(int(beat_frames[-1]) + 30, dtype=np.float32)
+        onset_env[beat_frames] = rng.random(len(beat_frames)).astype(np.float32)
+
+        result = detect_time_signature(beat_frames=beat_frames, onset_env=onset_env)
+
+        assert result["time_signature"] == "4/4"
+        assert result["method"] == "default"
+        assert all(abs(score) < 0.1 for score in result["all_scores"].values())
+
+    def test_detection_is_deterministic(self) -> None:
+        beat_frames, onset_env = _accent_grid([1.0, 0.4, 0.4], downbeat_phase=2)
+
+        first = detect_time_signature(beat_frames=beat_frames, onset_env=onset_env)
+        second = detect_time_signature(beat_frames=beat_frames, onset_env=onset_env)
+
+        assert first == second
+
+
+class TestResolveTempoOctave:
+    """The tracker's tempo is halved only on backbeat evidence (see resolve_tempo_octave)."""
+
+    # Half-time feel at 79 BPM: kick, hat, snare, hat on the 158 BPM eighths, with hats
+    # loud enough that the tracker locks to the eighths; the chord changes with the kick
+    # at the start of every 79 BPM bar.
+    HALF_TIME_FEEL: ClassVar[list[float]] = [0.8, 0.6, 1.0, 0.6]
+
+    def _track_and_resolve(
+        self, onset_env: np.ndarray, chroma: np.ndarray
+    ) -> tuple[float, np.ndarray, float, np.ndarray, dict[str, object]]:
+        tempo, beat_frames = compute_beats(onset_env=onset_env, sr=SR, hop_length=HOP)
+        resolved_tempo, resolved_frames, record = resolve_tempo_octave(
+            tempo_bpm=tempo,
+            beat_frames=beat_frames,
+            onset_env=onset_env,
+            chroma_cqt=chroma,
+        )
+        return tempo, beat_frames, resolved_tempo, resolved_frames, record
+
+    @pytest.mark.parametrize("jitter_s", [0.0, 0.008])
+    def test_double_time_backbeat_resolves_to_slower_tactus(self, jitter_s: float) -> None:
+        onset_env, chroma = _drum_track(
+            bpm=158.0, pattern=self.HALF_TIME_FEEL, chord_every=8, jitter_s=jitter_s
+        )
+
+        tempo, beat_frames, resolved_tempo, resolved_frames, record = self._track_and_resolve(
+            onset_env, chroma
+        )
+
+        assert tempo == pytest.approx(158.0, rel=0.03)  # the tracker locks to eighths
+        assert resolved_tempo == pytest.approx(tempo / 2.0)
+        assert len(resolved_frames) == pytest.approx(len(beat_frames) / 2.0, abs=1)
+        # The kept beats are the kick/snare eighths, not the hats.
+        strengths = [float(onset_env[frame - 2 : frame + 3].max()) for frame in resolved_frames]
+        assert float(np.median(strengths)) > 0.75
+        assert record["chosen_bpm"] == pytest.approx(resolved_tempo)
+        assert record["tracker_bpm"] == pytest.approx(tempo)
+        assert "backbeat" in str(record["reason"])
+
+    @pytest.mark.parametrize(
+        "pattern", [[1.0, 0.6, 0.8, 0.6], [1.0, 1.0, 1.0, 1.0]], ids=["downbeat", "flat"]
+    )
+    def test_genuinely_fast_4_4_stays_fast(self, pattern: list[float]) -> None:
+        onset_env, chroma = _drum_track(bpm=160.0, pattern=pattern, chord_every=4)
+
+        tempo, beat_frames, resolved_tempo, resolved_frames, record = self._track_and_resolve(
+            onset_env, chroma
+        )
+
+        assert tempo == pytest.approx(160.0, rel=0.03)
+        assert resolved_tempo == tempo
+        assert np.array_equal(resolved_frames, beat_frames)
+        assert record["chosen_bpm"] == pytest.approx(tempo)
+
+    def test_slow_track_is_not_doubled_or_halved(self) -> None:
+        onset_env, chroma = _drum_track(
+            bpm=70.0, pattern=[0.7, 1.0, 0.7, 1.0], chord_every=4, n_events=64
+        )
+
+        tempo, beat_frames, resolved_tempo, resolved_frames, _ = self._track_and_resolve(
+            onset_env, chroma
+        )
+
+        assert tempo == pytest.approx(70.0, rel=0.03)
+        assert resolved_tempo == tempo
+        assert np.array_equal(resolved_frames, beat_frames)
+
+    def test_sparse_grid_keeps_tracker_tempo(self) -> None:
+        onset_env, chroma = _drum_track(
+            bpm=158.0, pattern=self.HALF_TIME_FEEL, chord_every=8, n_events=12
+        )
+
+        tempo, beat_frames, resolved_tempo, resolved_frames, record = self._track_and_resolve(
+            onset_env, chroma
+        )
+
+        assert resolved_tempo == tempo
+        assert np.array_equal(resolved_frames, beat_frames)
+        assert record["reason"]
+
+    def test_resolution_is_deterministic(self) -> None:
+        onset_env, chroma = _drum_track(bpm=158.0, pattern=self.HALF_TIME_FEEL, chord_every=8)
+
+        first = self._track_and_resolve(onset_env, chroma)
+        second = self._track_and_resolve(onset_env, chroma)
+
+        assert first[2] == second[2]
+        assert np.array_equal(first[3], second[3])
+        assert first[4] == second[4]

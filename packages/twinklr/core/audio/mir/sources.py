@@ -18,6 +18,7 @@ from twinklr.core.audio.rhythm.beats import (
     compute_beats,
     detect_downbeats_phase_aligned,
     detect_time_signature,
+    resolve_tempo_octave,
 )
 from twinklr.core.audio.structure.sections import detect_song_sections
 from twinklr.core.config.models import RhythmSourceName, StructureSourceName
@@ -121,12 +122,19 @@ class DSPSource:
     version = "twinklr-dsp-v1"
 
     def analyze_rhythm(self, inputs: MIRInput) -> RhythmAnalysis:
-        tempo_bpm, beat_frames = compute_beats(
+        tracker_bpm, tracker_frames = compute_beats(
             onset_env=inputs.onset_envelope,
             sr=inputs.sample_rate,
             hop_length=inputs.hop_length,
         )
+        tempo_bpm, beat_frames, octave = resolve_tempo_octave(
+            tempo_bpm=tracker_bpm,
+            beat_frames=tracker_frames,
+            onset_env=inputs.onset_envelope,
+            chroma_cqt=inputs.chroma,
+        )
         signature = detect_time_signature(beat_frames=beat_frames, onset_env=inputs.onset_envelope)
+        signature["tempo_octave"] = octave
         beats_per_bar = int(str(signature["time_signature"]).split("/")[0])
         downbeats = detect_downbeats_phase_aligned(
             beat_frames=beat_frames,

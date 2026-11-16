@@ -181,6 +181,8 @@ def correct_tempo_octave(
 
 Was this mathematically pure? Absolutely not. Was it better than letting the tracker gaslight the entire choreography stack? Very much yes.
 
+The current pipeline settles this in `resolve_tempo_octave()` in `packages/twinklr/core/audio/rhythm/beats.py` with one musical test. On the tracker's grid it finds the strongest every-four-beats onset accent and the strongest every-four-beats chord change, and keeps each only if it beats shuffled beats (p < 0.05). If the accent lands exactly two tracker beats after the chord change, it is a backbeat (snare on 2 and 4, chords on 1 and 3) and the tracker has been counting eighth notes, so the tempo is halved. An accent that lines up with the chord change is a downbeat and the tracker's tempo stands, as it does whenever the evidence is weaker. Halving is only considered when the tracker reads at or above its 120 BPM prior, and the tempo is never doubled. The candidates, the evidence, and the reason are recorded under `time_signature.tempo_octave` in the analysis output.
+
 We also cross-checked tempo hypotheses against downbeat patterns. If the “126 BPM” interpretation produced bar starts that never lined up with stronger accents, while the “63 BPM” version did, that was a huge clue that the tracker was hearing subdivisions instead of the real pulse.
 
 The ugly truth: our first pass broke on exactly the kinds of songs you’d expect to break it.
@@ -277,33 +279,24 @@ Still, “most” is not “all,” and the songs that break your assumptions ar
 
 So `detect_time_signature()` in `packages/twinklr/core/audio/rhythm/beats.py` tries to infer beat grouping from accent patterns instead of just shrugging and hardcoding 4/4 forever.
 
-The function starts by sampling onset strengths at the beat locations, normalizing them, and asking a simple question for different group sizes:
+The function samples the peak onset strength around each beat, normalizes it, and asks a simple question for different group sizes:
 
 > If I group beats into chunks of `n`, is the first beat of each chunk usually the strongest?
 
-That’s the `score_grouping()` part.
+Two details matter. First, a song does not have to start on a downbeat, so every grouping is scored at each of its `n` possible bar phases and the best phase counts. Second, small groupings win that contest by chance alone (with two beats per group, the first one is the louder half the time), so each score has the same best-phase score on shuffled beats subtracted from it. Only the excess over chance is compared.
 
 ```python
-def score_grouping(n: int) -> float:
-    if len(strengths_norm) < n * 3:
-        return 0.0
+def _grouping_score(z: np.ndarray, n: int, phase: int) -> float:
+    n_groups = (len(z) - phase) // n
+    grouped = z[phase : phase + n_groups * n].reshape(n_groups, n)
+    first_is_max = float(np.mean(grouped.argmax(axis=1) == 0))
+    first_above_mean = float(np.mean(grouped[:, 0] > grouped.mean(axis=1)))
+    return 0.6 * first_is_max + 0.4 * first_above_mean
 
-    n_groups = len(strengths_norm) // n
-    if n_groups < 2:
-        return 0.0
-
-    grouped = strengths_norm[: n_groups * n].reshape(n_groups, n)
-
-    first_beat_is_max = (grouped.argmax(axis=1) == 0).astype(float)
-    first_beat_above_avg = (grouped[:, 0] > grouped.mean(axis=1)).astype(float)
-
-    return float(
-        0.6 * np.mean(first_beat_is_max)
-        + 0.4 * np.mean(first_beat_above_avg)
-    )
+# excess[n] = best-phase score - mean best-phase score over 100 seeded shuffles
 ```
 
-Then it backs that up with autocorrelation on the beat-strength sequence, which is a fancy way of checking whether accent patterns repeat every 3 beats, 4 beats, 6 beats, and so on.
+The answer is **4/4** unless the triple evidence (3/4 or 6/8) beats the duple evidence by more than 0.10. Accents alone cannot tell **2/4** from **4/4**, so duple meters are reported as 4/4.
 
 The point isn’t to become a full musicology engine. The point is to avoid dumb mistakes.
 
