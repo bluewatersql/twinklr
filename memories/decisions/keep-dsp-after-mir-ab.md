@@ -93,8 +93,12 @@ The report represents these unavailable metric means as `null`, not numeric zero
   dependency-conflict guidance, including on audio shorter than ten seconds; it never
   silently falls back or downloads weights. The DSP short-audio result records the
   truthful DSP source and adapter version.
-- Audio-feature cache identity is version 5 and includes both selected source names
-  and adapter versions, preventing cross-source stale hits.
+- Audio-feature cache identity includes both selected source names and adapter
+  versions, preventing cross-source stale hits. It was version 5 when this was decided;
+  the 2026-11-16 beat-grid fix moved it to 7 and the DSP adapter to `twinklr-dsp-v2`.
+- The DSP baseline that a candidate source must beat moved with that fix: downbeat F1
+  on the five fixtures is 0.933 (was 0.762), beat F1 0.931 unchanged
+  ([record](../../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p3-beat-grid-fix/README.md)).
 - Custom energy/multiscale, builds/drops, tension, and timeline analysis remains in
   place regardless of source selection.
 

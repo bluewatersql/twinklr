@@ -389,3 +389,13 @@ Implemented by one agent, reviewed by a second (approve with fixes), fixed by a 
   (integrator decision): it was 1 for every shipped family, had no consumer, and its
   definition did not hold under `on_unplayable="dark"` or beside entry windows. If the
   T3a validator needs a feasibility bound, it defines what it needs then.
+
+### Beat-grid fix — 2026-11-16
+
+Meter, tempo octave and downbeat detection were replaced on owner direction; Need A
+Favor now analyses as 78.3 BPM in 4/4. What changed, the before/after table for the
+owner's songs, the review history, the limits and the consequences for other
+pipelines are in the
+[evidence record](../evidence/2026-11-16-p3-beat-grid-fix/README.md). Integrator
+decisions inside it: 2/4 is no longer reported; the unused `tempo_changes` and
+`is_stable` outputs are removed; key, chords and structure keep full-mix chroma.
