@@ -38,7 +38,7 @@ from dataclasses import dataclass, field, replace
 from fractions import Fraction
 from itertools import pairwise
 import math
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -118,6 +118,7 @@ def plan_prepositions(
     sequence_end_ms: int,
     failure_mode: FailureMode = "error",
     on_unplayable: UnplayableMode = "error",
+    memo: PrepositionMemo | None = None,
 ) -> PrepositionResult:
     """Author every fixture over `[0, sequence_end_ms)`, transactions before each cue.
 
@@ -157,6 +158,13 @@ def plan_prepositions(
             with the cues found so far kept dark until nothing more is found; every
             replan keeps at least one more cue dark, so it ends, at worst with every
             cue dark and the fixture parked. `error` reports them as errors.
+        memo: For a caller planning the same cue objects several times over (the
+            pre-planning gate, once per section entry): where a fixture's planning
+            reaches a cue in a state an earlier call in the memo reached it in, with the
+            same cue objects after it and the same profile and arguments, the rest of
+            that call's plan is reused, since planning from there reads nothing else.
+            It holds the cues and profiles it was filled from; the caller keeps it for
+            one set of cues and profiles, and drops it after.
 
     Returns:
         The cues with their transactions and parks, ordered by fixture and time, or no
@@ -195,9 +203,22 @@ def plan_prepositions(
             on_unplayable,
         )
         dark: dict[int, _InfeasibleError] = {}
+        recalled = None
+        if memo is not None:
+            key = (
+                fixture_id,
+                id(profile),
+                tuple(locks),
+                frame_ms,
+                sequence_end_ms,
+                failure_mode,
+                on_unplayable,
+            )
+            # Kept with its plans, the profile keeps its id while the memo lives.
+            recalled = memo.setdefault(key, (profile, {}))[1]
         while True:
             out, fixture_diagnostics, fixture_dependencies, kept_dark = planner.plan(
-                by_fixture[fixture_id], dark
+                by_fixture[fixture_id], dark, None if dark else recalled
             )
             errors = [d for d in fixture_diagnostics if d.status == "error"]
             if not errors:
@@ -561,6 +582,94 @@ class _Plan:
     """The head as the cue's first frame finds it."""
 
 
+@dataclass(frozen=True)
+class _Reached:
+    """A cue an earlier plan of a fixture reached in a state (`_plan_view`), and that
+    plan's whole output; from the cue on, it is the output `lengths` (out,
+    diagnostics, dependencies, kept dark) into each."""
+
+    cues: tuple[FixtureSegment, ...]
+    index: int
+    view: tuple[Any, ...]
+    out: tuple[FixtureSegment, ...]
+    diagnostics: tuple[TransitionDiagnostic, ...]
+    dependencies: tuple[TransitionDependency, ...]
+    kept_dark: tuple[dict[str, str | int], ...]
+    lengths: tuple[int, int, int, int]
+
+    def continues(self, cues: Sequence[FixtureSegment], index: int, view: tuple[Any, ...]) -> bool:
+        """Whether planning `cues` from `index` in a state with `view` is this plan from
+        its cue on: the same view and the very same cue objects to the end."""
+        return (
+            len(cues) - index == len(self.cues) - self.index
+            and self.view == view
+            and all(a is b for a, b in zip(cues[index:], self.cues[self.index :], strict=True))
+        )
+
+
+PrepositionMemo = dict[
+    tuple[str, int, tuple[RenderLock, ...], int, int, FailureMode, UnplayableMode],
+    tuple[FixtureCapabilities, dict[int, list[_Reached]]],
+]
+"""`plan_prepositions`' memo: by fixture, profile identity, locks, frame, sequence end,
+failure mode and `on_unplayable`, the profile itself and, by cue identity, the states
+earlier plans reached that cue in."""
+
+
+def _plan_view(state: _State) -> tuple[Any, ...]:
+    """Everything planning on from `state` reads of it.
+
+    A pose axis' arrival or settle time, or the wheels' settle time, at or before
+    `start_ms` is only ever compared with a time at or after it: a command's
+    `time_ms + latency_ms` (`_follow`), a transaction's `motion_at` among the times it
+    waits for, or a wheel change's settle (`_transaction`, `_end_state`). Every such
+    time therefore plans the same, and the view leaves its value out; it stays at or
+    before every later state's `start_ms`. Everything else is kept as it is.
+    """
+    start = state.start_ms
+
+    def recent(time_ms: Fraction | None) -> Fraction | str | None:
+        return "past" if time_ms is not None and time_ms <= start else time_ms
+
+    head = state.head
+    motion = tuple(
+        (channel, None if times is None else (recent(times[0]), recent(times[1])))
+        for channel, times in head.motion.items()
+    )
+    return (
+        start,
+        head.values,
+        motion,
+        recent(head.wheels_settled),
+        state.dimmer_dark_since,
+        state.shutter_dark_since,
+        state.known_dark,
+        state.source,
+        state.substituted,
+    )
+
+
+def _remember(
+    memo: dict[int, list[_Reached]],
+    ordered: Sequence[FixtureSegment],
+    reached: Sequence[tuple[int, tuple[Any, ...], int, int, int, int]],
+    out: Sequence[FixtureSegment],
+    diagnostics: Sequence[TransitionDiagnostic],
+    dependencies: Sequence[TransitionDependency],
+    kept_dark: Sequence[dict[str, str | int]],
+) -> None:
+    """Record a completed plan's cues in `memo`, each with the state it was reached in.
+    Copies, since the caller extends its lists after."""
+    cues, done = tuple(ordered), (tuple(out), tuple(diagnostics), tuple(dependencies))
+    kept = tuple(kept_dark)
+    for index, view, *lengths in reached:
+        memo.setdefault(id(cues[index]), []).append(
+            _Reached(
+                cues, index, view, *done, kept, (lengths[0], lengths[1], lengths[2], lengths[3])
+            )
+        )
+
+
 class _FixturePlanner:
     """Plans one fixture in time order."""
 
@@ -602,12 +711,14 @@ class _FixturePlanner:
         # Encoded pose words by commanded value (`_word`) and travel times by word
         # distance (`_travel_ms`), reused wherever a value recurs, as on every cycle of
         # a periodic cue; both are exact and pure.
-        self._words: dict[ChannelName, dict[Fraction, int]] = {
+        self._words: dict[ChannelName, dict[Fraction | float, int]] = {
             channel: {} for channel in self.pose_channels
         }
         self._travel: dict[ChannelName, dict[int, Fraction]] = {
             channel: {} for channel in self.pose_channels
         }
+        # Word centers by axis and word (`_center`), as pure as the two above.
+        self._centers: dict[AxisName, dict[int, float]] = {}
 
     # --- Planning ---------------------------------------------------------------------
 
@@ -615,6 +726,7 @@ class _FixturePlanner:
         self,
         segments: Sequence[FixtureSegment],
         dark: Mapping[int, _InfeasibleError] | None = None,
+        memo: dict[int, list[_Reached]] | None = None,
     ) -> tuple[
         list[FixtureSegment],
         list[TransitionDiagnostic],
@@ -622,7 +734,9 @@ class _FixturePlanner:
         list[dict[str, str | int]],
     ]:
         """Plan the fixture's cues in time order; `dark` maps the start of each cue to
-        keep dark (`on_unplayable="dark"`) to the failure found for it."""
+        keep dark (`on_unplayable="dark"`) to the failure found for it. `memo` (only
+        without `dark`) holds, by cue, the states earlier plans of this fixture reached it
+        in (`plan_prepositions`)."""
         ordered = self._checked(segments)
         dark = dark or {}
         out: list[FixtureSegment] = []
@@ -662,7 +776,21 @@ class _FixturePlanner:
 
         state = _State(0, self._head(self.initial), None, None, self._evidence(), None)
         last: FixtureSegment | None = None
-        for target in ordered:
+        # Where each cue was reached (`memo`): its index, the state, the output so far.
+        reached: list[tuple[int, tuple[Any, ...], int, int, int, int]] = []
+        for index, target in enumerate(ordered):
+            if memo is not None:
+                view = _plan_view(state)
+                for earlier in memo.get(id(target), ()):
+                    if earlier.continues(ordered, index, view):
+                        out += earlier.out[earlier.lengths[0] :]
+                        diagnostics += earlier.diagnostics[earlier.lengths[1] :]
+                        dependencies += earlier.dependencies[earlier.lengths[2] :]
+                        kept_dark += earlier.kept_dark[earlier.lengths[3] :]
+                        _remember(memo, ordered, reached, out, diagnostics, dependencies, kept_dark)
+                        return out, diagnostics, dependencies, kept_dark
+                lengths = (len(out), len(diagnostics), len(dependencies), len(kept_dark))
+                reached.append((index, view, *lengths))
             available = target.t0_ms - state.start_ms
             status: TransitionStatus = "feasible"
             code: TransitionCode | None = None
@@ -753,6 +881,8 @@ class _FixturePlanner:
                 fail(state, None, failure)
                 return out, diagnostics, dependencies, kept_dark
             out.append(park)
+        if memo is not None:
+            _remember(memo, ordered, reached, out, diagnostics, dependencies, kept_dark)
         return out, diagnostics, dependencies, kept_dark
 
     def culprits(
@@ -1012,19 +1142,35 @@ class _FixturePlanner:
         word: int,
         commands: Iterable[tuple[int, int]],
     ) -> tuple[_Motion, int]:
-        """Follow word commands from `word`; return the motion and the last word."""
+        """Follow word commands from `word`; return the motion and the last word.
+
+        Each change is reached at `max(arrival, time_ms + latency_ms)` plus its word
+        distance's travel (`_travel_ms`, linear in the distance) and settles `settle_ms`
+        later. The arrival is kept as an integer count of `1/scale` ms, over the
+        denominators of the previous arrival and of one word's travel: exact, without
+        a fraction per command.
+        """
         axis = self._axis(channel)
         speed, latency, settle = axis.travel_speed_per_s, axis.latency_ms, axis.settle_ms
+        if motion is None or speed is None or latency is None or settle is None:
+            for _, commanded in commands:
+                if commanded != word:
+                    motion, word = None, commanded
+            return motion, word
+        per_word = self._travel_ms(channel, 0, 1)
+        start = Fraction(motion[0])
+        scale = math.lcm(start.denominator, per_word.denominator)
+        arrival = start.numerator * (scale // start.denominator)
+        step = per_word.numerator * (scale // per_word.denominator)
+        moved = False
         for time_ms, commanded in commands:
             if commanded == word:
                 continue
-            if motion is None or speed is None or latency is None or settle is None:
-                motion = None
-            else:
-                travel = self._travel_ms(channel, word, commanded)
-                arrival = max(motion[0], Fraction(time_ms + latency)) + travel
-                motion = (arrival, arrival + settle)
-            word = commanded
+            arrival = max(arrival, (time_ms + latency) * scale) + abs(commanded - word) * step
+            word, moved = commanded, True
+        if moved:
+            reached = Fraction(arrival, scale)
+            motion = (reached, reached + settle)
         return motion, word
 
     def _schedule(
@@ -1139,10 +1285,13 @@ class _FixturePlanner:
         Planner-authored values are always word centers, so no float rounding can land
         on a DMX rounding tie and move the head between two frames that should hold.
         """
-        try:
-            return self.profile.axes[key].word_center(word)
-        except ValueError as error:
-            raise _InfeasibleError("infeasible_transition", f"{key} {error}") from error
+        centers = self._centers.setdefault(key, {})
+        if word not in centers:
+            try:
+                centers[word] = self.profile.axes[key].word_center(word)
+            except ValueError as error:
+                raise _InfeasibleError("infeasible_transition", f"{key} {error}") from error
+        return centers[word]
 
     def _dark_commands(self, state: _State) -> tuple[int | None, str | None]:
         """The dimmer word and shutter state a transaction holds: every declared darkness.
@@ -1239,11 +1388,12 @@ class _FixturePlanner:
         return _Head(values, dict.fromkeys(self.pose_channels, rest), Fraction(0))
 
     def _values_at(self, segment: FixtureSegment, time_ms: int) -> _Values:
-        def level(channel: ChannelName) -> Fraction | None:
+        def level(channel: ChannelName) -> Fraction | float | None:
+            """The sample (`_frame_values`) of a continuous channel, else None."""
             value = segment.channels.get(channel)
             if value is None or not isinstance(value.physical, ContinuousTrajectory):
                 return None
-            return _level_at(value.physical, time_ms)
+            return next(_frame_values(value.physical, time_ms, time_ms + 1, 1))[1]
 
         def state(channel: ChannelName) -> str | None:
             value = segment.channels.get(channel)
@@ -1255,20 +1405,20 @@ class _FixturePlanner:
         for channel in self.pose_channels:
             pose = level(channel)
             assert pose is not None  # checked: cues author their pose
-            words[channel] = self._axis(channel).dmx_word(pose)
+            words[channel] = self._word(channel, pose)
         dimmer = self.profile.axes.get("dimmer")
         authored = level(ChannelName.DIMMER)
         shutter = state(ChannelName.SHUTTER)
         capability = self.profile.discrete.get("shutter")
         return _Values(
             words=words,
-            dimmer=authored,
+            dimmer=None if authored is None else Fraction(authored),
             dimmer_word=(
                 None
                 if dimmer is None
                 else self._default_word(dimmer)
                 if authored is None
-                else dimmer.dmx_word(authored)
+                else _encoded(dimmer, authored)
             ),
             shutter=shutter,
             held_shutter=shutter or (None if capability is None else capability.default_state),
@@ -1289,12 +1439,12 @@ class _FixturePlanner:
             if (
                 first.t_ms <= segment.t0_ms
                 and all(point.value == first.value for point in physical.points)
-                and self._word(channel, Fraction(first.value)) == head.values.words[channel]
+                and self._word(channel, first.value) == head.values.words[channel]
             ):
                 continue  # held at the word the head already has: no command moves it
             commands = (
                 (t, self._word(channel, value))
-                for t, value in _frame_levels(physical, segment.t0_ms, segment.t1_ms, self.frame_ms)
+                for t, value in _frame_values(physical, segment.t0_ms, segment.t1_ms, self.frame_ms)
             )
             motion[channel], _ = self._follow(
                 channel, motion[channel], head.values.words[channel], commands
@@ -1427,12 +1577,14 @@ class _FixturePlanner:
             ("settle_ms", axis.settle_ms),
         ]
 
-    def _word(self, channel: ChannelName, value: Fraction) -> int:
-        """The axis' `dmx_word` for a commanded value."""
+    def _word(self, channel: ChannelName, value: Fraction | float) -> int:
+        """The axis' `dmx_word` for a commanded value, exact (a float is the value it
+        holds, and keys the same entry as the equal fraction)."""
         words = self._words[channel]
-        if value not in words:
-            words[value] = self._axis(channel).dmx_word(value)
-        return words[value]
+        word = words.get(value)
+        if word is None:
+            word = words[value] = _encoded(self._axis(channel), value)
+        return word
 
     def _travel_ms(self, channel: ChannelName, start: int, end: int) -> Fraction:
         """Time to travel between two encoded words at the configured speed."""
@@ -1552,15 +1704,27 @@ def _held(time_ms: int, state: str) -> DiscreteTrajectory:
     return DiscreteTrajectory(events=(DiscretePoint(t_ms=time_ms, state=state),))
 
 
-def _level_at(trajectory: ContinuousTrajectory, time_ms: int) -> Fraction:
-    """The value the encoder samples at a frame start, in exact arithmetic."""
-    return next(_frame_levels(trajectory, time_ms, time_ms + 1, 1))[1]
+def _encoded(axis: AxisCapability, value: Fraction | float) -> int:
+    """`axis.dmx_word` of the exact value: an admitted float as is (`dmx_word` takes it
+    as the same fraction) without a fraction-to-float range check, anything else as a
+    fraction, so a refusal reads as it always has."""
+    if isinstance(value, float) and axis.admits(value):
+        return axis.dmx_word(value)
+    return axis.dmx_word(Fraction(value))
 
 
 def _frame_levels(
     trajectory: ContinuousTrajectory, start_ms: int, end_ms: int, step_ms: int
 ) -> Iterator[tuple[int, Fraction]]:
     """The encoder's sample at each frame start in `[start_ms, end_ms)`, in one pass."""
+    for time_ms, value in _frame_values(trajectory, start_ms, end_ms, step_ms):
+        yield time_ms, Fraction(value)
+
+
+def _frame_values(
+    trajectory: ContinuousTrajectory, start_ms: int, end_ms: int, step_ms: int
+) -> Iterator[tuple[int, Fraction | float]]:
+    """`_frame_levels`, with a sample that is a point's own value left as its float."""
     points = trajectory.points
     index = 0
     for time_ms in range(start_ms, end_ms, step_ms):
@@ -1570,7 +1734,7 @@ def _frame_levels(
         if left.t_ms > time_ms:
             raise ValueError(f"no value is defined at {time_ms} ms")
         if trajectory.interpolation == "hold" or index + 1 == len(points) or left.t_ms == time_ms:
-            yield time_ms, Fraction(left.value)
+            yield time_ms, left.value
             continue
         right = points[index + 1]
         share = Fraction(time_ms - left.t_ms, right.t_ms - left.t_ms)

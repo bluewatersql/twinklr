@@ -130,10 +130,8 @@ def _spec(shape: str, **fields: Any) -> PhysicalMovementSpec:
 
 
 def _at(spec: PhysicalMovementSpec, phase: Fraction, **kwargs: Any) -> tuple[float, float]:
-    pose = evaluate_physical_path(
-        spec, pose=kwargs.pop("pose", PoseDegrees(pan_deg=0.0, tilt_deg=0.0)), phase=phase, **kwargs
-    )
-    return pose.pan_deg, pose.tilt_deg
+    pose = kwargs.pop("pose", PoseDegrees(pan_deg=0.0, tilt_deg=0.0))
+    return evaluate_physical_path(spec, pose, phase.numerator, phase.denominator, **kwargs)
 
 
 def _template(*steps: dict[str, Any], **fields: Any) -> Template:

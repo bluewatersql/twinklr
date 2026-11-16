@@ -8,7 +8,8 @@ a DMX byte.
 
 from __future__ import annotations
 
-from itertools import pairwise
+from collections.abc import Sequence
+import operator
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -37,9 +38,12 @@ class ContinuousTrajectory(BaseModel):
 
     @model_validator(mode="after")
     def _validate_points(self) -> ContinuousTrajectory:
-        _require_increasing(tuple(point.t_ms for point in self.points))
-        if self.unit == "normalized" and any(not 0 <= p.value <= 1 for p in self.points):
-            raise ValueError("normalized trajectory values must lie in [0, 1]")
+        _require_increasing([point.t_ms for point in self.points])
+        if self.unit == "normalized":
+            # Finite values (`PhysicalPoint`): all lie in [0, 1] when the extremes do.
+            values = [point.value for point in self.points]
+            if min(values) < 0 or max(values) > 1:
+                raise ValueError("normalized trajectory values must lie in [0, 1]")
         return self
 
 
@@ -208,6 +212,9 @@ def check_physical_value(
             raise fail(f"profile {capabilities.profile_id!r} declares no {channel.value} axis")
         if value.unit != axis.unit:
             raise fail(f"unit {value.unit!r} does not match the axis unit {axis.unit!r}")
+        values = [point.value for point in value.points]
+        if axis.admits(min(values)) and axis.admits(max(values)):
+            return  # the operable range is an interval: every point lies in it
         for point in value.points:
             if not axis.admits(point.value):
                 raise fail(
@@ -225,6 +232,6 @@ def check_physical_value(
             raise fail(f"state {event.state!r} is not declared by the profile", event.t_ms)
 
 
-def _require_increasing(times: tuple[int, ...]) -> None:
-    if any(later <= earlier for earlier, later in pairwise(times)):
+def _require_increasing(times: Sequence[int]) -> None:
+    if any(map(operator.le, times[1:], times)):
         raise ValueError("times must be strictly increasing")

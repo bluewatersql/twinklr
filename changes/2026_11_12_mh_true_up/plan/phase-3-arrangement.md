@@ -138,3 +138,153 @@ P3 kickoff.
 - **Documents.** `docs/user-guide.md`: job-config rows for the two new settings.
   At phase closeout, `context/architecture/multi-agent-planning.md` gains the V3
   planner contract once it is accepted behavior.
+
+## Kickoff recheck and amendments — 2026-11-16
+
+The plan above was written at `9c55c2e`, before Phases 0–2 existed. It was rechecked
+read-only against `7356b376` by an agent separate from any implementer, on the owner's
+go-ahead of 2026-11-16. Where this section and the text above disagree, this section
+governs. Line numbers are at `7356b376`.
+
+### What the recheck found
+
+- **No family names a position preset** (catalog README), so there is no target
+  catalog for the planner to choose from.
+- **Variants are template presets only:** `narrow` (smaller extents) and `slow`
+  (doubled period). `TemplatePreset` has no category field.
+- **Admission is per template:** one failing preset excludes its family
+  (`pipeline.py:615`, `:691`).
+- **Nothing on the physical path renders accents,** and `MomentCue` has `emphasis` but
+  no confidence (`lyrics/models.py:158-180`).
+- **`twinklr show` refuses `physical_v2`** (`show_wiring.py:142`, `cli/show_cmd.py:78`),
+  so T5 as written could never run.
+- **Two plan-rebuild sites would drop V3 fields:** lyric binding
+  (`moment_cues.py:64,107,173`) and the fingerprint payload (`identity.py:116`).
+- **Render no longer fails on an unplayable cue** (default `on_unplayable="dark"`), so
+  the "render feasibility into validation" carry becomes: reject a plan that would be
+  darkened.
+- **The provider-limit check already covers every registered spec**
+  (`tests/unit/agents/test_structured_outputs.py`); the V3 spec only needs registering.
+- **Any byte added under `prompts/planner/` re-keys every legacy plan**
+  (`agents/prompts/fingerprint.py:30-53`), and `TemplateDescription`'s dump is part of
+  the legacy cache key (`orchestrator.py:252-256`).
+
+### Owner decisions, 2026-11-16
+
+| # | Question | Decision |
+|---|---|---|
+| D1 | Targets, with no family that uses one | Cut `target_id`, `RETARGET` and per-target admission from Phase 3; carried to the phase that ships a family using position presets |
+| D2 | T5 cannot run while `show` refuses `physical_v2` | Enable `physical_v2` in `twinklr show` inside Phase 3 (new task T5a), then T5 |
+| D3 | Density and accents | One `density: REST\|SPARSE\|BALANCED\|BUSY`. REST makes the section dark; BUSY is capped at 25% of song duration by the validator; SPARSE and BALANCED are recorded only. Accent ranking, the confidence threshold, the period fields and `LIT`/`MOTION_GATED` are deferred |
+| D12 | Deterministic reference | A new selector over the admitted physical families, same role/energy ladder, SHA-256 seeded tie-break, no legacy `SelectorResult` baseline. `deterministic_selector.py` stays untouched. This changes what Phase 5 compares against |
+
+### Integrator decisions (reversible)
+
+- **D4 Categories to variants.** `reach: INHERIT|COMPACT` (COMPACT → `narrow`);
+  `rate: INHERIT|SLOW` (SLOW → `slow`); one preset per section, COMPACT with SLOW
+  rejected by the validator. A fixed preset-id table documented in the catalog README;
+  no new template field. The model emits `preset_id: null`; the resolver fills it.
+  `STILL`, `PULSE`, `FAST` and `WIDE` are left out of the enums until a variant exists.
+- **D5 Variation.** `NONE|NARROW|WIDEN|SLOWER|FASTER`, relative to the source
+  section's effective preset. RESTATE keeps template and preset. RESOLVE uses SLOW or
+  COMPACT where declared, otherwise restates and traces.
+- **D6 Relation, source and role are derived** from the macro plan (first section in a
+  thread introduces; later ones take `thread.evolution`). The model picks only
+  `motif_id` (one of the section's `motif_ids`) and `variation`. A motif section is
+  unsegmented.
+- **D7 Intensity and colour** stay unapplied on the physical path; the diagnostic names
+  them. The Phase 2 intensity carry is closed by substitution (reach and rate), which
+  the owner is told at exit.
+- **D8 Feasibility.** The gate publishes `min_section_bars` per template and preset;
+  the validator rejects shorter sections. Other dark outcomes stay degrade-and-trace.
+- **D9 Per-preset admission.** The base is admitted if it passes; only failing presets
+  are excluded, and a non-admitted preset is treated as undeclared.
+- **D10 Prompt packs.** New sibling packs `prompts/planner_v3/` and
+  `prompts/judge_v3/`; the legacy packs are not edited.
+- **D11 Cache key.** V3 additions are conditional on the V3 contract. A pinned legacy
+  `get_cache_key` anchor, computed at `7356b376`, is added before T1 changes anything.
+  `MOVING_HEAD_CACHE_VERSION` stays "2".
+- New job fields (`planner_contract`, `arrangement`) change the plan, so they are not
+  render-only; they are excluded from dumps at their defaults so legacy session ids
+  hold.
+
+### Corrected tasks
+
+- **T1 Versioned intent.** Create `models_v3.py` with the fields of D3–D6. Modify
+  `models.py` (flatten returns the parent's type), `moment_cues.py` (keeps the plan's
+  type), `specs.py` (`planner_contract=`), `stage.py` (all three plan loads through
+  `load_choreography_plan`), `orchestrator.py` (types), `rendering_stage.py`,
+  `pipeline.py` (plan type), `identity.py`, `config/models.py` (`planner_contract`; V3
+  requires `physical_v2`), new packs, `tests/config_effects_registry.py`,
+  `test_structured_outputs.py`, `docs/user-guide.md`. `show_stages.py` moves to T5a.
+  The round-trip test goes through the orchestrator's normalizer.
+- **T2 Capability projection.** `project_capabilities(admission, documents) ->
+  CapabilityProjection(templates, exclusions, input_hash)`, each entry holding the
+  template id, its admitted reach/rate presets and `min_section_bars`. Built from the
+  gate's result, with no second compile. Adds per-preset admission (D9) and
+  `min_section_bars` (D8) to the gate. No `target_fixtures`. The plan's schema-limit
+  test is cut; the calibration and empty-candidate tests stay as pins.
+- **T3a Resolver (pure).** `resolve_arrangement(plan, context, projection, *, policy)`
+  derives relation, source, role, the effective preset and a dark flag, and writes
+  `preset_id`; it runs in the plan normalizer. `heuristic_validator.py` gains the busy
+  budget, variant pairs, minimum section length and motif membership.
+  `ArrangementPolicy` keeps `max_busy_fraction` only. `apply_arrangement_to_step` and
+  `compile/arrangement.py` are dropped.
+- **T3b Render integration.** `_render_physical` masks a REST section before
+  `_enter_section` and records it as `arrangement_dark`; the unapplied-intent
+  diagnostic is narrowed; an `arrangement` trace key appears only under V3.
+- **T4 Deterministic reference** per D12, in `selector_arrangement.py`.
+- **T5a Physical in `twinklr show`** (new, D2). Designed at its kickoff from the
+  combined-show stages; legacy combined-show goldens must not change.
+- **T5 Shared motif schedule and visibility,** on the physical combined show.
+
+Order: **T1 → T2 → T3a → (T3b ∥ T4) → T5a → T5.** T1, T2 and T3a share `stage.py`,
+`context.py`, `orchestrator.py`, the V3 packs, config, the registry and the docs.
+`motif_schedule.py` and its test touch no shared file and may be built early.
+
+### Invariants to hold
+
+Legacy bytes and goldens; the 16 Phase 0 and two Phase 1 fingerprints for a
+legacy-contract physical plan; legacy session ids; legacy planner cache keys. If D9
+changes output for an input that rendered before, `PHYSICAL_RENDERER_REVISION` is
+bumped and the owner told.
+
+## Single-path direction — 2026-11-16 (supersedes parts of the amendments above)
+
+The owner ruled the same day that the moving-head work must end with one path: no
+backward-compatibility layers and no old implementation left beside the new one
+([guardrail 9](../../shared/agent_guardrails.md)). This reverses the global constraints
+at the top of this plan that keep `legacy_v1` as the default, preserve unversioned plan
+loading and forbid touching the selector, and it withdraws these amendments: D10
+(sibling prompt packs), D11 (conditional cache key and a legacy key anchor), the
+`planner_contract` setting, and the "invariants to hold" for legacy bytes, session ids
+and legacy planner cache keys.
+
+Owner decisions:
+
+| Question | Decision |
+|---|---|
+| Reach and timing | The cutover is Phase 3's first task. The old path is removed after the owner has viewed a real-audio physical render in xLights and accepted it |
+| Deterministic selector and three-arm experiment | Ported to the physical families; one implementation. D12's separate arrangement selector folds into that port |
+| The rule itself | Added to the shared guardrails |
+
+Revised order:
+
+1. **P3-C0 Owner viewing render.** A real-audio `twinklr run` on the physical path,
+   rendered in xLights on an expendable show, for the owner to look at. Needs the
+   owner to name the audio and rig. The look verdict is the owner's; `PENDING-OWNER`
+   until given.
+2. **P3-C1 Cutover (after acceptance).** Remove the old renderer and curve handlers,
+   the 37 built-in templates, `moving_heads.mode`, the 3.0/3.1 schema switch, the
+   moving-head goldens and regression fixtures that pin old output, and their documents
+   and inventory records. Paths and grep evidence are recorded here before deletion
+   ([AGENTS.md → Implementation](../../../AGENTS.md#implementation)). `twinklr show`
+   renders moving heads physically as part of this (was T5a). The selector and the
+   experiment are ported.
+3. **T1–T5 as corrected above, with one planner contract:** the arrangement response
+   model replaces the current one in place, the existing prompt packs are edited, and
+   saved plans in the old shape are not loaded.
+
+Work that does not depend on the owner's viewing (T1–T3a on the planner side) proceeds
+single-contract while C0 is pending; nothing is deleted from the old renderer before
+acceptance.

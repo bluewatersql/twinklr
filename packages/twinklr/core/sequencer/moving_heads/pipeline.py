@@ -62,6 +62,7 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
     FALLBACK_METADATA_KEY,
     FailureMode,
     HeadFollow,
+    PrepositionMemo,
     UnplayableMode,
     entry_feasible,
     follow_cues,
@@ -633,10 +634,14 @@ def check_physical_templates(
                 )
             seen: set[tuple[Any, ...]] = set()
             # A step instance over the same frames compiles the same at every placement.
+            # Only placements cut at section ends share instances, so without them the
+            # cache is kept for one placement: what it holds is no longer kept alive.
             step_cache: dict[tuple[Any, ...], FixtureSegment] = {}
             index = 0
             while index < len(placements):
                 start_bar, duration_bars, plan = placements[index]
+                if on_unplayable != "error":
+                    step_cache = {}
                 whole = index == 0
                 index += 1
                 at = where
@@ -668,6 +673,8 @@ def check_physical_templates(
                     if key in seen:
                         continue
                     seen.add(key)
+                # The previous placement's cues are released before this one is compiled.
+                compiled = None
                 try:
                     compiled = compile_physical_template(
                         document.template,
@@ -960,7 +967,9 @@ def _plan_placement(
     however wide a window the previous section leaves. At the song start the section
     also enters from the run's initial state, as it renders there. Heads with the same
     profile, initial state and cues plan identically (the gate has no locks): one of
-    each is planned.
+    each is planned. Entries share their later cues, and a head reaching one of them in
+    the state an earlier entry reached it in plans the rest as that entry did
+    (`plan_prepositions`' memo, kept for this placement only).
     """
     by_fixture: dict[str, list[FixtureSegment]] = defaultdict(list)
     for segment in sorted(segments, key=lambda segment: segment.t0_ms):
@@ -973,6 +982,7 @@ def _plan_placement(
     }
     entries: list[int | None] = [None] if song_start else []
     entries += range(max(first_cycle.values(), default=1) or 1)
+    memo: PrepositionMemo = {}
     for entry in entries:
         states = dict(initial_states)
         entered = list(segments)
@@ -994,11 +1004,7 @@ def _plan_placement(
             phase_map=phase_map,
             failure_mode=failure_mode,
         )
-        groups: dict[tuple[Any, ...], list[str]] = defaultdict(list)
-        for fixture_id, profile in profiles.items():
-            own = [cue for cue in cues if cue.fixture_id == fixture_id]
-            groups[_plan_key(own, profile, states.get(fixture_id))].append(fixture_id)
-        members = {group[0]: group for group in groups.values()}
+        members = _plan_groups(cues, profiles, states)
         result = plan_prepositions(
             [cue for cue in cues if cue.fixture_id in members],
             {fixture_id: profiles[fixture_id] for fixture_id in members},
@@ -1007,6 +1013,7 @@ def _plan_placement(
             frame_ms=EFFECT_GRID_MS,
             sequence_end_ms=sequence_end_ms,
             failure_mode=failure_mode,
+            memo=memo,
         )
         errors = [d for d in result.diagnostics if d.status == "error"]
         if errors:
@@ -1093,6 +1100,53 @@ def _placement_key(
         max(start_limit_ms - context.start_ms, 0),
         min(end_limit_ms, end) - context.start_ms,
     )
+
+
+def _plan_groups(
+    cues: Sequence[FixtureSegment],
+    profiles: Mapping[str, FixtureCapabilities],
+    states: Mapping[str, InitialFixtureState],
+) -> dict[str, list[str]]:
+    """The fixtures with equal `_plan_key`s, each group under its first, in `profiles`
+    order. Keys are compared, never hashed (hashing hashes every point), and computed
+    only for heads alike in everything cheaper to compare (their cues' times and first
+    and last pose values), since heads differing there have different keys."""
+    own: dict[str, list[FixtureSegment]] = defaultdict(list)
+    for cue in cues:
+        own[cue.fixture_id].append(cue)
+    alike: dict[tuple[Any, ...], list[tuple[str, list[Any]]]] = defaultdict(list)
+    groups: dict[str, list[str]] = {}
+    for fixture_id, profile in profiles.items():
+        mine = own.get(fixture_id, [])
+        initial = states.get(fixture_id)
+        candidates = alike[_rough_plan_key(mine)]
+        key: list[Any] = []  # computed once, if any other head is alike
+        for first, first_key in candidates:
+            if not first_key:
+                first_key.append(_plan_key(own.get(first, []), profiles[first], states.get(first)))
+            if not key:
+                key.append(_plan_key(mine, profile, initial))
+            if first_key[0] == key[0]:
+                groups[first].append(fixture_id)
+                break
+        else:
+            candidates.append((fixture_id, key))
+            groups[fixture_id] = [fixture_id]
+    return groups
+
+
+def _rough_plan_key(cues: Sequence[FixtureSegment]) -> tuple[Any, ...]:
+    """Cue times and each pose channel's first and last values: equal for equal
+    `_plan_key`s."""
+    rough: list[tuple[Any, ...]] = []
+    for cue in cues:
+        rough.append((cue.t0_ms, cue.t1_ms))
+        for channel in _POSE:
+            value = cue.channels.get(channel)
+            physical = None if value is None else value.physical
+            if isinstance(physical, ContinuousTrajectory):
+                rough.append((physical.points[0].value, physical.points[-1].value))
+    return tuple(rough)
 
 
 def _plan_key(

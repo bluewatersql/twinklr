@@ -2,7 +2,7 @@
 type: context
 status: active
 area: governance
-updated: 2026-11-12
+updated: 2026-11-16
 ---
 
 # Execution Guardrails
@@ -47,6 +47,14 @@ these rules keep an agent from quietly substituting its own.
    happen. Owner-gated actions are listed in
    [AGENTS.md](../../AGENTS.md#owner-gated-actions).
 
-9. **When in doubt, stay in scope.** Uncertainty is not permission to improvise. If a
+9. **One path; a replacement removes what it replaces.** Do not add
+   backward-compatibility layers, version switches, or a parallel old and new
+   implementation of the same behaviour, and do not leave the old one behind as debt to
+   retire later. When new work supersedes existing code, the same change removes the
+   superseded code, its configuration, tests and documents. Removing something the owner
+   accepted (a look, a golden, a sealed record) still needs the owner's word first.
+   (Owner rule, 2026-11-16.)
+
+10. **When in doubt, stay in scope.** Uncertainty is not permission to improvise. If a
    decision would materially change architecture, public behavior, schemas, or scope,
    surface it with a researched recommendation and wait.

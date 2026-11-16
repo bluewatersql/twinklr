@@ -171,10 +171,15 @@ class AxisCapability(BaseModel):
         return word_min + word_max - word if self.inverted else word
 
     def _uninverted_word(self, value: Fraction) -> int:
-        low = Fraction(self.physical_min)
+        # `(value - low) * (word_max - word_min) / (high - low)` rounded half up, in
+        # integers: `(2n + d) // 2d` is `floor(n / d + 1/2)` for any nonzero `d`, so the
+        # quotient `n / d` needs no reducing.
+        low_n, low_d = self.physical_min.as_integer_ratio()
+        high_n, high_d = self.physical_max.as_integer_ratio()
         word_min, word_max = self.word_range
-        scaled = (value - low) * (word_max - word_min) / (Fraction(self.physical_max) - low)
-        return word_min + (2 * scaled.numerator + scaled.denominator) // (2 * scaled.denominator)
+        n = (value.numerator * low_d - low_n * value.denominator) * (word_max - word_min) * high_d
+        d = value.denominator * (high_n * low_d - low_n * high_d)
+        return word_min + (2 * n + d) // (2 * d)
 
     def _word_value(self, uninverted: int) -> Fraction:
         """The exact calibrated value an uninverted word encodes, at its center."""

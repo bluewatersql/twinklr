@@ -24,11 +24,13 @@ at the step end, so the end state is the kernel's, not the last frame's.
 
 from __future__ import annotations
 
+import bisect
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from fractions import Fraction
 from itertools import pairwise
 import math
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -116,7 +118,11 @@ class DiscreteChange(BaseModel):
 
 
 def compile_physical_step(
-    step: TemplateStep, context: StepCompileContext, *, sample_times_ms: tuple[int, ...]
+    step: TemplateStep,
+    context: StepCompileContext,
+    *,
+    sample_times_ms: tuple[int, ...],
+    shared: dict[tuple[Any, ...], PhysicalValue] | None = None,
 ) -> FixtureSegment:
     """Compile a step's explicit physical data into typed trajectories.
 
@@ -133,6 +139,11 @@ def compile_physical_step(
             and end (`context`) must already be frame-grid times: the caller quantizes
             musical bounds with the encoder's `quantize_cue`. Phase is evaluated at
             these frame times against the exact musical phase map.
+        shared: The sampled channels other fixtures' compiles of this step instance,
+            on the same profile and resolved components, have made and checked, by
+            channel and what else the channel reads (its phase offset, and the pan
+            sign for pan). A channel found there is reused as it is; one made here is
+            added once it passes its checks.
 
     Returns:
         A segment over the step with PAN and TILT (sampled, plus a terminal point at
@@ -185,49 +196,69 @@ def compile_physical_step(
         assert movement.start_pan_deg is not None and movement.start_tilt_deg is not None
         pose = PoseDegrees(pan_deg=movement.start_pan_deg, tilt_deg=movement.start_tilt_deg)
     offsets = context.phase_offset_by_channel
+    samples = (*times, t1_ms)
+    pan_offset = offsets.get(ChannelName.PAN, Fraction(0))
+    shared = {} if shared is None else shared
+    poses: list[tuple[float, float]] | None = None
     for channel in (ChannelName.PAN, ChannelName.TILT):
-        sign = context.pan_sign if channel is ChannelName.PAN else 1
         offset = offsets.get(channel, Fraction(0))
+        sign = context.pan_sign if channel is ChannelName.PAN else 1
+        key = (channel, offset, sign)
+        if _reuse(segment, channel, shared.get(key)):
+            continue
+        if poses is None or offset != pan_offset:
+            # Each sample's path value holds both axes: pan's pass yields tilt's too where
+            # both share a phase (tilt ignores the pan sign), so the path is evaluated
+            # once per sample.
+            poses = _path_values(
+                movement, pose, phase_map, samples, t0_ms, offset=offset, sign=context.pan_sign
+            )
+        axis = 0 if channel is ChannelName.PAN else 1
         trajectory = ContinuousTrajectory(
             unit="degree",
             points=tuple(
-                PhysicalPoint(
-                    t_ms=t,
-                    value=_movement_value(
-                        movement, pose, channel, phase_map, t, t0_ms, offset=offset, sign=sign
-                    ),
-                )
-                for t in (*times, t1_ms)
+                PhysicalPoint(t_ms=t, value=values[axis])
+                for t, values in zip(samples, poses, strict=True)
             ),
             interpolation="linear",
         )
         _add(segment, channel, trajectory, profile)
         _check_travel_rate(context.fixture_id, channel, trajectory, profile)
+        shared[key] = trajectory
 
-    _add_zoom(step, context, segment, profile, times, t1_ms)
+    _add_zoom(step, context, segment, profile, times, t1_ms, shared)
 
     dimmer = step.dimmer.physical
     if dimmer is not None:
         offset = offsets.get(ChannelName.DIMMER, Fraction(0))
-        _check_pulse_widths(
-            context.fixture_id, ChannelName.DIMMER, dimmer, phase_map, t0_ms, t1_ms, offset=offset
-        )
-        levels = ContinuousTrajectory(
-            unit="normalized",
-            points=tuple(
-                PhysicalPoint(
-                    t_ms=t,
-                    value=(
-                        dimmer.high
-                        if _pulse_high(dimmer, phase_map, t, t0_ms, offset=offset)
-                        else dimmer.low
-                    ),
-                )
-                for t in times
-            ),
-            interpolation="hold",
-        )
-        _add(segment, ChannelName.DIMMER, levels, profile)
+        dimmer_key = (ChannelName.DIMMER, offset)
+        if not _reuse(segment, ChannelName.DIMMER, shared.get(dimmer_key)):
+            _check_pulse_widths(
+                context.fixture_id,
+                ChannelName.DIMMER,
+                dimmer,
+                phase_map,
+                t0_ms,
+                t1_ms,
+                offset=offset,
+            )
+            levels = ContinuousTrajectory(
+                unit="normalized",
+                points=tuple(
+                    PhysicalPoint(
+                        t_ms=t,
+                        value=(
+                            dimmer.high
+                            if _pulse_high(dimmer, phase_map, t, t0_ms, offset=offset)
+                            else dimmer.low
+                        ),
+                    )
+                    for t in times
+                ),
+                interpolation="hold",
+            )
+            _add(segment, ChannelName.DIMMER, levels, profile)
+            shared[dimmer_key] = levels
 
     if components is not None and components.dimmer is not None:
         # A referenced attribute preset's level, held for the whole step.
@@ -273,6 +304,7 @@ def _add_zoom(
     profile: FixtureCapabilities,
     times: tuple[int, ...],
     t1_ms: int,
+    shared: dict[tuple[Any, ...], PhysicalValue],
 ) -> None:
     """The step's ZOOM on a profile with a zoom axis; see `compile_physical_step`."""
     zoom = step.physical_zoom
@@ -297,6 +329,10 @@ def _add_zoom(
                 )
             )
         segment.add_metadata("omitted_optional", "zoom")
+        return
+    # A wave follows pan's phase offset.
+    key = (ChannelName.ZOOM, context.phase_offset_by_channel.get(ChannelName.PAN, Fraction(0)))
+    if _reuse(segment, ChannelName.ZOOM, shared.get(key)):
         return
     if zoom is None or zoom.shape == "hold":
         # Unauthored, the encoder would write the default byte between and inside cues;
@@ -329,6 +365,7 @@ def _add_zoom(
     trajectory = ContinuousTrajectory(unit="degree", points=points, interpolation="linear")
     _add(segment, ChannelName.ZOOM, trajectory, profile)
     _check_travel_rate(context.fixture_id, ChannelName.ZOOM, trajectory, profile)
+    shared[key] = trajectory
 
 
 def resolve_discrete_state(capability: DiscreteCapability, state: str) -> int:
@@ -582,56 +619,56 @@ def _check_sample_times(times: Sequence[int], t0_ms: int, t1_ms: int) -> tuple[i
     return tuple(times)
 
 
-def _movement_value(
+def _path_values(
     movement: PhysicalMovementSpec,
     pose: PoseDegrees,
-    channel: ChannelName,
     phase_map: MusicalPhaseMap,
-    time_ms: int,
+    times: Sequence[int],
     origin_ms: int,
     *,
     offset: Fraction = Fraction(0),
     sign: int = 1,
-) -> float:
-    """The axis value at `time_ms`: `evaluate_physical_path` at the fixture's phase in
-    this axis's domain, the step phase minus `offset` (exact), with pan sign `sign`."""
-    is_pan = channel is ChannelName.PAN
-    if movement.shape == "hold" or movement.period_beats is None:
-        return pose.pan_deg if is_pan else pose.tilt_deg
-    phase = (
-        musical_phase_fraction(
-            phase_map, time_ms, origin_ms=origin_ms, period_beats=movement.period_beats
-        )
-        - offset
-    )
-    try:
-        at = evaluate_physical_path(movement, pose=pose, phase=phase, pan_sign=sign)
-    except OverflowError as error:
-        raise MusicalPhaseError(
-            f"phase at {time_ms} ms over a {movement.period_beats}-beat period is too large"
-        ) from error
-    return at.pan_deg if is_pan else at.tilt_deg
+) -> list[tuple[float, float]]:
+    """The `(pan, tilt)` at each of `times`: `evaluate_physical_path` at the fixture's
+    phase, the step phase minus `offset` (exact), with pan sign `sign`."""
+    period = movement.period_beats
+    if movement.shape == "hold" or period is None:
+        return [evaluate_physical_path(movement, pose, 0, 1, sign)] * len(times)
+    values = []
+    for time_ms in times:
+        phase = musical_phase_fraction(phase_map, time_ms, origin_ms=origin_ms, period_beats=period)
+        n, d = phase.numerator, phase.denominator
+        if offset:
+            n, d = n * offset.denominator - offset.numerator * d, d * offset.denominator
+        try:
+            values.append(evaluate_physical_path(movement, pose, n, d, sign))
+        except OverflowError as error:
+            raise MusicalPhaseError(
+                f"phase at {time_ms} ms over a {period}-beat period is too large"
+            ) from error
+    return values
 
 
 def evaluate_physical_path(
-    spec: PhysicalMovementSpec, *, pose: PoseDegrees, phase: Fraction, pan_sign: int = 1
-) -> PoseDegrees:
-    """The pose a movement kernel commands at `phase`, in unwrapped degrees.
+    spec: PhysicalMovementSpec, pose: PoseDegrees, n: int, d: int, pan_sign: int = 1
+) -> tuple[float, float]:
+    """The `(pan, tilt)` a movement kernel commands at the phase `n / d`, in unwrapped
+    degrees.
 
-    `phase` is the fixture's exact phase in cycles of `spec.period_beats`: the step
-    phase minus its distribution offset. `pose` is the resolved base aim (the step's
-    start angles or its position reference, never both added). `pan_sign` is the
-    fixture's mirror sign; it multiplies the pan displacement, for a 2-D path the pan
-    component after rotation and scaling, so a mirrored wing is the path reflected
-    about the vertical through its aim. With `φ = float(phase)`, `E_p`/`E_t` the pan
-    and tilt extents and `s = pan_sign`:
+    `n / d` (`d > 0`, not necessarily reduced) is the fixture's exact phase in cycles of
+    `spec.period_beats`: the step phase minus its distribution offset. `pose` is the
+    resolved base aim (the step's start angles or its position reference, never both
+    added). `pan_sign` is the fixture's mirror sign; it multiplies the pan
+    displacement, for a 2-D path the pan component after rotation and scaling, so a
+    mirrored wing is the path reflected about the vertical through its aim. With
+    `φ = n / d` as a float, `E_p`/`E_t` the pan and tilt extents and `s = pan_sign`:
 
     - `hold`: `pose`.
     - `linear` (finite): `pose + (s·E_p, E_t) · clamp(φ, 0, 1)`.
     - `sine_pan`/`sine_tilt`: `pose + (s·E_p, E_t) · sin(2πφ)` (the unused extent is 0).
 
     The relative shapes are a centered displacement `(x, y)` at the path parameter
-    `u = phase + transform.phase_cycles` (exact), or `1 - u` when `transform.reverse`:
+    `u = n / d + transform.phase_cycles` (exact), or `1 - u` when `transform.reverse`:
 
     - `circle`: `(cos 2πu, sin 2πu)`, starting at `(1, 0)`.
     - `lissajous` with `lissajous_ratio` `(a, b)`, default `(1, 2)`: `(sin 2πau, sin 2πbu)`,
@@ -646,37 +683,40 @@ def evaluate_physical_path(
     within its extents; a lissajous turned off a quarter turn can exceed them, by up to
     √2 (about 1.24 for 1:2 at 45°). Extents are never normalized to a common radius
     and no endpoint is closed. Bounds and rate are the compile's checks, on every
-    frame, not this function's.
+    frame, not this function's. Only floats of exact values are taken: integer true
+    division rounds `n / d` exactly as `float(Fraction(n, d))` does.
 
     Raises:
         OverflowError: If the phase is too large to evaluate as a float.
     """
     if spec.shape == "hold" or spec.period_beats is None:
-        return pose
+        return pose.pan_deg, pose.tilt_deg
     pan_extent = pan_sign * spec.pan_extent_deg
     if spec.shape in RELATIVE_PATH_SHAPES:
-        x, y = _centered_displacement(spec, phase)
-        return PoseDegrees.model_construct(
-            pan_deg=pose.pan_deg + pan_extent * x, tilt_deg=pose.tilt_deg + spec.tilt_extent_deg * y
-        )
-    fraction = float(phase)
+        x, y = _centered_displacement(spec, n, d)
+        return pose.pan_deg + pan_extent * x, pose.tilt_deg + spec.tilt_extent_deg * y
+    fraction = n / d
     if spec.shape == "linear":
         # A lagging head holds its start until its phase reaches zero.
         progress = min(max(fraction, 0.0), 1.0)
     else:
         # sine_pan/sine_tilt: the unused axis has zero extent by validation.
         progress = math.sin(2 * math.pi * fraction)
-    return PoseDegrees.model_construct(
-        pan_deg=pose.pan_deg + pan_extent * progress,
-        tilt_deg=pose.tilt_deg + spec.tilt_extent_deg * progress,
-    )
+    return pose.pan_deg + pan_extent * progress, pose.tilt_deg + spec.tilt_extent_deg * progress
 
 
-def _centered_displacement(spec: PhysicalMovementSpec, phase: Fraction) -> tuple[float, float]:
-    """A relative shape's rotated displacement `(x', y')`; see `evaluate_physical_path`."""
-    transform = spec.transform or PathTransform()
-    travel = phase + exact_decimal(transform.phase_cycles)
-    u = float(1 - travel if transform.reverse else travel)
+_NO_TRANSFORM = PathTransform()
+"""A relative path's transform when it sets none, built once rather than per sample."""
+
+
+def _centered_displacement(spec: PhysicalMovementSpec, n: int, d: int) -> tuple[float, float]:
+    """A relative shape's rotated displacement `(x', y')` at the phase `n / d`; see
+    `evaluate_physical_path`."""
+    transform = spec.transform or _NO_TRANSFORM
+    if transform.phase_cycles:
+        shift = exact_decimal(transform.phase_cycles)
+        n, d = n * shift.denominator + shift.numerator * d, d * shift.denominator
+    u = (d - n if transform.reverse else n) / d
     if spec.shape == "circle":
         x, y = math.cos(2 * math.pi * u), math.sin(2 * math.pi * u)
     elif spec.shape == "lissajous":
@@ -710,14 +750,19 @@ def _pulse_high(
     The pulse phase is the step phase minus the fixture's `offset`, plus the pulse's
     own `phase_cycles`; a lagging head starts its step mid-cycle.
     """
-    phase = (
-        musical_phase_fraction(
-            phase_map, time_ms, origin_ms=origin_ms, period_beats=pulse.period_beats
-        )
-        - offset
-        + exact_decimal(pulse.phase_cycles)
+    phase = musical_phase_fraction(
+        phase_map, time_ms, origin_ms=origin_ms, period_beats=pulse.period_beats
     )
-    return phase - math.floor(phase) < exact_decimal(pulse.duty_cycle)
+    # The phase as `n / d` (`d > 0`, not necessarily reduced), and its fractional part
+    # `phase - floor(phase)`, `(n mod d) / d`, against the duty: exact, in integers.
+    n, d = phase.numerator, phase.denominator
+    if offset:
+        n, d = n * offset.denominator - offset.numerator * d, d * offset.denominator
+    if pulse.phase_cycles:
+        shift = exact_decimal(pulse.phase_cycles)
+        n, d = n * shift.denominator + shift.numerator * d, d * shift.denominator
+    duty = exact_decimal(pulse.duty_cycle)
+    return n % d * duty.denominator < duty.numerator * d
 
 
 def _check_pulse_widths(
@@ -793,6 +838,15 @@ def _add(
 ) -> None:
     check_physical_value(segment.fixture_id, channel, value, profile)
     segment.channels[channel] = ChannelValue(channel=channel, physical=value)
+
+
+def _reuse(segment: FixtureSegment, channel: ChannelName, value: PhysicalValue | None) -> bool:
+    """Put a shared channel, already checked on this profile, on `segment`; False when
+    there is none (`compile_physical_step`)."""
+    if value is None:
+        return False
+    segment.channels[channel] = ChannelValue(channel=channel, physical=value)
+    return True
 
 
 def _check_travel_rate(
@@ -881,10 +935,11 @@ def _slice_value(value: PhysicalValue, start_ms: int, end_ms: int) -> PhysicalVa
         )
 
     points = value.points
-    head = PhysicalPoint(t_ms=start_ms, value=_value_at(value, start_ms))
-    inside_points = [point for point in points if start_ms < point.t_ms < end_ms]
+    times = [point.t_ms for point in points]  # strictly increasing
+    head = PhysicalPoint(t_ms=start_ms, value=_value_at(value, start_ms, times))
+    inside_points = points[bisect.bisect_right(times, start_ms) : bisect.bisect_left(times, end_ms)]
     tail = (
-        [PhysicalPoint(t_ms=end_ms, value=_value_at(value, end_ms))]
+        [PhysicalPoint(t_ms=end_ms, value=_value_at(value, end_ms, times))]
         if value.interpolation == "linear" and points[-1].t_ms >= end_ms
         else []
     )
@@ -893,14 +948,15 @@ def _slice_value(value: PhysicalValue, start_ms: int, end_ms: int) -> PhysicalVa
     )
 
 
-def _value_at(trajectory: ContinuousTrajectory, time_ms: int) -> float:
+def _value_at(trajectory: ContinuousTrajectory, time_ms: int, times: Sequence[int]) -> float:
+    """The value at `time_ms`; `times` are the points' times."""
     points = trajectory.points
-    before = [index for index, point in enumerate(points) if point.t_ms <= time_ms]
-    if not before:
+    index = bisect.bisect_right(times, time_ms) - 1  # the last point at or before it
+    if index < 0:
         raise ValueError(f"no value is defined at {time_ms} ms")
-    left = points[before[-1]]
-    if trajectory.interpolation == "hold" or left.t_ms == time_ms or before[-1] + 1 == len(points):
+    left = points[index]
+    if trajectory.interpolation == "hold" or left.t_ms == time_ms or index + 1 == len(points):
         return left.value
-    right = points[before[-1] + 1]
+    right = points[index + 1]
     fraction = (time_ms - left.t_ms) / (right.t_ms - left.t_ms)
     return left.value + fraction * (right.value - left.value)

@@ -542,6 +542,9 @@ def compile_physical_template(
             if step.step_id not in phases:
                 phases[step.step_id] = _resolve_phases(step, template, context, targets)
             distribution = phases[step.step_id]
+        # This instance's sampled channels, by profile and resolved components, for heads
+        # that share a channel's phase (`compile_physical_step`).
+        shared: dict[tuple[str | None, str | None], dict[tuple[Any, ...], Any]] = {}
         for fixture in targets:
             fixture_components = None if components is None else components[fixture.fixture_id]
             phase = None if distribution is None else distribution[fixture.fixture_id]
@@ -570,12 +573,7 @@ def compile_physical_template(
             )
             # Everything `compile_physical_step` and `follow_lag` read besides identity, so a
             # head on the same profile, resolved components and phase reuses another's cue.
-            key = (
-                template.template_id,
-                context.preset_id,
-                step.step_id,
-                t0,
-                t1,
+            fixture_key = (
                 profile_keys.setdefault(
                     fixture.fixture_id,
                     None
@@ -583,6 +581,14 @@ def compile_physical_template(
                     else fixture.physical_profile.model_dump_json(),
                 ),
                 None if fixture_components is None else fixture_components.model_dump_json(),
+            )
+            key = (
+                template.template_id,
+                context.preset_id,
+                step.step_id,
+                t0,
+                t1,
+                *fixture_key,
                 tuple(sorted(step_context.phase_offset_by_channel.items())),
                 step_context.pan_sign,
             )
@@ -599,7 +605,10 @@ def compile_physical_template(
                     )
                 else:
                     segment = compile_physical_step(
-                        step, step_context, sample_times_ms=tuple(range(t0, t1, EFFECT_GRID_MS))
+                        step,
+                        step_context,
+                        sample_times_ms=tuple(range(t0, t1, EFFECT_GRID_MS)),
+                        shared=shared.setdefault(fixture_key, {}),
                     )
                     assert fixture.physical_profile is not None  # checked by the step compile
                     lag = follow_lag(segment, fixture.physical_profile, frame_ms=EFFECT_GRID_MS)

@@ -301,7 +301,11 @@ def _period(period_beats: float) -> Fraction:
 
 
 def _cache(phase_map: MusicalPhaseMap) -> _PhaseCache:
-    cache = phase_map._cache
+    # The private attribute read directly: `phase_map._cache` takes pydantic's
+    # `__getattr__` fallback, which cost more than the cached lookup it serves.
+    private = phase_map.__pydantic_private__
+    assert private is not None  # the model declares a private attribute
+    cache: _PhaseCache = private["_cache"]
     if cache.knots is not phase_map.knots:
         cache = phase_map._cache = _PhaseCache(phase_map.knots)
     return cache
