@@ -66,6 +66,7 @@ from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, Fix
 from twinklr.core.sequencer.moving_heads.compile.physical import shutter_changes
 
 FailureMode = Literal["error", "preserve_aim", "drop_accent"]
+UnplayableMode = Literal["dark", "error"]
 
 FALLBACK_METADATA_KEY = "preposition_fallback"
 """Cue metadata naming the failure mode its effect opts into; the pass mode must match."""
@@ -93,6 +94,10 @@ class PrepositionResult(BaseModel):
     segments: tuple[FixtureSegment, ...]
     diagnostics: tuple[TransitionDiagnostic, ...]
     dependencies: tuple[TransitionDependency, ...]
+    unplayable: tuple[dict[str, str | int], ...] = ()
+    """Under `on_unplayable="dark"`, one record per cue kept dark because it could not
+    be played: its fixture, section, template, step and frames, and the diagnostic's
+    code and reason."""
 
     @property
     def has_errors(self) -> bool:
@@ -108,6 +113,7 @@ def plan_prepositions(
     frame_ms: int,
     sequence_end_ms: int,
     failure_mode: FailureMode = "error",
+    on_unplayable: UnplayableMode = "error",
 ) -> PrepositionResult:
     """Author every fixture over `[0, sequence_end_ms)`, transactions before each cue.
 
@@ -139,6 +145,14 @@ def plan_prepositions(
             that aim and plans later cues from there. Neither applies to unknown initial
             state, unknown visibility latency, a missing darkness guarantee, an
             unencodable value or a lock.
+        on_unplayable: `dark` keeps a cue that still cannot be played after its
+            fallback dark, as `drop_accent` does (status `drop_accent`, listed in
+            `unplayable`): a cue whose transaction fails for any reason but an unknown
+            initial state or a lock, and a cue that a shutter state too short to take
+            effect, or a park that cannot follow, lies in. Each fixture is replanned
+            with the cues found so far kept dark until nothing more is found; every
+            replan keeps at least one more cue dark, so it ends, at worst with every
+            cue dark and the fixture parked. `error` reports them as errors.
 
     Returns:
         The cues with their transactions and parks, ordered by fixture and time, or no
@@ -161,6 +175,7 @@ def plan_prepositions(
     planned: list[FixtureSegment] = []
     diagnostics: list[TransitionDiagnostic] = []
     dependencies: list[TransitionDependency] = []
+    unplayable: list[dict[str, str | int]] = []
     for fixture_id in sorted(by_fixture.keys() | capabilities.keys()):
         profile = capabilities.get(fixture_id)
         if profile is None:
@@ -173,18 +188,33 @@ def plan_prepositions(
             frame_ms,
             sequence_end_ms,
             failure_mode,
+            on_unplayable,
         )
-        out, fixture_diagnostics, fixture_dependencies = planner.plan(by_fixture[fixture_id])
-        if not any(diagnostic.status == "error" for diagnostic in fixture_diagnostics):
-            fixture_diagnostics += planner.shutter_timing(out)
+        dark: dict[int, _InfeasibleError] = {}
+        while True:
+            out, fixture_diagnostics, fixture_dependencies, kept_dark = planner.plan(
+                by_fixture[fixture_id], dark
+            )
+            errors = [d for d in fixture_diagnostics if d.status == "error"]
+            if not errors:
+                errors = planner.shutter_timing(out)
+                fixture_diagnostics += errors
+            found = {} if on_unplayable == "error" else planner.culprits(out, errors)
+            if not found.keys() - dark.keys():
+                break
+            dark |= found
         planned.extend(out)
         diagnostics.extend(sorted(fixture_diagnostics, key=lambda diagnostic: diagnostic.cue_ms))
         dependencies.extend(fixture_dependencies)
+        unplayable.extend(kept_dark)
 
     if any(diagnostic.status == "error" for diagnostic in diagnostics):
         planned = []
     return PrepositionResult(
-        segments=tuple(planned), diagnostics=tuple(diagnostics), dependencies=tuple(dependencies)
+        segments=tuple(planned),
+        diagnostics=tuple(diagnostics),
+        dependencies=tuple(dependencies),
+        unplayable=tuple(unplayable),
     )
 
 
@@ -416,6 +446,32 @@ def follow_lag(
     return None
 
 
+def dark_throughout(segment: FixtureSegment, profile: FixtureCapabilities, start_ms: int) -> bool:
+    """Whether every frame of `segment` from `start_ms` commands darkness: an authored
+    dimmer at zero the profile declares extinguishing, or an extinguishing shutter state."""
+    visibility = profile.visibility
+    dimmer = segment.channels.get(ChannelName.DIMMER)
+    levels: dict[int, Fraction] = {}
+    if (
+        visibility.dimmer_zero_extinguishes
+        and dimmer is not None
+        and isinstance(dimmer.physical, ContinuousTrajectory)
+    ):
+        levels = dict(_frame_levels(dimmer.physical, start_ms, segment.t1_ms, EFFECT_GRID_MS))
+    shutter = segment.channels.get(ChannelName.SHUTTER)
+    for time_ms in range(start_ms, segment.t1_ms, EFFECT_GRID_MS):
+        if levels.get(time_ms) == 0:
+            continue
+        if (
+            shutter is not None
+            and isinstance(shutter.physical, DiscreteTrajectory)
+            and _state_at(shutter.physical, time_ms) in visibility.extinguishing_shutter_states
+        ):
+            continue
+        return False
+    return True
+
+
 def _word_ms(axis: AxisCapability) -> Fraction:
     """Time to travel one encoded word at the configured speed."""
     assert axis.travel_speed_per_s is not None
@@ -512,6 +568,7 @@ class _FixturePlanner:
         frame_ms: int,
         end_ms: int,
         failure_mode: FailureMode,
+        on_unplayable: UnplayableMode = "error",
     ) -> None:
         self.fixture_id = fixture_id
         self.profile = profile
@@ -519,6 +576,7 @@ class _FixturePlanner:
         self.frame_ms = frame_ms
         self.end_ms = end_ms
         self.failure_mode = failure_mode
+        self.on_unplayable = on_unplayable
         self.pose_channels = tuple(ch for ch in _POSE if AXIS_KEYS[ch] in profile.axes)
         self.wheel_channels = tuple(ch for ch in _WHEELS if DISCRETE_KEYS[ch] in profile.discrete)
         self.channels = tuple(
@@ -540,14 +598,25 @@ class _FixturePlanner:
     # --- Planning ---------------------------------------------------------------------
 
     def plan(
-        self, segments: Sequence[FixtureSegment]
-    ) -> tuple[list[FixtureSegment], list[TransitionDiagnostic], list[TransitionDependency]]:
+        self,
+        segments: Sequence[FixtureSegment],
+        dark: Mapping[int, _InfeasibleError] | None = None,
+    ) -> tuple[
+        list[FixtureSegment],
+        list[TransitionDiagnostic],
+        list[TransitionDependency],
+        list[dict[str, str | int]],
+    ]:
+        """Plan the fixture's cues in time order; `dark` maps the start of each cue to
+        keep dark (`on_unplayable="dark"`) to the failure found for it."""
         ordered = self._checked(segments)
+        dark = dark or {}
         out: list[FixtureSegment] = []
         diagnostics: list[TransitionDiagnostic] = []
         dependencies: list[TransitionDependency] = []
+        kept_dark: list[dict[str, str | int]] = []
         if not ordered and self.end_ms == 0:
-            return out, diagnostics, dependencies
+            return out, diagnostics, dependencies, kept_dark
 
         def fail(state: _State, target: FixtureSegment | None, failure: _InfeasibleError) -> None:
             cue_ms = state.start_ms if target is None else target.t0_ms
@@ -575,7 +644,7 @@ class _FixturePlanner:
                 ordered[0] if ordered else None,
                 _InfeasibleError("unknown_initial_state", reason),
             )
-            return out, diagnostics, dependencies
+            return out, diagnostics, dependencies, kept_dark
 
         state = _State(0, self._head(self.initial), None, None, self._evidence(), None)
         last: FixtureSegment | None = None
@@ -583,44 +652,55 @@ class _FixturePlanner:
             available = target.t0_ms - state.start_ms
             status: TransitionStatus = "feasible"
             code: TransitionCode | None = None
-            try:
-                plan = self._transaction(state, target)
-            except _InfeasibleError as failure:
-                mode = self._fallback(target, failure)
-                if mode is None:
-                    fail(state, target, failure)
-                    return out, diagnostics, dependencies
-                status, code = mode, failure.code
+            failure = dark.get(target.t0_ms)
+            if failure is None:
+                try:
+                    plan = self._transaction(state, target)
+                except _InfeasibleError as error:
+                    failure = error
+            if failure is not None:
+                mode = None if target.t0_ms in dark else self._fallback(target, failure)
                 aim = self._aim(state)
-                if mode == "drop_accent":
+                if mode == "preserve_aim":
+                    try:
+                        held = self._hold_aim(target, state.head.values.words)
+                        self._check_locks(held.t0_ms, held.t1_ms, _POSE, failure.required_ms)
+                        plan = self._transaction(state, held)
+                    except _InfeasibleError as second:
+                        second.reason = (
+                            f"{failure.reason}; preserve_aim cannot apply: {second.reason}"
+                        )
+                        failure, mode = second, None
+                    else:
+                        target, status, code = held, mode, failure.code
+                        plan = replace(
+                            plan,
+                            required_ms=failure.required_ms,
+                            reason=f"{failure.reason}; preserve_aim holds pan/tilt at the "
+                            f"settled aim {aim} through the cue; {plan.reason}",
+                        )
+                if mode != "preserve_aim":
+                    degrade = mode is None
+                    if degrade and not self._degrades(failure):
+                        fail(state, target, failure)
+                        return out, diagnostics, dependencies, kept_dark
+                    why = "on_unplayable 'dark'" if degrade else "drop_accent"
                     diagnostics.append(
                         self._diagnostic(
                             target.t0_ms,
-                            status,
-                            code,
+                            "drop_accent",
+                            failure.code,
                             failure.required_ms,
                             available,
-                            f"{failure.reason}; drop_accent keeps the cue dark at the aim "
+                            f"{failure.reason}; {why} keeps the cue dark at the aim "
                             f"{aim} and plans the next cue from there",
                         )
                     )
                     dependencies.append(self._dependency(state, target, target.t1_ms))
+                    if degrade:
+                        kept_dark.append(self._kept_dark(target, failure))
                     last = target
                     continue
-                try:
-                    target = self._hold_aim(target, state.head.values.words)
-                    self._check_locks(target.t0_ms, target.t1_ms, _POSE, failure.required_ms)
-                    plan = self._transaction(state, target)
-                except _InfeasibleError as second:
-                    second.reason = f"{failure.reason}; preserve_aim cannot apply: {second.reason}"
-                    fail(state, target, second)
-                    return out, diagnostics, dependencies
-                plan = replace(
-                    plan,
-                    required_ms=failure.required_ms,
-                    reason=f"{failure.reason}; preserve_aim holds pan/tilt at the settled aim "
-                    f"{aim} through the cue; {plan.reason}",
-                )
             diagnostics.append(
                 self._diagnostic(
                     target.t0_ms,
@@ -657,9 +737,58 @@ class _FixturePlanner:
             except _InfeasibleError as failure:
                 failure.reason = f"cannot park {'after ' + last.segment_id if last else 'the fixture'}: {failure.reason}"
                 fail(state, None, failure)
-                return out, diagnostics, dependencies
+                return out, diagnostics, dependencies, kept_dark
             out.append(park)
-        return out, diagnostics, dependencies
+        return out, diagnostics, dependencies, kept_dark
+
+    def culprits(
+        self, out: Sequence[FixtureSegment], errors: Sequence[TransitionDiagnostic]
+    ) -> dict[int, _InfeasibleError]:
+        """The cue to keep dark for each error a dark cue could clear, by its start.
+
+        A shutter state too short to take effect lies in a cue, a transaction (its cue
+        then) or the park (the last cue played then); a park that cannot follow is
+        the last cue's. An unknown initial state or a lock is never cleared so."""
+        found: dict[int, _InfeasibleError] = {}
+        cues = [segment for segment in out if TRANSACTION_METADATA_KEY not in segment.metadata]
+        for error in errors:
+            if error.code is None or error.code in ("unknown_initial_state", "lock_conflict"):
+                continue
+            where = next((s for s in out if s.t0_ms <= error.cue_ms < s.t1_ms), None)
+            if where is None:  # a park that could not be authored, after its cue
+                where = next((s for s in cues if s.t1_ms == error.cue_ms), None)
+            if where is not None and TRANSACTION_METADATA_KEY in where.metadata:
+                if where.metadata[TRANSACTION_METADATA_KEY]:
+                    where = next((s for s in cues if s.t0_ms == where.t1_ms), None)
+                else:
+                    where = next((s for s in cues if s.t1_ms == where.t0_ms), None)
+            if where is not None:
+                found[where.t0_ms] = _InfeasibleError(
+                    error.code, error.reason, error.required_ms, substitutable=True
+                )
+        return found
+
+    def _degrades(self, failure: _InfeasibleError) -> bool:
+        """Whether `on_unplayable` keeps a cue dark that cannot be played for `failure`:
+        never for an unknown initial state or a lock."""
+        return self.on_unplayable == "dark" and failure.code not in (
+            "unknown_initial_state",
+            "lock_conflict",
+        )
+
+    def _kept_dark(self, cue: FixtureSegment, failure: _InfeasibleError) -> dict[str, str | int]:
+        return {
+            "fixture_id": cue.fixture_id,
+            "section_id": cue.section_id,
+            "template_id": cue.template_id,
+            "step_id": cue.step_id,
+            "start_ms": cue.t0_ms,
+            "end_ms": cue.t1_ms,
+            "frames": (cue.t1_ms - cue.t0_ms) // self.frame_ms,
+            "reason": "unplayable",
+            "code": failure.code,
+            "detail": failure.reason,
+        }
 
     def _transaction(self, state: _State, target: FixtureSegment) -> _Plan:
         g0, g1 = state.start_ms, target.t0_ms

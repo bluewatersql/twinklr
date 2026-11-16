@@ -10,6 +10,7 @@ Two mirrored wings flip the sign of the pan displacement only.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Callable
 import copy
 from fractions import Fraction
@@ -756,11 +757,12 @@ def test_plan_key_follows_trajectories_not_rank() -> None:
 
 def test_gate_plans_heads_once_unless_their_cues_differ(monkeypatch: pytest.MonkeyPatch) -> None:
     ids = _ids(4)
-    planned: list[set[str]] = []
+    planned: dict[str, set[int]] = defaultdict(set)
     real = pipeline_module.plan_prepositions
 
     def recording(segments: Any, *args: Any, **kwargs: Any) -> Any:
-        planned.append({segment.fixture_id for segment in segments})
+        templates = {segment.template_id for segment in segments}
+        planned[templates.pop()].add(len({segment.fixture_id for segment in segments}))
         return real(segments, *args, **kwargs)
 
     monkeypatch.setattr(pipeline_module, "plan_prepositions", recording)
@@ -782,7 +784,8 @@ def test_gate_plans_heads_once_unless_their_cues_differ(monkeypatch: pytest.Monk
             initial_states=_job(ids).moving_heads.initial_states,
             failure_mode="error",
         )
-    assert [len(heads) for heads in planned] == [1, 1, 4]
+    # At every placement the gate checks.
+    assert planned == {"p22_plain": {1}, "p22_hold": {1}, "p22_wave": {4}}
 
 
 def test_mirrored_odd_rig_renders_with_a_still_center_and_records_canonical_order() -> None:

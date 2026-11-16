@@ -61,6 +61,7 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
     FALLBACK_METADATA_KEY,
     FailureMode,
     HeadFollow,
+    UnplayableMode,
     entry_feasible,
     follow_cues,
     plan_prepositions,
@@ -524,6 +525,7 @@ def check_physical_templates(
     fixture_group: FixtureGroup,
     initial_states: Mapping[str, InitialFixtureState],
     failure_mode: FailureMode,
+    on_unplayable: UnplayableMode = "error",
 ) -> None:
     """Dry-compile templates on the rig, so a plan can only name ones that will render.
 
@@ -540,6 +542,16 @@ def check_physical_templates(
     `initial_states` under the run's `failure_mode`, so a template whose own cues
     cannot be repositioned between is refused unless it declares the fallback the run
     enables.
+
+    Beyond bar 1 it checks the placements a section can give the template: a repeating
+    cycle from each bar that starts another alignment to the bars, to the song's end; a
+    ONCE cycle from every start bar; each entered with every cue of its first cycle
+    revealed first. So an admitted template plays at every alignment of its cycles to
+    the song's bars and tempo, from whichever first-cycle cue a section reveals. What a
+    section's end adds (a cycle cut short, a remainder after the last whole cycle, the
+    state a fallback cascade reaches there) and what an earlier section leaves is
+    checked only under `on_unplayable="error"`, as best effort, from every start bar;
+    under `dark` the render keeps any such cue dark instead (`plan_prepositions`).
 
     Raises:
         UnsupportedRenderModeError: Naming each template, preset, step, fixture and
@@ -571,13 +583,29 @@ def check_physical_templates(
             where = f"template {template_id!r}" + (
                 f", preset {preset.preset_id!r}" if preset else ""
             )
-            # A ONCE cycle plays once wherever a section starts, so it is checked at every
-            # start bar a full cycle fits from, not only at bar 1's tempo.
-            placements = [(1, max(bars, 1))]
+            # Bar 1 over the whole song first, from the initial state. Then every
+            # placement class a section can give the template: a repeating cycle at each
+            # alignment to the bars, cut short at every bar, and ending in every
+            # remainder at every bar (`_repeating_placements`); a ONCE cycle at every
+            # start bar (added once bar 1 shows how far its motion runs).
+            placements = [(1, max(bars, 1), True)]
+            if repeat.mode != RepeatMode.ONCE:
+                placements += _repeating_placements(
+                    repeat.cycle_bars, bars, section_ends=on_unplayable == "error"
+                )
             seen: set[tuple[Any, ...]] = set()
-            while placements:
-                start_bar, duration_bars = placements.pop(0)
-                at = where if start_bar == 1 else f"{where}, placed at bar {start_bar}"
+            # A step instance over the same frames compiles the same at every placement.
+            step_cache: dict[tuple[Any, ...], FixtureSegment] = {}
+            index = 0
+            while index < len(placements):
+                start_bar, duration_bars, plan = placements[index]
+                whole = index == 0
+                index += 1
+                at = where
+                if not whole:
+                    at += f", placed at bar {start_bar}"
+                    if repeat.mode != RepeatMode.ONCE:
+                        at += f" for {duration_bars} bar(s)"
                 context = TemplateCompileContext(
                     section_id="render_preflight",
                     template_id=document.template.template_id,
@@ -595,6 +623,9 @@ def check_physical_templates(
                     fixture_group_id=fixture_group.group_id,
                 )
                 if start_bar > 1:
+                    # Bar 1 is never deduplicated: there the head enters from its initial
+                    # state at the song start, so an equal key later may reposition
+                    # differently.
                     key = _placement_key(context, phase_map, start_limit, end_limit)
                     if key in seen:
                         continue
@@ -607,6 +638,7 @@ def check_physical_templates(
                         phase_map=phase_map,
                         start_limit_ms=start_limit,
                         end_limit_ms=end_limit,
+                        step_cache=step_cache,
                     )
                 except (
                     PhysicalCompileError,
@@ -616,52 +648,30 @@ def check_physical_templates(
                 ) as error:
                     # A step's error carries a note naming its template, step and fixture.
                     notes = "; ".join(getattr(error, "__notes__", ()))
-                    if notes and preset:
-                        notes += f", preset {preset.preset_id!r}"
-                    if notes and start_bar > 1:
-                        notes += f", placed at bar {start_bar}"
+                    if notes:
+                        notes += at.removeprefix(f"template {template_id!r}")
                     failures.append(f"{notes or at}: {error}")
                     break
-                cues, _, _ = _enter_section(
+                if not plan:
+                    continue
+                refusal = _plan_placement(
                     compiled.segments,
-                    {},
                     profiles,
                     initial_states,
                     section_start_ms=context.start_ms,
+                    first_cycle_end_ms=context.bar_offset_to_ms(repeat.cycle_bars),
                     phase_map=phase_map,
                     failure_mode=failure_mode,
-                )
-                # Heads with the same profile, initial state and cues plan identically (the
-                # gate has no locks): plan one of each.
-                groups: dict[tuple[Any, ...], list[str]] = defaultdict(list)
-                for fixture_id, profile in profiles.items():
-                    own = [cue for cue in cues if cue.fixture_id == fixture_id]
-                    groups[_plan_key(own, profile, initial_states.get(fixture_id))].append(
-                        fixture_id
-                    )
-                members = {group[0]: group for group in groups.values()}
-                heads = set(members)
-                result = plan_prepositions(
-                    [cue for cue in cues if cue.fixture_id in heads],
-                    {fixture_id: profiles[fixture_id] for fixture_id in heads},
-                    initial_states=initial_states,
-                    locks=(),
-                    frame_ms=EFFECT_GRID_MS,
                     sequence_end_ms=sequence_end_ms,
-                    failure_mode=failure_mode,
+                    song_start=start_bar == 1,
                 )
-                errors = [d for d in result.diagnostics if d.status == "error"]
-                if errors:
+                if refusal:
                     failures.append(
                         f"{at}: dark repositioning between its own cues cannot be planned: "
-                        + "; ".join(
-                            f"{'/'.join(members[d.fixture_id])} cue at {d.cue_ms} ms: "
-                            f"{d.code}: {d.reason}"
-                            for d in errors
-                        )
+                        + refusal
                     )
                     break
-                if start_bar == 1 and repeat.mode == RepeatMode.ONCE:
+                if whole and repeat.mode == RepeatMode.ONCE:
                     window = _once_window_bars(
                         compiled.segments,
                         phase_map,
@@ -669,11 +679,8 @@ def check_physical_templates(
                         cycle_bars=repeat.cycle_bars,
                         beats_per_bar=beat_grid.beats_per_bar,
                     )
-                    # Bar 1's key is not marked seen: there the head enters from its
-                    # initial state at the song start, so an equal key later may still
-                    # reposition differently.
-                    placements = [
-                        (later, min(bars - later + 1, window))
+                    placements += [
+                        (later, min(bars - later + 1, window), True)
                         for later in range(2, bars + 1)
                         if bars - later + 1 >= repeat.cycle_bars - 1e-9
                     ]
@@ -682,6 +689,134 @@ def check_physical_templates(
             "moving_heads.mode 'physical_v2' would offer the planner templates this rig "
             "cannot render: " + "; ".join(failures)
         )
+
+
+def _repeating_placements(
+    cycle_bars: float, bars: int, *, section_ends: bool = True
+) -> list[tuple[int, int, bool]]:
+    """The `(start_bar, duration_bars, plan)` sections the gate checks a repeating
+    template at, beyond bar 1 over the whole song; `plan` is False where compiling alone
+    adds anything.
+
+    A cycle of `p/q` bars, started on any bar, puts its cycles at `p` alignments to the
+    bars: a section from each of the bars 2 to `p` to the song's end holds every cycle
+    at its alignment, every boundary between consecutive cycles and the longest chains.
+    A section's end adds two things a longer one never shows: cutting a cycle's head
+    short (sections shorter than a cycle: compiled, since nothing follows the cut in
+    them) and a remainder after its last complete cycle under the remainder policy
+    (sections of up to `q` cycles plus a remainder, from every start bar: compiled and
+    planned, since the remainder follows a cycle); only with `section_ends`.
+    """
+    cycle = Fraction(repr(cycle_bars)).limit_denominator(64)
+    placements = [
+        (start, bars - start + 1, True) for start in range(2, min(cycle.numerator, bars) + 1)
+    ]
+    for start in range(1, bars + 1 if section_ends else 1):
+        for length in range(
+            1, min(math.ceil((cycle.denominator + 1) * cycle), bars - start + 1) + 1
+        ):
+            if length < cycle:
+                placements.append((start, length, False))
+            elif (length / cycle).denominator != 1:
+                placements.append((start, length, True))
+    return placements
+
+
+def _plan_placement(
+    segments: Sequence[FixtureSegment],
+    profiles: Mapping[str, FixtureCapabilities],
+    initial_states: Mapping[str, InitialFixtureState],
+    *,
+    section_start_ms: int,
+    first_cycle_end_ms: int,
+    phase_map: MusicalPhaseMap,
+    failure_mode: FailureMode,
+    sequence_end_ms: int,
+    song_start: bool,
+) -> str:
+    """Plan a gate placement entered at each cue of its first cycle; "" when every entry
+    plans, else the diagnostics of the first that does not.
+
+    After a section's entry window any cue of its first cycle can be the first a head
+    reveals, entered from darkness and played as authored (cut or whole, it ends the
+    same); a `drop_accent` cascade runs differently from each. Each entry is planned
+    from a dark head already at that cue's first pose and wheel states, so it plays
+    however wide a window the previous section leaves. At the song start the section
+    also enters from the run's initial state, as it renders there. Heads with the same
+    profile, initial state and cues plan identically (the gate has no locks): one of
+    each is planned.
+    """
+    by_fixture: dict[str, list[FixtureSegment]] = defaultdict(list)
+    for segment in sorted(segments, key=lambda segment: segment.t0_ms):
+        by_fixture[segment.fixture_id].append(segment)
+    first_cycle = {
+        fixture_id: sum(
+            1 for cue in own if int(cue.metadata["requested_t0_ms"]) < first_cycle_end_ms
+        )
+        for fixture_id, own in by_fixture.items()
+    }
+    entries: list[int | None] = [None] if song_start else []
+    entries += range(max(first_cycle.values(), default=1) or 1)
+    for entry in entries:
+        states = dict(initial_states)
+        entered = list(segments)
+        if entry is not None:
+            entered = []
+            for fixture_id, own in by_fixture.items():
+                own = own[min(entry, max(first_cycle[fixture_id] - 1, 0)) :]
+                entered += own
+                if fixture_id in states:
+                    states[fixture_id] = _revealing_state(
+                        own[0], profiles[fixture_id], states[fixture_id]
+                    )
+        cues, _, _ = _enter_section(
+            entered,
+            {},
+            profiles,
+            states,
+            section_start_ms=section_start_ms,
+            phase_map=phase_map,
+            failure_mode=failure_mode,
+        )
+        groups: dict[tuple[Any, ...], list[str]] = defaultdict(list)
+        for fixture_id, profile in profiles.items():
+            own = [cue for cue in cues if cue.fixture_id == fixture_id]
+            groups[_plan_key(own, profile, states.get(fixture_id))].append(fixture_id)
+        members = {group[0]: group for group in groups.values()}
+        result = plan_prepositions(
+            [cue for cue in cues if cue.fixture_id in members],
+            {fixture_id: profiles[fixture_id] for fixture_id in members},
+            initial_states=states,
+            locks=(),
+            frame_ms=EFFECT_GRID_MS,
+            sequence_end_ms=sequence_end_ms,
+            failure_mode=failure_mode,
+        )
+        errors = [d for d in result.diagnostics if d.status == "error"]
+        if errors:
+            prefix = "" if entry is None else f"(entered at cue {entry + 1} of its first cycle) "
+            return prefix + "; ".join(
+                f"{'/'.join(members[d.fixture_id])} cue at {d.cue_ms} ms: {d.code}: {d.reason}"
+                for d in errors
+            )
+    return ""
+
+
+def _revealing_state(
+    cue: FixtureSegment, profile: FixtureCapabilities, initial: InitialFixtureState
+) -> InitialFixtureState:
+    """The run's dark initial state moved to `cue`'s first pose and wheel states."""
+    pose = {"pan_deg": initial.pan_deg, "tilt_deg": initial.tilt_deg}
+    for channel, field in ((ChannelName.PAN, "pan_deg"), (ChannelName.TILT, "tilt_deg")):
+        if AXIS_KEYS[channel] in profile.axes:
+            pose[field] = _pose_points(cue, channel)[0].value
+    wheels = dict(initial.discrete_states)
+    for channel in _WHEELS:
+        key = DISCRETE_KEYS[channel]
+        capability = profile.discrete.get(key)
+        if capability is not None:
+            wheels[key] = _wheel_state(cue, channel, cue.t0_ms, capability.default_state)
+    return initial.model_copy(update={**pose, "discrete_states": wheels})
 
 
 def _once_window_bars(
@@ -960,6 +1095,9 @@ class RenderingPipeline:
         """Set by a `physical_v2` `render()`: every fixture's encoded frames, rig order."""
         self.render_record: dict[str, Any] | None = None
         """Set by a `physical_v2` `render()`: the identity and evidence the trace carries."""
+        self.unplayable_warning: str | None = None
+        """Set by a `physical_v2` `render()` that kept cues dark under `on_unplayable`:
+        the one warning it logged, with the counts."""
 
         # Create shared infrastructure
         self.curve_generator = CurveGenerator()
@@ -1198,6 +1336,10 @@ class RenderingPipeline:
         cues: list[FixtureSegment] = []
         kept: dict[str, list[HeadFollow]] = defaultdict(list)
         dropped: list[dict[str, Any]] = []
+        unplayable: list[dict[str, str | int]] | None = (
+            [] if policy.on_unplayable == "dark" else None
+        )
+        basic_checked: set[tuple[str, str | None]] = set()
         in_window: list[dict[str, Any]] = []
         entry_windows: list[dict[str, Any]] = []
         time_markers: list[TimeMarker] = []
@@ -1249,6 +1391,7 @@ class RenderingPipeline:
                         action="unchanged",
                     )
                 )
+            refused = 0 if unplayable is None else len(unplayable)
             compiled = compile_physical_template(
                 template_doc.template,
                 context,
@@ -1256,7 +1399,34 @@ class RenderingPipeline:
                 phase_map=phase_map,
                 start_limit_ms=start_limit,
                 end_limit_ms=end_limit,
+                unplayable=unplayable,
             )
+            key = (template_doc.template.template_id, context.preset_id)
+            if unplayable is not None and len(unplayable) > refused and key not in basic_checked:
+                # Only a refusal this placement adds is left dark: one the template shows
+                # from bar 1 over the song, where the gate places it, still raises.
+                basic_checked.add(key)
+                compile_physical_template(
+                    template_doc.template,
+                    context.model_copy(
+                        update={
+                            "section_id": "render_preflight",
+                            "start_bar": 1,
+                            "duration_bars": max(
+                                1,
+                                sum(
+                                    1
+                                    for start in self.beat_grid.bar_boundaries
+                                    if start < self.beat_grid.duration_ms
+                                ),
+                            ),
+                        }
+                    ),
+                    preset,
+                    phase_map=phase_map,
+                    start_limit_ms=start_limit,
+                    end_limit_ms=end_limit,
+                )
             dropped.extend(compiled.dropped_steps)
             entered, inside, windows = _enter_section(
                 compiled.segments,
@@ -1316,9 +1486,27 @@ class RenderingPipeline:
             frame_ms=EFFECT_GRID_MS,
             sequence_end_ms=len(times) * EFFECT_GRID_MS,
             failure_mode=policy.reposition_fallback,
+            on_unplayable=policy.on_unplayable,
         )
         if result.has_errors:
             raise PhysicalRenderError(result.diagnostics)
+        unplayable = [*(unplayable or ()), *result.unplayable]
+        unplayable_totals: dict[str, dict[str, int]] = {}
+        for record in unplayable:
+            total = unplayable_totals.setdefault(str(record["code"]), {"cues": 0, "frames": 0})
+            total["cues"] += 1
+            total["frames"] += int(record["frames"])
+        if unplayable:
+            self.unplayable_warning = (
+                f"physical_v2: {len(unplayable)} cue(s) placed where they cannot play honestly "
+                f"are kept dark ({sum(t['frames'] for t in unplayable_totals.values())} "
+                "frame(s); "
+                + ", ".join(
+                    f"{code}: {total['cues']}" for code, total in sorted(unplayable_totals.items())
+                )
+                + "); the trace's dropped_cues lists them"
+            )
+            logger.warning(self.unplayable_warning)
 
         frames: list[EncodedFixtureFrame] = []
         for fixture in fixtures:
@@ -1384,7 +1572,9 @@ class RenderingPipeline:
                     "end_limit_ms": end_limit,
                 }
                 for record in in_window
-            ],
+            ]
+            + unplayable,
+            "unplayable_totals": unplayable_totals,
             "entry_windows": entry_windows,
             "topology": (
                 None

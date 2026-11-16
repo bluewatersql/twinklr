@@ -2772,6 +2772,15 @@ for _fallback_path in (
         _PHYSICAL_PREPOSITION,
     )
 
+# What a physical render does with a cue the plan placed where it cannot play. Evidenced
+# by a render that keeps such a cue dark at the default and is refused under `error`.
+CONFIG_EFFECTS["job.moving_heads.on_unplayable"] = ConfigDisposition(
+    ConfigDispositionKind.EFFECT_TEST,
+    "tests/unit/sequencer/moving_heads/compile/test_unplayable.py::"
+    "test_on_unplayable_field_changes_the_render",
+    "exact path changes whether an unplayable cue is kept dark or the render is refused",
+)
+
 # P2.1 named rig components: a fixture group's position and attribute presets and the
 # step references that name them. They feed only the opt-in physical compile; each
 # exact path mutates its field and must either change `compile_physical_template`'s

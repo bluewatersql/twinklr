@@ -41,6 +41,8 @@ class MovingHeadRenderingStage:
         - "xsq_output_path": Path to generated XSQ file
         - "delivery_artifacts": DeliveryArtifacts (.xsq, .xtiming files, .xmap)
         - "rendered_segment_count": Number of segments rendered
+        - "unplayable_warning": a physical render's warning about the cues it kept
+          dark under `on_unplayable`, when it kept any
 
     Example:
         >>> stage = MovingHeadRenderingStage(
@@ -159,6 +161,8 @@ class MovingHeadRenderingStage:
             context.set_state("delivery_artifacts", pipeline.artifacts)
             context.set_state("rendered_segment_count", len(segments))
             context.set_state("rendered_segments", tuple(segments))
+            if pipeline.unplayable_warning is not None:
+                context.set_state("unplayable_warning", pipeline.unplayable_warning)
 
             # Track metrics
             context.add_metric("mh_render_segments", len(segments))
@@ -306,7 +310,8 @@ class RenderPreflightStage:
     the fixtures the render stage will load (`preflight_render_policy`), the templates
     the planner will be offered (`offered_template_ids`; every one must carry physical
     data, and each must dry-compile on this rig and plan the dark repositioning between
-    its own cues under the job's `reposition_fallback`: `check_physical_templates`), the
+    its own cues under the job's `reposition_fallback`, at the placements its
+    `on_unplayable` leaves to the gate: `check_physical_templates`), the
     song's musical phase map, built from the detected BeatGrid, which the renderer
     never infers (it holds every fixture dark outside the map's covered span, which
     is logged), and, when the run supplies an xLights layout (`layout_models` in
@@ -386,6 +391,7 @@ class RenderPreflightStage:
                 fixture_group=fixture_group,
                 initial_states=job_config.moving_heads.initial_states,
                 failure_mode=job_config.moving_heads.reposition_fallback,
+                on_unplayable=job_config.moving_heads.on_unplayable,
             )
             layout_models = context.get_state("layout_models")
             if layout_models is not None:

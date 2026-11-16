@@ -13,6 +13,7 @@ transaction pass.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Callable
 import copy
 from fractions import Fraction
@@ -615,12 +616,13 @@ def test_entry_window_opens_an_orbit_on_its_real_path() -> None:
 
 def test_gate_groups_heads_by_their_real_path(monkeypatch: pytest.MonkeyPatch) -> None:
     """The gate plans heads with identical trajectories once: a plain circle is one
-    plan; mirrored wings over four heads are two (left and right)."""
-    planned: list[set[str]] = []
+    plan; mirrored wings over four heads are two (left and right), at every placement."""
+    planned: dict[str, set[int]] = defaultdict(set)
     real = pipeline_module.plan_prepositions
 
     def recording(segments: Any, *args: Any, **kwargs: Any) -> Any:
-        planned.append({segment.fixture_id for segment in segments})
+        templates = {segment.template_id for segment in segments}
+        planned[templates.pop()].add(len({segment.fixture_id for segment in segments}))
         return real(segments, *args, **kwargs)
 
     monkeypatch.setattr(pipeline_module, "plan_prepositions", recording)
@@ -639,7 +641,7 @@ def test_gate_groups_heads_by_their_real_path(monkeypatch: pytest.MonkeyPatch) -
             initial_states=dict.fromkeys(ids, initial),
             failure_mode="error",
         )
-    assert [len(heads) for heads in planned] == [1, 2]
+    assert planned == {"p23_plain": {1}, "p23_wings": {2}}
 
 
 # --- RepeatMode.ONCE ------------------------------------------------------------------
@@ -885,7 +887,7 @@ def test_the_gate_checks_a_once_cycle_at_every_start_bar() -> None:
         [path_step("f", "sweep", mode="finite", pan_extent=extent)],
         mode="ONCE",
     )
-    job = physical_job()
+    job = physical_job(on_unplayable="error")
 
     def render(start_bar: int) -> None:
         RenderingPipeline(
@@ -1010,14 +1012,17 @@ def test_bar_ones_entry_does_not_stand_for_a_later_bar_with_its_key() -> None:
     """At bar 1 the head enters from its initial state at the song start, so its window
     drops the first step and the jump between the steps never plays; from bar 2 on, an
     equal key, the head reaches the first step in time and the jump is refused. The
-    gate names bar 2, the first later placement."""
+    gate enters every placement with its first step revealed, so it names that entry
+    at bar 1, not the initial state's."""
     template = _jump_template().model_copy(update={"template_id": "p23_jump"})
     document = TemplateDoc(template=template)
     with (
         registered_templates(document),
         pytest.raises(
-            UnsupportedRenderModeError, match=r"placed at bar 2: .*infeasible_transition"
-        ) as refused,
+            UnsupportedRenderModeError,
+            match=r"'p23_jump': dark repositioning between its own cues cannot be planned: "
+            r"\(entered at cue 1 of its first cycle\) MH1 cue at 2020 ms: infeasible_transition",
+        ),
     ):
         check_physical_templates(
             ["p23_jump"],
@@ -1026,7 +1031,6 @@ def test_bar_ones_entry_does_not_stand_for_a_later_bar_with_its_key() -> None:
             initial_states=physical_job().moving_heads.initial_states,
             failure_mode="error",
         )
-    assert "'p23_jump': dark" not in str(refused.value)  # bar 1 itself repositions
 
 
 def _placement(

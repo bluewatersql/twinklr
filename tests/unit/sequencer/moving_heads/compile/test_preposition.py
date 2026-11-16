@@ -1160,3 +1160,31 @@ def test_a_dropped_cue_that_hides_the_previous_cues_settling_is_still_a_leak() -
 
     with pytest.raises(AssertionError, match="leaks to 1420"):
         assert_honest_transactions(doctored, [a, dropped, c], profile, _initial())
+
+
+def test_a_wheel_turning_inside_a_lit_cue_is_dishonest() -> None:
+    """One lit cue whose own content turns the colour wheel at 1100 ms: the planner leaves
+    a cue's content as authored, so the oracle must reject the lit turn itself (it once
+    checked a cue's own wheel changes only for a later relight)."""
+    profile = _profile(edit=lambda p: p["discrete"]["color"]["states"]["red"].update(settle_ms=40))
+    level = ContinuousTrajectory(
+        unit="normalized", points=(PhysicalPoint(t_ms=1000, value=1.0),), interpolation="hold"
+    )
+    cue = physical_segment(
+        {
+            _PAN: _line(0.0, 1000, 1400),
+            _TILT: _line(0.0, 1000, 1400),
+            _DIMMER: level,
+            _SHUTTER: _states((1000, "open")),
+            _COLOR: _states((1000, "white"), (1100, "red")),
+        },
+        t0_ms=1000,
+        t1_ms=1400,
+        segment_id="A",
+        section_id="A",
+    )
+    result = _plan([cue], profile, _initial())
+    assert _at(result, 1000).status == "feasible"
+
+    with pytest.raises(AssertionError, match="color turns at 1100 ms and is lit at 1100 ms"):
+        assert_honest_transactions(result, [cue], profile, _initial())

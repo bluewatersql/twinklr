@@ -427,7 +427,7 @@ def test_a_declared_drop_accent_keeps_the_cue_dark_and_error_refuses() -> None:
             choreography_plan=physical_sections(("p24a_jump", 1, 4)),
             beat_grid=_grid(),
             fixture_group=physical_rig(),
-            job_config=physical_job(),
+            job_config=physical_job(on_unplayable="error"),
             output_path=None,
         ).render()
 
@@ -444,10 +444,10 @@ def test_reposition_fallback_field_changes_preposition(config_path: str) -> None
     cannot reposition is kept dark; resetting either one to its default refuses it."""
     _render(("p24a_jump", 1, 2), job=physical_job(reposition_fallback="drop_accent"))
 
-    job = physical_job(reposition_fallback="drop_accent")
+    job = physical_job(reposition_fallback="drop_accent", on_unplayable="error")
     template_id = "p24a_jump"
     if config_path.startswith("job."):
-        job = physical_job()
+        job = physical_job(on_unplayable="error")
     else:
         template_id = "p24a_jump_plain"
     with registered_templates(*_DOCS), pytest.raises(PhysicalRenderError, match="jumps across"):
@@ -792,7 +792,8 @@ def test_apply_entry_window_moves_a_cut_past_a_shutter_state_it_cannot_hold() ->
 def test_the_first_cue_after_the_window_also_begins_where_its_shutter_takes_effect() -> None:
     """A cue that starts after the window end is still the first to reveal after the
     transaction's darkness: its 40 ms open state cannot take its 150 ms settle, so it
-    begins at its next change instead (the review's seed 50085 failed at render here)."""
+    begins at its next change instead (the review's seed 50085 failed at render here),
+    which it holds until it opens again."""
     profile = _pulse_rig(150).expand_fixtures()[0].config.physical_profile
     assert profile is not None
     line = ContinuousTrajectory(
@@ -801,7 +802,10 @@ def test_the_first_cue_after_the_window_also_begins_where_its_shutter_takes_effe
         interpolation="linear",
     )
     shutter = DiscreteTrajectory(
-        events=tuple(DiscretePoint(t_ms=t, state=s) for t, s in ((140, "open"), (180, "closed")))
+        events=tuple(
+            DiscretePoint(t_ms=t, state=s)
+            for t, s in ((140, "open"), (180, "closed"), (360, "open"))
+        )
     )
     segment = physical_segment(
         {ChannelName.PAN: line, ChannelName.TILT: line, ChannelName.SHUTTER: shutter},
@@ -1132,7 +1136,7 @@ def test_a_cut_waits_for_the_open_latency_too() -> None:
     shutter = DiscreteTrajectory(
         events=tuple(
             DiscretePoint(t_ms=t, state=s)
-            for t, s in ((0, "closed"), (100, "open"), (140, "closed"))
+            for t, s in ((0, "closed"), (100, "open"), (140, "closed"), (360, "open"))
         )
     )
     segment = physical_segment(

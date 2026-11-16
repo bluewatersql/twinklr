@@ -34,10 +34,11 @@ RENDER_ONLY_CONFIG_KEYS = (
     "moving_heads.max_effects",
     "moving_heads.max_xsq_bytes",
     "moving_heads.reposition_fallback",
+    "moving_heads.on_unplayable",
 )
 """Job keys that change only the moving-head render, never the plan. Excluded from
-the derived ID so moving a head's start pose, an output budget or a reposition fallback
-does not re-key the planner's cache. ``moving_heads.mode`` stays in: it changes what the
+the derived ID so moving a head's start pose, an output budget, a reposition fallback or
+what becomes of an unplayable cue does not re-key the planner's cache. ``moving_heads.mode`` stays in: it changes what the
 planner is offered. A legacy job's dump carries none of them, so its ID is unchanged."""
 
 

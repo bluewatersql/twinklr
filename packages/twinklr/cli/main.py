@@ -589,6 +589,9 @@ async def _run_pipeline_async(
                 console.print(f"   trace    {artifacts.trace_path.name}")
             else:
                 console.print(f"   {result.outputs['render']}")
+            unplayable = pipeline_context.get_state("unplayable_warning")
+            if unplayable:
+                console.print(f"\n[yellow]⚠ {unplayable}[/yellow]")
 
         console.print(f"\n[green]📁 All artifacts saved to:[/green] {artifact_dir}")
         return 0

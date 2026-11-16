@@ -7,6 +7,7 @@ all components to compile a complete template to IR segments.
 from collections.abc import Mapping, Sequence
 from fractions import Fraction
 import logging
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -51,6 +52,7 @@ from twinklr.core.sequencer.moving_heads.compile.physical import (
 )
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     FALLBACK_METADATA_KEY,
+    dark_throughout,
     follow_lag,
 )
 from twinklr.core.sequencer.moving_heads.compile.preset import apply_preset
@@ -75,6 +77,10 @@ from twinklr.core.utils.logging import get_renderer_logger, log_performance
 
 logger = logging.getLogger(__name__)
 renderer_log = get_renderer_logger()
+
+
+class EmptyStepError(ValueError):
+    """A step instance starting inside the cue limits leaves no frame once quantized."""
 
 
 class UnsupportedRigShapeError(ValueError):
@@ -314,6 +320,8 @@ def compile_physical_template(
     phase_map: MusicalPhaseMap,
     start_limit_ms: int = 0,
     end_limit_ms: int,
+    step_cache: dict[tuple[Any, ...], FixtureSegment] | None = None,
+    unplayable: list[dict[str, str | int]] | None = None,
 ) -> TemplateCompileResult:
     """Compile a template's scheduled steps for the physical renderer.
 
@@ -348,6 +356,17 @@ def compile_physical_template(
         phase_map: The song's musical phase map, built from the detected grid.
         start_limit_ms: Frame-grid time no step may start before.
         end_limit_ms: Frame-grid time no step may end after.
+        step_cache: Compiled step instances to reuse, keyed by template, preset, step,
+            frame span and what the fixture contributes (its profile, resolved
+            components and phase), for a caller compiling one template at many
+            placements against one phase map and rig (the pre-planning gate).
+        unplayable: When given (a render under `on_unplayable="dark"`), a step instance
+            a fixture cannot play here (a `PhysicalCompileError` or `PhysicalChannelError`
+            it raises for that fixture, or an `EmptyStepError`) and every fixture's cues of a
+            ONCE cycle the section is too short for are left out and recorded here
+            instead of raised: fixture, section, template, step, frames, `reason`
+            "unplayable", `code` (`compile_refused` or `once_section_too_short`) and
+            `detail`. Errors of the template as a whole still raise.
 
     Returns:
         TemplateCompileResult with the physical segments.
@@ -366,7 +385,8 @@ def compile_physical_template(
             motion the head cannot follow, or an envelope the profile cannot light
             (`apply_visibility`).
         UnsupportedRigShapeError: If a step's target group matches no fixture.
-        ValueError: If a step starting inside the limits is zero-length on the grid.
+        EmptyStepError: If a step starting inside the limits is zero-length on the grid
+            (a `ValueError`).
     """
     provenance: list[str] = [f"template:{template.template_id}"]
     working_template = template
@@ -404,7 +424,7 @@ def compile_physical_template(
         },
     )
     if working_template.repeat.mode == RepeatMode.ONCE and schedule_result.num_complete_cycles == 0:
-        raise PhysicalCompileError(
+        error = PhysicalCompileError(
             MHDiagnostic(
                 code="unsupported_attribute",
                 severity="error",
@@ -418,6 +438,29 @@ def compile_physical_template(
                 action="rejected",
             )
         )
+        if unplayable is None:
+            raise error
+        t0 = quantize_cue(context.start_ms).actual_ms
+        t1 = max(t0, min(quantize_cue(context.end_ms).actual_ms, end_limit_ms))
+        unplayable.extend(
+            _unplayable_record(
+                fixture.fixture_id,
+                context.section_id.split("|")[0],
+                template.template_id,
+                None,
+                t0,
+                t1,
+                "once_section_too_short",
+                error,
+            )
+            for fixture in context.fixtures
+        )
+        return TemplateCompileResult(
+            template_id=working_template.template_id,
+            segments=[],
+            num_complete_cycles=0,
+            provenance=provenance,
+        )
     section_segment = context.section_id.split("|")
     section_id = section_segment[0]
     segment_id = section_segment[1] if len(section_segment) > 1 else "A"
@@ -426,6 +469,7 @@ def compile_physical_template(
     dropped: list[dict[str, str | int]] = []
     resolved: dict[str, dict[str, ResolvedStepComponents]] = {}
     phases: dict[str, dict[str, ResolvedFixturePhase]] = {}
+    profile_keys: dict[str, str | None] = {}
     for instance in schedule_result.instances:
         step = step_map[instance.step_id]
         requested_t0 = context.bar_offset_to_ms(instance.start_bars)
@@ -452,11 +496,27 @@ def compile_physical_template(
             )
             continue
         if t1 <= t0:
-            raise ValueError(
+            empty = EmptyStepError(
                 f"step {step.step_id!r} of template {template.template_id!r} in section "
                 f"{context.section_id!r} ({requested_t0}-{requested_t1} ms) leaves no "
                 f"frame once quantized and cut at {end_limit_ms} ms"
             )
+            if unplayable is None:
+                raise empty
+            unplayable.extend(
+                _unplayable_record(
+                    fixture.fixture_id,
+                    section_id,
+                    template.template_id,
+                    step.step_id,
+                    t0,
+                    max(t0, t1),
+                    "compile_refused",
+                    empty,
+                )
+                for fixture in _resolve_target_fixtures(step, template, context)
+            )
+            continue
         targets = _resolve_target_fixtures(step, template, context)
         components = None
         if step.component_refs is not None:
@@ -508,26 +568,81 @@ def compile_physical_template(
                 phase_offset_by_channel={} if phase is None else phase.phase_by_channel,
                 pan_sign=1 if phase is None else phase.pan_sign,
             )
+            # Everything `compile_physical_step` and `follow_lag` read besides identity, so a
+            # head on the same profile, resolved components and phase reuses another's cue.
+            key = (
+                template.template_id,
+                context.preset_id,
+                step.step_id,
+                t0,
+                t1,
+                profile_keys.setdefault(
+                    fixture.fixture_id,
+                    None
+                    if fixture.physical_profile is None
+                    else fixture.physical_profile.model_dump_json(),
+                ),
+                None if fixture_components is None else fixture_components.model_dump_json(),
+                tuple(sorted(step_context.phase_offset_by_channel.items())),
+                step_context.pan_sign,
+            )
             try:
-                segment = compile_physical_step(
-                    step, step_context, sample_times_ms=tuple(range(t0, t1, EFFECT_GRID_MS))
-                )
-                assert fixture.physical_profile is not None  # checked by the step compile
-                lag = follow_lag(segment, fixture.physical_profile, frame_ms=EFFECT_GRID_MS)
-                if lag is not None:
-                    channel, time_ms, reason = lag
-                    raise PhysicalChannelError(
-                        fixture_id=fixture.fixture_id,
-                        channel=channel,
-                        time_ms=time_ms,
-                        reason=reason,
+                cached = None if step_cache is None else step_cache.get(key)
+                if cached is not None:
+                    segment = FixtureSegment(
+                        **{
+                            **dict(cached),
+                            "fixture_id": fixture.fixture_id,
+                            "channels": dict(cached.channels),
+                            "metadata": dict(cached.metadata),
+                        }
                     )
+                else:
+                    segment = compile_physical_step(
+                        step, step_context, sample_times_ms=tuple(range(t0, t1, EFFECT_GRID_MS))
+                    )
+                    assert fixture.physical_profile is not None  # checked by the step compile
+                    lag = follow_lag(segment, fixture.physical_profile, frame_ms=EFFECT_GRID_MS)
+                    if lag is not None:
+                        channel, time_ms, reason = lag
+                        raise PhysicalChannelError(
+                            fixture_id=fixture.fixture_id,
+                            channel=channel,
+                            time_ms=time_ms,
+                            reason=reason,
+                        )
+                    if step_cache is not None:
+                        step_cache[key] = FixtureSegment(
+                            **{
+                                **dict(segment),
+                                "channels": dict(segment.channels),
+                                "metadata": dict(segment.metadata),
+                            }
+                        )
             except (PhysicalCompileError, PhysicalChannelError, ValueError) as error:
                 error.add_note(
                     f"template {template.template_id!r}, step {step.step_id!r}, "
                     f"fixture {fixture.fixture_id!r}"
                 )
-                raise
+                # Only a deliberate refusal is left dark; any other error is a defect.
+                if unplayable is None or not isinstance(
+                    error, (PhysicalCompileError, PhysicalChannelError)
+                ):
+                    raise
+                unplayable.append(
+                    _unplayable_record(
+                        fixture.fixture_id,
+                        section_id,
+                        template.template_id,
+                        step.step_id,
+                        t0,
+                        t1,
+                        "compile_refused",
+                        error,
+                    )
+                )
+                continue
+            assert fixture.physical_profile is not None  # the step compiled on it
             segment.add_metadata("requested_t0_ms", requested_t0)
             segment.add_metadata("requested_t1_ms", requested_t1)
             segment.add_metadata(FALLBACK_METADATA_KEY, step.physical_reposition_fallback)
@@ -568,7 +683,20 @@ def compile_physical_template(
                     f"template {template.template_id!r}, step {step.step_id!r}, "
                     f"fixture {fixture.fixture_id!r}"
                 )
-                raise
+                if unplayable is None:
+                    raise
+                unplayable.append(
+                    _unplayable_record(
+                        fixture.fixture_id,
+                        section_id,
+                        template.template_id,
+                        step.step_id,
+                        t0,
+                        t1,
+                        "compile_refused",
+                        error,
+                    )
+                )
 
     if working_template.physical_overlays:
         # A HOLD_LAST_POSE remainder replays the cycle's closing step from a new phase
@@ -594,6 +722,32 @@ def compile_physical_template(
         provenance=provenance,
         dropped_steps=dropped,
     )
+
+
+def _unplayable_record(
+    fixture_id: str,
+    section_id: str,
+    template_id: str,
+    step_id: str | None,
+    start_ms: int,
+    end_ms: int,
+    code: str,
+    error: Exception,
+) -> dict[str, str | int]:
+    """A cue left out of an `on_unplayable="dark"` render, in the trace's record shape."""
+    detail = "; ".join((str(error), *getattr(error, "__notes__", ())))
+    return {
+        "fixture_id": fixture_id,
+        "section_id": section_id,
+        "template_id": template_id,
+        "step_id": step_id or "",
+        "start_ms": start_ms,
+        "end_ms": end_ms,
+        "frames": (end_ms - start_ms) // EFFECT_GRID_MS,
+        "reason": "unplayable",
+        "code": code,
+        "detail": detail,
+    }
 
 
 def _require_move_within_step(
@@ -779,8 +933,9 @@ def apply_entry_window(
     that cue (or, when every earlier cue lies in the window, the first cue after it)
     begins where its shutter state can be held for the visibility latency plus settle
     it needs, moving on to the cue's next shutter change otherwise and dropping the
-    partial state. A cue with no such point is dropped and recorded, and the next one is
-    tried; later cues are unchanged. Fixtures not in `window_ends` keep every cue.
+    partial state. A cue with no such point, or cut where it stays commanded dark to its
+    end (it would show nothing, and its darkness would count only from the cut), is
+    dropped and recorded, and the next one is tried; later cues are unchanged. Fixtures not in `window_ends` keep every cue.
 
     Args:
         segments: A section's compiled physical cues on the frame grid, each fixture's in
@@ -807,7 +962,9 @@ def apply_entry_window(
             if segment.t1_ms <= start
             else _holdable_cut(segment, start, profiles[segment.fixture_id])
         )
-        if cut is not None:
+        if cut is not None and (
+            cut == segment.t0_ms or not dark_throughout(segment, profiles[segment.fixture_id], cut)
+        ):
             entered.add(segment.fixture_id)
             kept.append(
                 segment
