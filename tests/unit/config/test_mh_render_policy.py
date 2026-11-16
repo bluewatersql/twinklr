@@ -142,6 +142,21 @@ def test_physical_preflight_names_each_unusable_initial_state() -> None:
     preflight_render_policy(physical_job(), physical_rig())
 
 
+def test_refusal_names_each_fixture_what_to_add_and_where_the_example_is() -> None:
+    """A rig without profiles is refused naming every fixture, where its profile goes and
+    the user guide's minimal example."""
+    with pytest.raises(UnsupportedRenderModeError) as raised:
+        preflight_render_policy(physical_job(), build_fixture_group(RIGS["mh4_minimal"]))
+
+    message = str(raised.value)
+    for fixture_id in ("MH1", "MH2", "MH3", "MH4"):
+        assert (
+            f"{fixture_id}: physical_profile is missing; add one to its config, or once as "
+            "base_config.physical_profile for identical heads"
+        ) in message
+    assert message.count("docs/user-guide.md#minimal-physical-profile") == 1
+
+
 def test_physical_job_model_still_validates() -> None:
     """The model accepts a physical job in code; with no fixtures known, the preflight
     has nothing to refuse until the fixtures are checked."""

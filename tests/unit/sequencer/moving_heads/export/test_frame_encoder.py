@@ -221,11 +221,11 @@ def test_absent_authored_channels_receive_declared_defaults() -> None:
     }
 
 
-def test_undefined_default_is_rejected() -> None:
+def test_unlisted_default_is_filled_and_the_encoder_refuses_an_incomplete_profile() -> None:
+    # A loaded profile has every default: an unlisted spare byte is filled with 0 (C1.0).
     payload = profile_payload()
     del payload["defaults"][8]
-    with pytest.raises(ValidationError, match=r"missing defaults for offsets \[8\]"):
-        _profile(payload)
+    assert _profile(payload).defaults[8] == 0
 
     incomplete = _profile().model_copy(update={"defaults": dict.fromkeys(range(1, 8), 0)})
     segment = physical_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=20)

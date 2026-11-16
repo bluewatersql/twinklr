@@ -347,6 +347,84 @@ def family_rig(
     )
 
 
+def minimal_head_profile_payload() -> dict[str, Any]:
+    """`physical_head_profile(inverted=False)` as a rig author may state it: only what the
+    profile defaults cannot supply. Spare channel 6 keeps a nonzero byte, the shutter's
+    default byte is not 0 and the states' ranges are wider than their bytes, so those
+    are stated; units, the dimmer range, every other byte, the shutter's open and closed
+    states and the darkness declaration are left to their defaults."""
+
+    def states(settle: dict[str, int], ranges: dict[str, tuple[int, int, int]]) -> dict:
+        return {
+            name: {"range_min": low, "range_max": high, "value": value}
+            | ({"settle_ms": settle[name]} if name in settle else {})
+            for name, (low, high, value) in ranges.items()
+        }
+
+    timing = {"travel_speed_per_s": 720.0, "latency_ms": 0, "settle_ms": 40}
+    return {
+        "profile_id": "synthetic_spot",
+        "provenance": "synthetic",
+        "footprint": 18,
+        "defaults": {6: 64},
+        "axes": {
+            "pan": {"physical_min": -270.0, "physical_max": 270.0, "coarse_offset": 1}
+            | {"fine_offset": 2, **timing},
+            "tilt": {"physical_min": -135.0, "physical_max": 135.0, "coarse_offset": 3}
+            | {"fine_offset": 4, **timing},
+            "dimmer": {"coarse_offset": 5},
+        },
+        "discrete": {
+            "shutter": {
+                "offset": 17,
+                "settle_ms": 0,
+                "default_state": "closed",
+                "states": states({}, {"closed": (60, 95, 64), "open": (0, 31, 8)}),
+            },
+            "color": {
+                "offset": 7,
+                "settle_ms": 120,
+                "states": states(
+                    {"blue": 140}, {"white": (0, 9, 0), "red": (10, 19, 14), "blue": (20, 29, 26)}
+                ),
+            },
+            "gobo": {
+                "offset": 18,
+                "settle_ms": 150,
+                "states": states(
+                    {"star": 160}, {"open": (0, 7, 0), "dots": (8, 15, 10), "star": (16, 23, 20)}
+                ),
+            },
+        },
+        "visibility": {"close_latency_ms": 0, "open_latency_ms": 0},
+    }
+
+
+def minimal_family_rig(fixture_ids: Sequence[str]) -> FixtureGroup:
+    """`family_rig(fixture_ids)` written minimally: one `minimal_head_profile_payload` in
+    `base_config` for every head, `position_index` in place of a declared topology (the
+    derived row ranks the heads as `topology_payload` does), the same `flick` preset.
+    `base_config` still needs a legacy `dmx_mapping` until the cutover removes it."""
+    return FixtureGroup.model_validate(
+        {
+            "group_id": "MOVING_HEADS",
+            "base_config": {
+                "dmx_mapping": {"pan_channel": 1, "tilt_channel": 3, "dimmer_channel": 5},
+                "physical_profile": minimal_head_profile_payload(),
+            },
+            "fixtures": [
+                {
+                    "fixture_id": fixture_id,
+                    "xlights_model_name": f"Dmx {fixture_id}",
+                    "position": {"position_index": index},
+                }
+                for index, fixture_id in enumerate(fixture_ids, start=1)
+            ],
+            "presets": family_rig(fixture_ids).presets.model_dump(mode="json"),
+        }
+    )
+
+
 def family_job(fixture_ids: Sequence[str], **policy: Any) -> JobConfig:
     """`physical_job` with every head of `fixture_ids` in the known dark initial state."""
     return physical_job(initial_states=dict.fromkeys(fixture_ids, PHYSICAL_INITIAL_STATE), **policy)

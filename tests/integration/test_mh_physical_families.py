@@ -32,6 +32,7 @@ from tests.support.mh_physical import (
     family_job,
     family_rig,
     hold_step,
+    minimal_family_rig,
     overlay,
     physical_bars_grid,
     physical_catalog,
@@ -1002,3 +1003,48 @@ def _without(rig: FixtureGroup, gone: str) -> FixtureGroup:
     for preset in payload["presets"]["attributes"].values():
         preset["fixtures"].pop(gone, None)
     return FixtureGroup.model_validate(payload)
+
+
+# --- Profile defaults (C1.0) -----------------------------------------------------------
+
+
+def test_a_minimal_rig_is_admitted_and_delivered_byte_identical_to_the_explicit_rig(
+    tmp_path: Path,
+) -> None:
+    """One minimal profile in `base_config` and `position_index` in place of a topology:
+    the gate admits what it admits on the explicit rig (a profile per head, a declared
+    topology), and the render delivers the same frames and the same `.xsq`. Only the
+    trace differs: it lists, per head, what the profile left to its defaults."""
+    grid = physical_bars_grid(*([500.0] * 7))
+    sections = [("mirror_wings", 1, 2), ("masked_wheel_flick", 3, 4), ("fly_out_cascade", 5, 6)]
+    job = family_job(HEADS, **_STRICT)
+    rigs = {"explicit": (family_rig(HEADS), job), "minimal": (minimal_family_rig(HEADS), job)}
+    pipelines: dict[str, RenderingPipeline] = {}
+    admissions: dict[str, TemplateAdmission] = {}
+    with physical_catalog():
+        for name, (rig, job) in rigs.items():
+            admissions[name] = _gate(CATALOG_IDS, grid, rig, job)
+            pipelines[name] = RenderingPipeline(
+                choreography_plan=physical_sections(*sections),
+                beat_grid=grid,
+                fixture_group=rig,
+                job_config=job,
+                output_path=tmp_path / name / "song.xsq",
+                admission=admissions[name],
+            )
+            pipelines[name].render()
+
+    assert admissions["minimal"] == admissions["explicit"]
+    assert {template_id for template_id, _, _ in sections} <= set(admissions["explicit"].admitted)
+    explicit, minimal = pipelines["explicit"], pipelines["minimal"]
+    assert minimal.frames == explicit.frames
+    assert (tmp_path / "minimal" / "song.xsq").read_bytes() == (
+        tmp_path / "explicit" / "song.xsq"
+    ).read_bytes()
+    assert explicit.render_record is not None and minimal.render_record is not None
+    for record in explicit.render_record["fixtures"]:
+        assert "defaulted" not in record
+    profile = minimal_family_rig(HEADS).expand_fixtures()[0].config.physical_profile
+    assert profile is not None and "axes.pan.unit" in profile.defaulted
+    for record in minimal.render_record["fixtures"]:
+        assert record["defaulted"] == list(profile.defaulted)

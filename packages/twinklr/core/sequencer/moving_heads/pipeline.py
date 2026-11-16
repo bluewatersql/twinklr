@@ -1965,6 +1965,13 @@ class RenderingPipeline:
                     "fixture_id": fixture.fixture_id,
                     "xlights_model_name": fixture.xlights_model_name,
                     "profile_sha256": _sha256(profiles[fixture.fixture_id]),
+                    # What the profile left out and its loading filled; left out when
+                    # nothing was, so a fully stated rig's trace keeps its keys.
+                    **(
+                        {"defaulted": list(profiles[fixture.fixture_id].defaulted)}
+                        if profiles[fixture.fixture_id].defaulted
+                        else {}
+                    ),
                 }
                 for fixture in fixtures
             ],

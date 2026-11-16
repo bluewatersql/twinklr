@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
+
 from twinklr.core.config.fixtures import FixtureGroup
+from twinklr.core.config.fixtures.capabilities import PROFILE_GUIDE
 from twinklr.core.config.models import JobConfig, MHRenderPolicy
 
 
@@ -33,20 +36,30 @@ def preflight_render_policy(
         fixture_group: Fixtures the job renders onto, when already loaded.
 
     Raises:
-        UnsupportedRenderModeError: Naming each failing fixture and missing item.
+        UnsupportedRenderModeError: Naming each failing fixture and what to add: where
+            a profile goes, and for fixtures without an initial state the entries their
+            profiles' default bytes give, as one object to paste after checking it.
     """
     policy = job_config.moving_heads
     if policy.mode == "legacy_v1" or fixture_group is None:
         return
 
     problems: list[str] = []
+    missing_profile = False
+    suggested: dict[str, object] = {}
     fixtures = fixture_group.expand_fixtures()
     for fixture in fixtures:
         profile = fixture.config.physical_profile
         if profile is None:
-            problems.append(f"{fixture.fixture_id}: physical_profile is missing")
+            missing_profile = True
+            problems.append(
+                f"{fixture.fixture_id}: physical_profile is missing; add one to its config, "
+                "or once as base_config.physical_profile for identical heads"
+            )
             continue
         initial = policy.initial_states.get(fixture.fixture_id)
+        if initial is None:
+            suggested[fixture.fixture_id] = profile.default_initial_state().model_dump(mode="json")
         reasons = list(profile.check_initial_state(initial))
         if initial is not None and not initial.settled:
             reasons.append("initial state is not settled")
@@ -71,9 +84,20 @@ def preflight_render_policy(
         for fixture_id in sorted(policy.initial_states.keys() - known)
     )
     if problems:
+        guidance = []
+        if suggested:
+            guidance.append(
+                f"To start {', '.join(suggested)} at their profiles' default bytes, add to "
+                f"moving_heads.initial_states: {json.dumps(suggested)}; pasting it asserts "
+                "that each head really rests there, settled and dark as stated, when the "
+                "sequence starts"
+            )
+        if missing_profile or suggested:
+            guidance.append(f"A minimal profile and initial states: {PROFILE_GUIDE}")
         raise UnsupportedRenderModeError(
             f"moving_heads.mode {policy.mode!r} cannot render this rig: "
             + "; ".join(problems)
+            + "".join(f". {line}" for line in guidance)
             + ". Add the missing items, or set moving_heads.mode to 'legacy_v1'"
         )
 

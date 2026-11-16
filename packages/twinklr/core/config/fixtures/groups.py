@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
-from twinklr.core.config.fixtures.capabilities import FixtureCapabilities
+from twinklr.core.config.fixtures.capabilities import PROFILE_GUIDE, FixtureCapabilities
 from twinklr.core.config.fixtures.dmx import ChannelInversions, DmxMapping
 from twinklr.core.config.fixtures.instances import FixtureConfig, FixtureInstance, FixturePosition
 from twinklr.core.config.fixtures.physical import (
@@ -72,8 +72,9 @@ class BaseFixtureConfig(BaseModel):
         )
 
 
-def _validated_profile(fixture_id: object, profile: object) -> FixtureCapabilities:
-    """Validate a fixture's physical profile, naming the fixture on failure."""
+def _validated_profile(owner: str, profile: object) -> FixtureCapabilities:
+    """Validate a physical profile, naming its owner and the guide's minimal example on
+    failure."""
     try:
         return FixtureCapabilities.model_validate(profile)
     except ValidationError as error:
@@ -82,7 +83,8 @@ def _validated_profile(fixture_id: object, profile: object) -> FixtureCapabiliti
             for item in error.errors()
         )
         raise ValueError(
-            f"fixture {fixture_id!r} has an invalid physical_profile: {problems}"
+            f"{owner} has an invalid physical_profile: {problems}. A minimal profile and "
+            f"what it must state: {PROFILE_GUIDE}"
         ) from None
 
 
@@ -122,7 +124,7 @@ class SimplifiedFixtureInstance(BaseModel):
         if profile is None:
             return value
         fixture_id = info.data.get("fixture_id")
-        return {**value, "physical_profile": _validated_profile(fixture_id, profile)}
+        return {**value, "physical_profile": _validated_profile(f"fixture {fixture_id!r}", profile)}
 
 
 class FixtureGroup(BaseModel):
@@ -185,12 +187,16 @@ class FixtureGroup(BaseModel):
         """
         if not isinstance(value, dict):
             return value
+        base = value.get("base_config")
+        if isinstance(base, dict) and base.get("physical_profile") is not None:
+            _validated_profile("base_config", base["physical_profile"])
         for fixture in value.get("fixtures") or ():
             if not isinstance(fixture, dict):
                 continue
+            owner = f"fixture {fixture.get('fixture_id')!r}"
             for holder in (fixture.get("config"), fixture.get("config_overrides")):
                 if isinstance(holder, dict) and holder.get("physical_profile") is not None:
-                    _validated_profile(fixture.get("fixture_id"), holder["physical_profile"])
+                    _validated_profile(owner, holder["physical_profile"])
         return value
 
     @model_validator(mode="after")
@@ -251,8 +257,10 @@ class FixtureGroup(BaseModel):
                     "no base_config provided in FixtureGroup"
                 )
 
-            # Build full FixtureConfig from base_config + overrides
+            # Build full FixtureConfig from base_config + overrides. The shared profile
+            # is passed as loaded, so what its loading defaulted stays recorded.
             config_dict = self.base_config.model_dump()
+            config_dict["physical_profile"] = self.base_config.physical_profile
             config_dict.update(fixture.config_overrides)
 
             # Add fixture-specific values

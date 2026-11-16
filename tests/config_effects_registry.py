@@ -2609,6 +2609,7 @@ _PHYSICAL_PROFILE_FIELDS = {
     "discrete.states.range_max": _PHYSICAL_IDENTITY_ONLY,
     "discrete.states.value": _PHYSICAL_FRAMES,
     "discrete.states.settle_ms": _PHYSICAL_CHANGES,
+    "discrete.settle_ms": _PHYSICAL_CHANGES,
     "discrete.default_state": _PHYSICAL_CHANGES,
     "discrete.closed_state": _PHYSICAL_PREPOSITION,
     "visibility": _PHYSICAL_PREPOSITION,

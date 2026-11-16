@@ -468,3 +468,43 @@ Known and recorded, not fixed:
   cutover deletes.
 - For the planner contract (T3a): `INHERIT` means the effective variant, and the
   admitted presets vary with rig speed and grid.
+
+### Profile defaults (C1.0) — 2026-11-16
+
+Written on `feat/mh-profile-defaults` (`fee944c4`, `7b1adf91`, `076c417d`) and applied
+here as one commit; the user-guide conflict with the family adaptation was resolved by
+the integrator. One implementing agent, one review (approve with fixes: one high), a
+fix round, and a verification of the fixes by separate agents.
+
+- **Defaults live in the existing profile models;** no second schema, and nothing
+  reads the old fixture fields. A wrap validator fills only absent keys, then
+  validates the result as an explicit profile, so a minimal profile dumps, fingerprints
+  and renders exactly as its explicit equivalent. What was filled is listed in the
+  trace (`fixtures[*].defaulted`).
+- **Defaulted:** axis units; the dimmer's 0–1 range; default bytes (pan, tilt and
+  dimmer at the word for 0, others 0, a wheel at its default state); a state's range;
+  one `settle_ms` per wheel inherited by its states; the shutter's `closed`/`open`
+  states by name; the visibility claims the profile already supports.
+- **Never defaulted:** which offset does what, physical ranges, state bytes, and every
+  timing. A guessed timing that is too fast would let the renderer reveal a head that
+  is still moving. This corrects the task text above, which listed timings as
+  candidates (integrator wording, not an owner requirement).
+- **Initial states are not defaulted** (integrator decision on the reviewer's high
+  finding; the owner was told). Assuming a head rests settled and dark at its default
+  bytes before frame 0 claims what nothing establishes: the renderer's own park leaves
+  heads at their last aim. A fixture without an entry is refused before planning, and
+  the refusal prints the entries its profile's default bytes give, ready to paste,
+  saying that pasting asserts the heads really rest there. The zero-configuration
+  alternative, offered to the owner, is a planner change that treats the start pose as
+  unknown and keeps each head dark for a worst-case arrival.
+- **Measured** on a synthetic equivalent of the owner's 4-head, 16-channel rig: 587
+  values written by hand before; 98 now, including the pasted initial states.
+- **Output:** zero differences in the 360-configuration byte matrix against the branch
+  point (author and reviewer); Phase 0 fingerprints identical.
+- **For the cutover inventory:** `FixtureConfig.dmx_mapping` is still required until
+  the cutover, so the guide's minimal example carries a placeholder mapping; a profile
+  dumped and reloaded loses its `defaulted` record (the profile stays correct), which
+  matters if `regenerate` or `inject` ever render from a dumped group.
+- **Not done:** deriving travel speed from the xLights layout's `SlewLimit`. Feasible
+  (the layout profiler already parses it) but it is a preview limit, not a
+  measurement; left as an owner option.

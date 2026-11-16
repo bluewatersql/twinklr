@@ -103,11 +103,12 @@ def test_backend_offsets_17_and_48_allowed_49_rejected() -> None:
         _profile(_wide_payload(footprint=49, dimmer_offset=48))
 
 
-def test_missing_default_or_unknown_initial_state_reported() -> None:
+def test_unlisted_default_is_filled_and_unknown_initial_state_reported() -> None:
+    # An unlisted default is filled when the profile loads (C1.0): here the dimmer's,
+    # with the word that encodes 0.
     payload = profile_payload()
     del payload["defaults"][5]
-    with pytest.raises(ValidationError, match=r"missing defaults for offsets \[5\]"):
-        _profile(payload)
+    assert _profile(payload).defaults[5] == 0
 
     profile = _profile()
     assert profile.check_initial_state(InitialFixtureState(**initial_state_payload())) == ()
@@ -592,7 +593,7 @@ def _broken_profile() -> dict[str, Any]:
         ),
         pytest.param(
             _base_config_group(_broken_profile()),
-            r"base_config\.physical_profile[\s\S]*offset 1",
+            r"base_config has an invalid physical_profile[\s\S]*offset 1",
             id="base-config",
         ),
     ],
@@ -692,6 +693,13 @@ _PROFILE_MUTATIONS: dict[str, Mutation] = {
     "discrete.states.settle_ms": (
         "changes",
         lambda p: _set(p, ("discrete", "color", "states", "red", "settle_ms"), 120),
+    ),
+    "discrete.settle_ms": (
+        "changes",
+        lambda p: (
+            _set(p, ("discrete", "color", "settle_ms"), 120),
+            p["discrete"]["color"]["states"]["red"].pop("settle_ms"),  # red inherits it
+        ),
     ),
     "discrete.default_state": (
         "changes",
