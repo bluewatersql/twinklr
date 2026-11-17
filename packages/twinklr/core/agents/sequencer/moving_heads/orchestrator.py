@@ -301,8 +301,8 @@ class MovingHeadPlannerOrchestrator:
         3. Validate plan (heuristic validator)
         4. Evaluate plan (judge agent)
         5. Refine if needed (repeat with feedback, including what was repaired); a valid
-           plan that leaves a HIGH lyric cue without an event is sent back once more before
-           judging while iterations remain
+           plan that leaves a HIGH lyric cue without an event is sent back before judging,
+           at most once per run and only while iterations remain
         6. Return final plan or best attempt
 
         Args:

@@ -25,7 +25,7 @@ Repair rules, per section:
 - an unbound event before the section moves to its first beat, one after it to its last
   beat, and one on a beat its bar does not have to the bar's last beat;
 - of events of one kind (shutter, hit, colour, gobo) on the same beat, one is kept: a
-  cue-bound one before an unbound one, else the first;
+  cue-bound one first, then one repair did not change, then the first;
 - a referenced cue that no event lands on is recorded (nothing is synthesised).
 """
 
@@ -204,8 +204,15 @@ def _repair_section(
 
     section_beats = _section_beats(start_bar, end_bar, grid)
     kept: list[dict[str, Any]] = []
+    repaired: list[bool] = []  # per kept event: whether repair changed or noted it
+
+    def keep(event: dict[str, Any], item: str, first_record: int) -> None:
+        kept.append(event)
+        repaired.append(any(repair.item == item for repair in repairs[first_record:]))
+
     for event in section["events"]:
         item = f"{event['action']} event at bar {event['bar']} beat {event['beat']}"
+        first_record = len(repairs)
         if not _repair_fields(event, item, record):
             continue
         cue_id = event["moment_cue_id"]
@@ -238,13 +245,13 @@ def _repair_section(
                     continue
                 else:
                     _bind(event, item, cues[cue_id], grid, section_beats, record)
-                    kept.append(event)
+                    keep(event, item, first_record)
                     continue
         _clamp(event, item, start_bar, end_bar, grid, record)
-        kept.append(event)
+        keep(event, item, first_record)
 
     section["moment_cues"] = referenced
-    section["events"] = _one_per_kind_and_beat(kept, record)
+    section["events"] = _one_per_kind_and_beat(kept, repaired, record)
     realised = {event["moment_cue_id"] for event in section["events"]}
     for cue_id in referenced:
         if cue_id not in realised:
@@ -334,15 +341,20 @@ def _clamp(
         record(item, RepairAction.ADJUSTED, f"a bar has {bpb} beats: moved to beat {bpb}")
 
 
-def _one_per_kind_and_beat(events: list[dict[str, Any]], record: _Record) -> list[dict[str, Any]]:
-    """Keep one event of each kind per beat: a cue-bound one first, else the first."""
+def _one_per_kind_and_beat(
+    events: list[dict[str, Any]], repaired: list[bool], record: _Record
+) -> list[dict[str, Any]]:
+    """Keep one event of each kind per beat: a cue-bound one first, then one repair did
+    not change, then the first."""
+
+    def rank(index: int) -> tuple[bool, bool, int]:
+        return (events[index]["moment_cue_id"] is None, repaired[index], index)
+
     winners: dict[tuple[int, int, str], int] = {}
     for index, event in enumerate(events):
         key = (event["bar"], event["beat"], _KINDS[event["action"]])
         held = winners.get(key)
-        if held is None or (
-            events[held]["moment_cue_id"] is None and event["moment_cue_id"] is not None
-        ):
+        if held is None or rank(index) < rank(held):
             winners[key] = index
     kept_indices = set(winners.values())
     for index, event in enumerate(events):
@@ -387,6 +399,7 @@ def unanswered_high_cues(
                 lines.append(
                     f"section '{section.section_id}': the HIGH lyric moment cue "
                     f"'{cue.cue_id}' (\"{cue.text}\") has no event; add one with "
-                    f"moment_cue_id '{cue.cue_id}' (a hit or a strobe suits it)"
+                    f"moment_cue_id '{cue.cue_id}': an accent that suits its emphasis and "
+                    "visual hint"
                 )
     return lines

@@ -548,8 +548,15 @@ def test_the_planner_is_told_to_answer_the_song_in_every_section() -> None:
     for instruction in (
         "Every section answers the song.",
         "Set `intensity` from its energy target, a palette-role `color` from its palette, "
-        "and an accent (an event) on every high- and medium-emphasis lyric moment cue and on "
-        "the drops and hits.",
+        "and answer every high- and medium-emphasis lyric moment cue and every drop and hit "
+        "with an event chosen to fit the section (see Proportion).",
+        "**Proportion.** Answering the song is not making the show busy. Accents are "
+        "punctuation: give each section a few, spaced so each one lands, and save strobes "
+        "and the highest intensity for the builds and the peak, so the biggest moment is the "
+        "biggest thing in the show. In a quiet section answer a medium-emphasis cue with a "
+        "colour or gobo change or a soft pulse, not a strobe. Hold a colour across a section "
+        "and change it where the palette or the mood turns. Contrast makes the chorus land: "
+        "a restrained verse is part of answering the song.",
         "Leave a field null only when you can say in `reasoning` why the template's own "
         "look already answers this moment.",
         "Intensity that stays flat across a clear change of energy ignores the song.",
@@ -574,7 +581,8 @@ def test_the_planner_is_told_to_answer_the_song_in_every_section() -> None:
     ):
         line = next(item for item in developer.split("- `") if item.startswith(f"{mode}`"))
         assert boundary in line, mode
-    assert "Put an event on every high- and medium-emphasis lyric moment cue" in user
+    assert "Answer every high- and medium-emphasis lyric moment cue" in user
+    assert "keep a restrained verse restrained so the chorus lands" in user
     assert "A field left null needs a reason there." in user
 
 
@@ -587,6 +595,9 @@ def test_the_judge_penalises_a_plan_that_ignores_the_song() -> None:
         "colour that ignores the section's palette",
         "a plan whose sections are mostly null song intent",
         "cannot score above the soft-fail band",
+        "a plan that is busy rather than responsive: strobes or the highest intensity in "
+        "low-energy sections, accents too dense to read, colour changes faster than the "
+        "music changes, no contrast between verse and chorus.",
         "**Reward** plans whose `reasoning` cites the lyrics (cue ids and text), the energy "
         "targets and the palette colours",
     ):

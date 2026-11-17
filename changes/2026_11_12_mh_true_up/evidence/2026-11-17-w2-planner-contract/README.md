@@ -126,7 +126,7 @@ oversize-schema provider tests use `MacroPlan` (8 / 83, still over).
 
 ## Field mapping, old contract (`10f3ac49`) → W2, as implemented
 
-Marks: **kept**; **reshaped, same range**; **new**. There is no narrower row.
+Marks: **kept**; **reshaped, same range** (the two transition rows: same range, quantised to steps); **new**. There is no narrower row.
 
 | Old field | New field | Mark | Notes |
 |---|---|---|---|
@@ -148,8 +148,8 @@ Marks: **kept**; **reshaped, same range**; **new**. There is no narrower row.
 | `moment_cues[{cue_id}]` | `moment_cues[cue_id]` | reshaped, same range | |
 | `transition_in` (`TransitionHint` or null) | `transitions[edge=ENTRY]` | reshaped, same range | Same 5 modes and `CurveLibrary`; `per_channel_overrides` → `channels` list |
 | `transition_out` | `transitions[edge=EXIT]` | reshaped, same range | Its own length (not shared) |
-| `TransitionHint.duration_bars` (0-8) | `length`: 9 steps, BEAT (¼ bar in 4/4) … EIGHT_BARS, including 1½, 3 and 6 bars | reshaped, same range | Review item 13: the whole old range in finer steps; code owns the exact milliseconds |
-| `TransitionHint.fade_out_ratio` (0-1) | `split`: QUARTER, THIRD, HALF, TWO_THIRDS, THREE_QUARTERS | reshaped, same range | Review item 14; the old default 0.25 maps exactly to QUARTER |
+| `TransitionHint.duration_bars` (0-8) | `length`: 9 steps, BEAT (¼ bar in 4/4) … EIGHT_BARS, including 1½, 3 and 6 bars | reshaped, same range, quantised to steps | Review item 13: the whole old range in finer steps; a value between steps snaps to the nearest (1.25 bars → BAR or ONE_AND_HALF_BARS); code owns the exact milliseconds |
+| `TransitionHint.fade_out_ratio` (0-1) | `split`: QUARTER, THIRD, HALF, TWO_THIRDS, THREE_QUARTERS | reshaped, same range, quantised to steps | Review item 14; a value between steps snaps to the nearest. The old model's default 0.5 is HALF; the W0 parity fixture's 0.25 is QUARTER |
 | — | `gobo` (section), `action: hit`, `action: color` + `color`, `mode: blackout`, `motif_id`, `variation`, `density`, null for intensity/colour/gobo | new | |
 
 Removed with their callers (rule 9; no other importer, config or doc reader):
@@ -187,7 +187,8 @@ recording each as `PlanRepair{section_id, item, action: dropped|adjusted|recorde
 | … when there is no beat grid | keeps its binding and its own position (recorded) |
 | An unbound event before / after the section | moved to its first beat / its last beat (adjusted) |
 | An event on a beat its bar does not have | moved to the bar's last beat (adjusted) |
-| Events of one kind (shutter, hit, colour, gobo) on one beat | one kept: a cue-bound one before an unbound one, else the first; each other dropped and named (a duplicate, or the kept one) |
+| Events of one kind (shutter, hit, colour, gobo) on one beat | one kept (tie-break below); each other dropped and named (a duplicate, or the kept one) |
+| (same-beat conflict tie-break) | a cue-bound event first, then one repair did not change, then the first |
 | A referenced cue no event lands on | recorded, with the fix: "add an event with moment_cue_id '…' that matches its emphasis, or remove the reference" (nothing synthesised) |
 
 The run never fails for one item. Repairs reach the judge (in the plan JSON), the next
@@ -199,11 +200,13 @@ are any), the `eval-report`, and survive a regeneration.
 only on a refinement round, so a valid plan that leaves a HIGH lyric moment cue of a
 planned section without an event is now sent back: the controller's new
 `plan_advisories` hook (`moment_cues.unanswered_high_cues`) returns one line per such cue;
-while a planning round remains, the plan goes back to the planner with those lines as its
-fixes before any judge call; on the last round the advisory is ignored and the plan is
-judged. It never fails a run. Tested with the provider mocked for both cases
-(`test_an_unanswered_high_cue_sends_a_valid_plan_back_while_rounds_remain[2|1]`), next to
-the repair loop test and the structural-refusal loop test.
+the first time, while a planning round remains, the plan goes back to the planner with
+those lines as its fixes before any judge call. It resends **at most once per run**
+(`IterationContext.advisory_sent`), so it cannot consume the judge's rounds; otherwise the
+plan is judged as it is. It never fails a run. Tested with the provider mocked
+(`test_an_unanswered_high_cue_sends_a_valid_plan_back_while_rounds_remain[2|1]`, and
+`test_the_advisory_resends_at_most_once_so_the_judge_keeps_its_rounds`: a planner ignoring
+the advice twice is judged on round 2, and the judge's revise verdict gets round 3).
 
 ## Prompts (review item 6)
 
@@ -264,6 +267,21 @@ energy targets and palette colours. The judge now sees the lyric moment cues
 (`build_judge_variables` passes `lyric_context`; `judge/user.j2` lists them) and the
 section palettes.
 
+**Proportion** (second review). The planner developer prompt has a Proportion paragraph,
+and the "answer every cue" sentences now say the answer is chosen to fit the section:
+> **Proportion.** Answering the song is not making the show busy. Accents are punctuation:
+> give each section a few, spaced so each one lands, and save strobes and the highest
+> intensity for the builds and the peak, so the biggest moment is the biggest thing in the
+> show. In a quiet section answer a medium-emphasis cue with a colour or gobo change or a
+> soft pulse, not a strobe. Hold a colour across a section and change it where the palette
+> or the mood turns. Contrast makes the chorus land: a restrained verse is part of
+> answering the song.
+
+The user prompt's checklist says the same in short; the judge penalises "a plan that is
+busy rather than responsive: strobes or the highest intensity in low-energy sections,
+accents too dense to read, colour changes faster than the music changes, no contrast
+between verse and chorus."
+
 Pinned by `test_prompts.py` (`test_the_planner_is_told_to_answer_the_song_in_every_section`,
 `test_the_judge_penalises_a_plan_that_ignores_the_song`,
 `test_no_pack_nudges_the_model_toward_leaving_the_song_unanswered`, which forbids
@@ -294,7 +312,7 @@ same way ("from the section's energy (null: the template's own)").
 
 - **Every song plans again once.** The planner cache key hashes the response schema
   (`spec_prompt_hash` → `response_schema_hash`, `a76326c7…` → `d9389872…`) and the prompt
-  packs (`cfb07167…` → `1e18a5de…`); no manual bump is needed
+  packs (`cfb07167…` → `b495d2ec…`); no manual bump is needed
   (`test_the_response_schema_re_keys_the_plan_cache`). The first `run`/`show`/`inject` per
   song is a paid planning call; a plan that leaves a high-emphasis cue unanswered can take
   one more planner call (bounded by `max_iterations`).
@@ -359,17 +377,17 @@ It exits non-zero unless the response was provider-enforced (`json_schema`), val
 a `ChoreographyPlan`, and has no validator errors; it prints the effort used, usage, the
 song intent per section, the repair count and each repair, and any unanswered HIGH cue
 (the dry run exits non-zero if the schema would not be sent enforced). Dry run on this
-tree: schema 11 / 60, 10,971 bytes; developer 27,001, system 4,890, user 8,070 characters;
-`schema_enforced True`; request 53,686 bytes; exit 0.
+tree: schema 11 / 60, 10,971 bytes; developer 27,715, system 4,890, user 8,342 characters;
+`schema_enforced True`; request 54,685 bytes; exit 0.
 
 ## Verification (this tree, fresh)
 
 | Command | Result |
 |---|---|
-| `uv run pytest tests -q --no-cov` | 6752 passed, 30 skipped, 24 xfailed |
-| `uv run ruff check packages tests scripts` | All checks passed |
-| `uv run ruff format --check packages tests scripts` | 1291 files already formatted |
-| `uv run mypy packages/twinklr` | no issues in 645 source files |
+| `uv run pytest tests -q --no-cov` | 6754 passed, 30 skipped, 24 xfailed |
+| `uv run ruff check .` | All checks passed |
+| `uv run ruff format --check .` | 1296 files already formatted |
+| `uv run mypy .` | no issues in 649 source files |
 | `pytest tests/regression/test_mh_intent_parity.py` | 2 passed, 24 xfailed |
 | `… --runxfail` | 24 failed (target assertions, as at `10f3ac49`), 2 passed |
 | `pytest tests/regression/test_mh_pins.py` | 45 passed |
@@ -393,7 +411,7 @@ tree: schema 11 / 60, 10,971 bytes; developer 27,001, system 4,890, user 8,070 c
 | 11 | Event cue id not stripped | Stripped, blank → null |
 | 12 | Duplicate / conflicting events | One per kind and beat, recorded |
 | 13 | Coarse lengths | Nine steps |
-| 14 | Coarse split | Five steps |
+| 14 | Coarse split | Five steps (old default 0.5 → HALF; W0 fixture 0.25 → QUARTER) |
 
 ## For the integrator and the owner
 
@@ -405,3 +423,14 @@ tree: schema 11 / 60, 10,971 bytes; developer 27,001, system 4,890, user 8,070 c
 3. Lengths and splits remain categories (finer now); code owns the exact durations.
 4. `context/current-state.md` got one corrected sentence; the rest of the closeout is the
    integrator's.
+
+## Second review (APPROVE with fixes), done
+
+| # | Item | Done |
+|---|---|---|
+| 1 | Advisory could consume the judge's rounds | Resends at most once per run (`IterationContext.advisory_sent`); test with a planner ignoring the advice twice |
+| 2 | No sense of proportion | Proportion paragraph and fit-the-section wording in the planner pack; busy-not-responsive penalty in the judge pack; both pinned |
+| 3 | Same-beat tie-break | Cue-bound first, then unrepaired, then first; tested |
+| 4 | Advisory text | "an accent that suits its emphasis and visual hint" |
+| 5 | Quantisation and defaults | Rows marked "same range, quantised to steps"; old default 0.5 → HALF, W0 fixture 0.25 → QUARTER |
+| 6 | Typos | Judge "name the section and the cue"; overview "Its schema is…" |

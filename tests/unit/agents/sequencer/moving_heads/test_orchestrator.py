@@ -1045,3 +1045,84 @@ class TestOrchestratorIntegration:
             assert result.plan is not None and result.plan.sections[0].events
         else:
             assert result.plan is not None and result.plan.sections[0].events == []
+
+    @pytest.mark.asyncio
+    async def test_the_advisory_resends_at_most_once_so_the_judge_keeps_its_rounds(self) -> None:
+        """A planner that ignores the advice twice: the first plan is sent back, the second
+        is judged anyway, and the judge's "revise" verdict still gets its round."""
+        section = SongSectionRef(section_id="chorus_1", name="chorus", start_ms=0, end_ms=4_000)
+        profile = create_test_audio_profile().model_copy(
+            update={
+                "song_identity": SongIdentity(
+                    title="Cue Song",
+                    artist="Test Artist",
+                    duration_ms=4_000,
+                    bpm=120.0,
+                    time_signature="4/4",
+                ),
+                "structure": Structure(sections=[section], structure_confidence=0.9),
+            }
+        )
+        cue = MomentCue(
+            cue_id="hook",
+            timestamp_ms=1_500,
+            section_id="chorus_1",
+            emphasis="HIGH",
+            text="light it up",
+            visual_hint="A bright hit.",
+        )
+        silent = ChoreographyPlan(
+            sections=[plan_section("chorus_1", 1, 2, "sweep_lr_fan_pulse")],
+            overall_strategy="x",
+        )
+        verdicts = [
+            JudgeVerdict(
+                status=status,
+                score=score,
+                confidence=0.9,
+                strengths=["Clean"],
+                issues=[],
+                feedback_for_planner="Answer the hook.",
+                iteration=index,
+            )
+            for index, (status, score) in enumerate(
+                [(VerdictStatus.SOFT_FAIL, 6.0), (VerdictStatus.APPROVE, 8.0)]
+            )
+        ]
+        planner_messages: list[str] = []
+        judged = 0
+
+        async def planner_call(*, user_message: str, **kwargs: object) -> LLMResponse:
+            planner_messages.append(user_message)
+            return LLMResponse(content=silent.model_dump(mode="json"), metadata=ResponseMetadata())
+
+        async def judge_call(**kwargs: object) -> LLMResponse:
+            nonlocal judged
+            judged += 1
+            return LLMResponse(
+                content=verdicts[judged - 1].model_dump(mode="json"), metadata=ResponseMetadata()
+            )
+
+        provider = MagicMock()
+        provider.provider_type = ProviderType.ANTHROPIC
+        provider.generate_json_with_conversation_async = AsyncMock(side_effect=planner_call)
+        provider.generate_json_async = AsyncMock(side_effect=judge_call)
+        context = MovingHeadPlanningContext(
+            audio_profile=profile,
+            lyric_context=LyricContextModel(
+                has_lyrics=True, vocal_coverage_pct=0.25, moment_cues=[cue]
+            ),
+            fixtures=FixtureContext(count=4, groups=[]),
+            beat_grid=BeatGrid.from_tempo(tempo_bpm=120, total_bars=2),
+            available_templates=["sweep_lr_fan_pulse"],
+        )
+
+        result = await MovingHeadPlannerOrchestrator(provider=provider, max_iterations=3).run(
+            context
+        )
+
+        assert result.success
+        assert len(planner_messages) == 3
+        assert judged == 2
+        assert "the HIGH lyric moment cue 'hook'" in planner_messages[1]
+        assert result.context.advisory_sent

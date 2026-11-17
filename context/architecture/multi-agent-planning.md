@@ -19,8 +19,9 @@ The choreography planner is an iterative refinement loop over structured Pydanti
    motif and variation, density, and ENTRY/EXIT transitions. The planner is asked to
    answer the song in every section and to give a reason for any field it leaves to the
    template; the judge penalises unanswered lyric cues, flat intensity and an ignored
-   palette, and a valid plan leaving a high-emphasis cue unanswered is sent back once
-   more while a planning round remains. The
+   palette, and a valid plan leaving a high-emphasis cue unanswered is sent back to the
+   planner before judging, at most once per run and only while a planning round remains.
+   The
    schema is within Claude's measured limits (11 unions, 60 nodes; pinned in
    `tests/unit/agents/test_structured_outputs.py`).
 2. **Normalisation and heuristic validation**: on the moving-head path, single items the

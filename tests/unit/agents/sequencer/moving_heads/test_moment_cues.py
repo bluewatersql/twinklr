@@ -341,6 +341,24 @@ def test_one_event_of_a_kind_per_beat_the_cue_bound_one_first() -> None:
     assert "a duplicate of another event on this beat" in reasons
 
 
+def test_of_two_unbound_events_on_a_beat_the_one_repair_did_not_change_is_kept() -> None:
+    """A planned event and one that repair moved onto the same beat conflict: the one the
+    planner placed there is kept, though it comes later."""
+    bound = _bind(
+        _plan(
+            moment_cues=(),
+            start_bar=2,
+            end_bar=2,
+            events=[_event(3, 1, "closed"), _event(2, 4, "strobe_fast")],
+        )
+    )
+
+    assert [(e.action.value, e.bar, e.beat) for e in bound.sections[0].events] == [
+        ("strobe_fast", 2, 4)
+    ]
+    assert _repairs(bound)[-1] == ("closed event at bar 2 beat 4", RepairAction.DROPPED)
+
+
 def test_a_repeated_part_label_is_cleared() -> None:
     plan = _plan(events=[])
     section = plan.sections[0].model_copy(
@@ -397,5 +415,6 @@ def test_an_unanswered_high_cue_is_advised_and_an_answered_one_is_not() -> None:
 
     assert unanswered_high_cues(plan, lyrics, [_section()]) == [
         "section 'chorus_1': the HIGH lyric moment cue 'high-2' (\"light the way home\") has "
-        "no event; add one with moment_cue_id 'high-2' (a hit or a strobe suits it)"
+        "no event; add one with moment_cue_id 'high-2': an accent that suits its emphasis "
+        "and visual hint"
     ]

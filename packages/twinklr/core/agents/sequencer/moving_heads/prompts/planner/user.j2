@@ -189,9 +189,12 @@ For every section:
 - Set `intensity` from its energy target, and let it move as the song's energy moves.
 - Set `color` to a palette role from its palette (the Section palettes above); a named
   colour only for a deliberate contrast, with the reason.
-- Put an event on every high- and medium-emphasis lyric moment cue listed above for the
-  section (its id in `moment_cues`, the event's `moment_cue_id` set; deterministic code
-  lands it on the cue's beat), and on the section's drops, hits and stops.
+- Answer every high- and medium-emphasis lyric moment cue listed above for the section
+  with an event (its id in `moment_cues`, the event's `moment_cue_id` set; deterministic
+  code lands it on the cue's beat), and the section's drops, hits and stops, each with an
+  accent that fits the section: strobes and the highest intensity for builds and the
+  peak, a colour or gobo change or a soft pulse in a quiet section. Keep accents few and
+  spaced, and keep a restrained verse restrained so the chorus lands.
 - Set `section_role` and `energy_level` for what the section does and how hard it drives.
 - Carry the macro motifs with `motif_id`, and use `variation` and `density` to shape the
   arc across repeated sections (a second chorus wider or faster than the first).

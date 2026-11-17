@@ -143,6 +143,7 @@ class IterationContext(BaseModel):
         final_verdict: Final judge verdict (if any)
         plan_repairs: What deterministic repair changed in the latest plan, fed to the
             next planning iteration
+        advisory_sent: Whether a valid plan was already sent back for advised revisions
     """
 
     # State
@@ -163,6 +164,8 @@ class IterationContext(BaseModel):
 
     # Repair of the latest plan, for the next planner prompt
     plan_repairs: list[str] = Field(default_factory=list)
+    # Whether a valid plan was already sent back once for advised revisions
+    advisory_sent: bool = Field(default=False)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -374,11 +377,11 @@ class StandardIterationController[TPlan]:
                 planner result before heuristic validation and judging.
             plan_repairs: Optional reader of what normalization repaired in a plan; the
                 next planning iteration's prompt receives it as `plan_repairs`.
-            plan_advisories: Optional reader of what a valid plan should still revise.
-                While a later planning iteration remains, a non-empty list sends the plan
-                back to the planner (with the advisories as its fixes) before judging; on
-                the last iteration it is ignored and the plan is judged, so an advisory
-                never fails a run.
+            plan_advisories: Optional reader of what a valid plan should still revise. The
+                first time it is non-empty while a later planning iteration remains, the
+                plan goes back to the planner (with the advisories as its fixes) before
+                judging. That happens at most once per run, so the judge's rounds are kept;
+                otherwise the plan is judged as it is, and an advisory never fails a run.
 
         Returns:
             IterationResult with final plan and metadata
@@ -506,7 +509,8 @@ class StandardIterationController[TPlan]:
                 continue
 
             advisories = plan_advisories(plan) if plan_advisories is not None else []
-            if advisories and iteration < planning_attempts - 1:
+            if advisories and not context.advisory_sent and iteration < planning_attempts - 1:
+                context.advisory_sent = True
                 self.logger.info(
                     f"Plan revision advised (iteration {iteration + 1}): "
                     f"{len(advisories)} item(s); re-planning before judging"

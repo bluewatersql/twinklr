@@ -29,10 +29,19 @@ its song section, its bars, the templates that play over it (`parts`), and its *
 intent**: how the light answers this moment of the song.
 
 **Every section answers the song.** Set `intensity` from its energy target, a
-palette-role `color` from its palette, and an accent (an event) on every high- and
-medium-emphasis lyric moment cue and on the drops and hits. Leave a field null only when
-you can say in `reasoning` why the template's own look already answers this moment. A
-plan whose sections are mostly null ignores the song.
+palette-role `color` from its palette, and answer every high- and medium-emphasis lyric
+moment cue and every drop and hit with an event chosen to fit the section (see
+Proportion). Leave a field null only when you can say in `reasoning` why the template's
+own look already answers this moment. A plan whose sections are mostly null ignores the
+song.
+
+**Proportion.** Answering the song is not making the show busy. Accents are
+punctuation: give each section a few, spaced so each one lands, and save strobes and the
+highest intensity for the builds and the peak, so the biggest moment is the biggest thing
+in the show. In a quiet section answer a medium-emphasis cue with a colour or gobo change
+or a soft pulse, not a strobe. Hold a colour across a section and change it where the
+palette or the mood turns. Contrast makes the chorus land: a restrained verse is part of
+answering the song.
 
 - `section_id`: the unique Section ID from the Song Structure table (for example
   `chorus_1` or `chorus_2`), never the repeatable display Name (`chorus`).
@@ -121,16 +130,17 @@ section.
 - `color`: a colour change; set the event's `color` (same vocabulary as above)
 - `gobo`: a pattern change; set the event's `gobo`
 
-Every other action leaves `color` and `gobo` null. Put an event on every drop, hit and
-stop the song has, and on the lyric moment cues below.
+Every other action leaves `color` and `gobo` null. Answer the song's drops, hits and
+stops and the lyric moment cues below, in proportion to the section.
 
 **`moment_cues`** and **`moment_cue_id`**: tie light to the lyrics. The Lyric Context
 lists moment cues, each with its section, time, emphasis and a visual hint. Answer every
 high- and medium-emphasis cue of a section: list its id in the section's `moment_cues`
-and give an event that `moment_cue_id`. Deterministic code places that event exactly on the cue's
-beat, so its own bar and beat need only be close. Match the action to the cue's emphasis
-and visual hint: a high-emphasis cue suits a `hit` or a strobe, a medium one a `color` or
-`gobo` change; a low one may take something gentle. Only ids from the Lyric Context of
+and give an event that `moment_cue_id`. Deterministic code places that event exactly on
+the cue's beat, so its own bar and beat need only be close. Match the action to the cue's
+emphasis, its visual hint and the section's energy: a high-emphasis cue in a driving
+section suits a `hit` or a strobe; a medium one a `color` or `gobo` change, or in a quiet
+section a soft `pulse`; a low one may take something gentle. Only ids from the Lyric Context of
 the same section are valid.
 
 **`motif_id`** and **`variation`**: carry a macro motif (from the Macro Strategy motifs)
