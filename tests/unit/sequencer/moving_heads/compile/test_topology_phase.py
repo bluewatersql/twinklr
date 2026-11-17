@@ -655,16 +655,20 @@ def test_absent_topology_and_distribution_are_left_out_of_dumps() -> None:
     assert "topology" not in rig.model_dump(mode="json")
     assert "topology" in _rig(2).model_dump(mode="json")
 
-    legacy = {
-        "step_id": "legacy",
+    plain = {
+        "step_id": "plain",
         "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
-        "geometry": {},
-        "movement": {"movement_type": "sweep_lr"},
-        "dimmer": {"dimmer_type": "hold"},
+        "movement": {
+            "physical": {
+                "shape": "hold",
+                "mode": "periodic",
+                "start_pan_deg": 0,
+                "start_tilt_deg": 0,
+            }
+        },
+        "dimmer": {},
     }
-    assert "physical_distribution" not in TemplateStep.model_validate(legacy).model_dump(
-        mode="json"
-    )
+    assert "physical_distribution" not in TemplateStep.model_validate(plain).model_dump(mode="json")
 
 
 def _job(ids: tuple[str, ...]) -> JobConfig:

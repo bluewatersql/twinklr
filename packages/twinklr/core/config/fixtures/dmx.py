@@ -1,7 +1,4 @@
-"""DMX channel configuration and mapping models.
-
-Defines DMX channel assignments, configurations, and mappings for moving head fixtures.
-"""
+"""DMX channel assignments for moving head fixtures."""
 
 from __future__ import annotations
 
@@ -9,19 +6,12 @@ import logging
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from twinklr.core.config.fixtures.physical import (
+    REMOVED_DMX_MAPPING_FIELDS,
+    reject_removed_fields,
+)
+
 logger = logging.getLogger(__name__)
-
-
-class ShutterMap(BaseModel):
-    """DMX values for shutter states."""
-
-    model_config = ConfigDict(frozen=True)
-
-    closed: int = Field(default=0, ge=0, le=255, description="Shutter closed")
-    open: int = Field(default=255, ge=0, le=255, description="Shutter fully open")
-    strobe_slow: int = Field(default=64, ge=0, le=255, description="Slow strobe")
-    strobe_medium: int = Field(default=127, ge=0, le=255, description="Medium strobe")
-    strobe_fast: int = Field(default=190, ge=0, le=255, description="Fast strobe")
 
 
 class ChannelWithConfig(BaseModel):
@@ -40,27 +30,12 @@ class ChannelWithConfig(BaseModel):
         return value
 
 
-class ChannelInversions(BaseModel):
-    """Flags for inverting channel behaviors.
-
-    Some fixtures may require inverted control for proper orientation.
-    """
-
-    model_config = ConfigDict(frozen=False)
-
-    pan: bool = Field(default=False, description="Invert pan direction")
-    tilt: bool = Field(default=False, description="Invert tilt direction")
-    dimmer: bool = Field(default=False, description="Invert dimmer curve")
-    shutter: bool = Field(default=False, description="Invert shutter values")
-    color: bool = Field(default=False, description="Invert color wheel")
-    gobo: bool = Field(default=False, description="Invert gobo wheel")
-
-
 class DmxMapping(BaseModel):
-    """Complete DMX channel assignments and mappings.
+    """DMX channel assignments.
 
-    Defines which DMX channels control which fixture parameters.
-    Supports both 8-bit and 16-bit (fine) control.
+    The renderer does not read these: each fixture's physical_profile states its
+    channels. The pan, tilt, dimmer, shutter, color and gobo channel numbers are listed
+    to the moving-head planner.
     """
 
     model_config = ConfigDict(frozen=False)
@@ -70,58 +45,14 @@ class DmxMapping(BaseModel):
     tilt_channel: int | ChannelWithConfig = Field(..., description="Tilt coarse channel")
     dimmer_channel: int | ChannelWithConfig = Field(..., description="Dimmer/intensity channel")
 
-    # Fine control (16-bit) - optional
-    pan_fine_channel: int | ChannelWithConfig | None = Field(
-        default=None, description="Pan fine channel (16-bit)"
-    )
-    tilt_fine_channel: int | ChannelWithConfig | None = Field(
-        default=None, description="Tilt fine channel (16-bit)"
-    )
-    use_16bit_pan_tilt: bool = Field(default=False, description="Use 16-bit pan/tilt resolution")
-
-    # Shutter control - optional
     shutter_channel: int | ChannelWithConfig | None = Field(
         default=None, description="Shutter/strobe channel"
     )
-    shutter_default: int = Field(
-        default=255, ge=0, le=255, description="Default shutter value (usually open)"
-    )
-    shutter_map: ShutterMap = Field(
-        default_factory=ShutterMap, description="Shutter DMX value mappings"
-    )
-
-    # Color wheel - optional
     color_channel: int | ChannelWithConfig | None = Field(
         default=None, description="Color wheel channel"
     )
-    color_map: dict[str, int] = Field(
-        default_factory=lambda: {
-            "open": 0,
-            "white": 0,
-            "red": 18,
-            "orange": 36,
-            "yellow": 54,
-            "green": 72,
-            "cyan": 90,
-            "blue": 108,
-            "magenta": 126,
-        },
-        description="Color name to DMX value mapping",
-    )
-
-    # Gobo wheel - optional
     gobo_channel: int | ChannelWithConfig | None = Field(
         default=None, description="Gobo wheel channel"
-    )
-    gobo_map: dict[str, int] = Field(
-        default_factory=lambda: {
-            "open": 0,
-            "gobo1": 10,
-            "gobo2": 20,
-            "gobo3": 30,
-            "gobo4": 40,
-        },
-        description="Gobo name to DMX value mapping",
     )
 
     # Private normalized storage - these are always ChannelWithConfig
@@ -131,6 +62,11 @@ class DmxMapping(BaseModel):
     _shutter_channel_obj: ChannelWithConfig | None = None
     _color_channel_obj: ChannelWithConfig | None = None
     _gobo_channel_obj: ChannelWithConfig | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        return reject_removed_fields(value, REMOVED_DMX_MAPPING_FIELDS, "dmx_mapping")
 
     @model_validator(mode="after")
     def normalize_channels(self) -> DmxMapping:

@@ -10,13 +10,14 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from twinklr.core.config.fixtures.capabilities import PROFILE_GUIDE, FixtureCapabilities
-from twinklr.core.config.fixtures.dmx import ChannelInversions, DmxMapping
+from twinklr.core.config.fixtures.dmx import DmxMapping
 from twinklr.core.config.fixtures.instances import FixtureConfig, FixtureInstance, FixturePosition
 from twinklr.core.config.fixtures.physical import (
-    MovementLimits,
-    Orientation,
-    PanTiltRange,
+    REMOVED_DMX_MAPPING_FIELDS,
+    REMOVED_FIXTURE_FIELDS,
     drop_retired_fields,
+    reject_removed_fields,
+    reject_removed_position_fields,
 )
 from twinklr.core.config.fixtures.presets import RigPresetLibrary
 from twinklr.core.sequencer.models.moving_heads.topology import FixtureTopology
@@ -33,23 +34,8 @@ class BaseFixtureConfig(BaseModel):
 
     model_config = ConfigDict(frozen=False)
 
-    # DMX configuration (shared across all fixtures)
     # DMX channel assignments (shared mapping)
     dmx_mapping: DmxMapping = Field(..., description="DMX channel assignments")
-    inversions: ChannelInversions = Field(
-        default_factory=ChannelInversions, description="Channel inversion flags"
-    )
-
-    # Physical capabilities (shared across fixtures)
-    pan_tilt_range: PanTiltRange = Field(
-        default_factory=PanTiltRange, description="Physical movement range"
-    )
-    orientation: Orientation = Field(
-        default_factory=Orientation, description="Calibration and orientation data"
-    )
-    limits: MovementLimits = Field(
-        default_factory=MovementLimits, description="Safety movement limits"
-    )
 
     # Shared physical renderer profile; a fixture's config_overrides entry replaces it.
     # Left out of dumps when absent.
@@ -64,11 +50,12 @@ class BaseFixtureConfig(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def drop_removed_fields(cls, value: object) -> object:
-        return drop_retired_fields(
+        value = drop_retired_fields(
             value,
             frozenset({"dmx_universe", "channel_count", "capabilities", "movement_speed"}),
             "fixture",
         )
+        return reject_removed_fields(value, REMOVED_FIXTURE_FIELDS, "fixture")
 
 
 def _validated_profile(owner: str, profile: object) -> FixtureCapabilities:
@@ -100,9 +87,7 @@ class SimplifiedFixtureInstance(BaseModel):
     xlights_model_name: str = Field(..., description="xLights model name (e.g., 'Dmx MH1')")
 
     # Position is the only section that varies per fixture
-    position: FixturePosition | None = Field(
-        default=None, description="Physical mounting position and offsets"
-    )
+    position: FixturePosition | None = Field(default=None, description="Physical mounting position")
 
     # Optional: Allow overriding base_config for specific fixtures
     config_overrides: dict[str, Any] = Field(
@@ -118,7 +103,17 @@ class SimplifiedFixtureInstance(BaseModel):
     @field_validator("config_overrides")
     @classmethod
     def type_profile_override(cls, value: dict[str, Any], info: Any) -> dict[str, Any]:
-        """Validate a per-fixture physical_profile override rather than pass it untyped."""
+        """Refuse a removed field and validate a per-fixture physical_profile override
+        rather than pass it untyped."""
+        reject_removed_fields(value, REMOVED_FIXTURE_FIELDS, "config_overrides")
+        reject_removed_fields(
+            value.get("dmx_mapping"), REMOVED_DMX_MAPPING_FIELDS, "config_overrides.dmx_mapping"
+        )
+        if "position" in value:
+            raise ValueError(
+                "config_overrides field 'position' never took effect: each fixture's "
+                "position is its own `position`, which replaces it. Move it there"
+            )
         profile = value.get("physical_profile")
         if profile is None:
             return value
@@ -154,10 +149,6 @@ class FixtureGroup(BaseModel):
         default=None,
         description="xLights group name for ALL fixtures (e.g., 'GROUP - MOVING HEADS')",
     )
-    xlights_semantic_groups: dict[str, str] = Field(
-        default_factory=dict,
-        description="Semantic group name -> xLights group model name (e.g., 'LEFT': 'GROUP - MH LEFT')",
-    )
 
     # Named components templates refer to. Left out of dumps when empty.
     presets: RigPresetLibrary = Field(
@@ -173,6 +164,29 @@ class FixtureGroup(BaseModel):
         exclude_if=lambda value: value is None,
         description="Where each head sits in the full rig, for phase distribution",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        """Refuse a removed field, naming it, here: the `fixtures` union would otherwise
+        fall back to the simplified form, which drops a full fixture's `config`."""
+        if not isinstance(value, dict):
+            return value
+        if "xlights_semantic_groups" in value:
+            raise ValueError(
+                "fixture group field 'xlights_semantic_groups' was removed: nothing renders "
+                "to those groups. Delete it; xlights_group names the group of every head"
+            )
+        for fixture in value.get("fixtures") or ():
+            config = fixture.get("config") if isinstance(fixture, dict) else None
+            if isinstance(config, dict):
+                owner = f"fixture {fixture.get('fixture_id')!r}"
+                reject_removed_fields(config, REMOVED_FIXTURE_FIELDS, owner)
+                reject_removed_fields(
+                    config.get("dmx_mapping"), REMOVED_DMX_MAPPING_FIELDS, f"{owner} dmx_mapping"
+                )
+                reject_removed_position_fields(config.get("position"), f"{owner} position")
+        return value
 
     @model_validator(mode="before")
     @classmethod

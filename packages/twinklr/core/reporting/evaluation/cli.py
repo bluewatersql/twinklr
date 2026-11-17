@@ -144,7 +144,7 @@ def eval_report_cli(
 
         click.echo("")
         click.echo("✓ Report generated successfully!")
-        if report.physical is not None and not report.physical.fingerprint_matches:
+        if not report.physical.fingerprint_matches:
             click.echo(f"  ✗ {mismatch_message(report.physical)}")
         click.echo(f"  Report: {out / 'report.md'}")
         click.echo(f"  JSON: {out / 'report.json'}")

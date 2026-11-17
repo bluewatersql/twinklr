@@ -30,14 +30,6 @@ class TransitionMode(StrEnum):
     SWEEP = "sweep"  # Sweeping motion (advanced)
 
 
-class BlendMode(StrEnum):
-    OVERRIDE = "override"
-    ADD = "add"
-    SUBTRACT = "subtract"
-    MULTIPLY = "multiply"
-    DIVIDE = "divide"
-
-
 class TemplateCategory(StrEnum):
     LOW_ENERGY = "low_energy"
     MEDIUM_ENERGY = "medium_energy"
@@ -54,26 +46,6 @@ class SemanticGroupType(StrEnum):
     EVEN = "EVEN"
 
 
-class ChaseOrder(StrEnum):
-    """Order for phase offset spreading.
-
-    Defines the order in which fixtures in a group receive phase offsets
-    when creating chase effects.
-
-    Attributes:
-        LEFT_TO_RIGHT: Start from left-most fixture.
-        RIGHT_TO_LEFT: Start from right-most fixture.
-        OUTSIDE_IN: Start from outer fixtures, move inward.
-        INSIDE_OUT: Start from center fixtures, move outward.
-    """
-
-    LEFT_TO_RIGHT = "LEFT_TO_RIGHT"
-    RIGHT_TO_LEFT = "RIGHT_TO_LEFT"
-    OUTSIDE_IN = "OUTSIDE_IN"
-    INSIDE_OUT = "INSIDE_OUT"
-    ODD_EVEN = "ODD_EVEN"
-
-
 class TemplateRole(StrEnum):
     OUTER_LEFT = "OUTER_LEFT"
     INNER_LEFT = "INNER_LEFT"
@@ -88,24 +60,6 @@ class TemplateRole(StrEnum):
     CENTER = "CENTER"
     LEFT = "LEFT"
     RIGHT = "RIGHT"
-
-
-class AimZone(StrEnum):
-    """Predefined aim targets.
-
-    Defines standard aim zones for geometry handlers to position fixtures.
-
-    Attributes:
-        SKY: Aim upward (typically tilt up).
-        HORIZON: Aim level (parallel to ground).
-        CROWD: Aim toward audience area.
-        STAGE: Aim toward stage/performance area.
-    """
-
-    SKY = "SKY"
-    HORIZON = "HORIZON"
-    CROWD = "CROWD"
-    STAGE = "STAGE"
 
 
 class Intensity(StrEnum):

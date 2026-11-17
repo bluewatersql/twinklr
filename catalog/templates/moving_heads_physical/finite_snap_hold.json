@@ -22,7 +22,6 @@
             "duration_bars": 1.0
           }
         },
-        "geometry": {},
         "movement": {
           "physical": {
             "shape": "linear",
@@ -69,7 +68,6 @@
   "presets": [
     {
       "preset_id": "narrow",
-      "name": "Narrow",
       "step_patches": {
         "snap": {
           "movement": {
@@ -82,7 +80,6 @@
     },
     {
       "preset_id": "slow",
-      "name": "Slow",
       "step_patches": {
         "snap": {
           "movement": {

@@ -48,7 +48,6 @@ def _context(
         template_id="physical_probe",
         fixture_id="MH1",
         role="OUTER_LEFT",
-        calibration={},
         start_ms=start_ms,
         duration_ms=duration_ms,
         beat_grid=_GRID,
@@ -350,33 +349,36 @@ def test_blank_state_names_are_rejected_by_the_model(field: str, name: str) -> N
 
 @pytest.mark.parametrize("field", ["physical_shutter_state", "physical_color", "physical_gobo"])
 def test_discrete_physical_data_alone_is_not_a_physical_step(field: str) -> None:
-    legacy = TemplateStep.model_validate(
-        {
-            "step_id": "legacy",
-            "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
-            "geometry": {},
-            "movement": {"movement_type": "sweep_lr"},
-            "dimmer": {"dimmer_type": "hold"},
-            field: "open",
-        }
-    )
-
-    with pytest.raises(PhysicalCompileError, match=r"movement\.physical"):
-        compile_physical_step(legacy, _context(), sample_times_ms=tuple(range(0, 1000, 20)))
+    with pytest.raises(ValidationError, match=r"movement\.physical\n  Field required"):
+        TemplateStep.model_validate(
+            {
+                "step_id": "states_only",
+                "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
+                "movement": {},
+                "dimmer": {},
+                field: "open",
+            }
+        )
 
 
 def test_absent_discrete_fields_stay_out_of_template_dumps() -> None:
-    legacy = TemplateStep.model_validate(
+    step = TemplateStep.model_validate(
         {
-            "step_id": "legacy",
+            "step_id": "aimed",
             "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
-            "geometry": {},
-            "movement": {"movement_type": "sweep_lr"},
-            "dimmer": {"dimmer_type": "hold"},
+            "movement": {
+                "physical": {
+                    "shape": "hold",
+                    "mode": "periodic",
+                    "start_pan_deg": 0.0,
+                    "start_tilt_deg": 0.0,
+                }
+            },
+            "dimmer": {},
         }
     )
 
-    dumped = legacy.model_dump(mode="json")
+    dumped = step.model_dump(mode="json")
     assert not {"physical_shutter_state", "physical_color", "physical_gobo"} & dumped.keys()
 
 

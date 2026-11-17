@@ -61,7 +61,6 @@ async def test_local_provider_reaches_show_wiring_without_openai_key(
         patch("twinklr.cli.show_cmd.preflight_render_policy"),
         patch("twinklr.cli.show_cmd.admit_physical_catalog"),
         patch("twinklr.cli.show_cmd.list_templates", return_value=[]),
-        patch("twinklr.cli.show_cmd.offered_template_ids", return_value=[]),
         patch(
             "twinklr.cli.show_cmd.prepare_combined_show_pipeline",
             side_effect=ValueError("stop after provider preflight"),
@@ -147,7 +146,6 @@ async def test_show_fe_bundle_and_default_catalog_layers_are_forwarded(
         patch("twinklr.cli.show_cmd.preflight_render_policy"),
         patch("twinklr.cli.show_cmd.admit_physical_catalog"),
         patch("twinklr.cli.show_cmd.list_templates", return_value=[MagicMock(template_id="mh")]),
-        patch("twinklr.cli.show_cmd.offered_template_ids", return_value=["mh"]),
         patch(
             "twinklr.cli.show_cmd.prepare_combined_show_pipeline",
             side_effect=ValueError("stop after wiring"),

@@ -99,39 +99,16 @@ async def test_physical_job_on_a_rig_without_profiles_is_refused() -> None:
 
 
 @pytest.mark.asyncio
-async def test_physical_job_offered_a_template_without_physical_data_is_refused() -> None:
-    no_physical = TemplateDoc.model_validate(
-        {
-            "template": {
-                "template_id": "no_physical_data",
-                "version": 1,
-                "name": "No Physical Data",
-                "category": "medium_energy",
-                "repeat": {"cycle_bars": 1.0, "loop_step_ids": ["main"]},
-                "steps": [
-                    {
-                        "step_id": "main",
-                        "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
-                        "geometry": {},
-                        "movement": {"movement_type": "sweep_lr"},
-                        "dimmer": {"dimmer_type": "hold"},
-                    }
-                ],
-                "metadata": {"energy_range": [20, 60], "recommended_sections": ["verse"]},
-            }
-        }
+async def test_a_job_offered_no_template_is_refused_before_planning() -> None:
+    """With no template loaded there is nothing to offer the planner: the gate refuses
+    the run before any provider request."""
+    result, _ = await _run(
+        physical_job(), templates=[], rig=physical_rig(), beat_grid=physical_grid()
     )
-    with physical_test_templates(), registered_templates(no_physical):
-        result, _ = await _run(
-            physical_job(),
-            templates=[TEMPLATE_ID, "no_physical_data"],
-            rig=physical_rig(),
-            beat_grid=physical_grid(),
-        )
 
     assert not result.success
-    assert "without physical data" in (result.error or "")
-    assert "no_physical_data" in (result.error or "")
+    assert "has no template this rig can render" in (result.error or "")
+    assert "none is loaded" in (result.error or "")
 
 
 @pytest.mark.asyncio
@@ -267,13 +244,6 @@ _TILT_OUT_OF_RANGE = {
         }
     }
 }
-_LEGACY_PRESET = [
-    {
-        "preset_id": "SNAPPY",
-        "name": "Snappy",
-        "step_patches": {"reveal": {"movement": {"intensity": "FAST"}}},
-    }
-]
 
 _CASES = [
     pytest.param(
@@ -299,14 +269,6 @@ _CASES = [
         _VARIANT_ID,
         [f"template '{_VARIANT_ID}'", "step 'reveal'", "fixture 'MH1'", "tilt", "200"],
         id="axis-target-out-of-bounds",
-    ),
-    pytest.param(
-        lambda: _variant(presets=_LEGACY_PRESET),
-        physical_rig,
-        physical_job,
-        _VARIANT_ID,
-        [f"template '{_VARIANT_ID}'", "step 'reveal'", "preset 'SNAPPY'", "movement.intensity"],
-        id="preset-adds-legacy-data",
     ),
 ]
 

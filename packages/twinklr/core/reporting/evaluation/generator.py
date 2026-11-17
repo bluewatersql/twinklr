@@ -270,11 +270,7 @@ async def generate_evaluation_report(
             max_concurrent_layers=0,  # TODO: compute
             templates_used=sorted(all_templates),
             roles_targeted=sorted(all_roles),
-            # Phase 2 metrics; the last three are not reported.
             validation_errors=validation_errors_count,
-            physics_violations=None,
-            compliance_issues=None,
-            harsh_transitions=None,
         ),
         sections=section_reports,
         physical=physical_summary,
@@ -425,7 +421,6 @@ def _process_section(
             preset_id=plan_section.preset_id,
             modifiers={modifier.key: modifier.value for modifier in plan_section.modifiers},
             reasoning=plan_section.reasoning,
-            steps=[],
         )
 
     return SectionReport(
@@ -443,40 +438,6 @@ def _process_section(
         flags=section_flags,
         render_facts=render_facts,
     )
-
-
-NOT_REPORTED_FOR_PHYSICAL = (
-    "Clamp percentage and its flags: the physical renderer refuses a value outside an "
-    "axis' operable range instead of clamping it.",
-    "Limited-range and static-curve flags: they key on legacy curve types, which "
-    "physical output does not have; each channel's range and rate of change are reported.",
-    "Loop continuity: a repeating cycle spans whole periods and its gap-free repeats "
-    "continue its phase. A finite move restarts each repeat: dark, through a transaction, "
-    "when the restart needs more than one frame's travel; otherwise lit, as one step "
-    "within the travel speed (reported as the largest lit step); and a repeat for which "
-    "neither fits is kept dark. Each section's largest lit frame-to-frame step per "
-    "fixture is reported instead.",
-    "Curve type, handler, base position and static DMX: legacy segment metadata that "
-    "physical segments do not carry.",
-    "Physics checks (speed and acceleration against assumed ranges): the renderer plans "
-    "motion within each profile's travel speed, latency and settle; acceleration is not "
-    "modelled, here or in the renderer. The largest lit step per frame is reported and "
-    "flagged where it exceeds the fixture's travel speed plus one DMX word. That bound is "
-    "per frame on commanded values, so it is necessary, not sufficient: it does not "
-    "detect sustained overspeed of up to one word per frame, nor a reveal before the "
-    "head has finished travelling or settling. What the renderer could not play is in "
-    "each section's dropped cues and transactions.",
-    "Template compliance: it checks legacy curve types, handlers and planner modifiers, "
-    "which physical output does not apply.",
-    "Section transitions (position, velocity and dimmer jumps): a head that must "
-    "reposition into a section does so dark, in its entry window (entry `cut`) or before "
-    "the section where its bound fits there (entry `none`); a head whose entry is "
-    "`skipped` plays through the boundary lit, within its travel speed. Each section's "
-    "entry windows and transactions, and for each skipped entry the change from the "
-    "head's last lit frame to the section's first, are reported instead.",
-)
-"""Each metric of the removed curve-based report this report leaves out, and why
-(`PhysicalRenderSummary`)."""
 
 
 def _physical_summary(physical: PhysicalRerender) -> PhysicalRenderSummary:
@@ -497,7 +458,6 @@ def _physical_summary(physical: PhysicalRerender) -> PhysicalRenderSummary:
         admission_preset_exclusions=record.get("admission_preset_exclusions", []),
         admission_effective_presets=record.get("admission_effective_presets", {}),
         unplayable_totals=record["unplayable_totals"],
-        not_reported=list(NOT_REPORTED_FOR_PHYSICAL),
     )
 
 

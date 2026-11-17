@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -15,6 +16,7 @@ from tests.config_effects_registry import (
     PROTECTED_EXACT_EFFECT_PATHS,
     ConfigDispositionKind,
 )
+from tests.support.mh_physical import hold_step, physical_template_doc
 from twinklr.core.audio.energy.profiling import _get_profile_parameters
 from twinklr.core.audio.structure.models import SectioningPreset
 from twinklr.core.config.fixtures import FixtureGroup
@@ -22,15 +24,19 @@ from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.sequencer.models.enum import QuantizeMode, TimingMode
 from twinklr.core.sequencer.models.template import (
     BaseTiming,
-    Color,
     Dimmer,
-    Gobo,
     Movement,
-    PhaseOffset,
     RepeatContract,
-    Shutter,
+    StepPatch,
+    StepTiming,
+    Template,
     TemplateDoc,
+    TemplatePreset,
     TemplateStep,
+)
+from twinklr.core.sequencer.moving_heads.templates.data_loader import (
+    TemplateDataError,
+    load_template_document,
 )
 
 REMOVED_CONFIG_PATHS = (
@@ -89,6 +95,48 @@ REMOVED_CONFIG_PATHS = (
     "template.template.roles",
     "template.template.repeat.repeatable",
     "template.template.steps.dimmer.cycles",
+    # Removed in C1.3 with the old moving-head renderer, their only reader.
+    *(
+        f"{prefix}.{field}"
+        for prefix in ("fixture.base_config", "fixture.fixtures.config")
+        for field in (
+            "inversions",
+            "pan_tilt_range",
+            "orientation",
+            "limits",
+            "dmx_mapping.pan_fine_channel",
+            "dmx_mapping.tilt_fine_channel",
+            "dmx_mapping.use_16bit_pan_tilt",
+            "dmx_mapping.shutter_default",
+            "dmx_mapping.shutter_map",
+            "dmx_mapping.color_map",
+            "dmx_mapping.gobo_map",
+            "position.pan_offset_deg",
+            "position.tilt_offset_deg",
+        )
+    ),
+    "fixture.xlights_semantic_groups",
+    "template.template.defaults",
+    "template.template.steps.geometry",
+    "template.template.steps.color",
+    "template.template.steps.shutter",
+    "template.template.steps.gobo",
+    "template.template.steps.timing.phase_offset",
+    "template.template.steps.movement.movement_type",
+    "template.template.steps.movement.intensity",
+    "template.template.steps.movement.cycles",
+    "template.template.steps.movement.params",
+    "template.template.steps.dimmer.dimmer_type",
+    "template.template.steps.dimmer.intensity",
+    "template.template.steps.dimmer.min_norm",
+    "template.template.steps.dimmer.max_norm",
+    "template.template.steps.dimmer.params",
+    "template.presets.name",
+    "template.presets.defaults",
+    "template.presets.step_patches.geometry",
+    "template.presets.step_patches.color",
+    "template.presets.step_patches.shutter",
+    "template.presets.step_patches.gobo",
 )
 
 
@@ -176,16 +224,6 @@ def test_removed_config_path_is_absent_from_public_schema(config_path: str) -> N
             },
             "dmx_start_address",
         ),
-        (
-            {
-                "group_id": "heads",
-                "base_config": {
-                    "orientation": {"tilt_up_dmx": 112},
-                    "dmx_mapping": {"pan_channel": 1, "tilt_channel": 2, "dimmer_channel": 3},
-                },
-            },
-            "tilt_up_dmx",
-        ),
     ),
 )
 def test_retired_fixture_config_loads_with_a_warning(
@@ -197,6 +235,145 @@ def test_retired_fixture_config_loads_with_a_warning(
 
     assert group.group_id == "heads"
     assert retired_key in caplog.text
+
+
+_MAPPING = {"pan_channel": 1, "tilt_channel": 2, "dimmer_channel": 3}
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    (
+        *(
+            (
+                {"group_id": "heads", "base_config": {"dmx_mapping": _MAPPING, key: {}}},
+                rf"fixture fields \['{key}'\] were removed with the old moving-head renderer",
+            )
+            for key in ("inversions", "pan_tilt_range", "orientation", "limits")
+        ),
+        *(
+            (
+                {"group_id": "heads", "base_config": {"dmx_mapping": {**_MAPPING, key: value}}},
+                rf"dmx_mapping fields \['{key}'\] were removed with the old moving-head renderer",
+            )
+            for key, value in (
+                ("pan_fine_channel", 4),
+                ("tilt_fine_channel", 5),
+                ("use_16bit_pan_tilt", True),
+                ("shutter_default", 255),
+                ("shutter_map", {}),
+                ("color_map", {}),
+                ("gobo_map", {}),
+            )
+        ),
+        (
+            {
+                "group_id": "heads",
+                "fixtures": [
+                    {
+                        "fixture_id": "MH1",
+                        "xlights_model_name": "Dmx MH1",
+                        "config": {"fixture_id": "MH1", "dmx_mapping": _MAPPING, "limits": {}},
+                    }
+                ],
+            },
+            r"fixture 'MH1' fields \['limits'\] were removed",
+        ),
+        (
+            {
+                "group_id": "heads",
+                "fixtures": [
+                    {
+                        "fixture_id": "MH1",
+                        "xlights_model_name": "Dmx MH1",
+                        "config": {
+                            "fixture_id": "MH1",
+                            "dmx_mapping": {**_MAPPING, "shutter_map": {}},
+                        },
+                    }
+                ],
+            },
+            r"fixture 'MH1' dmx_mapping fields \['shutter_map'\] were removed",
+        ),
+        (
+            {
+                "group_id": "heads",
+                "base_config": {"dmx_mapping": _MAPPING},
+                "fixtures": [
+                    {
+                        "fixture_id": "MH1",
+                        "xlights_model_name": "Dmx MH1",
+                        "config_overrides": {"inversions": {"pan": True}},
+                    }
+                ],
+            },
+            r"config_overrides fields \['inversions'\] were removed",
+        ),
+        (
+            {
+                "group_id": "heads",
+                "base_config": {"dmx_mapping": _MAPPING},
+                "fixtures": [
+                    {
+                        "fixture_id": "MH1",
+                        "xlights_model_name": "Dmx MH1",
+                        "config_overrides": {"position": {"position_index": 2}},
+                    }
+                ],
+            },
+            r"config_overrides field 'position' never took effect",
+        ),
+        (
+            {
+                "group_id": "heads",
+                "base_config": {"dmx_mapping": _MAPPING},
+                "fixtures": [
+                    {
+                        "fixture_id": "MH1",
+                        "xlights_model_name": "Dmx MH1",
+                        "position": {"position_index": 1, "pan_offset_deg": 5.0},
+                    }
+                ],
+            },
+            r"position fields \['pan_offset_deg'\] were removed: nothing read them",
+        ),
+        (
+            {"group_id": "heads", "xlights_semantic_groups": {"LEFT": "GROUP - LEFT"}},
+            r"'xlights_semantic_groups' was removed",
+        ),
+    ),
+)
+def test_fixture_config_of_the_removed_renderer_is_refused_by_name(
+    payload: dict[str, object], message: str
+) -> None:
+    """A fixture file naming a field only the old renderer read is refused, never
+    silently ignored, including inside a full fixture's `config`, which the `fixtures`
+    union would otherwise drop."""
+    with pytest.raises(ValidationError, match=message):
+        FixtureGroup.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("patch", "message"),
+    (
+        ({"movement": {"intensity": "FAST"}}, r"movement fields \['intensity'\] were removed"),
+        ({"dimmer": {"max_norm": 0.5}}, r"dimmer fields \['max_norm'\] were removed"),
+        ({"timing": {"phase_offset": {}}}, r"timing field 'phase_offset' was removed"),
+    ),
+)
+def test_a_step_patch_naming_a_removed_field_is_refused_when_the_document_loads(
+    tmp_path: Path, patch: dict[str, object], message: str
+) -> None:
+    """A preset's step patch is refused when its document loads (as `--template-dir`
+    and `template-validate` load it), naming the preset and the step."""
+    document = physical_template_doc("patched", [hold_step("reveal", 0.0)]).model_dump(mode="json")
+    document["presets"] = [{"preset_id": "SNAPPY", "step_patches": {"reveal": patch}}]
+    path = tmp_path / "patched.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(
+        TemplateDataError, match=rf"preset 'SNAPPY', step patch 'reveal': {message}"
+    ):
+        load_template_document(path)
 
 
 def test_retired_channel_config_wrapper_loads_with_a_warning(
@@ -223,15 +400,37 @@ def test_retired_channel_config_wrapper_loads_with_a_warning(
 @pytest.mark.parametrize(
     ("model", "payload", "retired_key"),
     (
-        (PhaseOffset, {"group": "ALL"}, "group"),
         (TemplateStep, {"priority": 1}, "priority"),
         (Movement, {"amplitude_override": 0.5}, "amplitude_override"),
-        (Color, {"preset": "WHITE", "params": {"probe": 1}}, "params"),
-        (Shutter, {"pattern": "OPEN", "params": {"probe": 1}}, "params"),
-        (Gobo, {"pattern": "OPEN", "params": {"probe": 1}}, "params"),
         (TemplateDoc, {"template": {"roles": ["OUTER_LEFT"]}}, "roles"),
         (RepeatContract, {"repeatable": False}, "repeatable"),
         (Dimmer, {"cycles": 2.0}, "cycles"),
+        # Removed in C1.3 with the old moving-head renderer, their only reader.
+        *((TemplateStep, {key: {}}, key) for key in ("geometry", "color", "shutter", "gobo")),
+        (StepTiming, {"phase_offset": {}}, "phase_offset"),
+        *(
+            (Movement, {key: value}, key)
+            for key, value in (
+                ("movement_type", "SWEEP_LR"),
+                ("intensity", "SMOOTH"),
+                ("cycles", 2.0),
+                ("params", {}),
+            )
+        ),
+        *(
+            (Dimmer, {key: value}, key)
+            for key, value in (
+                ("dimmer_type", "PULSE"),
+                ("intensity", "SMOOTH"),
+                ("min_norm", 0.1),
+                ("max_norm", 0.9),
+                ("params", {}),
+            )
+        ),
+        (Template, {"defaults": {}}, "defaults"),
+        (TemplatePreset, {"preset_id": "p", "name": "P"}, "name"),
+        (TemplatePreset, {"preset_id": "p", "defaults": {}}, "defaults"),
+        *((StepPatch, {key: {}}, key) for key in ("geometry", "color", "shutter", "gobo")),
     ),
 )
 def test_retired_template_config_fails_loudly_with_migration_message(
@@ -441,12 +640,6 @@ def test_registered_effect_and_invariant_nodeids_collect() -> None:
 
 def test_restored_effect_paths_keep_their_exact_public_nodeids() -> None:
     expected = {
-        "fixture.base_config.limits.avoid_backward": "tests/unit/config/test_fixtures.py::TestMovementLimits::test_avoid_backward_changes_public_pose_safety[base-config]",
-        "fixture.fixtures[FixtureInstance].config.limits.avoid_backward": "tests/unit/config/test_fixtures.py::TestMovementLimits::test_avoid_backward_changes_public_pose_safety[fixture-instance]",
-        "fixture.fixtures[FixtureInstance].config.position.pan_offset_deg": "tests/unit/config/test_fixtures.py::TestFixturePosition::test_offsets_change_public_pose_conversion[fixture-instance-pan-offset]",
-        "fixture.fixtures[FixtureInstance].config.position.tilt_offset_deg": "tests/unit/config/test_fixtures.py::TestFixturePosition::test_offsets_change_public_pose_conversion[fixture-instance-tilt-offset]",
-        "fixture.fixtures[SimplifiedFixtureInstance].position.pan_offset_deg": "tests/unit/config/test_fixtures.py::TestFixturePosition::test_offsets_change_public_pose_conversion[simplified-fixture-pan-offset]",
-        "fixture.fixtures[SimplifiedFixtureInstance].position.tilt_offset_deg": "tests/unit/config/test_fixtures.py::TestFixturePosition::test_offsets_change_public_pose_conversion[simplified-fixture-tilt-offset]",
         "job.timeline_tracks.sections": "tests/unit/formats/xlights/sequence/test_timeline.py::TestBuildTimelineTracks::test_sections_config_gates_public_track_builder[sections-disabled]",
     }
 

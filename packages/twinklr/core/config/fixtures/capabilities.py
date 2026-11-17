@@ -2,8 +2,8 @@
 
 A `FixtureCapabilities` profile says which model-relative DMX channels a fixture has,
 how calibrated physical values map to DMX words, which bytes select its discrete
-states, and what extinguishes its output. Nothing is inferred from the legacy fixture
-fields, and nothing unknown (speed, latency, settle time) becomes a number.
+states, and what extinguishes its output. Nothing is inferred from `dmx_mapping`, and
+nothing unknown (speed, latency, settle time) becomes a number.
 
 A profile that leaves out a value with a safe rule (an axis' unit, the dimmer's range,
 a default byte, a state's range, the shutter's open and closed states, the darkness

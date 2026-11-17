@@ -1,16 +1,28 @@
-"""Physical movement and orientation configuration.
+"""Retired and removed fixture-config fields.
 
-Defines physical capabilities, ranges, limits, and calibration data for fixtures.
+A retired field (dropped before the physical renderer) still loads, with a warning. A
+field removed with the old moving-head renderer is refused by name.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any
-
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 logger = logging.getLogger(__name__)
+
+REMOVED_FIXTURE_FIELDS = frozenset({"inversions", "pan_tilt_range", "orientation", "limits"})
+REMOVED_DMX_MAPPING_FIELDS = frozenset(
+    {
+        "pan_fine_channel",
+        "tilt_fine_channel",
+        "use_16bit_pan_tilt",
+        "shutter_default",
+        "shutter_map",
+        "color_map",
+        "gobo_map",
+    }
+)
+REMOVED_POSITION_FIELDS = frozenset({"pan_offset_deg", "tilt_offset_deg"})
 
 
 def drop_retired_fields(value: object, retired: frozenset[str], kind: str) -> object:
@@ -28,77 +40,25 @@ def drop_retired_fields(value: object, retired: frozenset[str], kind: str) -> ob
     return {key: item for key, item in value.items() if key not in retired}
 
 
-class PanTiltRange(BaseModel):
-    """Physical movement capabilities of the fixture in degrees."""
+_OLD_RENDERER_READ = (
+    "were removed with the old moving-head renderer, their only reader; delete them. The "
+    "renderer reads each fixture's physical_profile"
+)
 
-    model_config = ConfigDict(frozen=True)
 
-    pan_range_deg: float = Field(
-        default=540.0, gt=0, le=720, description="Total pan range in degrees"
+def reject_removed_fields(
+    value: object, removed: frozenset[str], kind: str, reason: str = _OLD_RENDERER_READ
+) -> object:
+    """Refuse removed fixture-config fields, naming each and why."""
+    if isinstance(value, dict):
+        found = sorted(removed & value.keys())
+        if found:
+            raise ValueError(f"{kind} fields {found} {reason}")
+    return value
+
+
+def reject_removed_position_fields(value: object, kind: str = "position") -> object:
+    """Refuse the mounting offsets, which nothing read, naming each."""
+    return reject_removed_fields(
+        value, REMOVED_POSITION_FIELDS, kind, "were removed: nothing read them; delete them"
     )
-    tilt_range_deg: float = Field(
-        default=270.0, gt=0, le=360, description="Total tilt range in degrees"
-    )
-
-
-class Orientation(BaseModel):
-    """Calibration data mapping physical positions to DMX values.
-
-    These reference points allow accurate conversion between DMX values
-    and real-world degrees.
-    """
-
-    model_config = ConfigDict(frozen=False)
-
-    # Reference DMX values for known positions
-    pan_front_dmx: int = Field(
-        default=128, ge=0, le=255, description="DMX value when pointing forward (center)"
-    )
-    tilt_zero_dmx: int = Field(
-        default=22, ge=0, le=255, description="DMX value at horizon/level (0°)"
-    )
-
-    @model_validator(mode="before")
-    @classmethod
-    def drop_removed_fields(cls, value: object) -> object:
-        return drop_retired_fields(
-            value,
-            frozenset({"tilt_up_dmx", "tilt_above_horizon_deg", "resting_position"}),
-            "orientation",
-        )
-
-
-class MovementLimits(BaseModel):
-    """Safety limits to prevent unwanted fixture positions.
-
-    These limits prevent fixtures from pointing at the truss, ceiling,
-    or other unsafe directions.
-    """
-
-    model_config = ConfigDict(frozen=False)
-
-    pan_min: int = Field(default=50, ge=0, le=255, description="Minimum pan DMX value")
-    pan_max: int = Field(default=190, ge=0, le=255, description="Maximum pan DMX value")
-    tilt_min: int = Field(default=5, ge=0, le=255, description="Minimum tilt DMX value")
-    tilt_max: int = Field(default=125, ge=0, le=255, description="Maximum tilt DMX value")
-    avoid_backward: bool = Field(
-        default=True, description="Prevent pointing backward (> 90° from forward)"
-    )
-
-    @field_validator("pan_max")
-    @classmethod
-    def validate_pan_range(cls, v: int, info: Any) -> int:
-        """Validate that pan_min < pan_max."""
-        pan_min = info.data.get("pan_min", 0)
-        if pan_min >= v:
-            raise ValueError(f"pan_min ({pan_min}) must be less than pan_max ({v})")
-        return v
-
-    @field_validator("tilt_max")
-    @classmethod
-    def validate_tilt_range(cls, v: int, info: Any) -> int:
-        """Validate that tilt_min < tilt_max."""
-        tilt_min = info.data.get("tilt_min", 0)
-        if tilt_min >= v:
-            raise ValueError(f"tilt_min ({tilt_min}) must be less than tilt_max ({v})")
-        return v

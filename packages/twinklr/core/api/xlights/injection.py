@@ -155,7 +155,7 @@ def reconcile_live_layout(
     """Make the live model list authoritative without inventing DMX channel maps.
 
     ``getModels`` exposes names, not moving-head channel semantics. Matching live names
-    retain their configured DMX/calibration data; configured fixtures absent from the
+    retain their configured DMX data; configured fixtures absent from the
     live layout are removed. Unconfigured live models are reported and never guessed.
     """
     live_models = set(model_names)
@@ -168,14 +168,9 @@ def reconcile_live_layout(
     }
     configured_names = {fixture.xlights_model_name for fixture in configured_fixtures}
     missing_groups = tuple(
-        sorted(
-            name
-            for name in (
-                *((configured.xlights_group,) if configured.xlights_group else ()),
-                *configured.xlights_semantic_groups.values(),
-            )
-            if name not in live_groups
-        )
+        name
+        for name in ((configured.xlights_group,) if configured.xlights_group else ())
+        if name not in live_groups
     )
     rig = configured.model_copy(deep=True)
     rig.fixtures = [
@@ -184,11 +179,6 @@ def reconcile_live_layout(
     rig.xlights_group = (
         configured.xlights_group if configured.xlights_group in live_groups else None
     )
-    rig.xlights_semantic_groups = {
-        key: value
-        for key, value in configured.xlights_semantic_groups.items()
-        if value in live_groups
-    }
     return LiveLayoutReconciliation(
         rig=rig,
         report=LayoutDivergenceReport(

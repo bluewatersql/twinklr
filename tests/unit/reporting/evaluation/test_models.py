@@ -3,18 +3,23 @@
 from pathlib import Path
 
 from twinklr.core.reporting.evaluation.models import (
-    ContinuityCheck,
     CurveAnalysis,
     CurveStats,
     EvaluationReport,
+    PhysicalRenderSummary,
     ReportFlag,
     ReportFlagLevel,
     ReportSummary,
     RunMetadata,
+    SectionRenderFacts,
     SectionReport,
     SongMetadata,
     TargetResolution,
     TemplateSelection,
+)
+
+_PHYSICAL = PhysicalRenderSummary(
+    run_fingerprint="a", rerender_fingerprint="a", fingerprint_matches=True
 )
 
 
@@ -85,35 +90,29 @@ class TestCurveStats:
             range=0.8,
             mean=0.5,
             std=0.2,
-            clamp_pct=5.0,
             energy=0.15,
         )
         assert stats.min == 0.1
         assert stats.max == 0.9
-        assert stats.clamp_pct == 5.0
 
 
-class TestContinuityCheck:
-    """Tests for ContinuityCheck model."""
+class TestCurveAnalysis:
+    """Tests for CurveAnalysis model."""
 
     def test_valid_analysis(self):
         """Test creating valid curve analysis."""
-        stats = CurveStats(
-            min=0.0, max=1.0, range=1.0, mean=0.5, std=0.3, clamp_pct=0.0, energy=0.2
-        )
-        continuity = ContinuityCheck(loop_delta=0.01, ok=True)
+        stats = CurveStats(min=0.0, max=1.0, range=1.0, mean=0.5, std=0.3, energy=0.2)
 
         analysis = CurveAnalysis(
             role="OUTER_LEFT",
             channel="PAN",
-            space="norm",
+            space="degree",
             plot_path=Path("/tmp/plot.png"),
             stats=stats,
-            continuity=continuity,
         )
         assert analysis.role == "OUTER_LEFT"
         assert analysis.channel == "PAN"
-        assert analysis.space == "norm"
+        assert analysis.space == "degree"
 
 
 class TestTemplateSelection:
@@ -147,6 +146,7 @@ class TestTemplateSelection:
             targets=targets,
             curves=[],
             flags=[],
+            render_facts=SectionRenderFacts(),
         )
         assert report.section_id == "verse_1"
         assert report.bar_range == (1.0, 21.0)
@@ -183,8 +183,10 @@ class TestEvaluationReport:
         song = SongMetadata(bpm=120.0, time_signature="4/4", bars_total=64, bar_duration_ms=2000.0)
         summary = ReportSummary(sections=0)
 
-        report = EvaluationReport(run=run, song=song, summary=summary, sections=[])
-        assert report.schema_version == "1.0.0"
+        report = EvaluationReport(
+            run=run, song=song, summary=summary, sections=[], physical=_PHYSICAL
+        )
+        assert report.schema_version == "2.0.0"
         assert report.run.run_id == "test"
         assert len(report.sections) == 0
 
@@ -199,9 +201,11 @@ class TestEvaluationReport:
         song = SongMetadata(bpm=120.0, time_signature="4/4", bars_total=64, bar_duration_ms=2000.0)
         summary = ReportSummary(sections=0)
 
-        report = EvaluationReport(run=run, song=song, summary=summary, sections=[])
+        report = EvaluationReport(
+            run=run, song=song, summary=summary, sections=[], physical=_PHYSICAL
+        )
         data = report.model_dump(mode="json")
 
-        assert data["schema_version"] == "1.0.0"
+        assert data["schema_version"] == "2.0.0"
         assert data["run"]["run_id"] == "test"
         assert isinstance(data["run"]["checkpoint_path"], str)

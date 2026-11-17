@@ -15,7 +15,6 @@
         "step_id": "reveal",
         "target": "ALL",
         "timing": {"base_timing": {"start_offset_bars": 0.5, "duration_bars": 0.5}},
-        "geometry": {},
         "movement": {
           "physical": {
             "shape": "linear",

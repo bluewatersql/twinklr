@@ -77,7 +77,6 @@ from twinklr.core.sequencer.display.xlights_mapping import (
 )
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import PhysicalOutputError
 from twinklr.core.sequencer.moving_heads.export.xsq_adapter import check_physical_models
-from twinklr.core.sequencer.moving_heads.pipeline import offered_template_ids
 from twinklr.core.sequencer.moving_heads.templates import load_templates_from_directory
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
     PHYSICAL_TEMPLATE_DIR,
@@ -147,7 +146,8 @@ LIVE_PLAN_IDENTITY = {
     "interrupted or other inject)",
     "audio_sha256": "the audio differs from the injected song's",
     "job_sha256": "the job config differs",
-    "rig_sha256": "the rig differs (fixture config or live layout)",
+    "rig_sha256": "the rig differs (fixture config, live layout, or the fields this Twinklr "
+    "version records for a rig)",
 }
 """What a recorded plan is valid for, and why `regenerate` refuses when one differs."""
 
@@ -585,12 +585,10 @@ async def _run_pipeline_async(
             )
             return 1
 
-    # The rig is final here, so the job's fixture prerequisites, and the
-    # templates the planner may be offered, are checked before any analysis or
-    # provider request.
+    # The rig is final here, so the job's fixture prerequisites are checked before any
+    # analysis or provider request.
     try:
         preflight_render_policy(job_config, fixture_group)
-        available_templates = offered_template_ids(available_templates)
     except UnsupportedRenderModeError as error:
         console.print(f"[red]ERROR: {error}[/red]")
         return 1

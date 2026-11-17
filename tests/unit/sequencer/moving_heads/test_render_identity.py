@@ -24,7 +24,7 @@ from tests.support.mh_physical import (
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import JobConfig, MHRenderPolicy
-from twinklr.core.sequencer.models.template import TemplateDoc
+from twinklr.core.sequencer.models.template import StepPatch, TemplateDoc
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import ENCODER_VERSION
 from twinklr.core.sequencer.moving_heads.identity import (
     LEGACY_BACKEND_ID,
@@ -149,12 +149,14 @@ def test_preset_content_changes_the_hash() -> None:
     )
     doc = get_template("mirror_wings")
     narrow = next(preset for preset in doc.presets if preset.preset_id == "narrow")
+    patch = StepPatch(movement={"physical": {"pan_extent_deg": 21.0, "tilt_extent_deg": 10.0}})
     edited_presets = [
-        preset.model_copy(update={"defaults": {**preset.defaults, "extra": 1}}, deep=True)
+        preset.model_copy(update={"step_patches": {"wings": patch}}, deep=True)
         if preset is narrow
         else preset
         for preset in doc.presets
     ]
+    assert narrow.step_patches["wings"] != patch
     edited = doc.model_copy(update={"presets": edited_presets}, deep=True)
 
     assert _fingerprint(plan=plan, templates=[edited]) != _fingerprint(plan=plan, templates=[doc])

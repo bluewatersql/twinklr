@@ -166,11 +166,10 @@ def quantized_cues(segments: Sequence[FixtureSegment]) -> tuple[CueTiming, ...]:
         for kind, requested in bounds:
             cues.append(_cue_timing(segment, None, kind, requested))
         for channel, channel_value in segment.channels.items():
-            if channel_value.physical is not None:
-                cues.extend(
-                    _cue_timing(segment, channel, "cue", requested)
-                    for requested in _step_cue_times(channel_value.physical)
-                )
+            cues.extend(
+                _cue_timing(segment, channel, "cue", requested)
+                for requested in _step_cue_times(channel_value.physical)
+            )
     return tuple(cues)
 
 
@@ -213,10 +212,9 @@ def encode_fixture_frames(
         ValueError: If segments name more than one fixture, frame times are empty or
             not increasing grid frames, a segment is zero-length on the grid or samples
             none of the frames, or the profile lacks a default byte.
-        PhysicalChannelError: If a channel holds no physical value, a value the
-            profile cannot honor, a sample before its first point, cues that land on
-            one frame or at or after the segment's end, or two segments write the same
-            channel in one frame.
+        PhysicalChannelError: If a channel holds a value the profile cannot honor, a
+            sample before its first point, cues that land on one frame or at or after
+            the segment's end, or two segments write the same channel in one frame.
         PhysicalOutputError: If the footprint exceeds the DMX effect's 48 channels.
     """
     fixture_ids = {segment.fixture_id for segment in segments}
@@ -259,13 +257,6 @@ def encode_fixture_frames(
         samplers: dict[ChannelName, _Sampler] = {}
         for channel, channel_value in segment.channels.items():
             value = channel_value.physical
-            if value is None:
-                raise PhysicalChannelError(
-                    fixture_id=fixture_id,
-                    channel=channel,
-                    time_ms=segment.t0_ms,
-                    reason="not a physical value; the physical encoder takes no legacy DMX",
-                )
             check_physical_value(fixture_id, channel, value, capabilities)
             samplers[channel] = _sampler(fixture_id, channel, value, end)
         first, stop = bisect_left(frame_times_ms, start), bisect_left(frame_times_ms, end)

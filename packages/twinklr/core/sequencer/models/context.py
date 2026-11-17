@@ -1,35 +1,14 @@
 from fractions import Fraction
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.config.fixtures.capabilities import FixtureCapabilities
 from twinklr.core.config.fixtures.presets import PoseDegrees, RigPresetLibrary
-from twinklr.core.sequencer.models.enum import ChannelName, Intensity
+from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.topology import FixtureTopology
-from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.timing.musical_phase import MusicalPhaseMap
-
-
-class TimedChannelIntent(BaseModel):
-    """Renderer-neutral discrete wheel change placed on the authoritative grid."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    at_ms: int = Field(ge=0)
-    pattern_id: str = Field(min_length=1)
-
-
-class SectionRenderIntent(BaseModel):
-    """Plan intent already translated into renderer-owned vocabulary."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    intensity: Intensity | None = None
-    color: ColorPreset | None = None
-    shutter_events: list[TimedChannelIntent] = Field(default_factory=list)
-    gobo_events: list[TimedChannelIntent] = Field(default_factory=list)
 
 
 class FixtureContext(BaseModel):
@@ -38,7 +17,6 @@ class FixtureContext(BaseModel):
     Attributes:
         fixture_id: Unique identifier for the fixture.
         role: Role assigned to this fixture (e.g., "FRONT_LEFT").
-        calibration: Fixture calibration data.
         physical_profile: Explicit capabilities for the physical renderer, if declared.
     """
 
@@ -46,7 +24,6 @@ class FixtureContext(BaseModel):
 
     fixture_id: str
     role: str
-    calibration: dict[str, Any] = Field(default_factory=dict)
     physical_profile: FixtureCapabilities | None = None
 
 
@@ -78,16 +55,9 @@ class StepCompileContext(BaseModel):
     Attributes:
         fixture_id: Unique identifier for the fixture.
         role: Role assigned to this fixture (e.g., "FRONT_LEFT").
-        calibration: Fixture calibration data. Written by the template compile and read
-            by nothing since the old renderer was removed; C1.3 removes it.
         start_ms: Start time in milliseconds.
         duration_ms: Duration in milliseconds.
-        n_samples: Written by the template compile and read by nothing since the old
-            renderer was removed; C1.3 removes it.
         beat_grid: Beat grid for timing conversions (needed for period_bars → cycles).
-        template_defaults: The template's own `defaults` (after preset merge). Written
-            by the template compile and read by nothing since the old renderer was
-            removed; C1.3 removes it.
         physical_profile: The fixture's physical profile; physical compile only.
         phase_map: The song's musical phase map; physical compile only.
         resolved_components: The step's component references resolved for this
@@ -111,11 +81,8 @@ class StepCompileContext(BaseModel):
 
     fixture_id: str
     role: str
-    calibration: dict[str, Any]
-    template_defaults: dict[str, Any] = Field(default_factory=dict)
     start_ms: int
     duration_ms: int
-    n_samples: int = Field(default=64, ge=2)
 
     beat_grid: BeatGrid  # Added for period_bars → cycles conversion
     physical_profile: FixtureCapabilities | None = None
@@ -142,11 +109,6 @@ class TemplateCompileContext(BaseModel):
     start_bar: int = Field(default=0, ge=0)
     duration_bars: int = Field(default=0, ge=0)
 
-    # Neither is read since the old renderer was removed; `n_samples` is passed on to
-    # each step context, and `intent` is never set. C1.3 removes both.
-    n_samples: int = Field(default=64, ge=2)
-
-    intent: SectionRenderIntent = Field(default_factory=SectionRenderIntent)
     # The fixture group's named components; physical compile only.
     presets: RigPresetLibrary = Field(default_factory=RigPresetLibrary)
     # The rig's canonical topology (declared or derived), and the fixture group a

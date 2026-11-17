@@ -46,7 +46,6 @@ from twinklr.core.sequencer.models.template import Template, TemplatePreset, Tem
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.physical import (
     PhysicalCompileError,
-    is_physical_template,
 )
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
     compile_physical_template,
@@ -228,7 +227,6 @@ def test_template_preset_patch_counts_as_set_on_the_step() -> None:
     preset = TemplatePreset.model_validate(
         {
             "preset_id": "high",
-            "name": "High",
             "step_patches": {"look": {"movement": {"physical": {"start_tilt_deg": 44.0}}}},
         }
     )
@@ -403,7 +401,10 @@ def test_attribute_preset_needs_the_channel_on_the_profile() -> None:
 
 
 def test_component_refs_are_physical_data() -> None:
-    assert is_physical_template(_template(referencing_step()))
+    """A step whose aim comes from a position reference alone is a valid step."""
+    step = _template(referencing_step()).steps[0]
+    assert step.component_refs is not None and step.component_refs.position_id == "front"
+    assert step.movement.physical.start_pan_deg is None
 
 
 def test_empty_preset_library_is_left_out_of_the_group_dump() -> None:
@@ -417,16 +418,22 @@ def test_empty_preset_library_is_left_out_of_the_group_dump() -> None:
         preset_library_payload()
     ).model_dump(mode="json")
 
-    legacy = TemplateStep.model_validate(
+    unreferencing = TemplateStep.model_validate(
         {
-            "step_id": "legacy",
+            "step_id": "aimed",
             "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
-            "geometry": {},
-            "movement": {"movement_type": "sweep_lr"},
-            "dimmer": {"dimmer_type": "hold"},
+            "movement": {
+                "physical": {
+                    "shape": "hold",
+                    "mode": "periodic",
+                    "start_pan_deg": 0.0,
+                    "start_tilt_deg": 0.0,
+                }
+            },
+            "dimmer": {},
         }
     )
-    assert "component_refs" not in legacy.model_dump(mode="json")
+    assert "component_refs" not in unreferencing.model_dump(mode="json")
 
 
 def _fingerprint(segment: FixtureSegment) -> str:

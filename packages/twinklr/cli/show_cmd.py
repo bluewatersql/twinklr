@@ -37,7 +37,6 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     check_output_budget,
     measure_output,
 )
-from twinklr.core.sequencer.moving_heads.pipeline import offered_template_ids
 from twinklr.core.sequencer.moving_heads.templates.data_loader import admit_physical_catalog
 from twinklr.core.sequencer.moving_heads.templates.library import list_templates
 from twinklr.core.sequencer.planning import MacroPlan
@@ -92,15 +91,13 @@ async def run_show_pipeline_async(
         validate_llm_provider_config(app_config)
         job_config = load_job_config(job_config_path)
         fixture_group = load_fixture_group(fixture_config_path)
-        # As `twinklr run`: the rig's render prerequisites are checked when it loads,
-        # and the planner is offered only templates the renderer can render; the render
-        # preflight gate repeats both after audio analysis, before any planner.
+        # As `twinklr run`: the rig's render prerequisites are checked when it loads;
+        # the render preflight gate repeats them after audio analysis, before any
+        # planner, and admits the templates this rig can render.
         preflight_render_policy(job_config, fixture_group)
         fe_bundle = load_display_fe_bundle(fe_output_dir, style_name=style_name)
         admit_physical_catalog()
-        available_templates = offered_template_ids(
-            [template.template_id for template in list_templates()]
-        )
+        available_templates = [template.template_id for template in list_templates()]
         song_name = clean_audio_filename(audio_path.stem)
         wiring = prepare_combined_show_pipeline(
             layout_path=layout_path,

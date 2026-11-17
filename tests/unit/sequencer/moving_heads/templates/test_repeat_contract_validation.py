@@ -12,17 +12,15 @@ from pydantic import ValidationError
 import pytest
 
 from tests.support.mh_physical import CATALOG_IDS, physical_catalog
-from twinklr.core.config.poses import TiltPose
 from twinklr.core.sequencer.models.enum import (
-    Intensity,
     TemplateCategory,
     TimingMode,
 )
 from twinklr.core.sequencer.models.template import (
     BaseTiming,
     Dimmer,
-    Geometry,
     Movement,
+    PhysicalMovementSpec,
     RemainderPolicy,
     RepeatContract,
     RepeatMode,
@@ -32,9 +30,6 @@ from twinklr.core.sequencer.models.template import (
     TemplateMetadata,
     TemplateStep,
 )
-from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
-from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
-from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 from twinklr.core.sequencer.moving_heads.templates.library import (
     InvalidTemplateError,
     TemplateRegistry,
@@ -53,9 +48,12 @@ def _step(step_id: str, *, offset_bars: float, duration_bars: float) -> Template
                 duration_bars=duration_bars,
             )
         ),
-        geometry=Geometry(geometry_type=GeometryType.ROLE_POSE, tilt_pose=TiltPose.HORIZON),
-        movement=Movement(movement_type=MovementType.SWEEP_LR, intensity=Intensity.SMOOTH),
-        dimmer=Dimmer(dimmer_type=DimmerType.PULSE, intensity=Intensity.SMOOTH),
+        movement=Movement(
+            physical=PhysicalMovementSpec(
+                shape="hold", mode="finite", start_pan_deg=0.0, start_tilt_deg=0.0
+            )
+        ),
+        dimmer=Dimmer(),
     )
 
 
@@ -72,7 +70,6 @@ def _doc(*, cycle_bars: float, loop_step_ids: list[str], steps: list[TemplateSte
                 loop_step_ids=loop_step_ids,
                 remainder_policy=RemainderPolicy.HOLD_LAST_POSE,
             ),
-            defaults={"dimmer_floor_dmx": 60, "dimmer_ceiling_dmx": 255},
             steps=steps,
             metadata=TemplateMetadata(
                 tags=["test"],

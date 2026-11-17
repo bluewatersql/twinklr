@@ -167,7 +167,6 @@ async def test_run_pipeline_reports_structured_partial_injection_failure(
     monkeypatch.setattr(cli_main, "admit_physical_catalog", list)
     monkeypatch.setattr(cli_main, "list_templates", list)
     monkeypatch.setattr(cli_main, "preflight_render_policy", lambda *args: None)
-    monkeypatch.setattr(cli_main, "offered_template_ids", lambda ids: ids)
     monkeypatch.setattr(
         cli_main,
         "reconcile_live_layout",
@@ -871,29 +870,6 @@ def _prepared_physical_run(monkeypatch, physical_job, physical_rig) -> list[dict
     monkeypatch.setattr(cli_main, "load_fixture_group", lambda _: physical_rig)
     monkeypatch.setattr(cli_main, "build_run_pipeline", capture)
     return calls
-
-
-@pytest.mark.anyio
-async def test_run_refuses_a_physical_job_when_no_template_has_physical_data(
-    tmp_path, monkeypatch, capsys
-) -> None:
-    """A prepared physical job is refused before any analysis when none of the loaded
-    templates could render under the physical renderer (here, without the physical
-    catalog, which otherwise always supplies some)."""
-    calls = _prepared_physical_run(monkeypatch, physical_job(), physical_rig())
-    monkeypatch.setattr(cli_main, "admit_physical_catalog", list)
-
-    exit_code = await cli_main.run_pipeline_async(
-        audio_path=tmp_path / "song.wav",
-        output_dir=tmp_path,
-        app_config_path=tmp_path / "config.json",
-        job_config_path=tmp_path / "job.json",
-    )
-
-    output = " ".join(capsys.readouterr().out.split())
-    assert exit_code == 1
-    assert calls == []
-    assert "no template with physical data" in output
 
 
 @pytest.mark.anyio

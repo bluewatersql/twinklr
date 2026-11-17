@@ -68,48 +68,20 @@ class ReportSummary(BaseModel):
         default_factory=list, description="Unique roles targeted in plan"
     )
 
-    # Phase 2: Advanced metrics. None: not reported (physical output).
     validation_errors: int = Field(default=0, description="Heuristic validation errors")
-    physics_violations: int | None = Field(default=0, description="Physics constraint violations")
-    compliance_issues: int | None = Field(default=0, description="Template compliance issues")
-    harsh_transitions: int | None = Field(
-        default=0, description="Number of harsh section transitions"
-    )
 
     model_config = ConfigDict(frozen=True)
 
 
 class CurveStats(BaseModel):
-    """Statistical analysis of a curve."""
+    """Statistical analysis of a channel's values over the encoded frames."""
 
     min: float = Field(description="Minimum value")
     max: float = Field(description="Maximum value")
     range: float = Field(description="Range (max - min)")
     mean: float = Field(description="Mean value")
     std: float = Field(description="Standard deviation")
-    clamp_pct: float | None = Field(
-        default=None,
-        description=(
-            "Percentage of samples at bounds (0-100); None for physical output, which the "
-            "renderer never clamps"
-        ),
-    )
-    energy: float = Field(
-        description=(
-            "Mean absolute derivative (movement energy): per sample for legacy curves, "
-            "per second for physical output"
-        )
-    )
-
-    model_config = ConfigDict(frozen=True)
-
-
-class ContinuityCheck(BaseModel):
-    """Loop continuity validation."""
-
-    loop_delta: float = Field(description="Absolute difference between start and end values")
-    ok: bool = Field(description="Whether continuity check passed")
-    threshold: float = Field(default=0.05, description="Threshold for passing check")
+    energy: float = Field(description="Mean absolute rate of change per second")
 
     model_config = ConfigDict(frozen=True)
 
@@ -120,16 +92,10 @@ class CurveAnalysis(BaseModel):
     role: str = Field(description="Fixture role (e.g., OUTER_LEFT)")
     channel: str = Field(description="Channel name (PAN, TILT, DIMMER)")
     space: str = Field(
-        description=(
-            "Value space: 'norm' or 'dmx' for legacy curves; for physical output the "
-            "unit, 'degree' (pan, tilt) or 'normalized' (emitted intensity)"
-        )
+        description="The unit: 'degree' (pan, tilt, zoom) or 'normalized' (emitted intensity)"
     )
     plot_path: Path | None = Field(default=None, description="Path to plot PNG")
     stats: CurveStats = Field(description="Statistical metrics")
-    continuity: ContinuityCheck | None = Field(
-        default=None, description="Loop continuity check; None for physical output"
-    )
     lit_range: float | None = Field(
         default=None,
         exclude_if=lambda value: value is None,
@@ -147,29 +113,6 @@ class CurveAnalysis(BaseModel):
         ),
     )
 
-    # Metadata from FixtureSegment
-    curve_type: str | None = Field(default=None, description="Curve type (e.g., SINE, LINEAR)")
-    handler: str | None = Field(default=None, description="Handler that generated curve")
-    base_position: float | None = Field(default=None, description="Base position (normalized)")
-    static_dmx: int | None = Field(default=None, description="Static DMX value if applicable")
-
-    # Phase 2: Physics validation
-    physics_check: PhysicsCheck | None = Field(
-        default=None, description="Physical constraint validation results"
-    )
-
-    model_config = ConfigDict(frozen=True)
-
-
-class StepConfig(BaseModel):
-    """Resolved step configuration from template."""
-
-    step_id: str = Field(description="Step identifier")
-    timing: dict[str, Any] = Field(description="Timing configuration")
-    geometry: dict[str, Any] = Field(description="Geometry configuration")
-    movement: dict[str, Any] = Field(description="Movement configuration")
-    dimmer: dict[str, Any] = Field(description="Dimmer configuration")
-
     model_config = ConfigDict(frozen=True)
 
 
@@ -182,9 +125,6 @@ class TemplateSelection(BaseModel):
         default_factory=dict, description="Template modifiers applied"
     )
     reasoning: str = Field(default="", description="Agent's reasoning for template choice")
-    steps: list[StepConfig] = Field(
-        default_factory=list, description="Resolved step configurations"
-    )
 
     model_config = ConfigDict(frozen=True)
 
@@ -236,20 +176,11 @@ class SectionReport(BaseModel):
     # Issues
     flags: list[ReportFlag] = Field(default_factory=list, description="Issues and warnings")
 
-    # Phase 2: Advanced validation
-    template_compliance: TemplateCompliance | None = Field(
-        default=None, description="Template compliance analysis"
-    )
-    transition_to_next: TransitionAnalysis | None = Field(
-        default=None, description="Transition analysis to next section"
-    )
     validation_issues: list[str] = Field(
         default_factory=list, description="Heuristic validation issues"
     )
-    render_facts: SectionRenderFacts | None = Field(
-        default=None,
-        exclude_if=lambda value: value is None,
-        description="The physical renderer's trace facts for this section (physical only)",
+    render_facts: SectionRenderFacts = Field(
+        description="The renderer's trace facts for this section"
     )
 
     model_config = ConfigDict(frozen=True)
@@ -258,15 +189,13 @@ class SectionReport(BaseModel):
 class EvaluationReport(BaseModel):
     """Top-level evaluation report."""
 
-    schema_version: str = Field(default="1.0.0", description="Report schema version")
+    schema_version: str = Field(default="2.0.0", description="Report schema version")
     run: RunMetadata = Field(description="Run identification and provenance")
     song: SongMetadata = Field(description="Song timing and structure")
     summary: ReportSummary = Field(description="High-level statistics")
     sections: list[SectionReport] = Field(description="Per-section analysis")
-    physical: PhysicalRenderSummary | None = Field(
-        default=None,
-        exclude_if=lambda value: value is None,
-        description="The physical render's identity and the gate's facts (physical only)",
+    physical: PhysicalRenderSummary = Field(
+        description="The render's identity and the gate's facts"
     )
 
     model_config = ConfigDict(frozen=True)
@@ -339,7 +268,7 @@ class SectionRenderFacts(BaseModel):
 
 
 class PhysicalRenderSummary(BaseModel):
-    """A physical report's render identity, the gate's facts and what it leaves out."""
+    """A report's render identity and the gate's facts."""
 
     run_fingerprint: str = Field(description="Render fingerprint the run recorded")
     rerender_fingerprint: str = Field(description="Render fingerprint of the re-render")
@@ -374,10 +303,6 @@ class PhysicalRenderSummary(BaseModel):
     unplayable_totals: dict[str, dict[str, int]] = Field(
         default_factory=dict, description="Cues and frames kept dark as unplayable, by code"
     )
-    not_reported: list[str] = Field(
-        default_factory=list,
-        description="Legacy metrics left out of a physical report, each with the reason",
-    )
 
     model_config = ConfigDict(frozen=True)
 
@@ -394,88 +319,5 @@ class ValidationResult(BaseModel):
     errors: list[str] = Field(default_factory=list, description="Validation errors")
     warnings: list[str] = Field(default_factory=list, description="Validation warnings")
     timestamp: str = Field(description="ISO 8601 timestamp of validation")
-
-    model_config = ConfigDict(frozen=True)
-
-
-class PhysicsCheck(BaseModel):
-    """Physical constraint validation for a curve."""
-
-    speed_ok: bool = Field(description="Whether speed limits were respected")
-    acceleration_ok: bool = Field(description="Whether acceleration limits were respected")
-    max_speed_deg_per_sec: float = Field(description="Maximum observed speed (deg/s)")
-    max_accel_deg_per_sec2: float = Field(description="Maximum observed acceleration (deg/s²)")
-    violations: list[str] = Field(default_factory=list, description="List of physics violations")
-
-    model_config = ConfigDict(frozen=True)
-
-
-class ModifierCompliance(BaseModel):
-    """Template modifier compliance check."""
-
-    modifier_key: str = Field(description="Modifier parameter name")
-    expected_value: Any = Field(description="Expected/requested value")
-    actual_impact: str = Field(description="Description of observed impact")
-    compliant: bool = Field(description="Whether modifier was applied correctly")
-    notes: str | None = Field(default=None, description="Additional compliance notes")
-
-    model_config = ConfigDict(frozen=True)
-
-
-class TemplateCompliance(BaseModel):
-    """Template compliance analysis for a section."""
-
-    template_id: str = Field(description="Template identifier")
-    curve_type_correct: bool = Field(description="Whether curve types match expected")
-    modifiers_compliant: list[ModifierCompliance] = Field(
-        default_factory=list, description="Per-modifier compliance checks"
-    )
-    geometry_correct: bool = Field(description="Whether geometry was applied correctly")
-    overall_compliant: bool = Field(description="Overall compliance status")
-    issues: list[str] = Field(default_factory=list, description="Compliance issues")
-
-    model_config = ConfigDict(frozen=True)
-
-
-class TransitionAnalysis(BaseModel):
-    """Transition analysis between two sections."""
-
-    from_section: str = Field(description="Source section name")
-    to_section: str = Field(description="Destination section name")
-    position_delta_pan: float = Field(description="Pan position change (normalized)")
-    position_delta_tilt: float = Field(description="Tilt position change (normalized)")
-    velocity_delta: float = Field(description="Velocity change (normalized/sec)")
-    dimmer_snap: bool = Field(description="Whether dimmer snapped abruptly")
-    smooth: bool = Field(description="Overall transition smoothness")
-    issues: list[str] = Field(default_factory=list, description="Transition issues")
-
-    model_config = ConfigDict(frozen=True)
-
-
-class ComparisonMetrics(BaseModel):
-    """Metrics comparison between two reports."""
-
-    metric_name: str = Field(description="Name of the metric")
-    report_a_value: float = Field(description="Value in report A")
-    report_b_value: float = Field(description="Value in report B")
-    delta: float = Field(description="Difference (B - A)")
-    delta_pct: float = Field(description="Percent change")
-    improved: bool = Field(description="Whether metric improved")
-
-    model_config = ConfigDict(frozen=True)
-
-
-class LegacyComparisonReport(BaseModel):
-    """Pre-P2P-T13 iteration comparison retained for checkpoint compatibility."""
-
-    schema_version: str = Field(default="1.0.0", description="Comparison schema version")
-    run_ids: list[str] = Field(description="Run IDs being compared")
-    report_count: int = Field(description="Number of reports compared")
-    metric_diffs: list[ComparisonMetrics] = Field(description="Per-metric comparison results")
-    quality_trend: dict[str, list[float]] = Field(
-        default_factory=dict, description="Metric values over iterations"
-    )
-    best_iteration_idx: int = Field(description="Index of best performing iteration")
-    output_path: Path = Field(description="Path to comparison output")
 
     model_config = ConfigDict(frozen=True)

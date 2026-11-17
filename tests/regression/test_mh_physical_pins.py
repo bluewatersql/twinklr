@@ -12,8 +12,10 @@ case pins its render fingerprint and the SHA-256 of its encoded frames
 The values were recorded when the old renderer was removed (C1.2), from that tree; the
 encoded frames and the `.xsq` are byte-identical to those of the commit before it
 (`mh-last-with-legacy-renderer`), whose fingerprints differ only because the render
-policy lost its `mode` key. An intended output change bumps `PHYSICAL_RENDERER_REVISION`
-and re-records these pins in the same commit, saying why.
+policy lost its `mode` key. C1.3 re-recorded the fingerprints alone: the template and
+rig dumps they hash lost the old renderer's fields; frames and `.xsq` are unchanged. An
+intended output change bumps `PHYSICAL_RENDERER_REVISION` and re-records these pins in
+the same commit, saying why.
 """
 
 from __future__ import annotations
@@ -36,178 +38,178 @@ HEADS = ("MH1", "MH2", "MH3", "MH4")
 
 PINS: dict[str, tuple[str, str]] = {
     "steady/finite_snap_hold/base": (
-        "4a9b878b5789c14c941c182ee93b09a69ea5c0f54c8f5df867924616ce4c8c5e",
+        "1b8e332f558893bca18db00910c4b52ca255fccd2b529209b2cf14206c249eed",
         "8dc76627bbfb3e4e0a170d097e491277cdb571b09c41198381db8cbcc374e120",
     ),
     "steady/finite_snap_hold/narrow": (
-        "9398a27ccb8ba788fa8ddc6fca969525da5c5c61428afabcf95caa9f39f6d836",
+        "4ad12932cc9c47076c20d723fad463beb42724b5ec5e8772a420ebeef3d9ff84",
         "c0d8292c375a952740fbbb4fdec44ca69ed99c1bc90decfe2f2f22b57387ccce",
     ),
     "steady/finite_snap_hold/slow": (
-        "f307e56c7808bb14fa921c54b3a0c2d0d4f59da932e4c726ce91fa857a202056",
+        "29bc1a523965a89631050dc221757d9056d6e89cf2c3e4c5f279fb2579982180",
         "4d455965979b705ad9af8136e4fd229c7b5374635e1786d07b8cab7636861b9d",
     ),
     "steady/fly_in_cascade/base": (
-        "ae6a547ef3fa8a42b75f31a9bd9837840c99b551e61c3fa733754845904eddb1",
+        "3a1c9ee2b805b915549a73aea1577ebf24a8bf429b8d28dadd2e3fdafb3bbfa5",
         "ffdfb044c11edf3040dd81744d17558a2d46c21181071367cca5f752a8413b0d",
     ),
     "steady/fly_in_cascade/narrow": (
-        "6850b2ca89bb2b7ec6b47a9a1feb6764cd4226624289f9644b74d747b006a1dd",
+        "28b78ee28487014f80275ee9affeb4829e454565b369032740c17cdb7358ccf6",
         "0280d85aaf1e832fc23b428e311b24ccb67dac720116f25f71d147261f88f310",
     ),
     "steady/fly_in_cascade/slow": (
-        "fae5409da2afa8edea1a8203a350ff099b506f365e62abebcb18c199f19b2b7b",
+        "1262ae82bbaa63290fcfea2f14cc322949df2c6ccda0241825a9d439d8957a47",
         "dd49563a5956e1e52f4a2c01e8f005a64a297ff28f9155f3eb05d10a29312433",
     ),
     "steady/fly_out_cascade/base": (
-        "0e293319a97e20b89e78e28bb02e916a88ceba9935adf0d68c2b2c4e2da10123",
+        "3c82bde8cd434d82a750006ea05f209234c5232c9be80be0b378054dfb900e61",
         "4235e01012dddfdae05f050fa904a9efa2e8eb4cf4f3b7e2ddd06b23951c733e",
     ),
     "steady/fly_out_cascade/narrow": (
-        "d9c273eda67416485b30be914b72f7cdd61e4947f95f255900f7b81f8649e5a1",
+        "4d053025910bc295be8967aab82ed8b3ea94c216b56a0454b3197332345f671f",
         "150edd82e9273731bd9ab781ab5c6caf420cf5d1129cddb637915687dab01a88",
     ),
     "steady/fly_out_cascade/slow": (
-        "a276b87447f4bcb20a6e58b3a9d82bafdbf6967255b4e13a6af2ddfd8e1182e0",
+        "da4cd0d63c3acf8ddc0abe6afab330916e1104a19933b555dbf247f3ec18fd15",
         "c7e91342cab3b42a868f59ab824961da433ac89db0c5646f1fd41e29b0444a70",
     ),
     "steady/masked_wheel_flick/base": (
-        "128116b674b955974bda2f212838ea606b6b10fa52447ca6f5f1470dedf9c808",
+        "1762c4c4ead9f7ba29dfe2c805513fe89caa8bd0ef892a85b2678b6d2904011f",
         "08ce9090980dbfefa79b6d78c90ef0f0b0c8ef3a19bb47d193d9af34805cd2de",
     ),
     "steady/masked_wheel_flick/narrow": (
-        "679f63ef1e358fa0abab8dc4427205d6781ef3f3e5187a19b123fa4717485c87",
+        "a08934281ac4a0caa56ad334e9cbe442ce426542b3af4e4a6b047e2a03805f5f",
         "2537e7e6cf39dad19aadb07a271b223f83c2af7fbbe52b4732f6416cee5993ad",
     ),
     "steady/masked_wheel_flick/slow": (
-        "bd526e028be40e874e10d3443be374899124845a3ac43f4dea9fd74bb1d603bf",
+        "8feaa86a5321181d888588c3346b23387c27455adf08008559d640454b0407c5",
         "56a758e57a37773c558bff6f8134843cf45c76d005021a6e882374d16d96431a",
     ),
     "steady/mirror_wings/base": (
-        "b9e3c0088f9fb09a160deaafc80b20ca54c4f9ff2e587ac7813d014bb087f8ad",
+        "8d28d19e3dc68d457d6b1f726759652641fd4bfe4882f566516b5d2889e55e31",
         "8e3cb9be3de61f968b065d8d0442ac5551becdbbf4624afb76b13a58e0f000fd",
     ),
     "steady/mirror_wings/narrow": (
-        "c0476c9f2f10d356505cd0c4892ae2ad10c7aee42b4403cbc7092c0d011d235d",
+        "eec6ea2481d1f6c13b6c821885e9cc91e071b3b1742df176339df682f7277806",
         "d83a23f4fea33e3e6f1b2bbfabdc0b5c26f605b673861c0021a1cc1c8bd36a1b",
     ),
     "steady/mirror_wings/slow": (
-        "6ba399fcf065fe992485eacbcb0ac62c1239d6529672d38830d832ed7111ebee",
+        "3b5fdc257be912c30ea4728c3afdf6316b6faaa32fac7419c040dbd564c78849",
         "bbcdbab3564fa3d0a7f107562326940ef92fa3f38130a37ac9d8b43f68bdd3b6",
     ),
     "steady/target_orbit/base": (
-        "ff99c573d4844288bc193dc2cd2934c0ed7b90a6abc8bc0670b5f7e1cbed03af",
+        "a57b809de429ca2043a19b4f9f4fbf08fdd7b5842f88c5f395845c69d9a7049f",
         "78d35ed327d359ca0cc456a151ae19f800a20b80ac1cc040ea4448be4d014ed1",
     ),
     "steady/target_orbit/narrow": (
-        "21b62abc7f437870460ef8e80f64dc3a70ef47f5d571dfc693bebf76c002c093",
+        "856070a211fe21e840ea72fd812a6ba253a162dc745039869ed9c5ab02a608fc",
         "a35e080540356862ecfe8738414c7cef0d781b639b869db97bc27ff0db5f180b",
     ),
     "steady/target_orbit/slow": (
-        "ef330f21a3c586c8241eade36aeea58745c077585896e3273594cdaa4a810b16",
+        "be05731452b0fef75c734b635b4342d6c4f85667854ddd83f431558d4dc19ae4",
         "a2eb0bf1f4d04307af57da96941f9d02e8c47ffcc583db3361b0a754975c7d36",
     ),
     "steady/zoom_wave/base": (
-        "894e301610e05bb7e565ed043a924d95702a725c70e3fc1c7073c00bfef37f59",
+        "b72992424658ddbf77f706c3585692d410d56bb006454cf188c2fbbaa95f2446",
         "bfa3f5ef5efd80d8f801f76ab412044d35161bb606288fc35f6fbeaf6970675a",
     ),
     "steady/zoom_wave/narrow": (
-        "0de2735c66f58f1fdcbcc5b90b3dc4a59289e5571dd85017a2289dd6875b7936",
+        "fc88db07fb088155c5eec94cd831856dde132058eaedf6bd53871d47a728e1f7",
         "0ddc62b56b92e1af2deedbc6b9bf47570bbe82663ff559091f3883f32e20169b",
     ),
     "steady/zoom_wave/slow": (
-        "b175db6736d8706eb25617a6626130879edb6849f265995aa9d1fbc7dd03696d",
+        "e3b1749c21794c996db448e7d6bf5bc41987aa0ba7804c42e6a305882c5bf265",
         "394aa7ae9fb0cc8e948e2c1b68264b9652edbddd44bcefd9d5ac0dea8e5cdb2c",
     ),
     "variable/finite_snap_hold/base": (
-        "0d64a4d1d195aec5a9bd3a4c15f1054b4ad457abe69741c54a707ac408433637",
+        "00bd6d63328952c5eb7fdede88fc7ab4d6cc902c4f91772978e49ca0d67e86a8",
         "d03e6f47159bc26621e835d36e191f370e0f90955ddac4b356afb477e613ba0f",
     ),
     "variable/finite_snap_hold/narrow": (
-        "1d9b5471e9f9bf8fc63a8bc78403753af64f0fcc5974b83db771bd402510d571",
+        "b997e8b664c3c2655429ca7291531c6c626f99bc4ee410ba6d684e9e47a33ffd",
         "9af804ac9d4aa9765aba26e095a80714399942811724696373cc015653545af6",
     ),
     "variable/finite_snap_hold/slow": (
-        "736a52248bac3e3d941b5af6eb587a1d6d72958b47f2ea487e480330855b77ef",
+        "c134f6c7b00b96b5f0b8e7e539b40ef2516bf68bb8f12f044d442bc35da04b00",
         "e4f7f3d9a0863c4f423dae91e481e8874d5971308aa2196a93e6fca84a6d8930",
     ),
     "variable/fly_in_cascade/base": (
-        "5e46105924aa6e90c8c82f2789069be627a67021d53a4322178c0f0fc58723d7",
+        "777084b6f97c5dc26ecf54b6249daf8ef9a65cdd70309d3193fa04059aeaa0b4",
         "34f9987fa593584b7894352d13944905315dd6c260035971de447db3c121fd7a",
     ),
     "variable/fly_in_cascade/narrow": (
-        "9a7134b67873ef257538aa292c37c599f58f6d60ed1ebfa059a93e44905221ef",
+        "2279be66a88bbcdafed7cc3e8b586019e6af58f40b027d85fa77824a07d5ec5f",
         "f2d02f0c7cdbcda887bcd350188338a8bfe0ae583b2b5e092c64b921985f1a9e",
     ),
     "variable/fly_in_cascade/slow": (
-        "d8a4f272114eb25245dedea33a1186f79c6048dd072e6a9e8ed9a543b07c4e9e",
+        "3a9f8b51ce16d19fd3cd321036cdad617bedf7686c58ab209f941870371f0aae",
         "49c484a8585d159fc61d0989eef1cc2a35fc22a5e46cf202f789736c8dd37ebe",
     ),
     "variable/fly_out_cascade/base": (
-        "453e1a61eb4f1e10442c7fb725db897ffbd24712cb22b8aaeafa4c27767c1e6f",
+        "69c5a32340f84fd33fe8ee7649e9ad80a0a5ff8f1ef3adaa4fab4fb414fe7afd",
         "36f29b21188085c76c462a8cfd73f3e10f21f7adfdbca525a674c4960aca28d2",
     ),
     "variable/fly_out_cascade/narrow": (
-        "2e1b7fbebc38e9a85900b9f8153352f1639f3e5cf8b98b27d1627f486f03b482",
+        "77e79ae7c64583c02a17570cdb81d58978b227a2f0d9fe6246735da4dedf5987",
         "c773f3be51097dd3ec2c309f6149f76e6c3bb7f6d1ea24416aba4662a10cb420",
     ),
     "variable/fly_out_cascade/slow": (
-        "abcd8416b9474ab26af199bd1b90b1d90687122679cfbc13539f3c87be0ae521",
+        "5d5c62a2d3ca0d6bd0d844490a399aa33517f55e0745c949ed7514262e40e468",
         "de6e5fb69f6beeeb43df051367101bd88d3d75b61e811bab2ac3e69d2edd499a",
     ),
     "variable/masked_wheel_flick/base": (
-        "39d1730210f38023d02aa693fbacaed4501688aeb1ba5ab39dbc5689205df374",
+        "eb6f94a4d202824ff6d40967abdb23515cea94a75ed0f960492c12574a8762af",
         "a628fb0ca672aba2a7c36e3ecfafcf1003b8d9c8a06adc5edcf0840004981f3f",
     ),
     "variable/masked_wheel_flick/narrow": (
-        "c86853c2ff2f742711a260e00f500ecb193e2dd38fa3bac1a7c80a4d9f34ffcf",
+        "2458661f25a2cb8e6c6663c9154f0518a55e6c1f912867a0d9dcddddf6524822",
         "a8b2c6b2cf905f657c6993dca020c6aa14bbfacc10f89bfb97491860bc81a6c3",
     ),
     "variable/masked_wheel_flick/slow": (
-        "d0c467712066d1dacbd19984e3e03d486d94a92de65bc33a7c7f4c01746ba172",
+        "a049e2d6624598a7e4eb90c86b96680577c96e561380018e33d4f2bd487ad6ec",
         "058ed1d9cbdde981fa5213dd23654d42fc86a9ebd6150fc50b089e07f85825f8",
     ),
     "variable/mirror_wings/base": (
-        "68462a22551a433102ca313d76dc6f0ba9bdb249292eff700b016e8ca353da1c",
+        "8868b1ec8a5278d9e765a89f1515f8e71dcd3ef195916316a113cd2deab7ba2c",
         "a59b343515d159c1603c1a0ed576afa3b6721178a643ad1c5fbc02d6bb706dde",
     ),
     "variable/mirror_wings/narrow": (
-        "a38f6ace0189d99668a4a70e1c10d8b9aef6ac5fa8e9aa60955007d1bbf1eff8",
+        "2852c924f95926e3da3375ed86f472f957628a57198e0460ffbd301d56a03bc0",
         "4d326471bc6af0e6f429bd8e5d5b7e374587d3f545a2fe3d2ad3ef908ab6f801",
     ),
     "variable/mirror_wings/slow": (
-        "a9fa704c755b59327f635c73c7c05adc235262527c37b24ba2879cc28dce6efb",
+        "9241fbf5e3ec79189c0edab453b6593a9b985c16eacf30b8eec914a0ab7ea4f9",
         "cee179ea21422e5e6f268664dd79981055afedfd98c5849c5dbfd44f5b80904e",
     ),
     "variable/target_orbit/base": (
-        "76f77c2dec0b744c25ecb5f22e52e2ebf092a3faa949fe15fb1753418b28e6e1",
+        "c1140e7769cf33b973685324e9391ff1a4854fb3f8677fdcd6ef9723bd6bf4f1",
         "2bfe8b5bd75f0097dd6fb8011e38a11578764984050474ddf0ee402ae3c85fa1",
     ),
     "variable/target_orbit/narrow": (
-        "5c840ffa7bc3355708790b42aad7c5a793e0a17b18eb1cc65ac02b73f97a3b03",
+        "0dd1951f42c7b1dfedf416f1d9d28537ab85106c41b4662868f6b9d3fc5ea2cb",
         "9f453dce2badb89d745c808896a8fe6d3b9feafacf5d122371d75d0a6377b4a6",
     ),
     "variable/target_orbit/slow": (
-        "9dce69ac319fba3de3fa6a61d713e3eda174d08895a555f8c215107ad22c80f7",
+        "e892c3fb0759961797420adb392495944d047bf46e7940fb49ecf621ac78480a",
         "ac930585ef5e3f15f79cc7267d407f586e99f71923c67b287415b69ec32365c5",
     ),
     "variable/zoom_wave/base": (
-        "3c11b5bf656f3ea96584c3deaec4cc99079ba7743cbf0c499bc7a11da406bea4",
+        "02b29654861ae6d8d81af6e79a4a50406189645e53111078ef793061b5ee25eb",
         "0020b12393f7dd4cf89bb4c4bbf3cd942ed5aa0de2abde665b3caffefdc751a7",
     ),
     "variable/zoom_wave/narrow": (
-        "1917ab98b59b94f3f699d8fec182a5c891b75a730f3b43dce343c469146959b1",
+        "7531dd7abf14fc302ed0a6b6d720f5e098eac7f60fcfe52bf2308df5f2e059e0",
         "a39df6ddbe83086edd4664152946711a1b5a24a927837fd366218594215ce44a",
     ),
     "variable/zoom_wave/slow": (
-        "2d82224aa8b641406564cb14200aadf187588882ab8ab1ec8484490247dafb24",
+        "6d581410b20ef0feaa07c0204e12aa94f1128fdfe2552c1de23a3a214b579c7f",
         "503a36b0d6d9b85cfa6e5518367e787f835571fbc02f9f44e09f96f2c6689561",
     ),
 }
 """`grid/template/variant`: (render fingerprint, SHA-256 of the encoded frames)."""
 
 MULTI_PIN = (
-    "69ee9c8c2591ab2a0a172259ddf566f4700e8e3e8c5321f4e26a213eefef055e",
+    "d419da217a67ce41f4c73945261817bd05bd0e1ca6316e5638122c85fcedcde4",
     "3ea6b3fca42f7ea4bbed6068c580331ce3649c6ef4c49f77f7b23fff7599fba7",
     "9ef5b7a162ca49079bb1a5261223b9ebcd399f8b7bb48463942ba4271861c6fb",
 )
@@ -216,14 +218,13 @@ MULTI_PIN = (
 MULTI_SECTIONS = ("mirror_wings", "target_orbit", "finite_snap_hold", "fly_in_cascade")
 
 GATED_PIN = (
-    "7b179959354e46c647732a07a95fdda87e1ce7631cce9b280f732119f77e54c9",
+    "264a06d8b65bd89db0100f51477ab6408d08a1e6a65c2d16b588e10e1fce79c1",
     "b971080b47c7c7b20e2466c76bfa187b6bb1872a5ec4ac6c316b9d0c614c96bd",
     "7f2d1e3bf22d121835f2c586bdea34718958dc234d6c2577fed66900fc4be14d",
 )
 """The gated plan: (render fingerprint, frames SHA-256, delivered `.xsq` SHA-256). The
 frames and `.xsq` hashes were rendered from `mh-last-with-legacy-renderer` (its job
-carrying `mode: physical_v2`); the fingerprint is this tree's, which differs from the
-tag's only by the policy's `mode` key."""
+carrying `mode: physical_v2`); the fingerprint is this tree's (re-recorded in C1.3)."""
 
 GATED_ADMISSION = TemplateAdmission(
     admitted=("mirror_wings", "target_orbit", "fly_in_cascade", "finite_snap_hold"),

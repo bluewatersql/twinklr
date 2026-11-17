@@ -136,8 +136,7 @@ def compile_physical_template(
     so a step running past it is truncated there without error. A step starting before
     `start_limit_ms`, the first frame boundary inside the covered span, or at or after
     `end_limit_ms` is dropped per target fixture and listed in `dropped_steps`: its
-    phase origin would lie outside the map. Section intent and legacy phase offsets are
-    not applied (a physical step rejects a non-default `timing.phase_offset`). A cue whose pose
+    phase origin would lie outside the map. A cue whose pose
     commands the head cannot follow within one encoded word (`follow_lag`) is refused.
     Each segment records its requested musical bounds in metadata `requested_t0_ms`
     and `requested_t1_ms`, and a step's `physical_reposition_fallback` under
@@ -378,11 +377,8 @@ def compile_physical_template(
                 preset_id=context.preset_id,
                 fixture_id=fixture.fixture_id,
                 role=fixture.role,
-                calibration=fixture.calibration,
-                template_defaults=working_template.defaults,
                 start_ms=t0,
                 duration_ms=t1 - t0,
-                n_samples=context.n_samples,
                 beat_grid=context.beat_grid,
                 physical_profile=fixture.physical_profile,
                 phase_map=phase_map,
@@ -494,7 +490,6 @@ def compile_physical_template(
                 segments.append(segment)
                 continue
             # After the metadata, so every lit slice carries it.
-            assert step.movement.physical is not None  # checked by the step compile
             try:
                 segments.extend(
                     apply_visibility(

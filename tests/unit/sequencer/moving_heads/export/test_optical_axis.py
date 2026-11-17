@@ -192,10 +192,12 @@ _DUMP_SHA256 = {
     "profile": "a3fd5aaf31f077dc69745a8bfe05faefeb8ca9dd7387e73769031a784a566443",
     "head": "068198ba9c45c6a87d65105483f568a1f394ea8af8d910f107b30e4b2bf4ebec",
     "head_inverted": "9cb8db93424b9cabc1734b7d49e5106fa2cf247e7c8c1a4c55c43b723deaabc0",
-    "rig": "bd9e604bfe3a3ff6894e365873d91a51055f9546998e014d439c7772d47fc775",
+    "rig": "93ffb351c0110e3208a9dcd7f161e296a04ebb117f57005354eeb6b065a6f192",
     "initial": "65fed8075a2b8887efb602d95cf624b4e965b8df3d194bb09fc01c117e78589f",
 }
-"""Profile, rig and initial-state dumps recorded before P2.5 (at `36002f2a`)."""
+"""Profile, rig and initial-state dumps recorded before P2.5 (at `36002f2a`). The rig's
+was re-recorded in C1.3, which removed the old renderer's fixture fields from its dump
+and nothing else."""
 _WORDS_SHA256 = "e938a66ff50e48da386232cc4e92bd209397bad0f9082ae08875570f64c088d4"
 """Every axis' words at 998 values across its window, on three profiles, before P2.5."""
 

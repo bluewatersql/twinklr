@@ -103,8 +103,7 @@ def test_window_keeps_only_the_frames_starting_inside_it() -> None:
 
 def test_physical_stats_hand_computed() -> None:
     """Statistics are in the channel's unit; `energy` is the mean rate of change per
-    second over the 20 ms frames; nothing is clamped by the physical renderer, so no
-    clamp percentage is reported."""
+    second over the 20 ms frames."""
     profile = _profile(inverted=False)
     channels = physical_channel_values(_frames(profile), {"MH1": profile}, (0, 1000))["MH1"]
 
@@ -116,7 +115,6 @@ def test_physical_stats_hand_computed() -> None:
     assert pan.mean == pytest.approx(44.1, abs=0.01)
     assert pan.std == pytest.approx(0.09 * 20 * math.sqrt((50**2 - 1) / 12), abs=0.01)
     assert pan.energy == pytest.approx(90.0, abs=0.01)  # 1.8° per frame = 90°/s
-    assert pan.clamp_pct is None
 
     tilt = physical_channel_stats(channels["tilt"], frame_ms=20)
     assert (tilt.range, tilt.std, tilt.energy) == pytest.approx((0.0, 0.0, 0.0), abs=1e-9)
@@ -129,7 +127,6 @@ def test_physical_stats_hand_computed() -> None:
     assert dimmer.std == pytest.approx(DIMMER_ON / 2)
     # One change of 128/255 across 49 frame steps, per second (50 frames).
     assert dimmer.energy == pytest.approx(DIMMER_ON / 49 * 50)
-    assert dimmer.clamp_pct is None
 
 
 def test_lit_motion_counts_only_lit_frames() -> None:

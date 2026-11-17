@@ -3,17 +3,10 @@
 Industry-standard Pydantic models for moving head fixture configuration.
 Provides clear separation of concerns, sensible defaults, and type safety.
 
-Design Principles:
-- Pydantic for validation and serialization
-- Sensible defaults (system works with minimal config)
-- Type-safe conversions (DMX ↔ degrees)
-- Clear separation: DMX, physical calibration, and orientation
-- Standard poses for common positions
-
 This package is organized into focused modules:
-- dmx: DMX channel configuration and mapping
-- physical: Physical movement and orientation
-- instances: Fixture instances, configurations, and poses
+- dmx: DMX channel assignments
+- physical: Retired and removed fixture-config fields
+- instances: Fixture instances and their configurations
 - groups: Fixture grouping and batch configuration
 - capabilities: Explicit physical-renderer profiles and run initial state
 """
@@ -30,10 +23,8 @@ from twinklr.core.config.fixtures.capabilities import (
     VisibilityCapability,
 )
 from twinklr.core.config.fixtures.dmx import (
-    ChannelInversions,
     ChannelWithConfig,
     DmxMapping,
-    ShutterMap,
 )
 
 # Groups module exports
@@ -49,14 +40,6 @@ from twinklr.core.config.fixtures.instances import (
     FixtureConfig,
     FixtureInstance,
     FixturePosition,
-    Pose,
-)
-
-# Physical module exports
-from twinklr.core.config.fixtures.physical import (
-    MovementLimits,
-    Orientation,
-    PanTiltRange,
 )
 
 __all__ = [
@@ -65,7 +48,6 @@ __all__ = [
     # Groups
     "BaseFixtureConfig",
     # DMX
-    "ChannelInversions",
     "ChannelWithConfig",
     "DiscreteCapability",
     "DiscreteState",
@@ -78,12 +60,6 @@ __all__ = [
     "FixtureInstance",
     "FixturePosition",
     "InitialFixtureState",
-    # Physical
-    "MovementLimits",
-    "Orientation",
-    "PanTiltRange",
-    "Pose",
-    "ShutterMap",
     "SimplifiedFixtureInstance",
     "VisibilityCapability",
 ]

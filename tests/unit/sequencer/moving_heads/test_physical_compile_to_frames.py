@@ -52,7 +52,6 @@ def _context(
         template_id="physical_probe",
         fixture_id="MH1",
         role="OUTER_LEFT",
-        calibration={},
         start_ms=t0,
         duration_ms=t1 - t0,
         beat_grid=_GRID,

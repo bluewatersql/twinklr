@@ -784,7 +784,6 @@ def test_once_needs_finite_steps() -> None:
         physical_template_doc("p23_bad", [pulsing], mode="ONCE")
     preset = TemplatePreset(
         preset_id="loop",
-        name="loop",
         step_patches={"fly": {"movement": {"physical": {"mode": "periodic"}}}},
     )
     with pytest.raises(ValidationError, match=r"ONCE.*finite"):

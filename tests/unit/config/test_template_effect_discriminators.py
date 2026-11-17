@@ -2,9 +2,7 @@
 
 The inventory ledger points at these parameterized tests.  Each parameter ID is
 the canonical schema path it proves; a fixed happy-path load is intentionally not
-accepted as evidence for unrelated fields.  A step field the physical compile does not
-apply is evidenced by its refusal there: a non-default value is rejected, never
-ignored.
+accepted as evidence for unrelated fields.
 """
 
 from __future__ import annotations
@@ -17,32 +15,20 @@ import pytest
 from tests.support.mh_physical import (
     hold_step,
     physical_bars_grid,
-    physical_job,
     physical_rig,
-    physical_sections,
     physical_template_doc,
-    registered_templates,
     sweep_step,
 )
 from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
-from twinklr.core.config.poses import PanPose
 from twinklr.core.sequencer.models.context import TemplateCompileContext
-from twinklr.core.sequencer.models.enum import (
-    AimZone,
-    ChaseOrder,
-    Intensity,
-    SemanticGroupType,
-    TemplateCategory,
-)
+from twinklr.core.sequencer.models.enum import SemanticGroupType, TemplateCategory
 from twinklr.core.sequencer.models.moving_heads.physical import PhysicalChannelError
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
 from twinklr.core.sequencer.models.template import (
-    Color,
-    Gobo,
-    PhaseOffsetMode,
+    Dimmer,
+    PhysicalDimmerPulse,
     RemainderPolicy,
     RepeatMode,
-    Shutter,
     StepPatch,
     TemplateDoc,
     TemplatePreset,
@@ -52,13 +38,7 @@ from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
     compile_physical_template,
 )
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
-from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
-from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
-from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
-from twinklr.core.sequencer.moving_heads.libraries.gobo import GoboPattern
-from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
-from twinklr.core.sequencer.moving_heads.libraries.shutter import ShutterPattern
-from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline, physical_cue_limits
+from twinklr.core.sequencer.moving_heads.pipeline import physical_cue_limits
 from twinklr.core.sequencer.moving_heads.templates.library import TemplateRegistry
 from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map
 
@@ -77,8 +57,6 @@ def _rich_doc() -> TemplateDoc:
     document.presets = [
         TemplatePreset(
             preset_id="base",
-            name="Base",
-            defaults={"probe": 1},
             step_patches={"main": StepPatch(timing={"base_timing": {"duration_bars": 0.5}})},
         )
     ]
@@ -268,110 +246,21 @@ _COMPILE_CASES: tuple[tuple[str, Mutation], ...] = (
         _set("template.steps.0.timing.base_timing.duration_bars", 0.25),
     ),
     (
-        "template.template.steps.timing.phase_offset",
-        _set("template.steps.0.timing.phase_offset.spread_bars", 0.1),
-    ),
-    (
-        "template.template.steps.timing.phase_offset.mode",
-        _set("template.steps.0.timing.phase_offset.mode", PhaseOffsetMode.GROUP_ORDER),
-    ),
-    (
-        "template.template.steps.timing.phase_offset.order",
-        _set("template.steps.0.timing.phase_offset.order", ChaseOrder.RIGHT_TO_LEFT),
-    ),
-    (
-        "template.template.steps.timing.phase_offset.spread_bars",
-        _set("template.steps.0.timing.phase_offset.spread_bars", 0.1),
-    ),
-    (
-        "template.template.steps.timing.phase_offset.wrap",
-        _set("template.steps.0.timing.phase_offset.wrap", False),
-    ),
-    (
-        "template.template.steps.geometry",
-        _set("template.steps.0.geometry.geometry_type", GeometryType.FAN),
-    ),
-    (
-        "template.template.steps.geometry.geometry_type",
-        _set("template.steps.0.geometry.geometry_type", GeometryType.FAN),
-    ),
-    (
-        "template.template.steps.geometry.params",
-        _set("template.steps.0.geometry.params", {"pan_center_norm": 0.2}),
-    ),
-    (
-        "template.template.steps.geometry.pan_pose_by_role",
-        _set(
-            "template.steps.0.geometry.pan_pose_by_role",
-            {"OUTER_LEFT": PanPose.WIDE_RIGHT, "OUTER_RIGHT": PanPose.WIDE_LEFT},
+        "template.template.steps.movement",
+        lambda document: setattr(
+            document.template.steps[0].movement,
+            "physical",
+            document.template.steps[0].movement.physical.model_copy(update={"start_pan_deg": 10.0}),
         ),
     ),
     (
-        "template.template.steps.geometry.tilt_pose",
-        _set("template.steps.0.geometry.tilt_pose", "ceiling"),
-    ),
-    (
-        "template.template.steps.geometry.aim_zone",
-        _set("template.steps.0.geometry.aim_zone", AimZone.CROWD),
-    ),
-    (
-        "template.template.steps.movement",
-        _set("template.steps.0.movement.movement_type", MovementType.HOLD),
-    ),
-    (
-        "template.template.steps.movement.movement_type",
-        _set("template.steps.0.movement.movement_type", MovementType.HOLD),
-    ),
-    (
-        "template.template.steps.movement.intensity",
-        _set("template.steps.0.movement.intensity", Intensity.INTENSE),
-    ),
-    ("template.template.steps.movement.cycles", _set("template.steps.0.movement.cycles", 2.0)),
-    (
-        "template.template.steps.movement.params",
-        _set("template.steps.0.movement.params", {"amplitude": 0.1}),
-    ),
-    (
         "template.template.steps.dimmer",
-        _set("template.steps.0.dimmer.dimmer_type", DimmerType.HOLD),
-    ),
-    (
-        "template.template.steps.dimmer.dimmer_type",
-        _set("template.steps.0.dimmer.dimmer_type", DimmerType.HOLD),
-    ),
-    (
-        "template.template.steps.dimmer.intensity",
-        _set("template.steps.0.dimmer.intensity", Intensity.INTENSE),
-    ),
-    ("template.template.steps.dimmer.min_norm", _set("template.steps.0.dimmer.min_norm", 0.2)),
-    ("template.template.steps.dimmer.max_norm", _set("template.steps.0.dimmer.max_norm", 0.8)),
-    (
-        "template.template.steps.dimmer.params",
-        _set("template.steps.0.dimmer.params", {"period_bars": 0.5}),
-    ),
-    (
-        "template.template.steps.color",
-        _set("template.steps.0.color", Color(preset=ColorPreset.RED)),
-    ),
-    (
-        "template.template.steps.color.preset",
-        _set("template.steps.0.color", Color(preset=ColorPreset.BLUE)),
-    ),
-    (
-        "template.template.steps.shutter",
-        _set("template.steps.0.shutter", Shutter(pattern=ShutterPattern.CLOSED)),
-    ),
-    (
-        "template.template.steps.shutter.pattern",
-        _set("template.steps.0.shutter", Shutter(pattern=ShutterPattern.OPEN)),
-    ),
-    (
-        "template.template.steps.gobo",
-        _set("template.steps.0.gobo", Gobo(pattern=GoboPattern.PRISM)),
-    ),
-    (
-        "template.template.steps.gobo.pattern",
-        _set("template.steps.0.gobo", Gobo(pattern=GoboPattern.OPEN)),
+        _set(
+            "template.steps.0.dimmer",
+            Dimmer(
+                physical=PhysicalDimmerPulse(period_beats=1.0, duty_cycle=0.5, low=0.0, high=1.0)
+            ),
+        ),
     ),
 )
 
@@ -410,28 +299,18 @@ _PRESET_CASES: tuple[tuple[str, Mutation], ...] = (
         ),
     ),
     (
-        "template.presets.step_patches.geometry",
-        _set("presets.0.step_patches", {"main": StepPatch(geometry={"geometry_type": "fan"})}),
-    ),
-    (
         "template.presets.step_patches.movement",
-        _set("presets.0.step_patches", {"main": StepPatch(movement={"cycles": 3.0})}),
+        _set(
+            "presets.0.step_patches",
+            {"main": StepPatch(movement={"physical": {"start_pan_deg": 10.0}})},
+        ),
     ),
     (
         "template.presets.step_patches.dimmer",
-        _set("presets.0.step_patches", {"main": StepPatch(dimmer={"max_norm": 0.4})}),
-    ),
-    (
-        "template.presets.step_patches.color",
-        _set("presets.0.step_patches", {"main": StepPatch(color={"preset": "red"})}),
-    ),
-    (
-        "template.presets.step_patches.shutter",
-        _set("presets.0.step_patches", {"main": StepPatch(shutter={"pattern": "closed"})}),
-    ),
-    (
-        "template.presets.step_patches.gobo",
-        _set("presets.0.step_patches", {"main": StepPatch(gobo={"pattern": "prism"})}),
+        _set(
+            "presets.0.step_patches",
+            {"main": StepPatch(dimmer={"physical": {"duty_cycle": 0.5, "period_beats": 1.0}})},
+        ),
     ),
     (
         "template.presets.step_patches.timing",
@@ -460,47 +339,3 @@ def test_template_preset_field_changes_compiled_snapshot(
     assert _compile_snapshot(changed, preset=True) != _compile_snapshot(baseline, preset=True), (
         config_path
     )
-
-
-_IDENTITY_ONLY_CASES: tuple[tuple[str, Mutation], ...] = (
-    ("template.template.defaults", _set("template.defaults", {"probe": 2})),
-    ("template.presets.defaults", _set("presets.0.defaults", {"probe": 2})),
-    ("template.presets.name", _set("presets.0.name", "Changed Preset")),
-)
-
-
-def _render(document: TemplateDoc) -> tuple[str, Any]:
-    plan = physical_sections(("effect_probe", 1, 4))
-    plan = plan.model_copy(
-        update={"sections": [plan.sections[0].model_copy(update={"preset_id": "base"})]}
-    )
-    with registered_templates(document):
-        pipeline = RenderingPipeline(
-            choreography_plan=plan,
-            beat_grid=physical_bars_grid(*([500.0] * 4)),
-            fixture_group=physical_rig(),
-            job_config=physical_job(),
-        )
-        pipeline.render()
-        return pipeline.fingerprint(), pipeline.frames
-
-
-@pytest.mark.parametrize(
-    ("config_path", "mutation"),
-    _IDENTITY_ONLY_CASES,
-    ids=[path for path, _ in _IDENTITY_ONLY_CASES],
-)
-def test_template_field_of_the_removed_renderer_changes_identity_only(
-    config_path: str, mutation: Mutation
-) -> None:
-    """The removed renderer was the only reader of these fields: changing one changes
-    the render fingerprint (the template document is part of it) and no encoded frame."""
-    baseline = _rich_doc()
-    changed = baseline.model_copy(deep=True)
-    mutation(changed)
-
-    fingerprint, frames = _render(changed)
-    base_fingerprint, base_frames = _render(baseline)
-
-    assert fingerprint != base_fingerprint, config_path
-    assert frames == base_frames

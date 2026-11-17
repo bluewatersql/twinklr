@@ -377,8 +377,7 @@ class RenderPreflightStage:
     Runs right after audio analysis; every planner (profile, lyrics, macro, moving
     heads) reads the audio through it, so a refusal spends no provider request. The
     job is checked against the fixtures the render stage will load (`preflight_render_policy`), the templates
-    the planner will be offered (`offered_template_ids`; every one must carry physical
-    data, and each must dry-compile on this rig and plan the dark repositioning between
+    the planner will be offered (each must dry-compile on this rig and plan the dark repositioning between
     its own cues under the job's `reposition_fallback`, at the placements its
     `on_unplayable` leaves to the gate: `check_physical_templates`; a template of the
     shipped physical catalog passes through the first of its base and declared presets
@@ -419,10 +418,7 @@ class RenderPreflightStage:
         from twinklr.core.pipeline.result import failure_result, success_result
         from twinklr.core.sequencer.moving_heads.export.frame_encoder import PhysicalOutputError
         from twinklr.core.sequencer.moving_heads.export.xsq_adapter import check_physical_models
-        from twinklr.core.sequencer.moving_heads.pipeline import (
-            check_physical_templates,
-            offered_template_ids,
-        )
+        from twinklr.core.sequencer.moving_heads.pipeline import check_physical_templates
         from twinklr.core.sequencer.moving_heads.templates.data_loader import (
             in_physical_catalog,
         )
@@ -441,13 +437,6 @@ class RenderPreflightStage:
             )
         try:
             preflight_render_policy(job_config, fixture_group)
-            offered = offered_template_ids(self.available_templates)
-            unrenderable = [t for t in self.available_templates if t not in offered]
-            if unrenderable:
-                raise UnsupportedRenderModeError(
-                    "the moving-head renderer would offer the planner templates "
-                    f"without physical data, which cannot render: {sorted(unrenderable)}"
-                )
             beat_grid = resolve_beat_grid(context, input)
             try:
                 phase_map = build_musical_phase_map(beat_grid)
@@ -465,13 +454,13 @@ class RenderPreflightStage:
                 phase_map.duration_ms,
             )
             admission = check_physical_templates(
-                offered,
+                self.available_templates,
                 beat_grid=beat_grid,
                 fixture_group=fixture_group,
                 initial_states=job_config.moving_heads.initial_states,
                 failure_mode=job_config.moving_heads.reposition_fallback,
                 on_unplayable=job_config.moving_heads.on_unplayable,
-                excludable=[t for t in offered if in_physical_catalog(t)],
+                excludable=[t for t in self.available_templates if in_physical_catalog(t)],
             )
             layout_models = context.get_state("layout_models")
             if layout_models is not None:

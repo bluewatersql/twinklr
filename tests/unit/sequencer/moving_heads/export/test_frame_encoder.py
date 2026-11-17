@@ -33,7 +33,7 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
     PhysicalChannelError,
     PhysicalPoint,
 )
-from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
+from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
 from twinklr.core.sequencer.moving_heads.export.dmx_settings_builder import DmxSettingsBuilder
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     CueTiming,
@@ -291,22 +291,6 @@ def test_adjacent_half_open_segments_do_not_conflict() -> None:
     assert [_word(frame, 1, 2) for frame in frames] == [pan.dmx_word(0.0)] * 2 + [
         pan.dmx_word(10.0)
     ] * 2
-
-
-def test_legacy_value_is_refused_by_the_physical_encoder() -> None:
-    segment = FixtureSegment(
-        section_id="s",
-        segment_id="seg",
-        step_id="step",
-        template_id="t",
-        fixture_id="MH1",
-        t0_ms=0,
-        t1_ms=20,
-        channels={PAN: ChannelValue(channel=PAN, static_dmx=100)},
-    )
-
-    with pytest.raises(PhysicalChannelError, match="not a physical value"):
-        encode_fixture_frames([segment], _profile(), frame_times_ms=(0,))
 
 
 @pytest.mark.parametrize(

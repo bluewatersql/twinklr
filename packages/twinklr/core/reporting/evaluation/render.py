@@ -118,8 +118,7 @@ def write_report_markdown(report: EvaluationReport, output_path: Path) -> None:
 
     lines.append("")
 
-    if report.physical is not None:
-        lines.extend(_render_physical_markdown(report.physical))
+    lines.extend(_render_physical_markdown(report.physical))
 
     # Song metadata
     lines.append("## Song Metadata")
@@ -147,7 +146,7 @@ def write_report_markdown(report: EvaluationReport, output_path: Path) -> None:
 
 
 def _render_physical_markdown(physical: PhysicalRenderSummary) -> list[str]:
-    """The physical render block: identity, the gate's facts, and what is left out."""
+    """The physical render block: identity and the gate's facts."""
     lines = ["## Physical render", ""]
     if physical.fingerprint_matches:
         lines.append(f"- **Render fingerprint**: `{physical.rerender_fingerprint}` (the run's) ✓")
@@ -196,9 +195,6 @@ def _render_physical_markdown(physical: PhysicalRenderSummary) -> list[str]:
         "detect sustained overspeed of up to one word per frame, nor a reveal before the "
         "head has finished travelling or settling."
     )
-    lines.append("")
-    lines.append("**Not reported for physical output**:")
-    lines.extend(f"- {reason}" for reason in physical.not_reported)
     lines.append("")
     return lines
 
@@ -292,43 +288,38 @@ def _render_section_markdown(section: SectionReport) -> list[str]:
                 )
             lines.append("")
 
-    if section.render_facts is not None:
-        facts = section.render_facts
-        lines.append("**Render facts**:")
-        for window in facts.entry_windows:
-            lines.append(
-                f"- Entry {window['fixture_id']}: {window['action']}"
-                + (
-                    f", dark for {window['window_ms']} ms"
-                    if window["window_ms"] is not None
-                    else ""
-                )
+    facts = section.render_facts
+    lines.append("**Render facts**:")
+    for window in facts.entry_windows:
+        lines.append(
+            f"- Entry {window['fixture_id']}: {window['action']}"
+            + (f", dark for {window['window_ms']} ms" if window["window_ms"] is not None else "")
+        )
+    transactions = ", ".join(f"{status}: {n}" for status, n in facts.transactions.items())
+    lines.append(f"- Transactions: {transactions or 'none'}")
+    for cue in facts.dropped_cues:
+        lines.append(
+            f"- Kept dark: {cue['fixture_id']} step {cue.get('step_id')!r} "
+            f"({cue['reason']}{', ' + str(cue['code']) if 'code' in cue else ''})"
+        )
+    for label, steps in (
+        ("Largest step", facts.lit_steps),
+        ("Across the boundary", facts.boundary_steps),
+    ):
+        for step in steps:
+            unit = "" if step.channel == "dimmer" else "°"
+            allowed = (
+                ""
+                if step.allowed is None
+                else f" (travel plus one DMX word allows {step.allowed:.2f}°)"
             )
-        transactions = ", ".join(f"{status}: {n}" for status, n in facts.transactions.items())
-        lines.append(f"- Transactions: {transactions or 'none'}")
-        for cue in facts.dropped_cues:
             lines.append(
-                f"- Kept dark: {cue['fixture_id']} step {cue.get('step_id')!r} "
-                f"({cue['reason']}{', ' + str(cue['code']) if 'code' in cue else ''})"
+                f"- {label}: {step.fixture_id} {step.channel} {step.change:+.2f}{unit} "
+                f"from {step.from_ms} to {step.to_ms} ms"
+                + ("" if step.lit else ", not lit at both ends")
+                + allowed
             )
-        for label, steps in (
-            ("Largest step", facts.lit_steps),
-            ("Across the boundary", facts.boundary_steps),
-        ):
-            for step in steps:
-                unit = "" if step.channel == "dimmer" else "°"
-                allowed = (
-                    ""
-                    if step.allowed is None
-                    else f" (travel plus one DMX word allows {step.allowed:.2f}°)"
-                )
-                lines.append(
-                    f"- {label}: {step.fixture_id} {step.channel} {step.change:+.2f}{unit} "
-                    f"from {step.from_ms} to {step.to_ms} ms"
-                    + ("" if step.lit else ", not lit at both ends")
-                    + allowed
-                )
-        lines.append("")
+    lines.append("")
 
     # Validation issues
     if section.validation_issues:

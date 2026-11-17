@@ -704,3 +704,40 @@ contract measures 3 union fields and 26 nodes against Claude's 16 and 68. It dro
 `preset_id` and `variation` from the model in favour of categorical `reach`/`rate`
 resolved through the gate admission. Pending owner answer: whether palette-role colour
 and lyric moment-cue references also leave the contract.
+
+## 2026-11-17: C1.3 done — shared models narrowed
+
+The shared models no longer carry anything of the deleted renderer. Record:
+[evidence/2026-11-16-c1-3-model-narrowing](../evidence/2026-11-16-c1-3-model-narrowing/README.md).
+
+- **Removed:** legacy `ChannelValue` options; template step geometry, colour, shutter,
+  gobo, legacy movement and dimmer fields and `timing.phase_offset`; write-only compile
+  context fields; the old renderer's `FixtureConfig` fields (`dmx_mapping` legacy
+  entries, `use_16bit_pan_tilt`, `inversions`, `pan_tilt_range`, `orientation`, `limits`,
+  pan and tilt offsets); `xlights_semantic_groups` and its reader; the evaluation
+  report's legacy comparison and physics, compliance, continuity and transition models.
+  Every removed key is refused by name with a remedy when a config or template loads.
+- **Beyond the listed scope, checked by the reviewer:** `limits`, `orientation`,
+  `pan_tilt_range` and the offsets had no production reader even at the tag; the
+  physical profile owns range and inversion. The "protected" ledger paths were
+  bookkeeping from `05f24d03`, not a safety guarantee.
+- **Proof of unchanged output:** 360-configuration byte matrix against `0ec65d47`, run
+  by the author and independently by the reviewer: frames, segments, `.xsq`, `.xtiming`,
+  `.xmap` and gate results identical. Planner-visible bytes identical. Pin frame and
+  `.xsq` hashes untouched; `PHYSICAL_RENDERER_REVISION` unchanged.
+- **Fingerprints changed** because the hashed template and rig dumps lost the removed
+  fields. Phase 1 request fingerprints are now
+  `50e6b255a06c3bdf1d523107ddf84f242ed7300a9ffd6cb312bb66bc16a9d4df` (`p1_linear_reveal`)
+  and `7a96d383cdc4a3fe81844ca4264a41ee588987e7d9b04eb09b12d96a19015315`
+  (`p1_linear_reveal_48ch`).
+- **Consequences the owner was told on 2026-11-17:** `twinklr show` session ids change
+  (the fixture file dump is hashed), so the first `show` re-run plans again and pays;
+  `twinklr run` is unaffected. `twinklr regenerate` refuses sequences injected before
+  this change until `twinklr inject` is run again. `report.json` is schema `2.0.0`.
+- **Review:** first pass requested changes (record said caches were unaffected; two
+  silent-acceptance gaps; rig leftovers); second pass approved.
+
+Carried into C1.5: `README.md:175`, `docs/overview.md:147`,
+`scripts/validation/_core/mh_xsq_validation.py` (still reads `xlights_semantic_groups`),
+a user-guide note on re-injecting before `regenerate`. Carried into T1: `dmx_mapping`
+primary channels are shown to the planner and stay until the contract changes.

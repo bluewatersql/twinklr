@@ -24,7 +24,7 @@ from twinklr.core.config.fixtures import (
     FixtureGroup,
     InitialFixtureState,
 )
-from twinklr.core.config.fixtures.dmx import ChannelInversions, DmxMapping
+from twinklr.core.config.fixtures.dmx import DmxMapping
 from twinklr.core.config.fixtures.instances import FixtureConfig, FixtureInstance
 from twinklr.core.config.models import JobConfig
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
@@ -212,7 +212,6 @@ def discrete_step_payload() -> dict[str, Any]:
     return {
         "step_id": "look",
         "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 0.5}},
-        "geometry": {},
         "movement": {
             "physical": {
                 "shape": "hold",
@@ -233,7 +232,6 @@ def physical_step_payload() -> dict[str, Any]:
     return {
         "step_id": "main",
         "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 0.5}},
-        "geometry": {},
         "movement": {
             "physical": {
                 "shape": "linear",
@@ -543,7 +541,6 @@ def hold_step(
     return {
         "step_id": step_id,
         "timing": {"base_timing": {"start_offset_bars": start, "duration_bars": duration}},
-        "geometry": {},
         "movement": {
             "physical": {
                 "shape": "hold",
@@ -719,25 +716,16 @@ def physical_head_profile(*, inverted: bool, pan_max: float = 270.0) -> dict[str
 
 
 def _fine_carry_rig() -> FixtureGroup:
-    """P0's two-head 16-bit rig: each fine channel below its coarse channel and not
-    adjacent to it, MH2 inverted."""
-    mapping = {
-        "pan_channel": 11,
-        "pan_fine_channel": 2,
-        "tilt_channel": 13,
-        "tilt_fine_channel": 9,
-        "dimmer_channel": 15,
-        "use_16bit_pan_tilt": True,
-    }
+    """P0's two-head rig, pan 11, tilt 13, dimmer 15; `physical_rig` gives each head its
+    16-bit profile."""
     group = FixtureGroup(group_id="MOVING_HEADS", xlights_group="GROUP - MOVING HEADS")
-    for fixture_id, inverted in (("MH1", False), ("MH2", True)):
+    for fixture_id in ("MH1", "MH2"):
         group.add_fixture(
             FixtureInstance(
                 fixture_id=fixture_id,
                 config=FixtureConfig(
                     fixture_id=fixture_id,
-                    dmx_mapping=DmxMapping.model_validate(mapping),
-                    inversions=ChannelInversions(pan=inverted, tilt=inverted),
+                    dmx_mapping=DmxMapping(pan_channel=11, tilt_channel=13, dimmer_channel=15),
                 ),
                 xlights_model_name=f"Dmx {fixture_id}",
             )
@@ -838,7 +826,6 @@ def referencing_step(
     return {
         "step_id": step_id,
         "timing": {"base_timing": {"start_offset_bars": start, "duration_bars": duration}},
-        "geometry": {},
         "movement": {"physical": {"shape": "hold", "mode": "periodic"}},
         "dimmer": {},
         "component_refs": {

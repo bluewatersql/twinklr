@@ -1344,8 +1344,6 @@ class _FixturePlanner:
             name = f"segment {segment.segment_id!r} of {self.fixture_id}"
             cue_times = [segment.t0_ms, segment.t1_ms]
             for channel, value in segment.channels.items():
-                if value.physical is None:
-                    raise ValueError(f"{name} {channel.value} is not a physical value")
                 check_physical_value(self.fixture_id, channel, value.physical, self.profile)
                 if isinstance(value.physical, DiscreteTrajectory):
                     cue_times += [event.t_ms for event in value.physical.events]

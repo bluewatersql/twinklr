@@ -1,54 +1,21 @@
-"""Fixture instance configuration and pose management.
-
-Defines individual fixture instances, their configurations, and pose representations.
-"""
+"""Fixture instances and their configurations."""
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from twinklr.core.config.fixtures.capabilities import FixtureCapabilities
-from twinklr.core.config.fixtures.dmx import ChannelInversions, DmxMapping
+from twinklr.core.config.fixtures.dmx import DmxMapping
 from twinklr.core.config.fixtures.physical import (
-    MovementLimits,
-    Orientation,
-    PanTiltRange,
+    REMOVED_FIXTURE_FIELDS,
     drop_retired_fields,
+    reject_removed_fields,
+    reject_removed_position_fields,
 )
-from twinklr.core.config.poses import STANDARD_POSES, PoseLibrary
-
-
-class Pose(BaseModel):
-    """Physical orientation of a fixture in degrees.
-
-    Represents pan/tilt angles in a coordinate system where:
-    - pan_deg: 0° = forward, positive = stage right, negative = stage left
-    - tilt_deg: 0° = horizon, positive = up, negative = down
-    """
-
-    model_config = ConfigDict(frozen=False)
-
-    pan_deg: float = Field(..., description="Pan angle in degrees")
-    tilt_deg: float = Field(..., description="Tilt angle in degrees")
-
-    @field_validator("pan_deg")
-    @classmethod
-    def normalize_pan(cls, v: float) -> float:
-        """Normalize pan to [-180, 180) range."""
-        # Normalize to [0, 360) first
-        v = v % 360.0
-        # Convert to [-180, 180)
-        if v >= 180.0:
-            v -= 360.0
-        return v
 
 
 class FixturePosition(BaseModel):
-    """Physical mounting position and aim offset of a fixture.
-
-    Handles the fact that fixtures mounted at different positions
-    need different DMX values to aim at the same target.
-    """
+    """Where a fixture sits on its mount, for ordering the rig left to right."""
 
     model_config = ConfigDict(frozen=False)
 
@@ -56,62 +23,25 @@ class FixturePosition(BaseModel):
         default=1, ge=1, le=10, description="Position number on this mount (1st, 2nd, etc.)"
     )
 
-    pan_offset_deg: float = Field(
-        default=0.0,
-        description="Pan offset in degrees (positive = stage right, negative = stage left)",
-    )
-    tilt_offset_deg: float = Field(
-        default=0.0, description="Tilt offset in degrees (positive = up, negative = down)"
-    )
-
-    def apply_offset(self, pose: Pose) -> Pose:
-        """Apply this fixture's mounting offset to a target pose."""
-        return Pose(
-            pan_deg=pose.pan_deg + self.pan_offset_deg,
-            tilt_deg=pose.tilt_deg + self.tilt_offset_deg,
-        )
-
-    def remove_offset(self, pose: Pose) -> Pose:
-        """Remove this fixture's mounting offset from an actual pose."""
-        return Pose(
-            pan_deg=pose.pan_deg - self.pan_offset_deg,
-            tilt_deg=pose.tilt_deg - self.tilt_offset_deg,
-        )
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        return reject_removed_position_fields(value)
 
 
 class FixtureConfig(BaseModel):
-    """Complete configuration for a moving head fixture.
-
-    This is the main configuration object containing all information
-    needed to control and sequence a fixture.
-    """
+    """Configuration of one moving head fixture."""
 
     model_config = ConfigDict(frozen=False)
 
     # Identification
     fixture_id: str = Field(..., description="Unique fixture identifier (e.g., 'MH1', 'MH2')")
 
-    # DMX configuration
+    # DMX channel numbers, listed to the planner
     dmx_mapping: DmxMapping = Field(..., description="DMX channel assignments")
-    inversions: ChannelInversions = Field(
-        default_factory=ChannelInversions, description="Channel inversion flags"
-    )
 
-    # Physical capabilities
-    pan_tilt_range: PanTiltRange = Field(
-        default_factory=PanTiltRange, description="Physical movement range"
-    )
-    orientation: Orientation = Field(
-        default_factory=Orientation, description="Calibration and orientation data"
-    )
-    limits: MovementLimits = Field(
-        default_factory=MovementLimits, description="Safety movement limits"
-    )
-
-    # Position (optional - for fixtures with physical offsets)
-    position: FixturePosition | None = Field(
-        default=None, description="Physical mounting position and offsets"
-    )
+    # Position (optional - orders the rig left to right)
+    position: FixturePosition | None = Field(default=None, description="Physical mounting position")
 
     # The renderer's profile of this fixture; required to render (or given once as the
     # group's base_config). Left out of dumps when absent.
@@ -127,7 +57,7 @@ class FixtureConfig(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def drop_removed_fields(cls, value: object) -> object:
-        return drop_retired_fields(
+        value = drop_retired_fields(
             value,
             frozenset(
                 {
@@ -140,149 +70,7 @@ class FixtureConfig(BaseModel):
             ),
             "fixture",
         )
-
-    def get_standard_pose(self, pose_id: str) -> Pose:
-        """Get a standard pose by ID.
-
-        Args:
-            pose_id: Pose ID from PoseLibrary enum (e.g., "FORWARD", "SOFT_HOME")
-
-        Returns:
-            Pose object for the standard position (config Pose, not domain Pose)
-
-        Note:
-            This returns a config.fixtures.Pose object.
-        """
-
-        # Convert string to PoseLibrary enum
-        try:
-            pose_enum = PoseLibrary(pose_id.lower())
-        except ValueError:
-            raise ValueError(f"Unknown pose ID: {pose_id}") from None
-
-        # Get domain pose
-        domain_pose = STANDARD_POSES[pose_enum]
-
-        # Convert to config Pose
-        return Pose(pan_deg=domain_pose.pan_deg, tilt_deg=domain_pose.tilt_deg)
-
-    def dmx_to_degrees(self, pan_dmx: int, tilt_dmx: int) -> Pose:
-        """Convert DMX values to physical degrees.
-
-        Args:
-            pan_dmx: Pan DMX value (0-255)
-            tilt_dmx: Tilt DMX value (0-255)
-
-        Returns:
-            Pose in physical degrees
-        """
-        # Pan conversion
-        pan_offset = pan_dmx - self.orientation.pan_front_dmx
-        pan_deg = (pan_offset / 255.0) * self.pan_tilt_range.pan_range_deg
-
-        # Apply inversion
-        if self.inversions.pan:
-            pan_deg = -pan_deg
-
-        # Tilt conversion
-        tilt_offset = tilt_dmx - self.orientation.tilt_zero_dmx
-        tilt_deg = (tilt_offset / 255.0) * self.pan_tilt_range.tilt_range_deg
-
-        # Apply inversion
-        if self.inversions.tilt:
-            tilt_deg = -tilt_deg
-
-        return Pose(pan_deg=pan_deg, tilt_deg=tilt_deg)
-
-    def degrees_to_dmx(self, pose: Pose) -> tuple[int, int]:
-        """Convert physical degrees to DMX values.
-
-        Applies inversions and limits automatically.
-
-        Args:
-            pose: Physical pose in degrees
-
-        Returns:
-            Tuple of (pan_dmx, tilt_dmx) values
-        """
-        pan_dmx, tilt_dmx = self._degrees_to_raw_dmx(pose)
-
-        # Apply limits
-        pan_dmx = max(self.limits.pan_min, min(self.limits.pan_max, pan_dmx))
-        tilt_dmx = max(self.limits.tilt_min, min(self.limits.tilt_max, tilt_dmx))
-
-        return (pan_dmx, tilt_dmx)
-
-    def _degrees_to_raw_dmx(self, pose: Pose) -> tuple[int, int]:
-        """Map a physical pose to DMX without applying safety-limit clamping."""
-        pan_deg = -pose.pan_deg if self.inversions.pan else pose.pan_deg
-        tilt_deg = -pose.tilt_deg if self.inversions.tilt else pose.tilt_deg
-
-        pan_dmx = int(
-            self.orientation.pan_front_dmx + (pan_deg / self.pan_tilt_range.pan_range_deg) * 255.0
-        )
-        tilt_dmx = int(
-            self.orientation.tilt_zero_dmx + (tilt_deg / self.pan_tilt_range.tilt_range_deg) * 255.0
-        )
-
-        return (pan_dmx, tilt_dmx)
-
-    def is_pose_safe(self, pose: Pose) -> bool:
-        """Return whether a physical pose satisfies DMX and backward-pointing limits."""
-        pan_dmx, tilt_dmx = self._degrees_to_raw_dmx(pose)
-        if not (self.limits.pan_min <= pan_dmx <= self.limits.pan_max):
-            return False
-        if not (self.limits.tilt_min <= tilt_dmx <= self.limits.tilt_max):
-            return False
-        return not (self.limits.avoid_backward and abs(pose.pan_deg) > 90)
-
-    def is_pan_in_bounds(self, value: int) -> bool:
-        """Check if pan DMX value is within movement limits.
-
-        Args:
-            value: Pan DMX value to check
-
-        Returns:
-            True if within limits, False otherwise
-        """
-        return self.limits.pan_min <= value <= self.limits.pan_max
-
-    def is_tilt_in_bounds(self, value: int) -> bool:
-        """Check if tilt DMX value is within movement limits.
-
-        Args:
-            value: Tilt DMX value to check
-
-        Returns:
-            True if within limits, False otherwise
-        """
-        return self.limits.tilt_min <= value <= self.limits.tilt_max
-
-    def pan_deg_to_dmx_delta(self, deg: float) -> int:
-        """Convert pan degrees to DMX delta (offset) without clamping.
-
-        Use this for relative movements or when you need the raw delta value.
-
-        Args:
-            deg: Pan angle delta in degrees
-
-        Returns:
-            DMX delta value (can be negative, not clamped)
-        """
-        return round((deg / self.pan_tilt_range.pan_range_deg) * 255.0)
-
-    def tilt_deg_to_dmx_delta(self, deg: float) -> int:
-        """Convert tilt degrees to DMX delta (offset) without clamping.
-
-        Use this for relative movements or when you need the raw delta value.
-
-        Args:
-            deg: Tilt angle delta in degrees
-
-        Returns:
-            DMX delta value (can be negative, not clamped)
-        """
-        return round((deg / self.pan_tilt_range.tilt_range_deg) * 255.0)
+        return reject_removed_fields(value, REMOVED_FIXTURE_FIELDS, "fixture")
 
 
 class FixtureInstance(BaseModel):

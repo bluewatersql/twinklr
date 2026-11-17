@@ -8,15 +8,14 @@ from pathlib import Path
 import pytest
 
 from twinklr.core.sequencer.models.enum import (
-    Intensity,
     TemplateCategory,
     TimingMode,
 )
 from twinklr.core.sequencer.models.template import (
     BaseTiming,
     Dimmer,
-    Geometry,
     Movement,
+    PhysicalMovementSpec,
     RemainderPolicy,
     RepeatContract,
     RepeatMode,
@@ -26,9 +25,6 @@ from twinklr.core.sequencer.models.template import (
     TemplateMetadata,
     TemplateStep,
 )
-from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
-from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
-from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
     PHYSICAL_TEMPLATE_DIR,
     admit_physical_catalog,
@@ -59,9 +55,12 @@ def _doc(
                 duration_bars=duration_bars,
             )
         ),
-        geometry=Geometry(geometry_type=GeometryType.ROLE_POSE),
-        movement=Movement(movement_type=MovementType.SWEEP_LR, intensity=Intensity.SMOOTH),
-        dimmer=Dimmer(dimmer_type=DimmerType.PULSE, intensity=Intensity.SMOOTH),
+        movement=Movement(
+            physical=PhysicalMovementSpec(
+                shape="hold", mode="finite", start_pan_deg=0.0, start_tilt_deg=0.0
+            )
+        ),
+        dimmer=Dimmer(),
     )
     return TemplateDoc(
         enabled=enabled,

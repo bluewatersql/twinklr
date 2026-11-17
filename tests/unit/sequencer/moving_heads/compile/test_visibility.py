@@ -931,14 +931,20 @@ def test_overlay_shape_is_refused_where_it_cannot_follow_the_cycle() -> None:
 def test_envelopes_and_overlays_are_physical_only_and_absent_from_dumps() -> None:
     """At their defaults neither appears in a dump, so every existing template dumps and
     fingerprints as before."""
-    legacy_step = {
-        "step_id": "s",
+    plain = {
+        "step_id": "plain",
         "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
-        "geometry": {},
-        "movement": {},
+        "movement": {
+            "physical": {
+                "shape": "hold",
+                "mode": "periodic",
+                "start_pan_deg": 0,
+                "start_tilt_deg": 0,
+            }
+        },
         "dimmer": {},
     }
-    dumped = TemplateStep.model_validate(legacy_step).model_dump(mode="json")
+    dumped = TemplateStep.model_validate(plain).model_dump(mode="json")
     assert "physical_visibility" not in dumped
     assert (
         "physical_overlays"

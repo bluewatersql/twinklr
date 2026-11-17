@@ -478,20 +478,20 @@ _G1_TEMPLATE = {
                "remainder_policy": "TRUNCATE"},
     "steps": [
         {"step_id": "a", "timing": {"base_timing": {"start_offset_bars": 0.0, "duration_bars": 0.25}},
-         "geometry": {}, "movement": {"physical": {
+         "movement": {"physical": {
              "shape": "linear", "mode": "finite", "start_pan_deg": 8.1, "start_tilt_deg": 9.6,
              "pan_extent_deg": -35.2, "period_beats": 2.0}},
          "dimmer": {"physical": {"period_beats": 2.0, "duty_cycle": 0.25, "low": 0.0, "high": 1.0}},
          "physical_shutter_state": "open", "physical_color": "blue",
          "physical_reposition_fallback": "drop_accent"},
         {"step_id": "b", "timing": {"base_timing": {"start_offset_bars": 0.25, "duration_bars": 0.5}},
-         "geometry": {}, "movement": {"physical": {
+         "movement": {"physical": {
              "shape": "hold", "mode": "periodic", "start_pan_deg": -33.6, "start_tilt_deg": 7.5}},
          "dimmer": {"physical": {"period_beats": 0.5, "duty_cycle": 0.75, "low": 0.0, "high": 1.0}},
          "physical_shutter_state": "open", "physical_color": "blue",
          "physical_reposition_fallback": "preserve_aim"},
         {"step_id": "c", "timing": {"base_timing": {"start_offset_bars": 0.75, "duration_bars": 0.25}},
-         "geometry": {}, "movement": {"physical": {
+         "movement": {"physical": {
              "shape": "circle", "mode": "periodic", "start_pan_deg": -6.4, "start_tilt_deg": 19.2,
              "pan_extent_deg": 45.4, "tilt_extent_deg": 10.0, "period_beats": 2.0}},
          "dimmer": {}, "physical_shutter_state": "open",

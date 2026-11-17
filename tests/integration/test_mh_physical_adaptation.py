@@ -379,7 +379,6 @@ def test_the_gate_places_each_preset_at_the_alignments_of_its_own_grown_cycle() 
     slow = TemplatePreset.model_validate(
         {
             "preset_id": "slow",
-            "name": "slow",
             "step_patches": {"blink": {"movement": {"physical": {"period_beats": 8.0}}}},
         }
     )

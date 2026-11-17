@@ -22,7 +22,6 @@
             "duration_bars": 2.0
           }
         },
-        "geometry": {},
         "movement": {
           "physical": {
             "shape": "sine_pan",
@@ -76,7 +75,6 @@
   "presets": [
     {
       "preset_id": "narrow",
-      "name": "Narrow",
       "step_patches": {
         "sway": {
           "movement": {
@@ -89,7 +87,6 @@
     },
     {
       "preset_id": "slow",
-      "name": "Slow",
       "step_patches": {
         "sway": {
           "movement": {

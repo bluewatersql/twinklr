@@ -8,8 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from twinklr.core.curves.models import BaseCurve, CurvePoint
-from twinklr.core.sequencer.models.enum import BlendMode, ChannelName
+from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import (
     CONTINUOUS_UNITS,
     ContinuousTrajectory,
@@ -18,85 +17,18 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
 
 
 class ChannelValue(BaseModel):
-    """Single channel's value specification.
-
-    Exactly one of static_dmx, curve or physical must be set.
-
-    For offset-centered curves (movement), set offset_centered=True
-    and provide base_dmx and amplitude_dmx. The final DMX value is
-    computed as: base_dmx + (curve_value - 0.5) * amplitude_dmx
-
-    For absolute curves (dimmer), leave offset_centered=False.
-    The final DMX value is computed as: lerp(clamp_min, clamp_max, curve_value)
-
-    A physical value is a typed trajectory in degrees, normalized units or named
-    states for the physical renderer. It takes none of the legacy composition fields.
-    """
+    """One channel's value: a typed physical trajectory in degrees or normalized units,
+    or named states."""
 
     model_config = ConfigDict(extra="forbid")
 
     channel: ChannelName
-
-    # Option A: static value
-    static_dmx: int | None = Field(default=None, ge=0, le=255)
-
-    # Option B: curve
-    curve: BaseCurve | None = Field(default=None)
-    value_points: list[CurvePoint] | None = Field(default=None)
-
-    # Composition hints (for movement offset curves)
-    base_dmx: int | None = None
-    amplitude_dmx: int | None = None
-    offset_centered: bool = Field(
-        default=False,
-        description="If true, interpret curve values as offset around 0.5",
-    )
-
-    blend_mode: BlendMode = Field(default=BlendMode.OVERRIDE)
-
-    clamp_min: int = Field(default=0, ge=0, le=255)
-    clamp_max: int = Field(default=255, ge=0, le=255)
-
-    # Option C: typed physical value (physical renderer only)
-    physical: PhysicalValue | None = Field(default=None)
+    physical: PhysicalValue
 
     @model_validator(mode="after")
-    def _validate_constraints(self) -> ChannelValue:
-        """Validate channel value constraints."""
-        if self.physical is not None:
-            return self._validate_physical()
-
-        # Must have exactly one of static_dmx or curve
-        if self.static_dmx is None and self.curve is None:
-            raise ValueError("ChannelValue must set either static_dmx or curve")
-        if self.static_dmx is not None and self.curve is not None:
-            raise ValueError("ChannelValue cannot set both static_dmx and curve")
-
-        # Clamp bounds
-        if self.clamp_max < self.clamp_min:
-            raise ValueError("clamp_max must be >= clamp_min")
-
-        return self
-
-    def _validate_physical(self) -> ChannelValue:
-        if self.static_dmx is not None or self.curve is not None:
-            raise ValueError("ChannelValue cannot mix a physical value with static_dmx or curve")
-        legacy = [
-            name
-            for name, is_set in (
-                ("value_points", self.value_points is not None),
-                ("base_dmx", self.base_dmx is not None),
-                ("amplitude_dmx", self.amplitude_dmx is not None),
-                ("offset_centered", self.offset_centered),
-                ("clamp_min", self.clamp_min != 0),
-                ("clamp_max", self.clamp_max != 255),
-                ("blend_mode", self.blend_mode != BlendMode.OVERRIDE),
-            )
-            if is_set
-        ]
-        if legacy:
-            raise ValueError(f"a physical ChannelValue cannot set legacy fields {legacy}")
-
+    def _validate_unit(self) -> ChannelValue:
+        """The trajectory's unit is the channel's: continuous for pan, tilt, dimmer and
+        zoom, discrete states for the rest."""
         unit = CONTINUOUS_UNITS.get(self.channel)
         if isinstance(self.physical, ContinuousTrajectory):
             if self.physical.unit != unit:
@@ -137,10 +69,6 @@ class FixtureSegment(BaseModel):
 
     channels: dict[ChannelName, ChannelValue] = Field(default_factory=dict)
     metadata: dict[str, str] = Field(default_factory=dict)
-
-    # Grouping hint: if False, this segment should not be grouped with others
-    # Set to False when template uses per-fixture phase offsets
-    allow_grouping: bool = Field(default=True)
 
     @property
     def metatag(self) -> str:

@@ -22,7 +22,6 @@
             "duration_bars": 2.0
           }
         },
-        "geometry": {},
         "movement": {
           "physical": {
             "shape": "lissajous",
@@ -79,7 +78,6 @@
   "presets": [
     {
       "preset_id": "narrow",
-      "name": "Narrow",
       "step_patches": {
         "wings": {
           "movement": {
@@ -93,7 +91,6 @@
     },
     {
       "preset_id": "slow",
-      "name": "Slow",
       "step_patches": {
         "wings": {
           "movement": {

@@ -63,7 +63,6 @@ def _context(
         template_id="physical_probe",
         fixture_id="MH1",
         role="OUTER_LEFT",
-        calibration={},
         start_ms=0,
         duration_ms=duration_ms,
         beat_grid=grid,
@@ -295,67 +294,7 @@ def test_unknown_speed_rejects_motion_but_not_a_hold() -> None:
     )
 
 
-# --- Legacy steps under physical compile ---------------------------------------------
-
-
-def test_legacy_normalized_circle_cannot_enter_physical_compile() -> None:
-    circle = TemplateStep.model_validate(
-        {
-            "step_id": "circle",
-            "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
-            "geometry": {"geometry_type": "fan"},
-            "movement": {"movement_type": "circle", "cycles": 1.0},
-            "dimmer": {"dimmer_type": "hold"},
-        }
-    )
-
-    with pytest.raises(PhysicalCompileError, match="migrat") as error:
-        compile_physical_step(circle, _context(), sample_times_ms=_FRAMES)
-    assert error.value.diagnostic.code == "unsupported_attribute"
-    assert error.value.diagnostic.action == "rejected"
-    assert error.value.diagnostic.fixture_id == "MH1"
-
-
-@pytest.mark.parametrize(
-    "legacy",
-    [
-        {"movement__movement_type": "circle"},
-        {"geometry__geometry_type": "fan"},
-        {"dimmer__dimmer_type": "pulse"},
-        {"shutter": {"pattern": "open"}},
-        {"color": {"preset": "red"}},
-        {"gobo": {"pattern": "open"}},
-        {"timing__phase_offset": {"mode": "GROUP_ORDER", "spread_bars": 0.25}},
-        {"movement__cycles": 2.0},
-        {"movement__intensity": "FAST"},
-        {"movement__params": {"amplitude": 0.5}},
-        {"dimmer__min_norm": 0.2},
-        {"dimmer__max_norm": 0.8},
-        {"dimmer__intensity": "INTENSE"},
-        {"dimmer__params": {"period_bars": 0.5}},
-        {"geometry__tilt_pose": "ceiling"},
-    ],
-)
-def test_legacy_data_beside_physical_data_is_rejected(legacy: dict[str, Any]) -> None:
-    with pytest.raises(PhysicalCompileError) as error:
-        compile_physical_step(_step(**legacy), _context(), sample_times_ms=_FRAMES)
-    assert error.value.diagnostic.code == "unsupported_attribute"
-
-
-def test_legacy_fields_at_their_defaults_do_not_reject_a_physical_step() -> None:
-    """A preset round trip sets every legacy field explicitly, at its default."""
-    step = _step()
-    round_tripped = TemplateStep.model_validate(
-        {
-            **step.model_dump(),
-            "movement": step.movement.model_dump(exclude_unset=False),
-            "dimmer": step.dimmer.model_dump(exclude_unset=False),
-            "geometry": step.geometry.model_dump(exclude_unset=False),
-        }
-    )
-    assert "cycles" in round_tripped.movement.model_fields_set
-
-    compile_physical_step(round_tripped, _context(), sample_times_ms=_FRAMES)
+# --- Step requirements ------------------------------------------------------------------
 
 
 def test_fixture_without_physical_profile_is_rejected() -> None:
@@ -364,19 +303,10 @@ def test_fixture_without_physical_profile_is_rejected() -> None:
 
 
 def test_absent_physical_fields_stay_out_of_template_dumps() -> None:
-    legacy = TemplateStep.model_validate(
-        {
-            "step_id": "legacy",
-            "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
-            "geometry": {},
-            "movement": {"movement_type": "sweep_lr"},
-            "dimmer": {"dimmer_type": "hold"},
-        }
-    )
+    step = _step(dimmer={}, physical_shutter=_DELETE)
 
-    dumped = legacy.model_dump(mode="json")
-    assert "physical" not in dumped["movement"]
-    assert "physical" not in dumped["dimmer"]
+    dumped = step.model_dump(mode="json")
+    assert dumped["dimmer"] == {}
     assert "physical_shutter" not in dumped
 
 

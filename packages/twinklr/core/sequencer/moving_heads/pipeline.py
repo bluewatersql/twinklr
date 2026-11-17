@@ -54,7 +54,6 @@ from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixt
 from twinklr.core.sequencer.models.moving_heads.topology import rig_topology
 from twinklr.core.sequencer.models.template import RepeatMode
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile.physical import is_physical_template
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     FALLBACK_METADATA_KEY,
     FailureMode,
@@ -110,29 +109,6 @@ from twinklr.core.sequencer.timing.musical_phase import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def offered_template_ids(template_ids: Sequence[str]) -> list[str]:
-    """The templates the planner may be offered: those the renderer can compile as
-    authored (`is_physical_template`), so a plan never names a template that fails at
-    render after paid planning.
-
-    Raises:
-        UnsupportedRenderModeError: When no template qualifies.
-    """
-    offered = [
-        template_id
-        for template_id in template_ids
-        if is_physical_template(get_template(template_id).template)
-    ]
-    if not offered:
-        raise UnsupportedRenderModeError(
-            f"the moving-head renderer has no template with physical data to offer the "
-            f"planner: none of the {len(template_ids)} loaded templates carries "
-            "movement.physical, without legacy data, on every step. Load physical templates "
-            "(--template-dir)"
-        )
-    return offered
 
 
 def physical_cue_limits(phase_map: MusicalPhaseMap, duration_ms: int) -> tuple[int, int]:
@@ -626,7 +602,7 @@ def check_physical_templates(
     bar that starts in the song, on every fixture of the rig, through the render's own
     `compile_physical_template` against the song's phase map and within the render's
     cue limits (`physical_cue_limits`). That checks target groups against the rig's
-    roles, legacy data a preset adds, every step's states and channels against each
+    roles, a preset patch the step models refuse, every step's states and channels against each
     profile, axis bounds, travel rate, pose motion the head can follow, and pulse and
     shutter timing for that placement, and each step's component references against
     the rig's presets, exactly as the render resolves them. The section then enters as the render enters a
@@ -665,7 +641,7 @@ def check_physical_templates(
     Raises:
         UnsupportedRenderModeError: Naming each rung, step, fixture and item that fails,
             for any template not in `excludable`, or for every exclusion when none
-            remains to admit.
+            remains to admit, or none was offered.
     """
     from twinklr.core.sequencer.moving_heads.compile.physical import PhysicalCompileError
     from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
@@ -862,11 +838,11 @@ def check_physical_templates(
         {"template_id": t, "reason": "; ".join(reasons(t))} for t in template_ids if not passing[t]
     )
     admitted = tuple(t for t in template_ids if passing[t])
-    if template_ids and not admitted:
+    if not admitted:
         raise UnsupportedRenderModeError(
             "the moving-head renderer has no template this rig can render, so no "
             "template remains to offer the planner: "
-            + "; ".join(exclusion["reason"] for exclusion in exclusions)
+            + ("; ".join(exclusion["reason"] for exclusion in exclusions) or "none is loaded")
         )
     effective_preset = {t: passing[t][0] for t in admitted}
     admitted_presets = {t: tuple(p for p in passing[t] if p is not None) for t in admitted}
@@ -1331,7 +1307,7 @@ def _physical_preset(
     the section named a preset.
 
     An undeclared id is not turned into an energy preset under `physical_v2`: that is
-    planner intent, which Phase 1 does not apply, and it would add legacy data.
+    planner intent, which Phase 1 does not apply.
     """
     template_id = template_doc.template.template_id
     declared = {preset.preset_id: preset for preset in template_doc.presets}

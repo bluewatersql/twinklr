@@ -22,7 +22,6 @@
             "duration_bars": 2.0
           }
         },
-        "geometry": {},
         "movement": {
           "physical": {
             "shape": "sweep",
@@ -74,7 +73,6 @@
   "presets": [
     {
       "preset_id": "narrow",
-      "name": "Narrow",
       "step_patches": {
         "fly": {
           "movement": {
@@ -87,7 +85,6 @@
     },
     {
       "preset_id": "slow",
-      "name": "Slow",
       "step_patches": {
         "fly": {
           "movement": {

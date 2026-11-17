@@ -54,7 +54,6 @@ from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.models.enum import SemanticGroupType
 from twinklr.core.sequencer.models.template import TemplateDoc, TemplatePreset
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile.physical import is_physical_template
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     TRANSACTION_METADATA_KEY,
     plan_prepositions,
@@ -93,10 +92,8 @@ def test_catalog_holds_the_families_each_physical_explicit_and_degradable() -> N
         validate_template_document(document)
         template = document.template
         assert template.template_id == path.stem
-        assert is_physical_template(template), path.name
         for step in template.steps:
             movement = step.movement.physical
-            assert movement is not None
             assert movement.start_pan_deg is not None and movement.start_tilt_deg is not None
             assert step.component_refs is None, path.name
             assert step.dimmer.physical is not None or step.physical_visibility is not None
@@ -314,9 +311,7 @@ def test_in_other_meters_every_family_is_offered_with_both_variants(
 
 def _with_preset(document: TemplateDoc, preset_id: str, patches: dict[str, Any]) -> TemplateDoc:
     """`document` declaring one preset of `patches` by step id."""
-    preset = TemplatePreset.model_validate(
-        {"preset_id": preset_id, "name": preset_id, "step_patches": patches}
-    )
+    preset = TemplatePreset.model_validate({"preset_id": preset_id, "step_patches": patches})
     return TemplateDoc(template=document.template, presets=[preset])
 
 
@@ -520,7 +515,6 @@ def _jumping_aim(*presets: tuple[str, float]) -> TemplateDoc:
             TemplatePreset.model_validate(
                 {
                     "preset_id": preset_id,
-                    "name": preset_id,
                     "step_patches": {"aim": {"movement": {"physical": {"pan_extent_deg": extent}}}},
                 }
             )

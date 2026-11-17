@@ -517,11 +517,17 @@ def test_apply_entry_window_cuts_drops_and_skips() -> None:
 def test_reposition_fallback_is_physical_only_and_absent_from_dumps() -> None:
     """Unset, the step field is left out of the template's dump (so no fingerprint moves)."""
     payload = {
-        "step_id": "legacy",
+        "step_id": "plain",
         "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
-        "geometry": {},
-        "movement": {"movement_type": "sweep_lr"},
-        "dimmer": {"dimmer_type": "hold"},
+        "movement": {
+            "physical": {
+                "shape": "hold",
+                "mode": "periodic",
+                "start_pan_deg": 0,
+                "start_tilt_deg": 0,
+            }
+        },
+        "dimmer": {},
     }
     assert "physical_reposition_fallback" not in TemplateStep.model_validate(payload).model_dump()
 

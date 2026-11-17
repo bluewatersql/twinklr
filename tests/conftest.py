@@ -10,9 +10,6 @@ from pathlib import Path
 import nltk.data
 import pytest
 
-from twinklr.core.config.fixtures.instances import FixtureInstance
-from twinklr.core.config.poses import PanPose, TiltPose
-from twinklr.core.sequencer.models.enum import TemplateRole
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 # ============================================================================
@@ -129,70 +126,6 @@ def simple_song_features() -> dict:
 def beat_grid(simple_song_features: dict) -> BeatGrid:
     """Create a BeatGrid from simple song features."""
     return BeatGrid.from_song_features(simple_song_features)
-
-
-# ============================================================================
-# Fixture Config Fixtures
-# ============================================================================
-
-
-@pytest.fixture
-def mock_fixture_instance() -> FixtureInstance:
-    """Create a mock FixtureInstance for testing."""
-    from twinklr.core.config.fixtures.base import FixtureConfig
-    from twinklr.core.config.fixtures.enums import ChannelName, FixtureType
-
-    config = FixtureConfig(
-        fixture_type=FixtureType.MOVING_HEAD,
-        model_name="Test Moving Head",
-        dmx_mapping={
-            ChannelName.PAN: 1,
-            ChannelName.TILT: 2,
-            ChannelName.DIMMER: 3,
-        },
-        inversions={
-            ChannelName.PAN: False,
-            ChannelName.TILT: False,
-        },
-        pan_range_deg=540.0,
-        tilt_range_deg=270.0,
-    )
-
-    return FixtureInstance(
-        fixture_id="test_fixture_1",
-        start_channel=1,
-        config=config,
-        role=TemplateRole.INNER_LEFT,
-        pan_pose=PanPose.CENTER,
-        tilt_pose=TiltPose.HORIZON,
-    )
-
-
-@pytest.fixture
-def mock_fixture_group(mock_fixture_instance: FixtureInstance) -> list[FixtureInstance]:
-    """Create a list of mock FixtureInstance objects for testing."""
-    # Create 4 fixtures
-    fixtures = []
-    roles = [
-        TemplateRole.OUTER_LEFT,
-        TemplateRole.INNER_LEFT,
-        TemplateRole.INNER_RIGHT,
-        TemplateRole.OUTER_RIGHT,
-    ]
-    pan_poses = [PanPose.WIDE_LEFT, PanPose.MID_LEFT, PanPose.MID_RIGHT, PanPose.WIDE_RIGHT]
-
-    for i, (role, pan_pose) in enumerate(zip(roles, pan_poses, strict=False)):
-        fixture = FixtureInstance(
-            fixture_id=f"test_fixture_{i + 1}",
-            start_channel=(i * 10) + 1,
-            config=mock_fixture_instance.config,
-            role=role,
-            pan_pose=pan_pose,
-            tilt_pose=TiltPose.HORIZON,
-        )
-        fixtures.append(fixture)
-
-    return fixtures
 
 
 # ============================================================================

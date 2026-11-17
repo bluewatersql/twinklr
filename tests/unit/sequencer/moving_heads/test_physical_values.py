@@ -1,4 +1,4 @@
-"""Typed physical channel values: an additive alternative to legacy DMX/curve values."""
+"""Typed physical channel values."""
 
 from __future__ import annotations
 
@@ -9,8 +9,7 @@ import pytest
 
 from tests.support.mh_physical import profile_payload, unprofiled_rig
 from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup
-from twinklr.core.curves.models import CurvePoint, PointsCurve
-from twinklr.core.sequencer.models.enum import BlendMode, ChannelName
+from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import (
     ContinuousTrajectory,
     DiscretePoint,
@@ -37,60 +36,34 @@ def _shutter(*events: tuple[int, str]) -> DiscreteTrajectory:
     return DiscreteTrajectory(events=tuple(DiscretePoint(t_ms=t, state=s) for t, s in events))
 
 
-_CURVE = PointsCurve(points=[CurvePoint(t=0.0, v=0.0), CurvePoint(t=1.0, v=1.0)])
-
-
-def test_physical_values_cannot_mix_with_legacy_curve() -> None:
+def test_a_channel_value_is_a_physical_value() -> None:
     trajectory = _pan((0, 0.0), (1000, 90.0))
 
-    value = ChannelValue(channel=ChannelName.PAN, physical=trajectory)
-    assert value.physical == trajectory
-    assert (value.static_dmx, value.curve) == (None, None)
-
+    assert ChannelValue(channel=ChannelName.PAN, physical=trajectory).physical == trajectory
     with pytest.raises(ValidationError, match="physical"):
-        ChannelValue(channel=ChannelName.PAN, static_dmx=1, physical=trajectory)
-    with pytest.raises(ValidationError, match="physical"):
-        ChannelValue(channel=ChannelName.PAN, curve=_CURVE, physical=trajectory)
+        ChannelValue(channel=ChannelName.PAN)  # type: ignore[call-arg]
 
 
 @pytest.mark.parametrize(
-    "legacy",
+    "removed",
     [
-        pytest.param({"value_points": [CurvePoint(t=0.0, v=0.5)]}, id="value-points"),
+        pytest.param({"static_dmx": 1}, id="static-dmx"),
+        pytest.param({"curve": {"points": [{"t": 0.0, "v": 0.0}]}}, id="curve"),
+        pytest.param({"value_points": [{"t": 0.0, "v": 0.5}]}, id="value-points"),
         pytest.param({"base_dmx": 128}, id="base"),
         pytest.param({"amplitude_dmx": 64}, id="amplitude"),
         pytest.param({"offset_centered": True}, id="offset-centered"),
         pytest.param({"clamp_min": 10}, id="clamp-min"),
         pytest.param({"clamp_max": 200}, id="clamp-max"),
-        pytest.param({"blend_mode": BlendMode.ADD}, id="blend-mode"),
+        pytest.param({"blend_mode": "add"}, id="blend-mode"),
     ],
 )
-def test_physical_value_rejects_legacy_composition_fields(legacy: dict[str, Any]) -> None:
-    with pytest.raises(ValidationError, match="legacy"):
-        ChannelValue(channel=ChannelName.PAN, physical=_pan((0, 0.0)), **legacy)
-
-
-def test_legacy_values_are_unchanged() -> None:
-    """Exactly one of static_dmx or curve remains the legacy rule, with its messages."""
-    assert ChannelValue(channel=ChannelName.DIMMER, static_dmx=255).physical is None
-    assert (
-        ChannelValue(
-            channel=ChannelName.PAN,
-            curve=_CURVE,
-            value_points=[CurvePoint(t=0.0, v=0.5)],
-            base_dmx=128,
-            amplitude_dmx=64,
-            offset_centered=True,
-            clamp_min=10,
-            clamp_max=200,
-        ).curve
-        == _CURVE
-    )
-
-    with pytest.raises(ValidationError, match="must set either static_dmx or curve"):
-        ChannelValue(channel=ChannelName.PAN)
-    with pytest.raises(ValidationError, match="cannot set both static_dmx and curve"):
-        ChannelValue(channel=ChannelName.PAN, static_dmx=1, curve=_CURVE)
+def test_the_old_renderer_value_fields_are_refused(removed: dict[str, Any]) -> None:
+    """The DMX and curve fields only the removed renderer read are not accepted."""
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        ChannelValue.model_validate(
+            {"channel": "pan", "physical": _pan((0, 0.0)).model_dump(), **removed}
+        )
 
 
 @pytest.mark.parametrize(

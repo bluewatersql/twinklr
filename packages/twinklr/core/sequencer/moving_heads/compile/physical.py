@@ -14,7 +14,7 @@ displacement times its mirror sign. Relative paths (circle, lissajous, sweep) mo
 about the resolved aim (`evaluate_physical_path`). Nothing is clamped: an out-of-range
 value, a travel rate above the configured speed, motion at an unknown speed, a pulse
 interval shorter than one frame, or a shutter change faster than its known latency
-and settle time is rejected. A legacy step is never reinterpreted.
+and settle time is rejected.
 
 The caller supplies the sample times: the encoder's frame starts, at most one frame
 apart, so the checked values are exactly the commanded ones. The value at each sample
@@ -53,11 +53,9 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
 from twinklr.core.sequencer.models.template import (
     RELATIVE_PATH_SHAPES,
     PathTransform,
-    PhaseOffset,
     PhysicalMovementSpec,
     PhysicalPulseSpec,
     PhysicalShutterPulse,
-    Template,
     TemplateStep,
 )
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
@@ -127,7 +125,7 @@ def compile_physical_step(
     """Compile a step's explicit physical data into typed trajectories.
 
     Args:
-        step: A physical step: `movement.physical` set and no legacy handler data.
+        step: The template step.
         context: Step identity, timing, the fixture's physical profile and the
             song's musical phase map. Phase is measured from `context.start_ms`. For a
             step with component references, `resolved_components` supplies the start
@@ -158,9 +156,9 @@ def compile_physical_step(
         records the origin.
 
     Raises:
-        PhysicalCompileError: For a legacy step, legacy data on a physical step, a
-            fixture without a physical profile, a start angle nothing sets, or a zoom
-            on a profile without a zoom axis that is not optional.
+        PhysicalCompileError: For a fixture without a physical profile, a start angle
+            nothing sets, or a zoom on a profile without a zoom axis that is not
+            optional.
         PhysicalChannelError: For a value, rate or state change the profile cannot honor,
             including a state or wheel the profile does not declare.
         OffGridTimeError: For a step bound or sample time off the frame grid.
@@ -495,8 +493,7 @@ def slice_physical_segment(segment: FixtureSegment, start_ms: int, end_ms: int) 
     Identity, metadata and the phase origin are kept, so motion does not restart.
 
     Raises:
-        ValueError: If the span is empty or outside the segment, or a channel is not
-            a physical value.
+        ValueError: If the span is empty or outside the segment.
     """
     if not segment.t0_ms <= start_ms < end_ms <= segment.t1_ms:
         raise ValueError(
@@ -505,11 +502,8 @@ def slice_physical_segment(segment: FixtureSegment, start_ms: int, end_ms: int) 
         )
     channels: dict[ChannelName, ChannelValue] = {}
     for channel, value in segment.channels.items():
-        physical = value.physical
-        if physical is None:
-            raise ValueError(f"{channel.value} is not a physical value")
         channels[channel] = ChannelValue(
-            channel=channel, physical=_slice_value(physical, start_ms, end_ms)
+            channel=channel, physical=_slice_value(value.physical, start_ms, end_ms)
         )
     return FixtureSegment(
         **{
@@ -535,18 +529,6 @@ def _require_physical_step(step: TemplateStep, context: StepCompileContext) -> F
             )
         )
 
-    if step.movement.physical is None:
-        raise reject(
-            f"step {step.step_id!r} of template {context.template_id!r} has no "
-            "movement.physical data. Legacy normalized curves are never reinterpreted as "
-            "angles: migrate the template with explicit physical data to render it"
-        )
-    legacy = _legacy_fields(step)
-    if legacy:
-        raise reject(
-            f"step {step.step_id!r} of template {context.template_id!r} sets legacy "
-            f"{legacy}, which the physical renderer does not apply"
-        )
     if context.physical_profile is None:
         raise reject(f"fixture {context.fixture_id!r} has no physical_profile")
     if context.resolved_components is None:
@@ -558,41 +540,6 @@ def _require_physical_step(step: TemplateStep, context: StepCompileContext) -> F
                     "sets is never centered"
                 )
     return context.physical_profile
-
-
-def is_physical_template(template: Template) -> bool:
-    """Whether the physical renderer can compile every step of `template` as authored.
-
-    Each step needs `movement.physical` and no legacy data, which the physical compile
-    refuses. A preset applied at render time can still add legacy data.
-    """
-    return bool(template.steps) and all(
-        step.movement.physical is not None and not _legacy_fields(step) for step in template.steps
-    )
-
-
-def _legacy_fields(step: TemplateStep) -> list[str]:
-    """The legacy data a step sets, which the physical renderer does not apply."""
-    return [
-        *_non_default_fields("geometry", step.geometry),
-        *_non_default_fields("movement", step.movement, keep="physical"),
-        *_non_default_fields("dimmer", step.dimmer, keep="physical"),
-        *(name for name in ("color", "shutter", "gobo") if getattr(step, name) is not None),
-        *(["timing.phase_offset"] if step.timing.phase_offset != PhaseOffset() else []),
-    ]
-
-
-def _non_default_fields(prefix: str, component: BaseModel, *, keep: str = "") -> list[str]:
-    """Legacy fields set away from their default; the physical renderer applies none.
-
-    Compared by value, not `model_fields_set`: a preset round trip sets every field
-    explicitly, at its default, and that changes nothing.
-    """
-    return [
-        f"{prefix}.{name}"
-        for name, field in type(component).model_fields.items()
-        if name != keep and getattr(component, name) != field.get_default(call_default_factory=True)
-    ]
 
 
 def _check_sample_times(times: Sequence[int], t0_ms: int, t1_ms: int) -> tuple[int, ...]:

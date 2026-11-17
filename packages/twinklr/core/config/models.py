@@ -215,19 +215,6 @@ def get_vision_judge_agent_default() -> AgentConfig:
     )
 
 
-# NOTE (P1P-T6): `ChannelDefaults` (job-level named shutter/color/gobo states) and
-# `JobConfig.is_channel_enabled` used to live here, declared and validated but never
-# read by anything. P0-T7 deliberately left them in place, reserved for this task to
-# wire or delete. Deleted: the rig config's `DmxMapping.shutter_default`/`color_map`/
-# `gobo_map` (packages/twinklr/core/config/fixtures/dmx.py) already express the same
-# concept at the layer the exporter actually reads from -- per-fixture, numeric,
-# resolved at the emit loop in `DmxSettingsBuilder` -- so a second job-level, named-state
-# copy would be a duplicate mechanism rather than a wire-up. `is_channel_enabled` is a
-# planner feature-flag question (may the LLM choreograph this channel type at all), which
-# is orthogonal to what an *unwritten* channel should emit and was never a dependency of
-# that decision. See changes/twinklr-reactivation-review/build/specs/phase-1p-render-truth/P1P-T6-channel-default-policy.md.
-
-
 def _get_agent_config_default() -> AgentOrchestrationConfig:
     """Return default agent orchestration config."""
     return AgentOrchestrationConfig()

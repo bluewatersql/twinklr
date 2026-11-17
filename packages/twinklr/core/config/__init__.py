@@ -1,18 +1,12 @@
 """Configuration management for Twinklr."""
 
 from twinklr.core.config.fixtures import (
-    ChannelInversions,
     DmxMapping,
     FixtureConfig,
     FixtureGroup,
     FixtureGroupBuilder,
     FixtureInstance,
     FixturePosition,
-    MovementLimits,
-    Orientation,
-    PanTiltRange,
-    Pose,
-    ShutterMap,
 )
 from twinklr.core.config.loader import (
     load_app_config,
@@ -40,7 +34,6 @@ __all__ = [
     "AppConfig",
     "AudioEnhancementConfig",
     "AudioProcessingConfig",
-    "ChannelInversions",
     "DmxMapping",
     "FixtureConfig",
     # Fixture config
@@ -51,12 +44,7 @@ __all__ = [
     # Job-level config
     "JobConfig",
     "LoggingConfig",
-    "MovementLimits",
-    "Orientation",
-    "PanTiltRange",
-    "Pose",
     "RhythmSourceName",
-    "ShutterMap",
     "StructureSourceName",
     "UnsupportedRenderModeError",
     "load_app_config",

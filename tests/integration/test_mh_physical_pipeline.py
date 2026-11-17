@@ -28,7 +28,6 @@ from tests.support.mh_physical import (
     physical_plan,
     physical_rig,
     physical_test_templates,
-    registered_templates,
 )
 from twinklr.cli.main import build_run_pipeline
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
@@ -41,8 +40,6 @@ from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.formats.xlights.sequence.parser import XSQParser
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import RenderLock
-from twinklr.core.sequencer.models.template import TemplateDoc
-from twinklr.core.sequencer.moving_heads.compile.physical import PhysicalCompileError
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     TRANSACTION_METADATA_KEY,
     plan_prepositions,
@@ -62,30 +59,6 @@ from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 def physical_templates() -> Iterator[None]:
     with physical_test_templates():
         yield
-
-
-_NO_PHYSICAL_DATA = TemplateDoc.model_validate(
-    {
-        "template": {
-            "template_id": "no_physical_data",
-            "version": 1,
-            "name": "No Physical Data",
-            "category": "medium_energy",
-            "repeat": {"cycle_bars": 1.0, "loop_step_ids": ["main"]},
-            "steps": [
-                {
-                    "step_id": "main",
-                    "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
-                    "geometry": {},
-                    "movement": {"movement_type": "sweep_lr"},
-                    "dimmer": {"dimmer_type": "hold"},
-                }
-            ],
-            "metadata": {"energy_range": [20, 60], "recommended_sections": ["verse"]},
-        }
-    }
-)
-"""A template step with no physical data, which the renderer refuses."""
 
 
 def _pipeline(
@@ -624,12 +597,6 @@ def test_unchecked_models_are_reported(
             id="byte-budget",
         ),
         pytest.param(
-            {"template_id": "no_physical_data"},
-            PhysicalCompileError,
-            "no movement.physical data",
-            id="template-without-physical-data",
-        ),
-        pytest.param(
             {
                 "layout_models": [
                     Model(name="Dmx MH1", DisplayAs="DmxMovingHeadAdv", DmxChannelCount="18")
@@ -649,7 +616,7 @@ def test_failure_delivers_nothing(
     message: str,
 ) -> None:
     """A refused compile, transaction, model or budget leaves no file at all."""
-    with registered_templates(_NO_PHYSICAL_DATA), pytest.raises(error, match=message):
+    with pytest.raises(error, match=message):
         _pipeline(tmp_path / "show.xsq", **kwargs).render()
 
     assert list(tmp_path.iterdir()) == []

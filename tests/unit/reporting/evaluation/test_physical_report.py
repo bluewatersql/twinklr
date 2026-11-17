@@ -170,7 +170,6 @@ async def test_physical_checkpoint_reports_the_render_the_run_made(tmp_path: Pat
 
     run = trace["render"]
     physical = report.physical
-    assert physical is not None
     # The re-render is the run's render: its fingerprint, recorded in the trace, matches.
     assert physical.run_fingerprint == run["render_fingerprint"]
     assert physical.rerender_fingerprint == run["render_fingerprint"]
@@ -181,25 +180,17 @@ async def test_physical_checkpoint_reports_the_render_the_run_made(tmp_path: Pat
     assert physical.admission_preset_exclusions == run.get("admission_preset_exclusions", [])
     assert physical.admission_effective_presets == run.get("admission_effective_presets", {})
     assert physical.unplayable_totals == run["unplayable_totals"]
-    assert physical.not_reported  # every legacy metric left out says why
     # A run renders no dark spans; its record and report say none.
     assert "dark_spans" not in json.loads(checkpoint.read_text())["render"]
     assert (physical.dark_spans, physical.dark_span_ms) == ([], 0)
 
     assert report.summary.sections == 2
-    # Removed metrics are absent, never zero.
-    assert report.summary.physics_violations is None
-    assert report.summary.compliance_issues is None
-    assert report.summary.harsh_transitions is None
     for section, (start_bar, end_bar) in zip(report.sections, ((1, 2), (3, 4)), strict=True):
         assert section.time_range_ms == (
             int(GRID.get_bar_start_ms(start_bar - 1)),
             int(GRID.get_bar_start_ms(end_bar)),
         )
-        assert section.template_compliance is None
-        assert section.transition_to_next is None
         facts = section.render_facts
-        assert facts is not None
         assert facts.entry_windows == [
             w for w in run["entry_windows"] if w["section_id"] == section.section_id
         ]
@@ -220,27 +211,32 @@ async def test_physical_checkpoint_reports_the_render_the_run_made(tmp_path: Pat
                 assert (curve.lit_range, curve.lit_rate) == (None, None)
             else:
                 assert curve.lit_range is not None and curve.lit_range <= curve.stats.range
-            assert curve.stats.clamp_pct is None
-            assert curve.continuity is None
-            assert curve.physics_check is None
-            assert (curve.curve_type, curve.handler, curve.base_position, curve.static_dmx) == (
-                None,
-                None,
-                None,
-                None,
-            )
             assert curve.plot_path is not None and curve.plot_path.exists()
 
     written = json.loads((tmp_path / "report" / "report.json").read_text(encoding="utf-8"))
     assert written["physical"]["fingerprint_matches"] is True
+    # The old renderer's metrics are not in the report at all.
+    assert not {"physics_violations", "compliance_issues", "harsh_transitions"} & set(
+        written["summary"]
+    )
+    assert "not_reported" not in written["physical"]
+    for section in written["sections"]:
+        assert not {"template_compliance", "transition_to_next"} & set(section)
+        assert "steps" not in section["selected_template"]
     for curve in (c for s in written["sections"] for c in s["curves"]):
-        assert curve["stats"]["clamp_pct"] is None
-        assert curve["continuity"] is None
+        assert "clamp_pct" not in curve["stats"]
+        assert not {
+            "continuity",
+            "physics_check",
+            "curve_type",
+            "handler",
+            "base_position",
+            "static_dmx",
+        } & set(curve)
     markdown = (tmp_path / "report" / "report.md").read_text(encoding="utf-8")
     assert "Physical render" in markdown
     assert run["render_fingerprint"] in markdown
-    for line in physical.not_reported:
-        assert line in markdown
+    assert "Not reported" not in markdown
     assert "clamp=" not in markdown and "loop=" not in markdown
     assert "Dark spans" not in markdown
     # Nothing is written beside the report but the report and its plots.

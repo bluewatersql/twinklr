@@ -12,23 +12,15 @@ from pydantic import BaseModel, SecretStr
 import pytest
 
 from tests.config_effects_registry import CONFIG_EFFECTS, ConfigDispositionKind
-from tests.support.mh_physical import (
-    physical_grid,
-    physical_head_profile,
-    physical_job,
-    physical_plan,
-    physical_test_templates,
-)
 from twinklr.cli.main import build_moving_head_graph
 from twinklr.core.audio.analyzer import AudioAnalyzer
 from twinklr.core.audio.enhancement_factory import EnhancementServiceFactory
 from twinklr.core.audio.mir.sources import RhythmAnalysis
 from twinklr.core.audio.models import LyricsBundle, LyricWord
 from twinklr.core.audio.models.enums import StageStatus
-from twinklr.core.config.fixtures import FixtureGroup, Pose
+from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
-from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
 
 
 def _alternate(path: str, value: Any) -> Any:
@@ -308,34 +300,10 @@ def _shared_config() -> dict[str, Any]:
             "pan_channel": {"channel": 1},
             "tilt_channel": {"channel": 2},
             "dimmer_channel": {"channel": 3},
-            "pan_fine_channel": {"channel": 4},
-            "tilt_fine_channel": {"channel": 5},
-            "use_16bit_pan_tilt": True,
             "shutter_channel": {"channel": 6},
-            "shutter_default": 240,
-            "shutter_map": {
-                "closed": 1,
-                "open": 241,
-                "strobe_slow": 61,
-                "strobe_medium": 121,
-                "strobe_fast": 181,
-            },
             "color_channel": {"channel": 7},
-            "color_map": {"open": 2, "white": 3, "red": 19},
             "gobo_channel": {"channel": 8},
-            "gobo_map": {"open": 4, "circles": 14},
         },
-        "inversions": {
-            "pan": True,
-            "tilt": True,
-            "dimmer": False,
-            "shutter": False,
-            "color": False,
-            "gobo": False,
-        },
-        "pan_tilt_range": {"pan_range_deg": 500.0, "tilt_range_deg": 250.0},
-        "orientation": {"pan_front_dmx": 120, "tilt_zero_dmx": 30},
-        "limits": {"pan_min": 10, "pan_max": 245, "tilt_min": 11, "tilt_max": 244},
     }
 
 
@@ -356,7 +324,6 @@ def _fixture_group() -> FixtureGroup:
                 },
             ],
             "xlights_group": "GROUP - HEADS",
-            "xlights_semantic_groups": {"LEFT": "GROUP - LEFT"},
         }
     )
 
@@ -384,7 +351,7 @@ def _alternate_fixture(path: str, value: Any) -> Any:
             },
         ]
     if path.endswith("config_overrides"):
-        return {"inversions": {"pan": False}}
+        return {"dmx_mapping": {"pan_channel": 9, "tilt_channel": 2, "dimmer_channel": 3}}
     if path == "fixture.fixtures[FixtureInstance].config":
         changed = dict(value)
         changed["dmx_mapping"] = dict(changed["dmx_mapping"])
@@ -427,9 +394,6 @@ def _fixture_snapshot(group: FixtureGroup) -> tuple[Any, ...]:
                     "gobo": mapping.gobo,
                     "shutter": mapping.shutter,
                 },
-                fixture.config.degrees_to_dmx(Pose(pan_deg=170, tilt_deg=90)),
-                fixture.config.degrees_to_dmx(Pose(pan_deg=-170, tilt_deg=-90)),
-                fixture.config.dmx_to_degrees(200, 180).model_dump(mode="json"),
             )
         )
     return (
@@ -442,66 +406,6 @@ def _fixture_snapshot(group: FixtureGroup) -> tuple[Any, ...]:
 
 @pytest.mark.parametrize("config_path", FIXTURE_EFFECT_PATHS, ids=FIXTURE_EFFECT_PATHS)
 def test_fixture_field_changes_shipped_behavior_snapshot(config_path: str) -> None:
-    """Every fixture path changes expansion, rig, pose conversion or the planner's
-    channel listing."""
+    """Every fixture path changes expansion, the rig order, or what the planner is given:
+    its xLights group mapping or channel listing."""
     assert _fixture_snapshot(_changed_fixture(config_path)) != _fixture_snapshot(_fixture_group())
-
-
-IDENTITY_ONLY_FIXTURE_PATHS = tuple(
-    path
-    for path, disposition in CONFIG_EFFECTS.items()
-    if disposition.test_nodeid is not None
-    and "test_fixture_field_of_the_removed_renderer_changes_identity_only"
-    in disposition.test_nodeid
-)
-
-
-def _physical_probe_rig(path: str | None = None) -> FixtureGroup:
-    """The probe's DMX mapping and calibration on a renderable two-head rig: MH1 a full
-    fixture instance, MH2 expanding `base_config`; with `path` changed when given."""
-    shared = {**_shared_config(), "physical_profile": physical_head_profile(inverted=False)}
-    payload: dict[str, Any] = {
-        "group_id": "probe-rig",
-        "xlights_semantic_groups": {"LEFT": "GROUP - LEFT"},
-        "base_config": shared,
-        "fixtures": [
-            {
-                "fixture_id": "MH1",
-                "xlights_model_name": "Dmx MH1",
-                "config": {**shared, "fixture_id": "MH1"},
-            },
-            {"fixture_id": "MH2", "xlights_model_name": "Dmx MH2"},
-        ],
-    }
-    if path is not None:
-        parts = _fixture_parts(path)
-        target: Any = payload
-        for part in parts[:-1]:
-            target = target[part]
-        target[parts[-1]] = _alternate_fixture(path, target[parts[-1]])
-    return FixtureGroup.model_validate(payload)
-
-
-def _render(group: FixtureGroup) -> tuple[str, Any]:
-    with physical_test_templates():
-        pipeline = RenderingPipeline(
-            choreography_plan=physical_plan(),
-            beat_grid=physical_grid(),
-            fixture_group=group,
-            job_config=physical_job(),
-        )
-        pipeline.render()
-        return pipeline.fingerprint(), pipeline.frames
-
-
-@pytest.mark.parametrize(
-    "config_path", IDENTITY_ONLY_FIXTURE_PATHS, ids=IDENTITY_ONLY_FIXTURE_PATHS
-)
-def test_fixture_field_of_the_removed_renderer_changes_identity_only(config_path: str) -> None:
-    """The removed renderer was the only reader of these fields: changing one changes
-    the render fingerprint (the rig is part of it) and no encoded frame."""
-    fingerprint, frames = _render(_physical_probe_rig(config_path))
-    base_fingerprint, base_frames = _render(_physical_probe_rig())
-
-    assert fingerprint != base_fingerprint
-    assert frames == base_frames
