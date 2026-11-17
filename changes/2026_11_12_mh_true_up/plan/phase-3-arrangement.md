@@ -563,3 +563,42 @@ probe. Means consistent with the LLM/renderer boundary: categorical choices reso
 in code in place of the nested per-channel transition objects; nullable choices
 written as one enum that includes null; nesting no deeper than five. The spec list in
 that guard test is hand-maintained, so T1 adds its spec to it.
+
+### Three-arm experiment after the selector port: what the owner must know — 2026-11-16
+
+From the C1.1d port and its independent review. The experiment (P2P-T13) has never
+been run: its manifest, results and D1 verdict are all pending, and no sealed or
+historical record was edited. The historical spec is not rewritten; these are the
+ways it no longer describes the code.
+
+1. **Arm A chooses among the families admitted for each song** (six on a zoomless
+   rig), not 37 templates. With so few candidates its variety rules relax for roughly
+   40–65% of sections.
+2. **Arm A can fail.** The spec says it never returns nothing. With an admission, a
+   section whose role and energy fit no admitted family raises a typed error and the
+   experiment stops before any paid call. On the rigs checked (zoomless with topology;
+   without topology) it never raises; on a rig admitting only the two cascades every
+   quiet section would.
+3. **Precondition 1 is probably unmet on the physical path.** Planner intensity,
+   colour, shutter and gobo are not applied by the physical renderer, and arm A names
+   one variant per family while arms B and C may pick `narrow` or `slow`. By the
+   spec's own rule an unmet precondition makes the experiment invalid. All six
+   preconditions were verified against the old renderer and need re-verifying.
+4. **D1 casts the selector as the fallback,** and it is no longer total.
+5. **The spec's data premise changed:** energies 0–19 fall in no family's range, and
+   five of the twelve census labels are in no family's recommended sections.
+6. **The owner backend must supply the gate's admission** in its analysis snapshot and
+   keep the physical catalog registered in the runner's process. The admission's hash
+   is part of the held-constant identity across arms.
+7. **One song arm A cannot plan stops the whole experiment,** and the frozen manifest
+   would then need re-freezing.
+
+Owner decision needed before C1.2: `reference_policy.py` (the `reference_legacy_v1`
+arm) names four old templates and cannot be ported without inventing which family is
+"quiet", "chorus", "entry" and "ending". Author and reviewer both recommend deleting
+it with its test and dropping it from Phase 5's comparison, with the rendered
+old-renderer files as the legacy reference and arm A as the deterministic physical
+reference. The integrator will delete it in C1.2 unless the owner says otherwise.
+
+For T2: the capability projection extends `SelectorAdmission` (the selector's
+projection of the gate result); it does not add a second projection beside it.
