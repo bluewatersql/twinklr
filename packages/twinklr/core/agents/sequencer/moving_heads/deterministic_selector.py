@@ -1,8 +1,13 @@
 """Seeded pure-code planning baseline for the P2P-T13 comparison.
 
 The selector deliberately keeps its small amount of creative policy in one inspectable
-configuration object.  It reads the same template documents exposed to the LLM path,
-emits today's schema-v2 :class:`ChoreographyPlan`, and never calls a provider.
+configuration object.  It chooses among an explicit candidate set: under a physical job
+the run's :class:`SelectorAdmission`, the templates the pre-planning gate admitted on
+this rig and song (the same set the LLM path is offered), each named with its effective
+variant; without one, every registered template (the old renderer's builtins, until the
+cutover removes them).  It emits today's schema-v2 :class:`ChoreographyPlan` and never
+calls a provider.  When no candidate fills a section at any rung of the fallback ladder
+it raises :class:`NoEligibleTemplateError`; the admission is never relaxed.
 """
 
 from __future__ import annotations
@@ -11,7 +16,7 @@ from collections import Counter, defaultdict
 from collections.abc import Sequence
 from enum import StrEnum
 import hashlib
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -30,6 +35,106 @@ from twinklr.core.sequencer.models.template import TemplateDoc
 from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
 from twinklr.core.sequencer.moving_heads.templates.library import REGISTRY
 from twinklr.core.sequencer.vocabulary.visual import PaletteRole
+
+if TYPE_CHECKING:
+    from twinklr.core.sequencer.moving_heads.pipeline import TemplateAdmission
+
+
+class NoEligibleTemplateError(ValueError):
+    """No candidate template fills a section at any rung of the fallback ladder, or
+    there is no candidate at all (`section_id` None).
+
+    Raised before any plan is returned, so before any provider call or render that
+    plan would feed.  Variety rules relax to make selection total; the candidate set
+    (the gate's admission) never does.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        section_id: str | None = None,
+        role: str | None = None,
+        energy: int | None = None,
+        candidate_ids: Sequence[str] = (),
+    ) -> None:
+        super().__init__(message)
+        self.section_id = section_id
+        self.role = role
+        self.energy = energy
+        self.candidate_ids = tuple(candidate_ids)
+
+
+class AdmittedTemplate(BaseModel):
+    """One template the pre-planning gate admitted, with its effective variant (the
+    first passing rung, None for the base) and its admitted presets."""
+
+    template_id: str = Field(min_length=1)
+    effective_preset: str | None
+    admitted_presets: tuple[str, ...]
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    @model_validator(mode="after")
+    def effective_is_admitted(self) -> AdmittedTemplate:
+        if self.effective_preset is not None and self.effective_preset not in (
+            self.admitted_presets
+        ):
+            raise ValueError(
+                f"template {self.template_id!r}: effective preset {self.effective_preset!r} "
+                "is not one of its admitted presets"
+            )
+        return self
+
+
+class ExcludedTemplate(BaseModel):
+    """A catalog template the gate left out of the offer, with its reason."""
+
+    template_id: str = Field(min_length=1)
+    reason: str
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class SelectorAdmission(BaseModel):
+    """The selector's candidate set for one rig and song: the gate's admission
+    (`check_physical_templates`) in its order, and its whole-template exclusions."""
+
+    templates: tuple[AdmittedTemplate, ...]
+    exclusions: tuple[ExcludedTemplate, ...] = ()
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    @model_validator(mode="after")
+    def unique_templates(self) -> SelectorAdmission:
+        seen: set[str] = set()
+        for entry in self.templates:
+            if entry.template_id in seen:
+                raise ValueError(f"template {entry.template_id!r} is admitted twice")
+            seen.add(entry.template_id)
+        return self
+
+    @property
+    def template_ids(self) -> tuple[str, ...]:
+        return tuple(entry.template_id for entry in self.templates)
+
+    @classmethod
+    def from_gate(cls, admission: TemplateAdmission) -> SelectorAdmission:
+        """Project the gate's result onto the selector's frozen candidate set."""
+        return cls(
+            templates=tuple(
+                AdmittedTemplate(
+                    template_id=template_id,
+                    effective_preset=admission.effective_preset[template_id],
+                    admitted_presets=admission.admitted_presets[template_id],
+                )
+                for template_id in admission.admitted
+            ),
+            exclusions=tuple(
+                ExcludedTemplate(template_id=entry["template_id"], reason=entry["reason"])
+                for entry in admission.exclusions
+            ),
+        )
 
 
 class FallbackRule(StrEnum):
@@ -151,24 +256,53 @@ class SelectorResult(BaseModel):
 class DeterministicSelector:
     """Select template documents by role/energy, then apply seeded constraints."""
 
-    def __init__(self, *, seed: int, config: SelectorConfig | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        seed: int,
+        config: SelectorConfig | None = None,
+        admission: SelectorAdmission | None = None,
+    ) -> None:
+        """Choose among `admission`'s templates, each named with its effective variant.
+
+        Without an admission the candidates are every registered template with no preset
+        named: the old renderer's builtins, until the cutover removes that path. The
+        admitted templates' documents are read from the registry, which holds them for
+        the run the gate checked (and only with the annotations the ladder reads).
+
+        Raises:
+            NoEligibleTemplateError: When there is no candidate at all.
+        """
         self.seed = seed
         self.config = config or SelectorConfig()
-        load_builtin_templates()
+        if admission is None:
+            load_builtin_templates()
+            template_ids = [info.template_id for info in REGISTRY.list_all()]
+            self._presets: dict[str, str | None] = {}
+        else:
+            template_ids = list(admission.template_ids)
+            self._presets = {
+                entry.template_id: entry.effective_preset for entry in admission.templates
+            }
         self._documents = {
-            info.template_id: REGISTRY.get(info.template_id, deep_copy=False)
-            for info in REGISTRY.list_all()
+            template_id: REGISTRY.get(template_id, deep_copy=False) for template_id in template_ids
         }
         if not self._documents:
-            raise ValueError("The deterministic selector requires at least one template")
+            raise NoEligibleTemplateError(
+                "The deterministic selector requires at least one template"
+            )
 
     def candidates_for(self, section: SelectorSection) -> CandidateSet:
-        """Return the first non-empty rung of the fixed fallback ladder."""
+        """Return the first non-empty rung of the fixed fallback ladder.
+
+        Raises:
+            NoEligibleTemplateError: When every rung is empty.
+        """
         for rule in self.config.fallback_order:
             candidates = self._candidates_at_rule(section, rule)
             if candidates:
                 return CandidateSet(rule=rule, template_ids=tuple(candidates))
-        raise AssertionError("category fallback must cover a non-empty template registry")
+        raise self._no_candidate(section)
 
     def select(self, sections: list[SelectorSection]) -> SelectorResult:
         """Produce one complete current-schema plan for the supplied song sections."""
@@ -217,7 +351,8 @@ class DeterministicSelector:
                 if chosen is not None:
                     break
             if chosen is None or chosen_rule is None:
-                raise AssertionError("fully relaxed category fallback must be total")
+                # Fully relaxed variety admits every candidate, so every rung was empty.
+                raise self._no_candidate(section)
 
             uses[chosen] += 1
             roles_by_template[chosen].add(section.role)
@@ -247,6 +382,19 @@ class DeterministicSelector:
             ),
             config=self.config,
             traces=traces,
+        )
+
+    def _no_candidate(self, section: SelectorSection) -> NoEligibleTemplateError:
+        candidates = sorted(self._documents)
+        rungs = ", ".join(rule.value for rule in self.config.fallback_order)
+        return NoEligibleTemplateError(
+            f"no candidate template fits section {section.section_id!r} (role "
+            f"{section.role!r}, energy {section.energy}) at any rung ({rungs}) among "
+            f"{candidates}; the candidate set is not relaxed",
+            section_id=section.section_id,
+            role=section.role,
+            energy=section.energy,
+            candidate_ids=candidates,
         )
 
     def _candidates_at_rule(self, section: SelectorSection, rule: FallbackRule) -> list[str]:
@@ -362,7 +510,7 @@ class DeterministicSelector:
             section_role=section.role,
             energy_level=section.energy,
             template_id=template.template_id,
-            preset_id=None,
+            preset_id=self._presets.get(template.template_id),
             modifiers=[],
             reasoning=(
                 "Deterministic annotation join with seeded choice; "

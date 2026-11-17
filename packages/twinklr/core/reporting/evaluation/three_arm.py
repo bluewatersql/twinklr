@@ -24,6 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validat
 
 from twinklr.core.agents.sequencer.moving_heads.deterministic_selector import (
     DeterministicSelector,
+    SelectorAdmission,
     SelectorSection,
 )
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
@@ -231,12 +232,22 @@ class HeldConstantIdentity(BaseModel):
     template_set_sha256: str = Field(pattern=SHA256_PATTERN)
     renderer_sha256: str = Field(pattern=SHA256_PATTERN)
     evaluation_config_sha256: str = Field(pattern=SHA256_PATTERN)
+    admission_sha256: str | None = Field(
+        default=None, pattern=SHA256_PATTERN, exclude_if=lambda value: value is None
+    )
+    """The song's `AnalysisSnapshot.admission`, hashed; None for an old-renderer run."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
 class AnalysisSnapshot(BaseModel):
-    """One shared analysis payload reused across all five runs for a song."""
+    """One shared analysis payload reused across all five runs for a song.
+
+    `admission` is what the pre-planning gate admitted on the experiment's rig for this
+    song: arm A selects only among it, every arm's plan may name only its templates,
+    and its hash is held constant across the arms. None means an old-renderer run,
+    whose candidates are the registered builtins (until the cutover removes them).
+    """
 
     song_id: str
     cache_key: str = Field(min_length=1)
@@ -247,6 +258,9 @@ class AnalysisSnapshot(BaseModel):
     template_set_sha256: str = Field(pattern=SHA256_PATTERN)
     renderer_sha256: str = Field(pattern=SHA256_PATTERN)
     evaluation_config_sha256: str = Field(pattern=SHA256_PATTERN)
+    admission: SelectorAdmission | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -263,6 +277,11 @@ class AnalysisSnapshot(BaseModel):
             template_set_sha256=self.template_set_sha256,
             renderer_sha256=self.renderer_sha256,
             evaluation_config_sha256=self.evaluation_config_sha256,
+            admission_sha256=(
+                None
+                if self.admission is None
+                else _identity_hash(self.admission.model_dump(mode="json"))
+            ),
         )
 
 
@@ -836,6 +855,10 @@ class ComparisonExperimentRunner:
         planning_runs = len(self.manifest.songs) * 4
         planning_reservation = self.manifest.spend.planning_cap_usd / planning_runs
 
+        # Every song is analysed and arm A planned before any arm runs, so a song arm A
+        # cannot plan (`NoEligibleTemplateError`) stops the experiment before any
+        # planning call or render.
+        prepared: list[tuple[SongManifestEntry, AnalysisSnapshot, ChoreographyPlan]] = []
         for song in self.manifest.songs:
             analysis = await self.backend.analyze(song)
             if analysis.song_id != song.song_id:
@@ -855,6 +878,15 @@ class ComparisonExperimentRunner:
                 raise ExperimentBlockedError(
                     "analysis returned placeholder held-constant identities before paid work"
                 )
+            arm_a_plan = (
+                DeterministicSelector(seed=self.manifest.seed, admission=analysis.admission)
+                .select(analysis.selector_sections)
+                .plan
+            )
+            prepared.append((song, analysis, arm_a_plan))
+
+        for song, analysis, arm_a_plan in prepared:
+            expected_identity = analysis.identity(self.manifest, song)
             seen_nonces: set[str] = set()
 
             for arm, replicates in ((Arm.A, (1,)), (Arm.B, (1, 2)), (Arm.C, (1, 2))):
@@ -886,13 +918,7 @@ class ComparisonExperimentRunner:
                         if nonce in seen_nonces:
                             raise AssertionError("regeneration nonces must be unique per song/run")
                         seen_nonces.add(nonce)
-                    plan = (
-                        DeterministicSelector(seed=self.manifest.seed)
-                        .select(analysis.selector_sections)
-                        .plan
-                        if arm is Arm.A
-                        else None
-                    )
+                    plan = arm_a_plan if arm is Arm.A else None
                     planning_input = (
                         None
                         if arm is Arm.A
@@ -994,6 +1020,23 @@ class ComparisonExperimentRunner:
             raise ExperimentBlockedError("analysis cache identity changed across arms")
         if result.held_constant != expected_identity:
             raise ExperimentBlockedError("held-constant hashes changed across arms")
+        admission = request.analysis.admission
+        if admission is not None:
+            planned = {
+                template_id
+                for section in result.plan.sections
+                for template_id in (
+                    section.template_id,
+                    *(segment.template_id for segment in section.segments or ()),
+                )
+                if template_id is not None
+            }
+            unadmitted = sorted(planned - set(admission.template_ids))
+            if unadmitted:
+                raise ExperimentBlockedError(
+                    f"arm {result.arm.value} planned {unadmitted}, not admitted on the "
+                    "experiment's rig for this song"
+                )
         if result.regeneration_nonce != (
             None if request.arm is Arm.A else request.regeneration_nonce
         ):

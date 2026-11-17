@@ -11,7 +11,21 @@ from pathlib import Path
 
 import pytest
 
-from twinklr.core.agents.sequencer.moving_heads.deterministic_selector import SelectorSection
+from tests.support.mh_physical import (
+    CATALOG_IDS,
+    FAMILY_IDS,
+    family_job,
+    family_rig,
+    physical_bars_grid,
+    physical_catalog,
+)
+from twinklr.core.agents.sequencer.moving_heads.deterministic_selector import (
+    AdmittedTemplate,
+    DeterministicSelector,
+    NoEligibleTemplateError,
+    SelectorAdmission,
+    SelectorSection,
+)
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.agents.shared.judge.controller import IterationCallRecord, IterationCallUsage
 from twinklr.core.reporting.evaluation.calibration import (
@@ -68,6 +82,7 @@ from twinklr.core.reporting.evaluation.vision_judge import (
     VisionRubricResponse,
     VisionTokenUsage,
 )
+from twinklr.core.sequencer.moving_heads.pipeline import check_physical_templates
 
 
 def _sha(value: bytes) -> str:
@@ -1660,3 +1675,175 @@ def test_report_rejects_nonce_cache_key_and_blind_track_recommitment(
     raw["blind_reveal"] = reveal.model_dump(mode="json", exclude_computed_fields=True)
     with pytest.raises(ValueError, match="track grouping"):
         ComparisonReport.model_validate(raw)
+
+
+# --- Arms over the admitted physical families (cutover C1.1d) ---------------------------
+
+HEADS = ("MH1", "MH2", "MH3", "MH4")
+PHYSICAL_SECTIONS = [
+    SelectorSection(section_id="intro_1", role="intro", start_bar=1, end_bar=1, energy=30),
+    SelectorSection(section_id="verse_1", role="verse", start_bar=2, end_bar=2, energy=45),
+    SelectorSection(section_id="chorus_1", role="chorus", start_bar=3, end_bar=4, energy=85),
+    SelectorSection(section_id="verse_2", role="verse", start_bar=5, end_bar=5, energy=45),
+    SelectorSection(section_id="chorus_2", role="chorus", start_bar=6, end_bar=7, energy=85),
+    SelectorSection(section_id="outro_1", role="outro", start_bar=8, end_bar=8, energy=70),
+]
+
+
+def _physical_llm_plan(template_id: str) -> ChoreographyPlan:
+    return ChoreographyPlan.model_validate(
+        {
+            "sections": [
+                {
+                    "section_name": "verse_1",
+                    "start_bar": 1,
+                    "end_bar": 8,
+                    "section_role": "verse",
+                    "energy_level": 45,
+                    "template_id": template_id,
+                    "preset_id": None,
+                    "intensity": "SMOOTH",
+                    "color_intent": {
+                        "selection": {
+                            "kind": "PALETTE_ROLE",
+                            "palette_role": "PRIMARY",
+                            "explicit_color": None,
+                        }
+                    },
+                    "shutter_events": [],
+                    "gobo_events": [],
+                    "moment_cues": [],
+                }
+            ],
+            "overall_strategy": "fixture",
+        }
+    )
+
+
+class _PhysicalBackend(_Backend):
+    """`_Backend` whose analysis records a physical admission and whose LLM arms plan
+    `llm_template_id`."""
+
+    def __init__(
+        self,
+        admission: SelectorAdmission,
+        sections: list[SelectorSection],
+        llm_template_id: str = "mirror_wings",
+        song_sections: dict[str, list[SelectorSection]] | None = None,
+    ) -> None:
+        super().__init__()
+        self.admission = admission
+        self.sections = sections
+        self.llm_template_id = llm_template_id
+        self.song_sections = song_sections or {}
+
+    async def analyze(self, song: SongManifestEntry) -> AnalysisSnapshot:
+        snapshot = await super().analyze(song)
+        return AnalysisSnapshot.model_validate(
+            {
+                **snapshot.model_dump(exclude={"selector_sections"}),
+                "selector_sections": self.song_sections.get(song.song_id, self.sections),
+                "admission": self.admission,
+            }
+        )
+
+    async def execute(self, request: ArmExecutionRequest) -> ArmRunResult:
+        if request.arm is not Arm.A:
+            request = request.model_copy(update={"plan": _physical_llm_plan(self.llm_template_id)})
+        return await super().execute(request)
+
+
+def _hand_admission(template_ids: tuple[str, ...]) -> SelectorAdmission:
+    return SelectorAdmission(
+        templates=tuple(
+            AdmittedTemplate(
+                template_id=template_id, effective_preset=None, admitted_presets=("narrow", "slow")
+            )
+            for template_id in template_ids
+        )
+    )
+
+
+@pytest.mark.asyncio
+async def test_physical_run_plans_arm_a_over_the_gate_admission_and_records_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End to end offline on a synthetic four-head rig without a zoom axis: the real gate
+    leaves `zoom_wave` out, the snapshot records that admission, arm A selects only
+    among the admitted families, and every arm's held-constant identity binds the
+    same admission."""
+    rig, job = family_rig(HEADS), family_job(HEADS)
+    with physical_catalog():
+        gate = check_physical_templates(
+            list(CATALOG_IDS),
+            beat_grid=physical_bars_grid(*[500.0] * 8),
+            fixture_group=rig,
+            initial_states=job.moving_heads.initial_states,
+            failure_mode=job.moving_heads.reposition_fallback,
+            on_unplayable=job.moving_heads.on_unplayable,
+            excludable=list(CATALOG_IDS),
+        )
+        admission = SelectorAdmission.from_gate(gate)
+        backend = _PhysicalBackend(admission, PHYSICAL_SECTIONS)
+        runner = ComparisonExperimentRunner(
+            manifest=_calibrated_manifest(tmp_path), backend=backend
+        )
+        monkeypatch.setattr(runner, "_assert_calibrated", lambda: None)
+        results = await runner.run(owner_opt_in=True)
+        expected = DeterministicSelector(seed=44, admission=admission).select(PHYSICAL_SECTIONS)
+
+    assert admission.template_ids == FAMILY_IDS
+    assert [exclusion.template_id for exclusion in admission.exclusions] == ["zoom_wave"]
+    assert "zoom" in admission.exclusions[0].reason
+    assert all(request.analysis.admission == admission for request in backend.requests)
+
+    arm_a = [result for result in results if result.arm is Arm.A]
+    assert len(arm_a) == 8
+    assert all(result.plan == expected.plan for result in arm_a)
+    effective = {entry.template_id: entry.effective_preset for entry in admission.templates}
+    for section in expected.plan.sections:
+        assert section.template_id in FAMILY_IDS
+        assert section.preset_id == effective[section.template_id]
+
+    admission_sha = _identity_sha(admission.model_dump(mode="json"))
+    assert {result.held_constant.admission_sha256 for result in results} == {admission_sha}
+
+
+@pytest.mark.asyncio
+async def test_physical_run_rejects_an_arm_planning_an_unadmitted_template(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with physical_catalog():
+        backend = _PhysicalBackend(
+            _hand_admission(FAMILY_IDS), PHYSICAL_SECTIONS, llm_template_id="zoom_wave"
+        )
+        runner = ComparisonExperimentRunner(
+            manifest=_calibrated_manifest(tmp_path), backend=backend
+        )
+        monkeypatch.setattr(runner, "_assert_calibrated", lambda: None)
+        with pytest.raises(ExperimentBlockedError, match=r"zoom_wave.*not admitted"):
+            await runner.run(owner_opt_in=True)
+
+
+@pytest.mark.asyncio
+async def test_arm_a_without_a_candidate_stops_before_any_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F7: when both low-energy families are out, the sixth song's quiet intro has no
+    admitted family at any rung; the typed error is raised after analysis and before
+    any arm of any song is executed (no planning call, no render)."""
+    admitted = tuple(t for t in FAMILY_IDS if t != "target_orbit")
+    quiet = [SelectorSection(section_id="intro_1", role="intro", start_bar=1, end_bar=4, energy=10)]
+    with physical_catalog():
+        backend = _PhysicalBackend(
+            _hand_admission(admitted), PHYSICAL_SECTIONS, song_sections={"s5": quiet}
+        )
+        runner = ComparisonExperimentRunner(
+            manifest=_calibrated_manifest(tmp_path), backend=backend
+        )
+        monkeypatch.setattr(runner, "_assert_calibrated", lambda: None)
+        with pytest.raises(NoEligibleTemplateError, match="intro_1"):
+            await runner.run(owner_opt_in=True)
+
+    assert backend.analysis_calls == 6
+    assert backend.requests == []
