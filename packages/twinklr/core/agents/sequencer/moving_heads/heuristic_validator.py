@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from itertools import pairwise
 import logging
 from typing import TYPE_CHECKING, Any, NamedTuple
 
@@ -52,6 +53,15 @@ class _PlanUnit(NamedTuple):
     # selection
     template_id: str
     preset_id: str | None
+
+
+MIN_REASONING_CHARACTERS = 20
+"""Below this, or under four words, a reasoning or strategy is a placeholder."""
+
+
+def _is_placeholder(text: str) -> bool:
+    stripped = text.strip()
+    return len(stripped) < MIN_REASONING_CHARACTERS or len(stripped.split()) < 4
 
 
 def create_validator_function(
@@ -160,13 +170,33 @@ class HeuristicValidator:
         # Cross-section checks using flattened units
         self._validate_units_timing_and_coverage(units, errors, warnings)
 
-        # Compare against song structure (section coverage/mismatch) if available
+        # Every song section with bars of its own is planned (one plan entry per Song
+        # Structure row). A section shorter than a bar shares its start bar with the
+        # next one; planning both would overlap, so it is not required.
         if self._song_sections:
-            missing_sections = set(self._song_sections.keys()) - covered_section_ids
-            if missing_sections:
-                warnings.append(
-                    f"Plan doesn't cover all song sections: {', '.join(sorted(missing_sections))}"
+            entries = list(self._song_sections.items())
+            collapsed = {
+                section_id
+                for (section_id, entry), (_, following) in pairwise(entries)
+                if entry.get("start_bar") == following.get("start_bar")
+            }
+            missing = [
+                f"'{section_id}' (bars {entry.get('start_bar')}-{entry.get('end_bar')})"
+                for section_id, entry in entries
+                if section_id not in covered_section_ids and section_id not in collapsed
+            ]
+            if missing:
+                errors.append(
+                    f"The plan has no section for song section(s) {', '.join(missing)}; plan "
+                    "every section of the Song Structure table, each over its own bars"
                 )
+
+        # A strategy and a reason, not a placeholder
+        if _is_placeholder(plan.overall_strategy):
+            errors.append(
+                f"overall_strategy {plan.overall_strategy!r} is a placeholder; say in a "
+                "sentence or more how the light follows this song"
+            )
 
         valid = len(errors) == 0
 
@@ -204,20 +234,27 @@ class HeuristicValidator:
                 f"Section '{name}' has invalid start_bar ({section.start_bar}); must be >= 1 (1-indexed)"
             )
 
-        # 2) compare to song structure if present (warn only)
+        # 2) its bars are the song structure's
         if self._song_sections and name in self._song_sections:
             expected_start = self._song_sections[name].get("start_bar")
             expected_end = self._song_sections[name].get("end_bar")
             if expected_start is not None and section.start_bar != expected_start:
-                warnings.append(
+                errors.append(
                     f"Section '{name}' start_bar ({section.start_bar}) doesn't match song structure ({expected_start})"
                 )
             if expected_end is not None and section.end_bar != expected_end:
-                warnings.append(
+                errors.append(
                     f"Section '{name}' end_bar ({section.end_bar}) doesn't match song structure ({expected_end})"
                 )
 
-        # 3) each part: an offered template over its own bars
+        # 3) a reason, not a placeholder
+        if _is_placeholder(section.reasoning):
+            errors.append(
+                f"Section '{name}': reasoning {section.reasoning!r} is a placeholder; name the "
+                "energy, palette colour, lyric cues and moments the section answers"
+            )
+
+        # 4) each part: an offered template over its own bars
         units: list[_PlanUnit] = []
         parts = section.part_bars()
         ids = part_ids(section)
@@ -295,10 +332,11 @@ class HeuristicValidator:
         if isinstance(song_sections_raw, list):
             for section_data in song_sections_raw:
                 if isinstance(section_data, dict):
+                    # Plans name sections by their unique section_id.
                     name = (
-                        section_data.get("name")
+                        str(section_data.get("section_id") or "")
+                        or section_data.get("name")
                         or section_data.get("label")
-                        or str(section_data.get("section_id", ""))
                     )
                     if name:
                         song_sections[name] = section_data

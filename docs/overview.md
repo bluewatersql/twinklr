@@ -117,7 +117,7 @@ _Source: `packages/twinklr/core/agents/`_
 Data-driven agent system using `AgentSpec` data objects and an async runner — no agent class hierarchies. The orchestration loop:
 
 1. **Planner** generates a `ChoreographyPlan`: per song section, one to three templates (with presets) and the section's typed categorical song intent (intensity, colour, gobo, timed events tied to lyric MomentCues, motif variation, density, entry and exit transitions). Its schema is within Claude's measured limits and is sent to Claude as an enforced structured output (live compile pending a probe)
-2. **Normalisation and heuristic validation**: deterministic code repairs single items the song cannot hold, keeping as much of each as the song allows (an event outside its section moves into it; an unknown cue is dropped), records each repair and shows it to the planner on the next revision; structural errors (a template not offered, sections beyond the song) send the plan back
+2. **Normalisation and heuristic validation**: deterministic code repairs single items the song cannot hold, keeping as much of each as the song allows (an event outside its section moves into it; an unknown cue is dropped), records each repair and shows it to the planner on the next revision; structural errors (a song section left unplanned, a section whose bars are not the song structure's, a template not offered, a placeholder reason or strategy) send the plan back
 3. **Judge** scores the plan (0-10) and decides: approve, soft-fail (revise), or hard-fail (redo)
 4. Structured feedback and the judge's own prior verdict history loop back into the next iteration
 

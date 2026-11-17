@@ -19,19 +19,11 @@ from twinklr.core.sequencer.models.enum import TransitionMode
 
 
 class TransitionStrategy(StrEnum):
-    """Strategy for transitioning a specific channel.
+    """How one channel changes at a transition boundary.
 
-    Different channels may require different transition strategies:
-    - Movement channels (pan/tilt): smooth interpolation
-    - Intensity channels (dimmer): crossfade
-    - Discrete channels (shutter/gobo): snap or sequenced changes
-
-    Attributes:
-        SNAP: Instant change at boundary (no blend).
-        SMOOTH_INTERPOLATION: Linear or curved interpolation (pan/tilt).
-        CROSSFADE: Overlapping fade out/in (dimmer).
-        FADE_VIA_BLACK: Fade to zero, change, fade up (color/gobo).
-        SEQUENCE: Sequenced change (e.g., close shutter, change, open).
+    `snap` changes at once; `smooth` interpolates (pan and tilt); `crossfade` overlaps
+    a fade out and in (dimmer); `fade_via_black` fades to dark, changes, fades up
+    (colour and gobo); `sequence` closes the shutter, changes, opens.
     """
 
     SNAP = "snap"
@@ -94,19 +86,7 @@ class ChannelTransition(BaseModel):
 
 
 class PlanTransition(BaseModel):
-    """The planner's transition into or out of a section, as categories.
-
-    Examples:
-        >>> PlanTransition(
-        ...     edge=TransitionEdge.ENTRY,
-        ...     mode=TransitionMode.CROSSFADE,
-        ...     length=TransitionLength.BAR,
-        ...     curve=CurveLibrary.EASE_IN_OUT_SINE,
-        ...     split=TransitionSplit.HALF,
-        ...     channels=[],
-        ... ).length
-        <TransitionLength.BAR: 'BAR'>
-    """
+    """The planner's transition into or out of a section, as categories."""
 
     edge: TransitionEdge = Field(description="ENTRY shapes the section's start, EXIT its end")
     mode: TransitionMode = Field(description="How the look changes across the boundary")

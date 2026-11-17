@@ -1,5 +1,6 @@
 """Tests for moving heads prompt packs."""
 
+from itertools import pairwise
 from pathlib import Path
 
 import pytest
@@ -621,3 +622,92 @@ def test_no_pack_nudges_the_model_toward_leaving_the_song_unanswered(pack: str) 
         "that is valid, not missing",
     ):
         assert nudge not in text, nudge
+
+
+class TestPlannerUserPromptRendering:
+    """The first planning prompt, rendered from production variables, reads cleanly:
+    one template per line, readable macro arcs, no empty headings, and it ends with
+    the sections to plan (2026-11-17 live probe 2 found each of these broken)."""
+
+    @staticmethod
+    def _render(hints: object = None, sections: list | None = None) -> str:
+        from tests.unit.agents.sequencer.moving_heads.test_orchestrator import (
+            create_test_audio_profile,
+            create_test_macro_plan,
+        )
+        from twinklr.core.agents.sequencer.moving_heads.context import (
+            FixtureContext,
+            MovingHeadPlanningContext,
+        )
+        from twinklr.core.agents.sequencer.moving_heads.orchestrator import (
+            build_planner_variables,
+        )
+
+        profile = create_test_audio_profile()
+        if hints is not None:
+            profile = profile.model_copy(update={"planner_hints": hints})
+        templates = ["sweep_lr_fan_pulse", "circle_fan_hold", "pendulum_chevron_breathe"]
+        context = MovingHeadPlanningContext(
+            audio_profile=profile,
+            fixtures=FixtureContext(count=4, groups=[]),
+            available_templates=templates,
+            macro_plan=create_test_macro_plan(profile),
+            template_descriptions=[
+                {
+                    "template_id": template_id,
+                    "name": template_id,
+                    "description": f"The {template_id} look.",
+                    "energy_range": [20, 80],
+                    "tags": ["sweep"],
+                    "recommended_sections": ["verse"],
+                }
+                for template_id in templates
+            ],
+        )
+        variables = {**build_planner_variables(context), "response_schema": "{}"}
+        if sections is not None:
+            sections.extend(variables["sections"])
+        loader = PromptPackLoader(base_path=PROMPTS_BASE)
+        return PromptRenderer().render(loader.load("planner")["user"], variables)
+
+    def test_each_template_is_on_its_own_line(self) -> None:
+        rendered = self._render()
+        lines = [line for line in rendered.splitlines() if line.startswith("- `")]
+        for template_id in ("sweep_lr_fan_pulse", "circle_fan_hold", "pendulum_chevron_breathe"):
+            (line,) = [line for line in lines if line.startswith(f"- `{template_id}`:")]
+            assert line.endswith("Recommended sections: verse")
+
+    def test_macro_arcs_are_readable_lines_not_python_dicts(self) -> None:
+        rendered = self._render()
+        assert "{'" not in rendered and "[{" not in rendered
+        assert "- from `intro`: palette `core.christmas_traditional`, entered by HOLD\n" in rendered
+        assert "- `pulse` in intro, verse_1, chorus_1, outro (RESTATE):" in rendered
+        assert "- `intro`: lead group `MEGA_TREE`\n" in rendered
+
+    def test_an_empty_directives_heading_is_omitted(self) -> None:
+        from twinklr.core.agents.audio.profile.models import PlannerHints, SectionObjectives
+
+        quiet = self._render(PlannerHints(avoid_patterns=["Strobing in the intro"]))
+        assert "Section Planning Directives" not in quiet
+        assert "### Patterns to Avoid\n- Strobing in the intro" in quiet
+        directed = self._render(
+            PlannerHints(
+                section_objectives=[
+                    SectionObjectives(section_id="intro", objectives=["Open softly."])
+                ]
+            )
+        )
+        assert "### Section Planning Directives\n\n**intro**:\n- Open softly." in directed
+
+    def test_the_prompt_ends_with_every_section_to_plan_over_its_bars(self) -> None:
+        sections: list = []
+        rendered = self._render(sections=sections)
+        tail = rendered[rendered.index("## Return") :]
+        assert tail.rstrip().endswith("how the light follows this song.")
+        bullets = [line for line in tail.splitlines() if line.startswith("- `")]
+        assert bullets == [
+            f"- `{s['section_id']}`: bars {s['start_bar']}-{s['end_bar']}" for s in sections
+        ]
+        assert [s["section_id"] for s in sections] == ["intro", "verse_1", "chorus_1", "outro"]
+        # Inclusive and contiguous: each section starts the bar after the last one ends.
+        assert all(b["start_bar"] == a["end_bar"] + 1 for a, b in pairwise(sections))

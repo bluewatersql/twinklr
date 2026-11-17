@@ -384,26 +384,29 @@ def unanswered_high_cues(
     lyric_context: LyricContextModel | None,
     song_sections: list[SongSectionRef],
 ) -> list[str]:
-    """One line per HIGH-emphasis lyric moment cue of a planned section that no event of
-    the section lands on: an advised revision, not an error."""
+    """One line per HIGH-emphasis lyric moment cue that no event lands on, its section
+    planned or not: an advised revision, not an error."""
     if lyric_context is None or not lyric_context.moment_cues:
         return []
     cues = {cue.cue_id: cue for cue in lyric_context.moment_cues}
     unusable = _unusable_cues(cues, song_sections)
+    planned = {section.section_id: section for section in plan.sections}
     lines: list[str] = []
-    for section in plan.sections:
-        answered = {event.moment_cue_id for event in section.events}
-        for cue in lyric_context.moment_cues:
-            if (
-                cue.section_id == section.section_id
-                and cue.emphasis == "HIGH"
-                and cue.cue_id not in unusable
-                and cue.cue_id not in answered
-            ):
-                lines.append(
-                    f"section '{section.section_id}': the HIGH lyric moment cue "
-                    f"'{cue.cue_id}' (\"{cue.text}\") has no event; add one with "
-                    f"moment_cue_id '{cue.cue_id}': an accent that suits its emphasis and "
-                    "visual hint"
-                )
+    for cue in lyric_context.moment_cues:
+        if cue.emphasis != "HIGH" or cue.cue_id in unusable:
+            continue
+        section = planned.get(cue.section_id)
+        if section is None:
+            lines.append(
+                f"section '{cue.section_id}' is not planned, so its HIGH lyric moment cue "
+                f"'{cue.cue_id}' (\"{cue.text}\") is unanswered; plan the section and give "
+                f"the cue an event with moment_cue_id '{cue.cue_id}'"
+            )
+        elif cue.cue_id not in {event.moment_cue_id for event in section.events}:
+            lines.append(
+                f"section '{section.section_id}': the HIGH lyric moment cue "
+                f"'{cue.cue_id}' (\"{cue.text}\") has no event; add one with "
+                f"moment_cue_id '{cue.cue_id}': an accent that suits its emphasis and "
+                "visual hint"
+            )
     return lines

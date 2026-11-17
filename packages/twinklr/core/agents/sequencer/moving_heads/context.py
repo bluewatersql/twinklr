@@ -218,19 +218,28 @@ class MovingHeadPlanningContext(BaseModel):
         }
 
         # Song structure with sections
-        section_entries = [
-            {
-                "name": section.name,
-                "section_id": section.section_id,
-                "start_ms": section.start_ms,
-                "end_ms": section.end_ms,
-                # Calculate bar positions from timing
-                "start_bar": self._ms_to_bar(section.start_ms),
-                "end_bar": self._ms_to_bar(section.end_ms),
-            }
-            for section in self.sections
-        ]
+        # A section's bars are inclusive: it starts on the bar its start time resolves to
+        # and ends on the bar before the one its end time resolves to (the next
+        # section's first bar, or the bar after the song's last), so consecutive
+        # sections share no bar and the last ends on the song's last bar.
+        section_entries = []
+        for section in self.sections:
+            start_bar = self._ms_to_bar(section.start_ms)
+            next_bar = self._ms_to_bar(section.end_ms)
+            section_entries.append(
+                {
+                    "name": section.name,
+                    "section_id": section.section_id,
+                    "start_ms": section.start_ms,
+                    "end_ms": section.end_ms,
+                    "start_bar": start_bar,
+                    "end_bar": max(start_bar, next_bar - 1),
+                    "_collapsed": next_bar <= start_bar,
+                }
+            )
         self._warn_on_collapsed_sections(section_entries)
+        for entry in section_entries:
+            del entry["_collapsed"]
 
         song_structure = {
             "sections": section_entries,
@@ -292,8 +301,7 @@ class MovingHeadPlanningContext(BaseModel):
         previous_start: int | None = None
         for entry in section_entries:
             start_bar = int(entry["start_bar"])
-            end_bar = int(entry["end_bar"])
-            if start_bar == end_bar:
+            if entry["_collapsed"]:
                 logger.warning(
                     "Section '%s' (%dms-%dms) is shorter than one bar; it collapsed onto bar %d",
                     entry["name"],

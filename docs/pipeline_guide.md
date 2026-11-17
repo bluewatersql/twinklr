@@ -755,7 +755,8 @@ uv run twinklr run \
      to musical and lyric moments, motif variation, density, entry and exit
    - **Validate**: Deterministic repair of single items the song cannot hold
      (recorded, and shown to the planner on its next revision), then heuristic
-     checks (bar ranges, no overlaps, coverage, offered templates)
+     checks (every song section planned over its own bars, no overlaps, offered
+     templates, a real reason per section and an overall strategy)
    - **Judge**: LLM scores the plan (0-10) and provides feedback
    - **Iterate**: If score < threshold, planner revises with feedback
 

@@ -93,8 +93,12 @@ class _FakeAnalyzer:
 
 
 def _plan(*sections: tuple[str, int, int]) -> ChoreographyPlan:
-    # Through JSON, as a planner's plan arrives.
-    return ChoreographyPlan.model_validate(sections_plan(*sections).model_dump(mode="json"))
+    # Through JSON, as a planner's plan arrives, with the reasons the validator requires.
+    data = sections_plan(*sections).model_dump(mode="json")
+    data["overall_strategy"] = "The heads follow the song's energy from section to section."
+    for section in data["sections"]:
+        section["reasoning"] = "Answers the section's energy with one fitting template."
+    return ChoreographyPlan.model_validate(data)
 
 
 PLAN = _plan(("target_orbit", 1, 2), ("mirror_wings", 3, 4))

@@ -44,7 +44,7 @@ V2 Migration: Uses structured context from MovingHeadPlanningContext
 **Template Library** ({{ available_templates | length }} templates):
 {% if template_descriptions is defined and template_descriptions %}
 {% for td in template_descriptions %}
-- `{{ td.template_id }}`: {{ td.description | default(td.name) }}{% if td.energy_range %} Energy: {{ td.energy_range[0] }}-{{ td.energy_range[1] }}{% endif %}{% if td.tags %} [{{ td.tags | join(', ') }}]{% endif %}{% if td.recommended_sections %} Recommended sections: {{ td.recommended_sections | join(', ') }}{% endif %}
+- `{{ td.template_id }}`: {{ td.description | default(td.name) }}{% if td.energy_range %} Energy: {{ td.energy_range[0] }}-{{ td.energy_range[1] }}{% endif %}{% if td.tags %} [{{ td.tags | join(', ') }}]{% endif %}{% if td.recommended_sections %} Recommended sections: {{ td.recommended_sections | join(', ') }}{% endif +%}
 {% endfor %}
 {% else %}
 {% for template in available_templates %}
@@ -74,9 +74,9 @@ V2 Migration: Uses structured context from MovingHeadPlanningContext
 {% endif %}
 
 {% if audio_profile.planner_hints is defined and audio_profile.planner_hints %}
+{% if audio_profile.planner_hints.section_objectives is defined and audio_profile.planner_hints.section_objectives %}
 ### Section Planning Directives
 
-{% if audio_profile.planner_hints.section_objectives is defined and audio_profile.planner_hints.section_objectives %}
 {% for entry in audio_profile.planner_hints.section_objectives %}
 **{{ entry.section_id }}**:
 {% for obj in entry.objectives[:2] %}
@@ -131,9 +131,24 @@ V2 Migration: Uses structured context from MovingHeadPlanningContext
 
 The MacroPlanner has defined the following strategic guidance for each section. **Align your template selections with these targets:**
 
-**Song palette arc:** {{ macro_palette_arc }}
-**Motif continuity:** {{ macro_motif_continuity }}
-**Focal arc:** {{ macro_focal_arc }}
+{% if macro_palette_arc %}
+**Song palette arc:**
+{% for stop in macro_palette_arc %}
+- from `{{ stop.applies_from_section_id }}`: palette `{{ stop.palette.palette_id }}`{% if stop.palette.role is defined and stop.palette.role %} ({{ stop.palette.role }}){% endif %}, entered by {{ stop.transition }}
+{% endfor %}
+{% endif %}
+{% if macro_motif_continuity %}
+**Motif continuity:**
+{% for thread in macro_motif_continuity %}
+- `{{ thread.motif_id }}` in {{ thread.section_ids | join(', ') }} ({{ thread.evolution }}): {{ thread.description }}
+{% endfor %}
+{% endif %}
+{% if macro_focal_arc %}
+**Focal arc:**
+{% for focus in macro_focal_arc %}
+- `{{ focus.section_id }}`: lead {{ focus.lead_target.type }} `{{ focus.lead_target.id }}`
+{% endfor %}
+{% endif %}
 
 | Section | Energy | Motion | Style | Palette | Motifs | Coordination |
 |---------|--------|--------|-------|---------|--------|--------------|
@@ -164,7 +179,7 @@ The MacroPlanner has defined the following strategic guidance for each section. 
 
 Create a complete choreography plan for **{{ song_title | default('this song', true) }}** that:
 
-1. **Maps to song structure**: Design choreography for each section (intro, verse, chorus, bridge, outro)
+1. **Plans every section**: One entry for each row of the Song Structure table
 2. **Matches musical energy**: Use appropriate templates and intensity - builds for builds, impacts for drops
 3. **Answers the song**: Colour from the song's palette, accents on its musical and lyric moments
 4. **Creates visual interest**: Vary templates and timing throughout, avoid repetition
@@ -207,6 +222,19 @@ For every section:
 
 ### Bar Numbering
 
-- **1-indexed**: First bar = 1, last bar = {{ total_bars }}
-- Plan should cover bar 1 through bar {{ total_bars }}
-- Section bar ranges should align with song structure above
+- **1-indexed and inclusive**: First bar = 1, last bar = {{ total_bars }}; a section from
+  bar 9 to bar 16 plays bars 9 through 16
+- Each section's bars are exactly its row in the Song Structure table
+
+## Return
+
+Return the complete plan: one entry in `sections` for each of these song sections, in
+this order, over exactly these bars:
+{% for section in sections %}
+{% if loop.last or loop.nextitem.start_bar != section.start_bar %}
+- `{{ section.section_id }}`: bars {{ section.start_bar }}-{{ section.end_bar }}
+{% endif %}
+{% endfor %}
+
+Give each section a `reasoning` that names what it answers, and an `overall_strategy`
+of a few sentences on how the light follows this song.

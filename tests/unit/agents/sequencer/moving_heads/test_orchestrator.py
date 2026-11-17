@@ -1,5 +1,6 @@
 """Tests for V2 MovingHead orchestrator."""
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -33,7 +34,7 @@ from twinklr.core.agents.sequencer.moving_heads.context import (
     MovingHeadPlanningContext,
     TemplateDescription,
 )
-from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
 from twinklr.core.agents.sequencer.moving_heads.orchestrator import (
     MovingHeadPlannerOrchestrator,
     build_judge_variables,
@@ -194,6 +195,15 @@ def planning_context() -> MovingHeadPlanningContext:
     )
 
 
+REASON = "Answers the section's energy and its lyric hook with one fitting accent."
+STRATEGY = "The heads follow the song's energy and answer its lyric hooks in palette colour."
+
+
+def _answered(*args: Any, **fields: Any) -> PlanSection:
+    """`plan_section` with a reason, as the validator requires."""
+    return plan_section(*args, **{"reasoning": REASON, **fields})
+
+
 def _event(bar: int, beat: int, action: str, cue_id: str | None = None) -> dict[str, object]:
     return {
         "bar": bar,
@@ -210,9 +220,9 @@ def valid_plan() -> ChoreographyPlan:
     """Create a valid choreography plan."""
     return ChoreographyPlan(
         sections=[
-            plan_section("intro", 1, 8, "sweep_lr_fan_pulse"),
-            plan_section("verse_1", 9, 24, "circle_fan_hold"),
-            plan_section("chorus_1", 25, 40, "pendulum_chevron_breathe"),
+            _answered("intro", 1, 8, "sweep_lr_fan_pulse"),
+            _answered("verse_1", 9, 24, "circle_fan_hold"),
+            _answered("chorus_1", 25, 40, "pendulum_chevron_breathe"),
         ],
         overall_strategy="Build energy progressively",
     )
@@ -643,7 +653,7 @@ class TestOrchestratorIntegration:
             )
 
             plan = ChoreographyPlan(
-                sections=[plan_section("intro", 1, 8, "sweep_lr_fan_pulse")],
+                sections=[_answered("intro", 1, 8, "sweep_lr_fan_pulse")],
                 overall_strategy="Test",
             )
 
@@ -700,7 +710,7 @@ class TestOrchestratorIntegration:
         cue_id = "intro-home"
         plan = ChoreographyPlan(
             sections=[
-                plan_section(
+                _answered(
                     "intro",
                     1,
                     2,
@@ -709,7 +719,7 @@ class TestOrchestratorIntegration:
                     events=[_event(1, 1, "strobe_fast", cue_id)],
                 )
             ],
-            overall_strategy="Accentuate the lyric.",
+            overall_strategy=STRATEGY,
         )
         controller_result = IterationResult[ChoreographyPlan](
             success=True,
@@ -776,7 +786,7 @@ class TestOrchestratorIntegration:
         cue_id = "chorus-home"
         planner_plan = ChoreographyPlan(
             sections=[
-                plan_section(
+                _answered(
                     "chorus",  # Display name; normalizer must canonicalize it.
                     1,
                     2,
@@ -785,7 +795,7 @@ class TestOrchestratorIntegration:
                     events=[_event(2, 4, "strobe_fast", cue_id)],
                 )
             ],
-            overall_strategy="Accentuate the lyric.",
+            overall_strategy=STRATEGY,
         )
         verdict = JudgeVerdict(
             status=VerdictStatus.APPROVE,
@@ -883,7 +893,7 @@ class TestOrchestratorIntegration:
         )
         first = ChoreographyPlan(
             sections=[
-                plan_section(
+                _answered(
                     "chorus_1",
                     1,
                     2,
@@ -892,11 +902,11 @@ class TestOrchestratorIntegration:
                     events=[_event(2, 1, "hit", "ghost"), _event(5, 1, "closed")],
                 )
             ],
-            overall_strategy="Accentuate the lyric.",
+            overall_strategy=STRATEGY,
         )
         second = ChoreographyPlan(
-            sections=[plan_section("chorus_1", 1, 2, "sweep_lr_fan_pulse")],
-            overall_strategy="Accentuate the lyric.",
+            sections=[_answered("chorus_1", 1, 2, "sweep_lr_fan_pulse")],
+            overall_strategy=STRATEGY,
         )
         verdicts = [
             JudgeVerdict(
@@ -983,12 +993,12 @@ class TestOrchestratorIntegration:
             visual_hint="A bright hit.",
         )
         silent = ChoreographyPlan(
-            sections=[plan_section("chorus_1", 1, 2, "sweep_lr_fan_pulse")],
-            overall_strategy="x",
+            sections=[_answered("chorus_1", 1, 2, "sweep_lr_fan_pulse")],
+            overall_strategy=STRATEGY,
         )
         answered = ChoreographyPlan(
             sections=[
-                plan_section(
+                _answered(
                     "chorus_1",
                     1,
                     2,
@@ -997,7 +1007,7 @@ class TestOrchestratorIntegration:
                     events=[_event(1, 4, "hit", "hook")],
                 )
             ],
-            overall_strategy="x",
+            overall_strategy=STRATEGY,
         )
         verdict = JudgeVerdict(
             status=VerdictStatus.APPROVE,
@@ -1072,8 +1082,8 @@ class TestOrchestratorIntegration:
             visual_hint="A bright hit.",
         )
         silent = ChoreographyPlan(
-            sections=[plan_section("chorus_1", 1, 2, "sweep_lr_fan_pulse")],
-            overall_strategy="x",
+            sections=[_answered("chorus_1", 1, 2, "sweep_lr_fan_pulse")],
+            overall_strategy=STRATEGY,
         )
         verdicts = [
             JudgeVerdict(

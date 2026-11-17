@@ -418,3 +418,15 @@ def test_an_unanswered_high_cue_is_advised_and_an_answered_one_is_not() -> None:
         "no event; add one with moment_cue_id 'high-2': an accent that suits its emphasis "
         "and visual hint"
     ]
+
+
+def test_a_high_cue_of_a_section_the_plan_left_out_is_unanswered() -> None:
+    sections = [
+        _section("chorus_1", start_ms=0, end_ms=2_000),
+        _section("chorus_2", start_ms=2_000, end_ms=4_000),
+    ]
+    lyrics = _lyrics(_cue("hook", 2_500, "chorus_2").model_copy(update={"emphasis": "HIGH"}))
+    plan = _plan(events=[], moment_cues=())
+
+    (line,) = unanswered_high_cues(plan, lyrics, sections)
+    assert line.startswith("section 'chorus_2' is not planned, so its HIGH lyric moment cue 'hook'")

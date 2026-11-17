@@ -423,14 +423,119 @@ Claude does not accept an `enum` under a list-valued `type`. What changed:
 
 One further request will be sent by the integrator after this fix.
 
+## Live probe 2 (2026-11-17): compiled, degenerate plan; offline diagnosis
+
+The integrator's second request (log `probe_live_2.log`, response `probe_response.json`,
+schema `50a67e62…`): Claude compiled and enforced the schema (`json_schema`, 14.6 s,
+21,042 prompt / 1,218 completion tokens, `end_turn`). The plan was one section, `intro`
+bars 1-7, with `reasoning` and `overall_strategy` both `"x"`, and no lyric cue answered.
+The probe reported it clean (`validator_errors []`, `unanswered_high_cues []`, exit 0).
+
+### Why it passed (reproduced offline, no request)
+
+`probe_planner.py --replay probe_response.json` runs the saved response through what
+production runs after the provider returns (`ChoreographyPlan` validation, the normaliser,
+`create_validator_function`, `unanswered_high_cues`). Run against the tree before this
+round, it gives no error:
+
+| Check (before) | Result on the probe 2 plan |
+|---|---|
+| validator errors | `[]` |
+| warnings | `Section 'intro' end_bar (7) doesn't match song structure (8)`; `Plan doesn't cover all song sections: chorus, outro, verse` |
+| `unanswered_high_cues` | `[]` (it looked only at planned sections) |
+
+Three defects, all older than W2 (the same code is at `10f3ac49`; the structure's bar
+arithmetic dates from 2026-02-03), none lost by W2:
+
+1. **Coverage and bar mismatches were warnings**, and the controller sends back errors only.
+2. **The validator keyed song sections by display name** (`verse`, `chorus`), plans by
+   `section_id` (`verse_1`), so a planned `verse_1` would never have matched either.
+3. **The Song Structure table was unplannable.** It gave each section's `end_bar` as the
+   bar its end time resolves to, which is the *next* section's first bar: `intro 1-8,
+   verse_1 8-23, chorus_1 23-38, outro 38-46` on a 45-bar song. Plan bars are inclusive, so
+   a plan copying the table failed validation with three overlaps and `outro` beyond bar
+   45; the model's `intro 1-7` was the only consistent reading of the table. Before:
+   a structure-copied plan → 4 errors; now → none.
+
+Separately, the probe called `HeuristicValidator.validate` and printed `unanswered_high_cues`
+but did not fail on placeholder text or an unplanned section.
+
+### Fixed
+
+- `context.py`: a section's `end_bar` is the bar before the one its end time resolves to
+  (inclusive, contiguous; the last ends on the song's last bar). Probe song: `intro 1-7,
+  verse_1 8-22, chorus_1 23-37, outro 38-45`. A section shorter than a bar is still
+  reported as collapsed.
+- `heuristic_validator.py`: keyed by `section_id`; an unplanned song section is an
+  **error** naming each with its bars; a section's start or end bar differing from the
+  structure is an **error**; a `reasoning` or `overall_strategy` under 20 characters or
+  four words is an **error** (`MIN_REASONING_CHARACTERS`). A section shorter than a bar
+  (sharing its start bar with the next) is not required, since planning both would overlap.
+  The evaluation report's `validate_plan_structure` uses the same validator, so a recorded
+  plan with empty reasons now reports those errors too.
+- `moment_cues.unanswered_high_cues`: a HIGH cue whose section is not planned is counted
+  (`section 'chorus_1' is not planned, so its HIGH lyric moment cue 'chorus-light' …`).
+- Replay now: 3 validator errors (intro placeholder reasoning; `verse_1`, `chorus_1`,
+  `outro` unplanned with their bars; placeholder strategy), one unanswered HIGH cue, exit 1.
+
+### Why the model answered like that (request vs production)
+
+Same request shape as production: `AsyncAgentRunner` (planner is `CONVERSATIONAL`) joins
+developer + system into one system prompt with `\n\n`; the provider's `_split_messages`
+does the same for the probe's developer, system, user list. Same `effort` (high) and
+`max_tokens` (50,000) from the spec; production also passes `timeout_seconds` and the
+spec's fallback flag, which change nothing on an enforced call. No `thinking` parameter is
+sent; on Opus 5.5 that is adaptive thinking. `reasoning_tokens=0` is a reporting artifact:
+`_extract_token_usage` does not split thinking out of `output_tokens`. The response JSON is
+860 characters (a few hundred tokens) of 1,218 output tokens, so some thinking likely ran,
+briefly; whether it did is not observable from the log.
+
+Defects in what the model read (`msg_user` rendered from the probe 2 request):
+- Template library: all templates on one line (Jinja `trim_blocks` ate the newline after
+  `{% endif %}`).
+- `### Section Planning Directives` heading rendered with nothing under it.
+- Song palette arc, motif continuity and focal arc dumped as Python dicts.
+- The prompt ended at "Bar Numbering" saying "Plan should cover bar 1 through bar 45",
+  with no list of the sections to return; the table it pointed to overlapped.
+- Schema descriptions carried docstring noise: a `>>> PlanTransition(...)` doctest and a
+  Python-name `Attributes:` list (`SMOOTH_INTERPOLATION`) for `TransitionStrategy`.
+- The synthetic song read as a fixture ("Test Song" by "Test Artist", every section
+  `MED`, one generic macro note), which may have invited a token answer.
+
+Best-supported explanation: the request never stated the deliverable concretely (every
+section, over these bars), its bar table contradicted the validator, and nothing in the
+loop rejected a one-section placeholder plan, so a minimal schema-valid answer cost the
+model nothing. Hypotheses only another live request can test: that the closing section
+list and inclusive table alone produce a full plan; that the fixture-like song contributed;
+that adaptive thinking at `high` ran little or none here.
+
+### Changed for the next request
+
+- `planner/user.j2`: one template per line; the directives heading only when there are
+  objectives; palette arc, motif continuity and focal arc as readable lines; the plan's
+  first requirement is "one entry for each row of the Song Structure table"; bar numbering
+  says inclusive; the prompt now ends with `## Return`: each section id with its bars, in
+  order, and a request for real reasons and a strategy. Pinned by
+  `TestPlannerUserPromptRendering` (rendered from production `build_planner_variables`).
+- `transition.py`: `PlanTransition` docstring is one line; `TransitionStrategy` describes
+  its wire values. Claude schema 10,941 → 10,297 bytes; still 6 unions / 60 nodes; OpenAI
+  40 / 7 / 166. `response_schema_hash` `50a67e62…` → `e09b6057…`.
+- Probe: the synthetic song has a title, artist, mood arc, section objectives, an energy
+  arc (`LOW`, `MED`, `PEAK`, `RELEASE`) and notes; it runs the production post-provider
+  path; prints a per-section table (song bars, plan bars, intent set, parts, events,
+  reasoning) and each lyric cue's answer; fails, saying why, on an unplanned section,
+  placeholder text, any production validator error, or an unanswered HIGH cue.
+
 ## Verification (this tree, fresh)
 
 | Command | Result |
 |---|---|
-| `uv run pytest tests -q --no-cov` | 6758 passed, 30 skipped, 24 xfailed |
+| `uv run pytest tests -q --no-cov` | 6765 passed, 30 skipped, 24 xfailed (after the probe 2 round) |
 | `uv run ruff check .` | All checks passed |
 | `uv run ruff format --check .` | 1296 files already formatted |
 | `uv run mypy .` | no issues in 649 source files |
+| `probe_planner.py` (dry run) | enforced, 53,793 request bytes, exit 0 |
+| `probe_planner.py --replay probe_response.json` | 3 validator errors, 1 unanswered HIGH cue, exit 1 |
 | `pytest tests/regression/test_mh_intent_parity.py` | 2 passed, 24 xfailed |
 | `… --runxfail` | 24 failed (target assertions, as at `10f3ac49`), 2 passed |
 | `pytest tests/regression/test_mh_pins.py` | 45 passed |

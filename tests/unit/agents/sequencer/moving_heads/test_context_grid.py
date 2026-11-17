@@ -89,9 +89,16 @@ class TestMsToBarWithGrid:
         assert context.total_bars == len(UNEVEN_BARS)
 
     def test_prompt_section_bars_come_from_the_grid(self, uneven: BeatGrid) -> None:
+        """Inclusive bars: a section ends on the bar before the one its end time
+        resolves to, so consecutive sections share no bar and the last ends on the
+        song's last bar (bar 5 starts at the song's end, 10000 ms)."""
         context = make_context(uneven)
         sections = context.for_prompt()["song_structure"]["sections"]
-        assert [(s["start_bar"], s["end_bar"]) for s in sections] == [(1, 3), (3, 5)]
+        assert [(s["start_bar"], s["end_bar"]) for s in sections] == [(1, 2), (3, 4)]
+        assert all(
+            set(s) == {"name", "section_id", "start_ms", "end_ms", "start_bar", "end_bar"}
+            for s in sections
+        )
 
     def test_section_starts_are_monotonic_non_decreasing(self, uneven: BeatGrid) -> None:
         """Rounding must never reorder sections, however short they are."""
