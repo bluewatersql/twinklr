@@ -46,9 +46,8 @@ from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.fixtures.presets import PoseDegrees
 from twinklr.core.config.render_policy import UnsupportedRenderModeError
-from twinklr.core.curves.registry import CurveRegistry
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
-from twinklr.core.sequencer.models.context import StepCompileContext, TemplateCompileContext
+from twinklr.core.sequencer.models.context import TemplateCompileContext
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import (
     ContinuousTrajectory,
@@ -77,14 +76,11 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
     plan_prepositions,
 )
 from twinklr.core.sequencer.moving_heads.compile.scheduler import schedule_repeats
-from twinklr.core.sequencer.moving_heads.compile.step_compiler import compile_step
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
     compile_physical_template,
-    compile_template,
 )
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import frame_times
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
-from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
 from twinklr.core.sequencer.moving_heads.pipeline import (
     RenderingPipeline,
     check_physical_templates,
@@ -141,7 +137,6 @@ def _template(*steps: dict[str, Any], **fields: Any) -> Template:
 def _context(
     template: Template, rig: FixtureGroup, *, duration_bars: int, start_bar: int = 1
 ) -> TemplateCompileContext:
-    registries = create_default_registries()
     return TemplateCompileContext(
         section_id="verse",
         template_id=template.template_id,
@@ -149,10 +144,6 @@ def _context(
         beat_grid=_GRID,
         start_bar=start_bar,
         duration_bars=duration_bars,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
         presets=rig.presets,
         topology=rig_topology(rig),
         fixture_group_id=rig.group_id,
@@ -756,37 +747,9 @@ def test_short_section_rejects_a_once_cycle_it_cuts() -> None:
     assert {(s.t0_ms, s.t1_ms) for s in segments} == {(0, 3000)}
 
 
-def test_once_rejected_by_legacy_compile() -> None:
-    """The legacy compile refuses a ONCE template, and a relative path, by name."""
-    template = _once()
-    registries = create_default_registries()
-    context = _context(template, physical_rig(), duration_bars=1)
-    with pytest.raises(ValueError, match=r"ONCE.*physical_v2"):
-        compile_template(template, context)
-
-    step = TemplateStep.model_validate(path_step("o", "circle", transform={"reverse": True}))
-    step_context = StepCompileContext(
-        section_id="verse",
-        segment_id="A",
-        template_id="p23_probe",
-        fixture_id="MH1",
-        role="LEFT",
-        calibration={},
-        start_ms=0,
-        duration_ms=1000,
-        beat_grid=_GRID,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
-    )
-    with pytest.raises(ValueError, match="physical_v2"):
-        compile_step(step, step_context)
-
-
 def test_once_template_passes_validate_repeat_contract() -> None:
     """One cycle is an exact, hole-free span, so the unchanged contract accepts ONCE
-    templates of one step and of two steps; registration leaves 37 builtins after."""
+    templates of one step and of two steps; registration leaves the registry as it was."""
     two = physical_template_doc(
         "p23_once_two",
         [
@@ -799,9 +762,10 @@ def test_once_template_passes_validate_repeat_contract() -> None:
     for document in (one, two):
         validate_repeat_contract(document.template)
         validate_template_document(document)
+    before = len(REGISTRY.list_all())
     with registered_templates(two):
-        assert len(REGISTRY.list_all()) == 38
-    assert len(REGISTRY.list_all()) == 37
+        assert len(REGISTRY.list_all()) == before + 1
+    assert len(REGISTRY.list_all()) == before
 
 
 def test_once_needs_finite_steps() -> None:
@@ -1043,7 +1007,6 @@ def _placement(
     relative to the section start, and the reposition errors, or the compile error."""
     phase_map = build_musical_phase_map(grid)
     start_limit, end_limit = limits or physical_cue_limits(phase_map, int(grid.duration_ms))
-    registries = create_default_registries()
     context = TemplateCompileContext(
         section_id="placement",
         template_id=template.template_id,
@@ -1051,10 +1014,6 @@ def _placement(
         beat_grid=grid,
         start_bar=start_bar,
         duration_bars=duration_bars,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
         presets=rig.presets,
         topology=rig_topology(rig),
         fixture_group_id=rig.group_id,
@@ -1225,7 +1184,6 @@ def _once_reference(template_id: str, grid: BeatGrid, rig: FixtureGroup) -> bool
     bars = sum(1 for bar in grid.bar_boundaries if bar < grid.duration_ms)
     profiles = {f.fixture_id: f.config.physical_profile for f in rig.expand_fixtures()}
     initial = dict.fromkeys(profiles, physical_job().moving_heads.initial_states["MH1"])
-    registries = create_default_registries()
     for start_bar in range(1, bars + 1):
         if bars - start_bar + 1 < template.repeat.cycle_bars:
             continue
@@ -1236,10 +1194,6 @@ def _once_reference(template_id: str, grid: BeatGrid, rig: FixtureGroup) -> bool
             beat_grid=grid,
             start_bar=start_bar,
             duration_bars=bars - start_bar + 1,
-            curve_registry=CurveRegistry(),
-            geometry_registry=registries["geometry"],
-            movement_registry=registries["movement"],
-            dimmer_registry=registries["dimmer"],
             presets=rig.presets,
             topology=rig_topology(rig),
             fixture_group_id=rig.group_id,

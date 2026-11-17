@@ -25,7 +25,6 @@ import tempfile
 import time
 from typing import Any
 
-from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import MHRenderPolicy
 from twinklr.core.formats.xlights.sequence.emission import EmissionRequest, EmissionSession
 from twinklr.core.formats.xlights.sequence.exporter import XSQExporter
@@ -38,13 +37,11 @@ from twinklr.core.formats.xlights.sequence.models.xsq import (
 from twinklr.core.formats.xlights.sequence.trace import write_xsq_trace_sidecar
 from twinklr.core.formats.xlights.sequence.xmap import XMAP_SUFFIX, write_xmap
 from twinklr.core.formats.xlights.sequence.xtiming import export_timing_tracks
-from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     FrameRun,
     check_output_budget,
     measure_output,
 )
-from twinklr.core.sequencer.moving_heads.export.xsq_adapter import XsqAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -79,106 +76,6 @@ class DeliveryArtifacts:
     @property
     def all_paths(self) -> tuple[Path, ...]:
         return (self.xsq_path, *self.xtiming_paths, self.xmap_path, self.trace_path)
-
-
-def build_sequence(
-    segments: list[FixtureSegment],
-    time_markers: list[TimeMarker],
-    *,
-    fixture_group: FixtureGroup,
-    media_file: str,
-    duration_ms: int | None = None,
-    song: str = "",
-    artist: str = "",
-    timeline_tracks: list[TimingTrack] | None = None,
-) -> XSequence:
-    """Build the fresh sequence for `segments` — no user document involved.
-
-    Args:
-        segments: Compiled fixture segments to export.
-        time_markers: Section markers built during the render.
-        fixture_group: Fixture group for DMX mapping and model names.
-        media_file: Audio file the sequence plays against; must be non-empty.
-        duration_ms: Sequence duration. Defaults to the last segment's end; when given
-            (normally the song's length) the longer of the two wins, so a plan that
-            stops before the song ends still yields a sequence spanning the song.
-        song: Song title for the head.
-        artist: Artist for the head.
-        timeline_tracks: Timing tracks from the audio analysis (beats, bars, lyrics…).
-
-    Returns:
-        The populated `XSequence`.
-
-    Raises:
-        ValueError: If `media_file` is empty.
-    """
-    last_segment_ms = max((segment.t1_ms for segment in segments), default=0)
-    xsq = _fresh_sequence(
-        time_markers,
-        media_file=media_file,
-        duration_ms=max(last_segment_ms, duration_ms or 0),
-        song=song,
-        artist=artist,
-        timeline_tracks=timeline_tracks,
-    )
-
-    placements = XsqAdapter().convert(segments, fixture_group, xsq)
-
-    logger.debug(
-        "Built fresh sequence: %d segments, %d placements, %d models",
-        len(segments),
-        len(placements),
-        len(xsq.element_effects),
-    )
-    return xsq
-
-
-def export_delivery(
-    segments: list[FixtureSegment],
-    time_markers: list[TimeMarker],
-    *,
-    fixture_group: FixtureGroup,
-    output_path: Path,
-    media_file: str,
-    duration_ms: int | None = None,
-    song: str = "",
-    artist: str = "",
-    timeline_tracks: list[TimingTrack] | None = None,
-) -> DeliveryArtifacts:
-    """Write the run's `.xsq`, `.xtiming` files and `.xmap`.
-
-    The sidecars are named from `output_path`'s stem and land beside it.
-
-    Args:
-        segments: Compiled fixture segments to export.
-        time_markers: Section markers built during the render.
-        fixture_group: Fixture group for DMX mapping and model names.
-        output_path: Destination for the `.xsq`.
-        media_file: Audio file the sequence plays against; must be non-empty.
-        duration_ms: Song duration, when known.
-        song: Song title for the head.
-        artist: Artist for the head.
-        timeline_tracks: Timing tracks from the audio analysis.
-
-    Returns:
-        The artifacts written.
-
-    Raises:
-        ValueError: If `media_file` is empty.
-    """
-    xsq = build_sequence(
-        segments,
-        time_markers,
-        fixture_group=fixture_group,
-        media_file=media_file,
-        duration_ms=duration_ms,
-        song=song,
-        artist=artist,
-        timeline_tracks=timeline_tracks,
-    )
-
-    XSQExporter().export(xsq, output_path, pretty=True)
-    return _write_sidecars(xsq, output_path)
 
 
 def build_physical_sequence(

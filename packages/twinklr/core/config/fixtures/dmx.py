@@ -128,8 +128,6 @@ class DmxMapping(BaseModel):
     _pan_channel_obj: ChannelWithConfig | None = None
     _tilt_channel_obj: ChannelWithConfig | None = None
     _dimmer_channel_obj: ChannelWithConfig | None = None
-    _pan_fine_channel_obj: ChannelWithConfig | None = None
-    _tilt_fine_channel_obj: ChannelWithConfig | None = None
     _shutter_channel_obj: ChannelWithConfig | None = None
     _color_channel_obj: ChannelWithConfig | None = None
     _gobo_channel_obj: ChannelWithConfig | None = None
@@ -148,8 +146,6 @@ class DmxMapping(BaseModel):
         self._pan_channel_obj = _normalize(self.pan_channel)
         self._tilt_channel_obj = _normalize(self.tilt_channel)
         self._dimmer_channel_obj = _normalize(self.dimmer_channel)
-        self._pan_fine_channel_obj = _normalize(self.pan_fine_channel)
-        self._tilt_fine_channel_obj = _normalize(self.tilt_fine_channel)
         self._shutter_channel_obj = _normalize(self.shutter_channel)
         self._color_channel_obj = _normalize(self.color_channel)
         self._gobo_channel_obj = _normalize(self.gobo_channel)
@@ -176,18 +172,6 @@ class DmxMapping(BaseModel):
         """Dimmer channel number."""
         assert self._dimmer_channel_obj is not None
         return self._dimmer_channel_obj.channel
-
-    # Pan fine properties
-    @property
-    def pan_fine(self) -> int | None:
-        """Pan fine channel number."""
-        return self._pan_fine_channel_obj.channel if self._pan_fine_channel_obj else None
-
-    # Tilt fine properties
-    @property
-    def tilt_fine(self) -> int | None:
-        """Tilt fine channel number."""
-        return self._tilt_fine_channel_obj.channel if self._tilt_fine_channel_obj else None
 
     # Shutter properties
     @property

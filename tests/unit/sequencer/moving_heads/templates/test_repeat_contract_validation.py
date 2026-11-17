@@ -11,6 +11,7 @@ from __future__ import annotations
 from pydantic import ValidationError
 import pytest
 
+from tests.support.mh_physical import CATALOG_IDS, physical_catalog
 from twinklr.core.config.poses import TiltPose
 from twinklr.core.sequencer.models.enum import (
     Intensity,
@@ -34,10 +35,6 @@ from twinklr.core.sequencer.models.template import (
 from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
 from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
-from twinklr.core.sequencer.moving_heads.templates import (
-    list_templates,
-    load_builtin_templates,
-)
 from twinklr.core.sequencer.moving_heads.templates.library import (
     InvalidTemplateError,
     TemplateRegistry,
@@ -153,22 +150,19 @@ def test_parallel_steps_are_accepted() -> None:
 
 
 def test_every_shipped_template_passes_the_validator() -> None:
-    load_builtin_templates()
-    template_ids = [info.template_id for info in list_templates()]
-    assert len(template_ids) == 37
-
-    for template_id in template_ids:
-        validate_repeat_contract(get_template(template_id).template)
+    with physical_catalog() as template_ids:
+        assert sorted(template_ids) == list(CATALOG_IDS)
+        for template_id in template_ids:
+            validate_repeat_contract(get_template(template_id).template)
 
 
 def test_every_shipped_template_schedules_all_of_its_steps() -> None:
     """The consequence the validator exists to guarantee, stated directly."""
-    load_builtin_templates()
-
-    for info in list_templates():
-        template = get_template(info.template_id).template
-        declared = {step.step_id for step in template.steps}
-        assert declared == set(template.repeat.loop_step_ids), (
-            f"{info.template_id} declares steps it never schedules: "
-            f"{sorted(declared - set(template.repeat.loop_step_ids))}"
-        )
+    with physical_catalog() as template_ids:
+        for template_id in template_ids:
+            template = get_template(template_id).template
+            declared = {step.step_id for step in template.steps}
+            assert declared == set(template.repeat.loop_step_ids), (
+                f"{template_id} declares steps it never schedules: "
+                f"{sorted(declared - set(template.repeat.loop_step_ids))}"
+            )

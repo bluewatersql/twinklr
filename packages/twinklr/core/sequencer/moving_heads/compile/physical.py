@@ -386,8 +386,7 @@ def wheel_changes(
 ) -> tuple[DiscreteChange, ...]:
     """List every color and gobo wheel selection the encoded frames make.
 
-    See `_discrete_changes`. Masking and settle are scheduled by the transaction pass,
-    never by the legacy channel blender.
+    See `_discrete_changes`. Masking and settle are scheduled by the transaction pass.
     """
     return _discrete_changes(segments, profiles, (ChannelName.COLOR, ChannelName.GOBO))
 
@@ -540,8 +539,7 @@ def _require_physical_step(step: TemplateStep, context: StepCompileContext) -> F
         raise reject(
             f"step {step.step_id!r} of template {context.template_id!r} has no "
             "movement.physical data. Legacy normalized curves are never reinterpreted as "
-            "angles: migrate the template with explicit physical data to render it under "
-            "physical_v2"
+            "angles: migrate the template with explicit physical data to render it"
         )
     legacy = _legacy_fields(step)
     if legacy:

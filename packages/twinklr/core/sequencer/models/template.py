@@ -644,23 +644,6 @@ class TemplateStep(BaseModel):
         default=None, exclude_if=lambda value: value is None
     )
 
-    @property
-    def has_physical_data(self) -> bool:
-        """Whether any component carries data for the physical renderer."""
-        return (
-            self.movement.physical is not None
-            or self.dimmer.physical is not None
-            or self.physical_shutter is not None
-            or self.physical_shutter_state is not None
-            or self.physical_color is not None
-            or self.physical_gobo is not None
-            or self.physical_reposition_fallback is not None
-            or self.component_refs is not None
-            or bool(self.physical_distribution)
-            or self.physical_visibility is not None
-            or self.physical_zoom is not None
-        )
-
     @model_validator(mode="after")
     def _validate_physical_shutter(self) -> "TemplateStep":
         if self.physical_shutter is not None and self.physical_shutter_state is not None:
@@ -872,7 +855,7 @@ class Template(BaseModel):
     defaults: dict[str, Any] = Field(default_factory=dict)
     steps: list["TemplateStep"] = Field(default_factory=list)
     metadata: TemplateMetadata | None = None
-    # Physical renderer only; left out of dumps when empty, refused by the legacy compile.
+    # Physical renderer only; left out of dumps when empty.
     physical_overlays: tuple[AttributeOverlay, ...] = Field(
         default=(), exclude_if=lambda value: not value
     )

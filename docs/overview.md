@@ -24,20 +24,11 @@ The core design principle: **LLMs plan creative intent; deterministic code handl
 
 Twinklr currently supports:
 
-- **Moving head fixtures** — the renderer can emit pan, tilt, dimmer, shutter, color,
-  and gobo when the fixture maps those channels. In the 37 Python builtins, every
-  template declares dimmer behavior and one template each declares color, shutter, or
-  gobo directly; pan/tilt come from geometry and movement handlers, while schema-v2
-  section intent can override color and add timed shutter/gobo events; that intent
-  reaches a mapped channel only within channels 1-16. See
-  `packages/twinklr/core/sequencer/moving_heads/templates/builtins/` and
-  `packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py`.
-  An opt-in `physical_v2` renderer (job schema 3.1) renders templates that carry
-  explicit physical data onto fixtures that declare a `physical_profile`: complete
-  20 ms frames as constant DMX effects over model-relative channels 1-48 (the xLights
-  DMX effect's limit), 16-bit pan/tilt as coarse/fine byte pairs, and dark
-  repositioning planned between cues. None of the 37 builtins carries physical data;
-  a `physical_v2` run instead loads seven physical families from
+- **Moving head fixtures** — the renderer renders templates that carry explicit
+  physical data onto fixtures that declare a `physical_profile`: complete 20 ms frames
+  as constant DMX effects over model-relative channels 1-48 (the xLights DMX effect's
+  limit), 16-bit pan/tilt as coarse/fine byte pairs, and dark repositioning planned
+  between cues. Every run loads seven physical families from
   `catalog/templates/moving_heads_physical` (one of them, `zoom_wave`, a synthetic
   pilot of a zoom axis) and offers the planner those the rig can render. Planner intent is not applied on that path. See
   `packages/twinklr/core/sequencer/moving_heads/compile/physical.py` and
@@ -155,13 +146,13 @@ _Source: `packages/twinklr/core/sequencer/moving_heads/templates/`_
 
 Pre-built choreography units define tested geometry, movement, and channel behavior as self-contained building blocks. The LLM selects templates and typed categorical intent; it never invents movement patterns or fixture math from scratch.
 
-The validating registry loads both Python builtins and data-form `TemplateDoc` JSON, with explicit collision/override rules for progressive migration. Each template can provide presets and metadata used by LLM and deterministic selection.
+The validating registry loads the data-form `TemplateDoc` JSON family catalog and any `--template-dir` documents, with explicit collision/override rules. Each template can provide presets and metadata used by LLM and deterministic selection.
 
 ### Sequencer & Rendering
 
 _Source: `packages/twinklr/core/sequencer/`_
 
-- **Moving heads** (`sequencer/moving_heads/`) — template compiler, schema-v2 intent resolution, fixture segment generation, DMX channel mapping, XSQ export.
+- **Moving heads** (`sequencer/moving_heads/`) — physical template compiler, pre-planning gate, dark repositioning, frame encoder, XSQ export.
 - **Display** (`sequencer/display/`) — 24 effect handlers for RGB/pixel elements, composition engine.
 - **Curves** (`packages/twinklr/core/curves/`) — curve generation library (native + custom easing functions) used for smooth DMX value transitions.
 - **XSQ format** (`packages/twinklr/core/formats/xlights/`) — native xLights `.xsq` file reader/writer with custom value curve support.
@@ -175,9 +166,9 @@ Pydantic V2 models with a `ConfigBase` class providing `load_or_default()` for f
 | Config | Default File | Purpose |
 |---|---|---|
 | `AppConfig` | `config.json` | App-level settings: LLM provider, API key, cache dirs, audio processing, logging |
-| `JobConfig` | `job_config.json` | Job-specific: agent orchestration, fixture config path, asset policy, transitions, timing tracks, and final-plan checkpoint writing |
+| `JobConfig` | `job_config.json` | Job-specific: agent orchestration, fixture config path, asset policy, moving-head render policy, timing tracks, and final-plan checkpoint writing |
 
-Schema version 3.0 is the default and 3.1 is also accepted (`JobConfig.schema_version`); 3.1 is required to select the opt-in `physical_v2` moving-head render mode, which needs a `physical_profile` on every fixture and a usable `moving_heads.initial_states` entry for each, and is refused when the fixtures load, before any analysis, when they are missing. Config files are not committed to the repo — create them from the documented field defaults in `packages/twinklr/core/config/models.py`.
+Schema version 3.1 is the only one accepted and the default (`JobConfig.schema_version`). The moving-head renderer needs a `physical_profile` on every fixture and a usable `moving_heads.initial_states` entry for each; a job is refused when the fixtures load, before any analysis, when they are missing. Config files are not committed to the repo — create them from the documented field defaults in `packages/twinklr/core/config/models.py`.
 
 ### Session Coordinator
 

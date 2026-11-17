@@ -257,19 +257,17 @@ def _normalize_group(entry: ShowTraceEntry, manifest: ShowEvaluationManifest) ->
 
 
 def show_emissions(trace: ShowTraceV2) -> list[ShowTraceEntry]:
-    """The trace's deduplicated emissions, a physical moving head's as seen onsets.
+    """The trace's deduplicated emissions, each moving head's as seen onsets.
 
-    A trace with a physical render record writes each moving head as constant DMX
-    frame runs. Its runs made only of preposition segments (dark transactions and
-    parks) and those starting inside a recorded dark span (`render.dark_spans`) are
-    dark and left out; the remaining runs of one element are merged while they follow
-    each other with the same representative source, so each is one onset from where a
-    cue is first seen. Visibility inside a cue's own content (an envelope) is not
-    known to the trace and is not taken out. Any other trace is read as it is.
+    The trace writes each moving head as constant DMX frame runs. Its runs made only of
+    preposition segments (dark transactions and parks) and those starting inside a
+    recorded dark span (`render.dark_spans`) are dark and left out; the remaining runs
+    of one element are merged while they follow each other with the same
+    representative source, so each is one onset from where a cue is first seen.
+    Visibility inside a cue's own content (an envelope) is not known to the trace and
+    is not taken out.
     """
     entries = _deduplicate(trace.entries)
-    if trace.render is None:
-        return entries
     spans = [(int(start), int(end)) for start, end in trace.render.get("dark_spans", [])]
     onsets: list[ShowTraceEntry] = []
     current: dict[str, int] = {}  # element -> index of its latest onset

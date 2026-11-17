@@ -1,21 +1,13 @@
 """Load moving-head templates from strict JSON documents.
 
-Python builtins load first and configured data directories load second. Collisions
-across normalized template IDs, display names, or explicit aliases are a loud error
-with both sources named. Callers must pass ``allow_overrides=True`` to shadow the
-exact same template ID with a data document; even then, aliases owned by any other
-template cannot be stolen. The registry preflights the entire key set before removing
-the old source's aliases/factory/metadata, so a failed override leaves it intact.
-
-Tracked template data lives under the existing repository catalog root at
-``catalog/templates/moving_heads``. That shares P1K-T3's data home without pretending
-that ``TemplateDoc`` and ``EffectRecipe`` already have one schema. Structurally they
-are converging on one catalog with two renderers, later; unifying them is deliberately
-outside this loader.
-
-The physical family catalog lives beside it, at
-``catalog/templates/moving_heads_physical``, and loads only for a ``physical_v2`` job
-(``admit_physical_catalog``), between the builtins and any ``--template-dir``.
+The family catalog (``catalog/templates/moving_heads_physical``) loads first
+(``admit_physical_catalog``) and configured data directories (``--template-dir``)
+second. Collisions across normalized template IDs, display names, or explicit aliases
+are a loud error with both sources named. Callers must pass ``allow_overrides=True``
+to shadow the exact same template ID with a data document; even then, aliases owned by
+any other template cannot be stolen. The registry preflights the entire key set before
+removing the old source's aliases/factory/metadata, so a failed override leaves it
+intact.
 """
 
 from __future__ import annotations
@@ -23,7 +15,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -34,17 +26,10 @@ from twinklr.core.sequencer.moving_heads.templates.library import (
     TemplateRegistry,
 )
 
-if TYPE_CHECKING:
-    from twinklr.core.config.models import JobConfig
-
-DEFAULT_DATA_TEMPLATE_DIR = (
-    Path(__file__).resolve().parents[6] / "catalog" / "templates" / "moving_heads"
-)
 PHYSICAL_TEMPLATE_DIR = (
     Path(__file__).resolve().parents[6] / "catalog" / "templates" / "moving_heads_physical"
 )
-"""The physical family catalog: outside `DEFAULT_DATA_TEMPLATE_DIR`, whose documents
-must stay model-equal to Python builtins and which loads recursively."""
+"""The family catalog."""
 
 
 class TemplateDataError(ValueError):
@@ -122,24 +107,13 @@ def load_templates_from_directory(
     return registered
 
 
-def admit_physical_catalog(
-    job_config: JobConfig, *, registry: TemplateRegistry = REGISTRY
-) -> list[str]:
-    """Hold the physical family catalog in `registry` exactly when the job is `physical_v2`.
-
-    A physical job registers each catalog document, keeping one an earlier run in the
-    same process already admitted from the catalog; any other job removes every catalog
-    document again. Nothing else loads `PHYSICAL_TEMPLATE_DIR`, so a legacy run, the
-    deterministic selector and the shared registry's 37 builtins are unchanged.
+def admit_physical_catalog(*, registry: TemplateRegistry = REGISTRY) -> list[str]:
+    """Hold the family catalog in `registry`: register each catalog document, keeping one
+    an earlier run in the same process already admitted from the catalog.
 
     Returns:
-        The catalog's template IDs now registered, in path order; none for a legacy job.
+        The catalog's template IDs now registered, in path order.
     """
-    if job_config.moving_heads.mode != "physical_v2":
-        for info in registry.list_all():
-            if in_physical_catalog(info.template_id, registry=registry):
-                registry.unregister(info.template_id)
-        return []
     admitted: list[str] = []
     for path in discover_template_documents(PHYSICAL_TEMPLATE_DIR):
         document = load_template_document(path)

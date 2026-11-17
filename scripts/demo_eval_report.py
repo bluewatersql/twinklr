@@ -54,18 +54,12 @@ async def main_async():
 
     # Configure evaluation
     config = EvalConfig(
-        samples_per_bar=96,  # High resolution
-        clamp_warning_threshold=0.10,  # 10% warning
-        clamp_error_threshold=0.25,  # 25% error
         plot_all_roles=False,  # Auto-select representative roles
         include_dmx_plots=False,  # Normalized only for now
         output_format=["json", "md"],
     )
 
     logger.debug("Configuration:")
-    logger.debug(f"  Samples per bar: {config.samples_per_bar}")
-    logger.debug(f"  Clamp warning: {config.clamp_warning_threshold * 100}%")
-    logger.debug(f"  Clamp error: {config.clamp_error_threshold * 100}%")
     logger.debug(f"  Output formats: {config.output_format}\n")
 
     # Generate report (async)

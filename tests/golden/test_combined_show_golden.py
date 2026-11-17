@@ -1,15 +1,24 @@
-"""Headline P3-T5 artifact: actual DMX + Spirals + chase in one XSequence."""
+"""Headline P3-T5 artifact: physical moving-head DMX + Spirals + chase in one XSequence.
+
+The display half is pinned effect for effect (type, time ranges, settings and palette
+strings, and its trace entries without their shared-table indices); the moving-head
+half is the physical render, pinned by its render fingerprint, effect count and the
+hash of its effects and trace entries.
+"""
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+import hashlib
 import json
 from pathlib import Path
+from typing import Any
 
+import pytest
+
+from tests.support.mh_physical import family_job, family_rig, physical_catalog
 from twinklr.core.agents.audio.profile.models import SongSectionRef
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
-from twinklr.core.config.fixtures import FixtureGroup, FixtureInstance
-from twinklr.core.config.fixtures.dmx import DmxMapping
-from twinklr.core.config.fixtures.instances import FixtureConfig
 from twinklr.core.formats.xlights.sequence.models.xsq import TimeMarker, XSequence
 from twinklr.core.formats.xlights.sequence.trace import build_xsq_trace_payload
 from twinklr.core.sequencer.display.effects.handlers import load_builtin_handlers
@@ -22,10 +31,8 @@ from twinklr.core.sequencer.display.models.render_plan import (
     RenderLayerPlan,
     RenderPlan,
 )
-from twinklr.core.sequencer.models.enum import ChannelName
-from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
-from twinklr.core.sequencer.moving_heads.delivery import build_sequence
-from twinklr.core.sequencer.moving_heads.handlers.wheels import DefaultColorHandler
+from twinklr.core.sequencer.moving_heads.delivery import build_physical_sequence
+from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
 from twinklr.core.sequencer.planning.models import (
     CallResponsePair,
     FocalAssignment,
@@ -40,8 +47,7 @@ from twinklr.core.sequencer.planning.models import (
 )
 from twinklr.core.sequencer.show_coordination import (
     coordinate_display_render_plan,
-    coordinate_moving_head_plan,
-    coordinate_moving_head_segments,
+    moving_head_dark_spans,
 )
 from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
@@ -133,18 +139,6 @@ def _macro() -> MacroPlan:
     )
 
 
-def _fixture_group() -> FixtureGroup:
-    group = FixtureGroup(group_id="MOVING_HEADS", xlights_group="Moving Heads")
-    config = FixtureConfig(
-        fixture_id="MH1",
-        dmx_mapping=DmxMapping(pan_channel=1, tilt_channel=2, dimmer_channel=3, color_channel=4),
-    )
-    group.add_fixture(
-        FixtureInstance(fixture_id="MH1", config=config, xlights_model_name="Dmx MH1")
-    )
-    return group
-
-
 def _event(group_id: str, effect_type: str) -> RenderEvent:
     return RenderEvent(
         event_id=f"{group_id}-{effect_type}",
@@ -169,63 +163,43 @@ def _event(group_id: str, effect_type: str) -> RenderEvent:
     )
 
 
-def _build_combined() -> tuple[XSequence, dict[str, object]]:
+MH_ELEMENT = "Dmx MH1"
+
+
+@pytest.fixture(autouse=True)
+def _catalog() -> Iterator[None]:
+    with physical_catalog():
+        yield
+
+
+def _build_combined() -> tuple[XSequence, dict[str, Any], RenderingPipeline]:
     macro = _macro()
     grid = _grid()
     graph = _graph()
-    fixture_group = _fixture_group()
-    coordinated_plan = coordinate_moving_head_plan(
-        ChoreographyPlan(
+    pipeline = RenderingPipeline(
+        choreography_plan=ChoreographyPlan(
             sections=[
                 PlanSection(
                     section_name="drop",
                     start_bar=1,
                     end_bar=2,
-                    template_id="sweep_lr_fan_hold",
+                    template_id="mirror_wings",
                 )
             ],
             overall_strategy="golden",
         ),
-        macro,
-        grid,
-        {"MOVING_HEADS"},
-        coordination_graph=graph,
+        beat_grid=grid,
+        fixture_group=family_rig(("MH1",)),
+        job_config=family_job(("MH1",)),
+        media_file="combined-show.wav",
+        dark_spans=moving_head_dark_spans(
+            macro, grid, graph, moving_head_target_ids={"MOVING_HEADS"}
+        ),
     )
-    color_preset = coordinated_plan.sections[0].color_intent.explicit_color
-    assert color_preset is not None
-    fixture_config = fixture_group.expand_fixtures()[0].config
-    color_result = DefaultColorHandler().generate(
-        {
-            "preset": color_preset.value,
-            "calibration": {"fixture_config": fixture_config},
-        },
-        1,
-    )
-    assert color_result.static_dmx is not None
-    source_segment = FixtureSegment(
-        section_id="drop",
-        segment_id="sweep",
-        step_id="sweep",
-        template_id="sweep_lr_fan_hold",
-        fixture_id="MH1",
-        t0_ms=0,
-        t1_ms=4400,
-        channels={
-            ChannelName.PAN: ChannelValue(channel=ChannelName.PAN, static_dmx=180),
-            ChannelName.TILT: ChannelValue(channel=ChannelName.TILT, static_dmx=90),
-            ChannelName.DIMMER: ChannelValue(channel=ChannelName.DIMMER, static_dmx=200),
-            ChannelName.COLOR: ChannelValue(
-                channel=ChannelName.COLOR, static_dmx=color_result.static_dmx
-            ),
-        },
-    )
-    mh_segments = coordinate_moving_head_segments(
-        [source_segment], macro, grid, graph, moving_head_target_ids={"MOVING_HEADS"}
-    )
-    sequence = build_sequence(
-        mh_segments,
+    pipeline.render()
+    sequence = build_physical_sequence(
+        pipeline.requests,
         [TimeMarker(name="drop", time_ms=0, end_time_ms=4400)],
-        fixture_group=fixture_group,
         media_file="combined-show.wav",
         duration_ms=4400,
     )
@@ -266,63 +240,92 @@ def _build_combined() -> tuple[XSequence, dict[str, object]]:
         write_result.trace_entries,
         fallback_substitutions=write_result.fallback_substitutions,
     )
-    return sequence, trace
+    return sequence, trace, pipeline
 
 
-def _snapshot(sequence: XSequence) -> dict[str, object]:
-    effects: dict[str, dict[str, object]] = {}
+def _sha256(value: object) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+
+
+def _snapshot(
+    sequence: XSequence, trace: dict[str, Any], pipeline: RenderingPipeline
+) -> dict[str, Any]:
+    """Each display element's one effect type, settings, palette and time ranges; the
+    moving heads' effects and trace entries by hash."""
+    display: dict[str, dict[str, Any]] = {}
+    moving_heads: list[list[object]] = []
     for element in sequence.element_effects:
         for layer in element.layers:
             for effect in layer.effects:
                 assert effect.ref is not None
-                current = effects.setdefault(
+                settings = sequence.effect_db.entries[effect.ref]
+                palette = (
+                    sequence.color_palettes[int(effect.palette)].settings
+                    if effect.palette
+                    else None
+                )
+                if element.element_name == MH_ELEMENT:
+                    moving_heads.append(
+                        [effect.effect_type, effect.start_time_ms, effect.end_time_ms, settings]
+                    )
+                    assert palette is None
+                    continue
+                current = display.setdefault(
                     element.element_name,
                     {
                         "type": effect.effect_type,
                         "ranges": [],
-                        "settings": sequence.effect_db.entries[effect.ref],
-                        "palette": (
-                            sequence.color_palettes[int(effect.palette)].settings
-                            if effect.palette
-                            else None
-                        ),
+                        "settings": settings,
+                        "palette": palette,
                     },
                 )
                 assert current["type"] == effect.effect_type
-                assert current["settings"] == sequence.effect_db.entries[effect.ref]
+                assert current["settings"] == settings
                 current["ranges"].append([effect.start_time_ms, effect.end_time_ms])
+    assert pipeline.render_record is not None
     return {
         "media_file": sequence.head.media_file,
         "duration_ms": sequence.sequence_duration_ms,
-        "effects": effects,
+        "effects": display,
+        "moving_heads": {
+            "render_fingerprint": pipeline.render_record["render_fingerprint"],
+            "effect_count": len(moving_heads),
+            "effects_sha256": _sha256(moving_heads),
+            "trace_sha256": _sha256(
+                [entry for entry in trace["entries"] if entry["backend"] == "moving_head"]
+            ),
+        },
     }
 
 
+def _display_trace(trace: dict[str, Any]) -> list[dict[str, Any]]:
+    """The display trace entries without their EffectDB and palette indices, which
+    count the moving heads' entries the shared tables hold before them."""
+    return [
+        {key: value for key, value in entry.items() if key not in ("effectdb_ref", "palette_ref")}
+        for entry in trace["entries"]
+        if entry["backend"] == "display"
+    ]
+
+
 def test_combined_show_drop_matches_emitted_golden() -> None:
-    sequence, trace = _build_combined()
-    actual = _snapshot(sequence)
+    sequence, trace, pipeline = _build_combined()
+    actual = _snapshot(sequence, trace, pipeline)
     expected = json.loads(GOLDEN.read_text(encoding="utf-8"))
     assert actual == expected
-    assert trace == json.loads(TRACE_GOLDEN.read_text(encoding="utf-8"))
+    assert _display_trace(trace) == json.loads(TRACE_GOLDEN.read_text(encoding="utf-8"))
+    assert trace["entry_count"] == len(trace["entries"])
+    # The trace header the tag's golden recorded: no display effect fell back.
+    assert trace["schema_version"] == "twinklr-xsq-trace.v2"
+    assert trace["fallback_substitutions"] == 0
 
     by_element = actual["effects"]
-    assert by_element["Dmx MH1"]["type"] == "DMX"
-    assert "E_SLIDER_DMX1=180" in by_element["Dmx MH1"]["settings"]
-    assert "E_SLIDER_DMX2=90" in by_element["Dmx MH1"]["settings"]
-    assert "E_SLIDER_DMX4=90" in by_element["Dmx MH1"]["settings"]
     assert by_element["Mega Tree"]["type"] == "Spirals"
     assert by_element["Yard Arches"]["type"] == "SingleStrand"
     assert by_element["Mega Tree"]["palette"] == by_element["Yard Arches"]["palette"]
     assert "C_BUTTON_Palette1=#00E5FF" in by_element["Mega Tree"]["palette"]
-    display_ranges = {
-        tuple(item)
-        for element, details in by_element.items()
-        if element != "Dmx MH1"
-        for item in details["ranges"]
-    }
-    mh_ranges = {tuple(item) for item in by_element["Dmx MH1"]["ranges"]}
-    assert all(
-        display_end <= mh_start or mh_end <= display_start
-        for display_start, display_end in display_ranges
-        for mh_start, mh_end in mh_ranges
-    )
+    # The display calls where the moving heads rest: each display range is a span the
+    # render holds the heads dark over.
+    display_ranges = {tuple(item) for details in by_element.values() for item in details["ranges"]}
+    assert display_ranges == {tuple(span) for span in pipeline.render_record["dark_spans"]}
+    assert actual["moving_heads"]["effect_count"] > 0

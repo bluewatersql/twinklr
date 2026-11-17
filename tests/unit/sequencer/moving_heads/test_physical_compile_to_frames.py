@@ -11,7 +11,6 @@ from tests.support.mh_physical import (
     discrete_step_payload,
 )
 from twinklr.core.config.fixtures import FixtureCapabilities, InitialFixtureState
-from twinklr.core.curves.registry import CurveRegistry
 from twinklr.core.sequencer.models.context import StepCompileContext
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import ContinuousTrajectory
@@ -26,7 +25,6 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     quantize_cue,
 )
 from twinklr.core.sequencer.moving_heads.export.xsq_adapter import physical_run_requests
-from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map, musical_phase_at
 
@@ -48,7 +46,6 @@ _PERIOD_BEATS = 2.0
 def _context(
     profile: FixtureCapabilities, t0: int, t1: int, section_id: str = "verse"
 ) -> StepCompileContext:
-    registries = create_default_registries()
     return StepCompileContext(
         section_id=section_id,
         segment_id=section_id,
@@ -59,10 +56,6 @@ def _context(
         start_ms=t0,
         duration_ms=t1 - t0,
         beat_grid=_GRID,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
         physical_profile=profile,
         phase_map=build_musical_phase_map(_GRID),
     )

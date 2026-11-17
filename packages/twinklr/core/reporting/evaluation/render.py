@@ -115,12 +115,6 @@ def write_report_markdown(report: EvaluationReport, output_path: Path) -> None:
     # Phase 2: Advanced metrics
     if report.summary.validation_errors > 0:
         lines.append(f"- **Validation Errors**: {report.summary.validation_errors} ❌")
-    if report.summary.physics_violations:
-        lines.append(f"- **Physics Violations**: {report.summary.physics_violations} ⚠️")
-    if report.summary.compliance_issues:
-        lines.append(f"- **Compliance Issues**: {report.summary.compliance_issues} ⚠️")
-    if report.summary.harsh_transitions:
-        lines.append(f"- **Harsh Transitions**: {report.summary.harsh_transitions} ⚠️")
 
     lines.append("")
 
@@ -282,92 +276,21 @@ def _render_section_markdown(section: SectionReport) -> list[str]:
             lines.append("**Metrics**:")
             for curve in curves:
                 s = curve.stats
-                if curve.continuity is None:
-                    # Physical output: values in the channel's unit, rate per second.
-                    unit = "°" if curve.space == "degree" else ""
-                    lines.append(
-                        f"- {curve.channel} ({curve.space}): min={s.min:.2f}{unit}, "
-                        f"max={s.max:.2f}{unit}, range={s.range:.2f}{unit}, "
-                        f"mean={s.mean:.3f}{unit}, std={s.std:.3f}{unit}, "
-                        f"rate={s.energy:.3f}{unit}/s"
-                        + (
-                            f", lit range={curve.lit_range:.2f}{unit}, "
-                            f"lit rate={curve.lit_rate:.3f}{unit}/s"
-                            if curve.lit_range is not None and curve.lit_rate is not None
-                            else ""
-                        )
-                    )
-                    continue
-                cont = "✓" if curve.continuity.ok else f"✗ ({curve.continuity.loop_delta:.3f})"
-
-                # Build metric line with curve metadata
-                metric_parts = [
-                    f"{curve.channel}",
-                ]
-
-                # Add curve type if available
-                if curve.curve_type:
-                    curve_display = curve.curve_type.replace("CurveKind.", "")
-                    metric_parts.append(f"[{curve_display}]")
-
-                # Add handler if available
-                if curve.handler:
-                    metric_parts.append(f"({curve.handler})")
-
-                metric_line = " ".join(metric_parts) + ": "
-                metric_line += (
-                    f"min={s.min:.2f}, max={s.max:.2f}, range={s.range:.2f}, "
-                    f"clamp={s.clamp_pct:.1f}%, energy={s.energy:.3f}, "
-                    f"loop={cont}"
-                )
-
-                # Add base position for pan/tilt
-                if curve.base_position is not None:
-                    metric_line += f", base={curve.base_position:.2f}"
-
-                # Add static DMX if applicable
-                if curve.static_dmx is not None:
-                    metric_line += f", static={curve.static_dmx}"
-
-                # Phase 2: Add physics metrics
-                if curve.physics_check:
-                    pc = curve.physics_check
-                    if not pc.speed_ok or not pc.acceleration_ok:
-                        metric_line += " ⚠️"
-                    metric_line += f", speed={pc.max_speed_deg_per_sec:.1f}°/s"
-                    if pc.max_accel_deg_per_sec2 > 0:
-                        metric_line += f", accel={pc.max_accel_deg_per_sec2:.0f}°/s²"
-
-                lines.append(f"- {metric_line}")
-            lines.append("")
-
-    # Phase 2: Template compliance
-    if section.template_compliance:
-        tc = section.template_compliance
-        lines.append("**Template Compliance**:")
-        status = "✓ Compliant" if tc.overall_compliant else "✗ Issues Detected"
-        lines.append(f"- Overall: {status}")
-        lines.append(f"- Curve types: {'✓' if tc.curve_type_correct else '✗'}")
-        lines.append(f"- Geometry: {'✓' if tc.geometry_correct else '✗'}")
-
-        if tc.modifiers_compliant:
-            compliant_count = sum(1 for m in tc.modifiers_compliant if m.compliant)
-            lines.append(f"- Modifiers: {compliant_count}/{len(tc.modifiers_compliant)} compliant")
-
-            # Show modifier details
-            for mod in tc.modifiers_compliant:
-                icon = "✓" if mod.compliant else "✗"
+                # Values in the channel's unit, rate per second.
+                unit = "°" if curve.space == "degree" else ""
                 lines.append(
-                    f"  - {icon} `{mod.modifier_key}={mod.expected_value}`: {mod.actual_impact}"
+                    f"- {curve.channel} ({curve.space}): min={s.min:.2f}{unit}, "
+                    f"max={s.max:.2f}{unit}, range={s.range:.2f}{unit}, "
+                    f"mean={s.mean:.3f}{unit}, std={s.std:.3f}{unit}, "
+                    f"rate={s.energy:.3f}{unit}/s"
+                    + (
+                        f", lit range={curve.lit_range:.2f}{unit}, "
+                        f"lit rate={curve.lit_rate:.3f}{unit}/s"
+                        if curve.lit_range is not None and curve.lit_rate is not None
+                        else ""
+                    )
                 )
-
-        if tc.issues:
             lines.append("")
-            lines.append("**Compliance Issues**:")
-            for issue in tc.issues:
-                lines.append(f"- ⚠️ {issue}")
-
-        lines.append("")
 
     if section.render_facts is not None:
         facts = section.render_facts
@@ -423,27 +346,6 @@ def _render_section_markdown(section: SectionReport) -> list[str]:
         lines.append("")
     else:
         lines.append("**Flags**: None")
-        lines.append("")
-
-    # Phase 2: Transition to next section
-    if section.transition_to_next:
-        trans = section.transition_to_next
-        lines.append(f"**Transition to {trans.to_section.replace('_', ' ').title()}**:")
-        status = "✓ Smooth" if trans.smooth else "⚠️ Issues"
-        lines.append(f"- Status: {status}")
-        lines.append(
-            f"- Position delta: pan={trans.position_delta_pan:.3f}, tilt={trans.position_delta_tilt:.3f}"
-        )
-        lines.append(f"- Velocity delta: {trans.velocity_delta:.3f}")
-        if trans.dimmer_snap:
-            lines.append("- Dimmer: ⚠️ Snap detected")
-
-        if trans.issues:
-            lines.append("")
-            lines.append("**Transition Issues**:")
-            for issue in trans.issues:
-                lines.append(f"- ⚠️ {issue}")
-
         lines.append("")
 
     lines.append("---")

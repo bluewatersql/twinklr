@@ -16,26 +16,18 @@ from typing import Any
 from twinklr.core.config.fixtures import AxisCapability, FixtureCapabilities
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.reporting.evaluation.analyze import (
-    analyze_curve,
-    check_loop_continuity,
     largest_step,
     lit_motion,
     physical_channel_stats,
 )
 from twinklr.core.reporting.evaluation.collect import (
     build_run_metadata,
-    checkpoint_render_policy,
     extract_plan,
     load_checkpoint,
     recorded_render,
 )
-from twinklr.core.reporting.evaluation.compliance import verify_template_compliance
 from twinklr.core.reporting.evaluation.config import EvalConfig
-from twinklr.core.reporting.evaluation.continuity import analyze_section_transition
-from twinklr.core.reporting.evaluation.extract import (
-    extract_curves_from_segments,
-    physical_channel_values,
-)
+from twinklr.core.reporting.evaluation.extract import physical_channel_values
 from twinklr.core.reporting.evaluation.models import (
     CurveAnalysis,
     EvaluationReport,
@@ -51,7 +43,6 @@ from twinklr.core.reporting.evaluation.models import (
     TemplateSelection,
     ValidationResult,
 )
-from twinklr.core.reporting.evaluation.physics import check_physics_constraints
 from twinklr.core.reporting.evaluation.plot import plot_curve
 from twinklr.core.reporting.evaluation.render import write_report_json, write_report_markdown
 from twinklr.core.reporting.evaluation.rerender import (
@@ -134,13 +125,12 @@ async def generate_evaluation_report(
     checkpoint_data = load_checkpoint(checkpoint_path)
     plan = extract_plan(checkpoint_data)
     run_metadata = build_run_metadata(checkpoint_path, checkpoint_data)
-    # A physical checkpoint without the run's recorded render is refused here, before
-    # any audio is analyzed.
+    # A checkpoint without the run's recorded render is refused here, before any audio
+    # is analyzed.
     recorded = recorded_render(checkpoint_data)
-    if recorded is not None:
-        # The templates the run could name, loaded before the plan is validated; a plan
-        # naming any other is refused here too.
-        admit_plan_templates(plan, recorded.policy)
+    # The templates the run could name, loaded before the plan is validated; a plan
+    # naming any other is refused here too.
+    admit_plan_templates(plan)
 
     logger.debug(f"Loaded plan with {len(plan.sections)} sections")
 
@@ -150,11 +140,11 @@ async def generate_evaluation_report(
 
     if config.enable_heuristic_validation:
         logger.debug("Validating plan structure...")
-        # A physical plan could name only what the run's gate admitted (without a gate
-        # result: the registry, the physical catalog loaded).
+        # The plan could name only what the run's gate admitted (without a gate result:
+        # the registry, the family catalog loaded).
         available_templates = (
             list(recorded.admission.admitted)
-            if recorded is not None and recorded.admission is not None
+            if recorded.admission is not None
             else load_available_templates()
         )
         song_structure = {
@@ -189,18 +179,11 @@ async def generate_evaluation_report(
         plan=plan,
         audio_path=audio_path,
         fixture_config_path=fixture_config_path,
-        # The render a physical run recorded, else the legacy mode the checkpoint implies.
-        render_policy=(
-            recorded if recorded is not None else checkpoint_render_policy(checkpoint_data)
-        ),
+        recorded=recorded,
     )
     physical = render_data.physical
     # Every fixture's values over the whole song, read once (index: frame start / 20 ms).
-    song_values = (
-        physical_channel_values(physical.frames, physical.profiles, (0, sys.maxsize))
-        if physical is not None
-        else {}
-    )
+    song_values = physical_channel_values(physical.frames, physical.profiles, (0, sys.maxsize))
 
     logger.debug(f"Re-rendered {len(render_data.segments)} segments")
 
@@ -229,8 +212,6 @@ async def generate_evaluation_report(
     all_roles = set()
     total_warnings = 0
     total_errors = 0
-    physics_violations_count = 0
-    compliance_issues_count = 0
 
     for plan_section in expanded_sections:
         section_report = _process_section(
@@ -250,115 +231,6 @@ async def generate_evaluation_report(
         total_warnings += sum(1 for f in section_report.flags if f.level == ReportFlagLevel.WARNING)
         total_errors += sum(1 for f in section_report.flags if f.level == ReportFlagLevel.ERROR)
 
-        # Count physics violations
-        for curve in section_report.curves:
-            if curve.physics_check and (
-                not curve.physics_check.speed_ok or not curve.physics_check.acceleration_ok
-            ):
-                physics_violations_count += len(curve.physics_check.violations)
-
-        # Count compliance issues
-        if (
-            section_report.template_compliance
-            and not section_report.template_compliance.overall_compliant
-        ):
-            compliance_issues_count += len(section_report.template_compliance.issues)
-
-    # Phase 2: Analyze transitions between sections (if enabled). A physical render
-    # repositions dark between sections by design; its entry windows are reported instead.
-    harsh_transitions_count = 0
-    if config.enable_continuity_checks and len(section_reports) > 1 and physical is None:
-        logger.debug("Analyzing section transitions...")
-
-        updated_sections = []
-        for i in range(len(section_reports)):
-            current_section = section_reports[i]
-
-            # Check if there's a next section to transition to
-            if i < len(section_reports) - 1:
-                # Extract boundary curves for transition analysis
-                current_end_ms = int(expanded_sections[i].end_bar * song_metadata.bar_duration_ms)
-                next_start_ms = int(
-                    expanded_sections[i + 1].start_bar * song_metadata.bar_duration_ms
-                )
-
-                # Extract last 10% of current section
-                current_duration_ms = current_end_ms - int(
-                    expanded_sections[i].start_bar * song_metadata.bar_duration_ms
-                )
-                boundary_window_ms = max(
-                    100, int(current_duration_ms * 0.1)
-                )  # Last 10% or 100ms min
-
-                current_boundary_start = current_end_ms - boundary_window_ms
-                current_boundary_curves = extract_curves_from_segments(
-                    segments=render_data.segments,
-                    section_window_ms=(current_boundary_start, current_end_ms),
-                    samples_per_bar=config.samples_per_bar,
-                    bar_duration_ms=song_metadata.bar_duration_ms,
-                )
-
-                # Extract first 10% of next section
-                next_duration_ms = (
-                    int(expanded_sections[i + 1].end_bar * song_metadata.bar_duration_ms)
-                    - next_start_ms
-                )
-                next_boundary_window_ms = max(
-                    100, int(next_duration_ms * 0.1)
-                )  # First 10% or 100ms min
-
-                next_boundary_end = next_start_ms + next_boundary_window_ms
-                next_boundary_curves = extract_curves_from_segments(
-                    segments=render_data.segments,
-                    section_window_ms=(next_start_ms, next_boundary_end),
-                    samples_per_bar=config.samples_per_bar,
-                    bar_duration_ms=song_metadata.bar_duration_ms,
-                )
-
-                # Organize curves by role and channel for transition analysis
-                from_curves_by_role: dict[str, dict[str, list[float]]] = {}
-                for fixture_id, channels in current_boundary_curves.items():
-                    # Find role for this fixture
-                    fixture_ctx = next(
-                        (f for f in render_data.fixture_contexts if f.fixture_id == fixture_id),
-                        None,
-                    )
-                    role = fixture_ctx.role if fixture_ctx else fixture_id
-                    from_curves_by_role[role] = channels
-
-                to_curves_by_role: dict[str, dict[str, list[float]]] = {}
-                for fixture_id, channels in next_boundary_curves.items():
-                    fixture_ctx = next(
-                        (f for f in render_data.fixture_contexts if f.fixture_id == fixture_id),
-                        None,
-                    )
-                    role = fixture_ctx.role if fixture_ctx else fixture_id
-                    to_curves_by_role[role] = channels
-
-                # Analyze transition
-                transition = analyze_section_transition(
-                    from_section_name=expanded_sections[i].section_name,
-                    to_section_name=expanded_sections[i + 1].section_name,
-                    from_curves=from_curves_by_role,
-                    to_curves=to_curves_by_role,
-                    config=config,
-                )
-
-                # Count harsh transitions
-                if not transition.smooth:
-                    harsh_transitions_count += 1
-
-                # Update section with transition
-                updated_sections.append(
-                    current_section.model_copy(update={"transition_to_next": transition})
-                )
-            else:
-                # Last section - no transition
-                updated_sections.append(current_section)
-
-        # Replace section reports with updated versions
-        section_reports = updated_sections
-
     # Add global validation flags if present
     if plan_validation and not plan_validation.valid:
         validation_flags = validation_to_flags(plan_validation)
@@ -371,23 +243,21 @@ async def generate_evaluation_report(
                 update={"flags": updated_flags, "validation_issues": plan_validation.errors}
             )
 
-    physical_summary = None
-    if physical is not None:
-        physical_summary = _physical_summary(physical)
-        if not physical_summary.fingerprint_matches:
-            # Reported, not hidden: every metric below describes the re-render.
-            total_errors += 1
-            mismatch = ReportFlag(
-                level=ReportFlagLevel.ERROR,
-                code="RENDER_FINGERPRINT_MISMATCH",
-                message=mismatch_message(physical_summary),
-                details={"mismatched_inputs": physical_summary.mismatched_inputs},
+    physical_summary = _physical_summary(physical)
+    if not physical_summary.fingerprint_matches:
+        # Reported, not hidden: every metric below describes the re-render.
+        total_errors += 1
+        mismatch = ReportFlag(
+            level=ReportFlagLevel.ERROR,
+            code="RENDER_FINGERPRINT_MISMATCH",
+            message=mismatch_message(physical_summary),
+            details={"mismatched_inputs": physical_summary.mismatched_inputs},
+        )
+        if section_reports:
+            first_section = section_reports[0]
+            section_reports[0] = first_section.model_copy(
+                update={"flags": [mismatch, *first_section.flags]}
             )
-            if section_reports:
-                first_section = section_reports[0]
-                section_reports[0] = first_section.model_copy(
-                    update={"flags": [mismatch, *first_section.flags]}
-                )
 
     # Build report
     report = EvaluationReport(
@@ -400,13 +270,13 @@ async def generate_evaluation_report(
             max_concurrent_layers=0,  # TODO: compute
             templates_used=sorted(all_templates),
             roles_targeted=sorted(all_roles),
-            # Phase 2 metrics; a physical report does not report the last three.
+            # Phase 2 metrics; the last three are not reported.
             validation_errors=validation_errors_count,
-            physics_violations=physics_violations_count if physical is None else None,
-            compliance_issues=compliance_issues_count if physical is None else None,
-            harsh_transitions=harsh_transitions_count if physical is None else None,
+            physics_violations=None,
+            compliance_issues=None,
+            harsh_transitions=None,
         ),
-        sections=section_reports,  # Use updated section_reports with transitions
+        sections=section_reports,
         physical=physical_summary,
     )
 
@@ -435,7 +305,7 @@ def _process_section(
         song_metadata: Song timing information
         output_dir: Output directory for plots
         config: Evaluation configuration
-        song_values: A physical render's per-frame values over the song
+        song_values: The render's per-frame values over the song
             (`physical_channel_values`)
 
     Returns:
@@ -451,14 +321,10 @@ def _process_section(
 
     physical = render_data.physical
 
-    # Calculate time window: a physical section spans its bars on the detected grid,
-    # as the renderer places it.
-    if physical is not None:
-        start_ms = int(render_data.beat_grid.get_bar_start_ms(plan_section.start_bar - 1))
-        end_ms = int(render_data.beat_grid.get_bar_start_ms(plan_section.end_bar))
-    else:
-        start_ms = int(plan_section.start_bar * song_metadata.bar_duration_ms)
-        end_ms = int(plan_section.end_bar * song_metadata.bar_duration_ms)
+    # Calculate time window: a section spans its bars on the detected grid, as the
+    # renderer places it.
+    start_ms = int(render_data.beat_grid.get_bar_start_ms(plan_section.start_bar - 1))
+    end_ms = int(render_data.beat_grid.get_bar_start_ms(plan_section.end_bar))
 
     # Create display label
     if segment_id:
@@ -472,34 +338,23 @@ def _process_section(
         f"time {start_ms}-{end_ms}ms"
     )
 
-    # Extract curves
-    if physical is not None:
-        # The frames the section's cues land on: its bounds quantized as cues are.
-        frames_ms = (quantize_cue(start_ms).actual_ms, quantize_cue(end_ms).actual_ms)
-        curves_by_fixture = _frame_slice(song_values or {}, frames_ms)
-    else:
-        curves_by_fixture = extract_curves_from_segments(
-            segments=render_data.segments,
-            section_window_ms=(start_ms, end_ms),
-            samples_per_bar=config.samples_per_bar,
-            bar_duration_ms=song_metadata.bar_duration_ms,
-        )
+    # The frames the section's cues land on: its bounds quantized as cues are.
+    frames_ms = (quantize_cue(start_ms).actual_ms, quantize_cue(end_ms).actual_ms)
+    curves_by_fixture = _frame_slice(song_values or {}, frames_ms)
 
     # Analyze curves and generate plots
     curve_analyses = []
     section_flags = []
-    render_facts = None
-    if physical is not None:
-        render_facts = _section_facts(physical.render_record, plan_section.section_name, frames_ms)
-        render_facts = render_facts.model_copy(
-            update={
-                "lit_steps": _lit_steps(curves_by_fixture, physical.profiles, frames_ms[0]),
-                "boundary_steps": _boundary_steps(
-                    song_values or {}, physical.profiles, render_facts.entry_windows, frames_ms[0]
-                ),
-            }
-        )
-        section_flags.extend(_section_fact_flags(render_facts, section_end_ms=end_ms))
+    render_facts = _section_facts(physical.render_record, plan_section.section_name, frames_ms)
+    render_facts = render_facts.model_copy(
+        update={
+            "lit_steps": _lit_steps(curves_by_fixture, physical.profiles, frames_ms[0]),
+            "boundary_steps": _boundary_steps(
+                song_values or {}, physical.profiles, render_facts.entry_windows, frames_ms[0]
+            ),
+        }
+    )
+    section_flags.extend(_section_fact_flags(render_facts, section_end_ms=end_ms))
 
     # Get fixture contexts with roles
     fixture_contexts = render_data.fixture_contexts
@@ -533,192 +388,34 @@ def _process_section(
                 plot_filename = f"{section_id}_seg{segment_id}__{role}__{channel_name.lower()}.png"
             else:
                 plot_filename = f"{section_id}__{role}__{channel_name.lower()}.png"
-            if physical is not None:
-                space = "normalized" if channel_name == ChannelName.DIMMER.value else "degree"
-                plot_path = output_dir / "plots" / plot_filename
-                plot_curve(
-                    samples=samples,
-                    title=f"{display_label} • {role} • {channel_name.upper()}",
-                    output_path=plot_path,
-                    space=space,
-                    bar_range=(plan_section.start_bar, plan_section.end_bar),
-                    section_bar_range=(plan_section.start_bar, plan_section.end_bar),
-                )
-                lit = (
-                    None
-                    if channel_name == ChannelName.DIMMER.value
-                    else lit_motion(
-                        samples, fixture_curves[ChannelName.DIMMER.value], frame_ms=EFFECT_GRID_MS
-                    )
-                )
-                curve_analyses.append(
-                    CurveAnalysis(
-                        role=role,
-                        channel=channel_name,
-                        space=space,
-                        plot_path=plot_path,
-                        stats=physical_channel_stats(samples, frame_ms=EFFECT_GRID_MS),
-                        lit_range=None if lit is None else lit[0],
-                        lit_rate=None if lit is None else lit[1],
-                    )
-                )
-                continue
-
-            # Extract metadata from segments for this fixture/channel
-            curve_type = None
-            handler = None
-            base_position = None
-            static_dmx = None
-
-            for seg in render_data.segments:
-                # Check if segment overlaps with section time window
-                seg_overlaps = (
-                    seg.fixture_id == fixture_id
-                    and seg.t0_ms < end_ms  # Segment starts before section ends
-                    and seg.t1_ms > start_ms  # Segment ends after section starts
-                )
-                if seg_overlaps and channel_name in seg.channels:
-                    # Extract channel-specific metadata based on channel type
-                    # channel_name is lowercase string like "pan", "tilt", "dimmer"
-                    if channel_name.lower() == "pan":
-                        curve_type = seg.metadata.get("pan_curve_type")
-                        handler = seg.metadata.get("movement_handler")
-                        base_position = seg.metadata.get("base_pan_norm")
-                        static_dmx = seg.metadata.get("pan_static_dmx")
-                    elif channel_name.lower() == "tilt":
-                        curve_type = seg.metadata.get("tilt_curve_type")
-                        handler = seg.metadata.get("movement_handler")
-                        base_position = seg.metadata.get("base_tilt_norm")
-                        static_dmx = seg.metadata.get("tilt_static_dmx")
-                    elif channel_name.lower() == "dimmer":
-                        curve_type = seg.metadata.get("dimmer_curve_type")
-                        handler = seg.metadata.get("dimmer_handler")
-                        static_dmx = seg.metadata.get("dimmer_static_dmx")
-
-                    # Convert string values to proper types
-                    if base_position and isinstance(base_position, str):
-                        try:
-                            base_position = float(base_position)
-                        except ValueError:
-                            base_position = None
-                    if static_dmx and isinstance(static_dmx, str):
-                        try:
-                            static_dmx = int(static_dmx) if static_dmx != "None" else None
-                        except ValueError:
-                            static_dmx = None
-
-                    break
-
-            # Analyze
-            stats, flags = analyze_curve(samples, config, curve_type=curve_type)
-            continuity = check_loop_continuity(
-                samples, config.loop_delta_threshold, curve_type=curve_type, channel=channel_name
-            )
-
-            # Phase 2: Physics constraints check (if enabled)
-            physics_check = None
-            if config.enable_physics_checks and channel_name.lower() in ["pan", "tilt"]:
-                section_duration_ms = end_ms - start_ms
-                physics_check = check_physics_constraints(
-                    samples=samples,
-                    channel=channel_name.lower(),  # type: ignore[arg-type]
-                    duration_ms=section_duration_ms,
-                    config=config,
-                )
-
-                # Add physics violation flags
-                if not physics_check.speed_ok or not physics_check.acceleration_ok:
-                    from .models import ReportFlag
-
-                    for violation in physics_check.violations:
-                        flags.append(
-                            ReportFlag(
-                                level=ReportFlagLevel.ERROR,
-                                code="PHYSICS_VIOLATION",
-                                message=violation,
-                                details={
-                                    "channel": channel_name,
-                                    "max_speed": physics_check.max_speed_deg_per_sec,
-                                    "max_accel": physics_check.max_accel_deg_per_sec2,
-                                },
-                            )
-                        )
-
-            # Check continuity flag
-            if not continuity.ok:
-                from .models import ReportFlag
-
-                flags.append(
-                    ReportFlag(
-                        level=ReportFlagLevel.WARNING,
-                        code="LOOP_DISCONTINUITY",
-                        message=f"Loop discontinuity: delta={continuity.loop_delta:.3f}",
-                        details={"loop_delta": continuity.loop_delta},
-                    )
-                )
-
-            # Plot
+            space = "normalized" if channel_name == ChannelName.DIMMER.value else "degree"
             plot_path = output_dir / "plots" / plot_filename
-
-            # Format curve type for display
-            display_curve_type = curve_type
-            if display_curve_type and display_curve_type.startswith("CurveKind."):
-                # Remove enum prefix for cleaner display
-                display_curve_type = display_curve_type.replace("CurveKind.", "")
-
             plot_curve(
                 samples=samples,
                 title=f"{display_label} • {role} • {channel_name.upper()}",
                 output_path=plot_path,
-                space="dmx",
+                space=space,
                 bar_range=(plan_section.start_bar, plan_section.end_bar),
-                curve_type=display_curve_type,
                 section_bar_range=(plan_section.start_bar, plan_section.end_bar),
             )
-
+            lit = (
+                None
+                if channel_name == ChannelName.DIMMER.value
+                else lit_motion(
+                    samples, fixture_curves[ChannelName.DIMMER.value], frame_ms=EFFECT_GRID_MS
+                )
+            )
             curve_analyses.append(
                 CurveAnalysis(
                     role=role,
                     channel=channel_name,
-                    space="dmx",  # Changed to DMX
+                    space=space,
                     plot_path=plot_path,
-                    stats=stats,
-                    continuity=continuity,
-                    curve_type=curve_type,
-                    handler=handler,
-                    base_position=base_position,
-                    static_dmx=static_dmx,
-                    physics_check=physics_check,  # Phase 2: Add physics check
+                    stats=physical_channel_stats(samples, frame_ms=EFFECT_GRID_MS),
+                    lit_range=None if lit is None else lit[0],
+                    lit_rate=None if lit is None else lit[1],
                 )
             )
-
-            section_flags.extend(flags)
-
-    # Phase 2: Template compliance check (if enabled). It checks legacy curve types,
-    # handlers and planner modifiers, none of which physical output has.
-    template_compliance = None
-    if config.enable_compliance_checks and plan_section.template_id and physical is None:
-        modifiers = {modifier.key: modifier.value for modifier in plan_section.modifiers}
-        template_compliance = verify_template_compliance(
-            template_id=plan_section.template_id,
-            modifiers=modifiers,
-            curves=curve_analyses,
-            metadata={},  # Could add more metadata from segments
-        )
-
-        # Add compliance issues as flags
-        if not template_compliance.overall_compliant:
-            from .models import ReportFlag
-
-            for issue in template_compliance.issues:
-                section_flags.append(
-                    ReportFlag(
-                        level=ReportFlagLevel.WARNING,
-                        code="COMPLIANCE_ISSUE",
-                        message=issue,
-                        details={"template_id": plan_section.template_id},
-                    )
-                )
 
     # Build template selection
     template_selection = None
@@ -744,7 +441,6 @@ def _process_section(
         ),
         curves=curve_analyses,
         flags=section_flags,
-        template_compliance=template_compliance,  # Phase 2
         render_facts=render_facts,
     )
 
@@ -779,7 +475,8 @@ NOT_REPORTED_FOR_PHYSICAL = (
     "entry windows and transactions, and for each skipped entry the change from the "
     "head's last lit frame to the section's first, are reported instead.",
 )
-"""Each legacy metric a physical report leaves out, and why (`PhysicalRenderSummary`)."""
+"""Each metric of the removed curve-based report this report leaves out, and why
+(`PhysicalRenderSummary`)."""
 
 
 def _physical_summary(physical: PhysicalRerender) -> PhysicalRenderSummary:

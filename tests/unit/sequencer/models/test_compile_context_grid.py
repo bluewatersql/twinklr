@@ -12,9 +12,7 @@ import logging
 
 import pytest
 
-from twinklr.core.curves.registry import CurveRegistry
 from twinklr.core.sequencer.models.context import TemplateCompileContext
-from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 # Bars of 2000 / 2500 / 1500 / 2500 ms starting at 1500 ms; average 2125 ms.
@@ -36,7 +34,6 @@ def make_grid(bar_boundaries: list[float]) -> BeatGrid:
 def make_context(
     beat_grid: BeatGrid, *, start_bar: int = 1, duration_bars: int = 2
 ) -> TemplateCompileContext:
-    registries = create_default_registries()
     return TemplateCompileContext(
         section_id="section",
         template_id="template",
@@ -44,10 +41,6 @@ def make_context(
         beat_grid=beat_grid,
         start_bar=start_bar,
         duration_bars=duration_bars,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
     )
 
 

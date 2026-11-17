@@ -35,18 +35,18 @@ class MovingHeadRenderingStage:
         - "beat_grid": BeatGrid (set by MovingHeadStage)
         - "choreography_plan": ChoreographyPlan (set by MovingHeadStage)
         - "layout_models", "layout_sha256": the xLights layout `twinklr run --layout`
-          loaded, if any; only a physical render uses them
-        - "template_admission": the render preflight's result, if any; a physical
-          render applies only the presets it admitted, plays each template's effective
+          loaded, if any
+        - "template_admission": the render preflight's result, if any; the render
+          applies only the presets it admitted, plays each template's effective
           variant where a section names none, and traces both
 
     State stored:
         - "xsq_output_path": Path to generated XSQ file
         - "delivery_artifacts": DeliveryArtifacts (.xsq, .xtiming files, .xmap)
         - "rendered_segment_count": Number of segments rendered
-        - "rendered_sequence", "render_fingerprint": a physical render's sequence, the
-          one its .xsq is written from and live injection reads, and its render identity
-        - "unplayable_warning": a physical render's warning about the cues it kept
+        - "rendered_sequence", "render_fingerprint": the render's sequence, the one its
+          .xsq is written from and live injection reads, and its render identity
+        - "unplayable_warning": the render's warning about the cues it kept
           dark under `on_unplayable`, when it kept any
 
     Example:
@@ -99,8 +99,7 @@ class MovingHeadRenderingStage:
             - Stores "delivery_artifacts" in context.state
             - Stores "rendered_segment_count" in context.state
             - Adds "mh_render_segments" to context.metrics
-            - Adds "mh_render_transitions" to context.metrics
-            - Adds a physical render's record to the run's plan checkpoint, when the
+            - Adds the render's record to the run's plan checkpoint, when the
               planning stage wrote one (`record_render`)
         """
         from twinklr.core.agents.sequencer.moving_heads.models import (
@@ -168,10 +167,10 @@ class MovingHeadRenderingStage:
 
             # Render to segments and write the delivery
             segments = pipeline.render()
-            if pipeline.render_record is not None:
-                # The rig is the live layout's reconciliation for `inject`/`regenerate`.
-                live_layout = isinstance(context.get_state("live_fixture_group"), _FixtureGroup)
-                record_render(pipeline.checkpoint_record(live_layout=live_layout), context)
+            # The rig is the live layout's reconciliation for `inject`/`regenerate`.
+            live_layout = isinstance(context.get_state("live_fixture_group"), _FixtureGroup)
+            record = pipeline.checkpoint_record(live_layout=live_layout)
+            record_render(record, context)
 
             logger.debug(f"✅ Rendered {len(segments)} segments to {self.xsq_output_path}")
 
@@ -179,12 +178,9 @@ class MovingHeadRenderingStage:
             context.set_state("xsq_output_path", self.xsq_output_path)
             context.set_state("delivery_artifacts", pipeline.artifacts)
             context.set_state("rendered_segment_count", len(segments))
-            context.set_state("rendered_segments", tuple(segments))
-            if pipeline.sequence is not None and pipeline.render_record is not None:
+            if pipeline.sequence is not None:
                 context.set_state("rendered_sequence", pipeline.sequence)
-                context.set_state(
-                    "render_fingerprint", pipeline.render_record["render_fingerprint"]
-                )
+                context.set_state("render_fingerprint", record["render_fingerprint"])
             if pipeline.unplayable_warning is not None:
                 context.set_state("unplayable_warning", pipeline.unplayable_warning)
 
@@ -269,11 +265,11 @@ class MovingHeadRenderingStage:
 
 
 def record_render(record: dict[str, Any], context: PipelineContext) -> None:
-    """Add a physical render's record (`RenderingPipeline.checkpoint_record`) to the plan
+    """Add a render's record (`RenderingPipeline.checkpoint_record`) to the plan
     checkpoint the planning stage wrote, under its `render` key, once the render is
     delivered.
 
-    The one writer for every command that renders physically and writes a checkpoint:
+    The one writer for every command that renders and writes a checkpoint:
     `twinklr run`, `inject` and `regenerate` (this module's stage, after `render()` has
     written the `.xsq`) and `twinklr show` (after its export has written the combined
     `.xsq`). `twinklr eval-report` re-renders the plan from the record exactly as that
@@ -311,7 +307,7 @@ def record_render(record: dict[str, Any], context: PipelineContext) -> None:
             raise
     except (OSError, ValueError, TypeError) as error:
         logger.warning(
-            "physical_v2: could not record the render in the checkpoint %s, so "
+            "could not record the render in the checkpoint %s, so "
             "`twinklr eval-report` cannot re-render it: %s",
             checkpoint_path,
             error,
@@ -379,9 +375,8 @@ class RenderPreflightStage:
     """Refuse a job the moving-head renderer cannot render, before any planning.
 
     Runs right after audio analysis; every planner (profile, lyrics, macro, moving
-    heads) reads the audio through it, so a refusal spends no provider request. A
-    `legacy_v1` job passes through untouched. A `physical_v2` job is checked against
-    the fixtures the render stage will load (`preflight_render_policy`), the templates
+    heads) reads the audio through it, so a refusal spends no provider request. The
+    job is checked against the fixtures the render stage will load (`preflight_render_policy`), the templates
     the planner will be offered (`offered_template_ids`; every one must carry physical
     data, and each must dry-compile on this rig and plan the dark repositioning between
     its own cues under the job's `reposition_fallback`, at the placements its
@@ -437,22 +432,20 @@ class RenderPreflightStage:
         )
 
         job_config = context.job_config
-        if job_config.moving_heads.mode == "legacy_v1":
-            return success_result(input, stage_name=self.name)
-
         fixture_group = load_render_fixture_group(context, self.fixture_config_path)
         if fixture_group is None:
             return failure_result(
-                "physical_v2 needs the rig's fixtures before planning; none could be loaded",
+                "the moving-head render needs the rig's fixtures before planning; none "
+                "could be loaded",
                 stage_name=self.name,
             )
         try:
             preflight_render_policy(job_config, fixture_group)
-            offered = offered_template_ids(job_config, self.available_templates)
+            offered = offered_template_ids(self.available_templates)
             unrenderable = [t for t in self.available_templates if t not in offered]
             if unrenderable:
                 raise UnsupportedRenderModeError(
-                    "moving_heads.mode 'physical_v2' would offer the planner templates "
+                    "the moving-head renderer would offer the planner templates "
                     f"without physical data, which cannot render: {sorted(unrenderable)}"
                 )
             beat_grid = resolve_beat_grid(context, input)
@@ -460,12 +453,12 @@ class RenderPreflightStage:
                 phase_map = build_musical_phase_map(beat_grid)
             except MusicalPhaseError as error:
                 raise UnsupportedRenderModeError(
-                    "moving_heads.mode 'physical_v2' needs a musical phase over the song's "
+                    "the moving-head renderer needs a musical phase over the song's "
                     f"detected beats, and this beat grid gives none: {error}. The renderer "
                     "does not infer tempo"
                 ) from error
             logger.info(
-                "physical_v2 renders the covered span [%s, %s] ms of the song's [0, %s] ms; "
+                "the render covers the span [%s, %s] ms of the song's [0, %s] ms; "
                 "every fixture is held dark outside it",
                 phase_map.covered_start_ms,
                 phase_map.covered_end_ms,
@@ -488,7 +481,7 @@ class RenderPreflightStage:
             return failure_result(str(error), stage_name=self.name)
         base = context.get_state("regeneration_base_plan")
         if isinstance(base, ChoreographyPlan):
-            # A physical regeneration re-renders the whole song from the injected plan;
+            # A regeneration re-renders the whole song from the injected plan;
             # one this gate would not render as injected is refused here, before any
             # planner.
             try:

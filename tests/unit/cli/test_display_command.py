@@ -303,17 +303,17 @@ async def test_async_command_reports_invalid_render_payload(
 
 
 @pytest.mark.asyncio
-async def test_display_accepts_a_physical_job_because_it_renders_no_moving_heads(
+async def test_display_accepts_a_moving_head_policy_because_it_renders_no_moving_heads(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Decision (P1.6): `twinklr display` never renders a DMX model, so a job's
-    moving-head render mode has no effect on it; a physical job file loads through the
-    real loader and the command proceeds to its display wiring."""
+    moving-head render policy has no effect on it; a job file loads through the real
+    loader and the command proceeds to its display wiring."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-only")
     job_path = tmp_path / "job.json"
     job_path.write_text(
-        json.dumps({"schema_version": "3.1", "moving_heads": {"mode": "physical_v2"}}),
+        json.dumps({"schema_version": "3.1", "moving_heads": {"on_unplayable": "error"}}),
         encoding="utf-8",
     )
     with (
@@ -333,4 +333,4 @@ async def test_display_accepts_a_physical_job_because_it_renders_no_moving_heads
 
     assert exit_code == 1
     prepare.assert_called_once()
-    assert prepare.call_args.kwargs["job_config"].moving_heads.mode == "physical_v2"
+    assert prepare.call_args.kwargs["job_config"].moving_heads.on_unplayable == "error"

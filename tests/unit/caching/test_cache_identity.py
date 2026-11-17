@@ -171,8 +171,8 @@ class TestDerivedSessionId:
 
     def test_session_id_ignores_render_only_policy_fields(self, audio_file: Path) -> None:
         """A start pose or an output budget changes only the render, never the plan,
-        so editing one must not re-key the planner's cache; the mode still does."""
-        physical = {"schema_version": "3.1", "moving_heads": {"mode": "physical_v2"}}
+        so editing one must not re-key the planner's cache."""
+        physical = {"schema_version": "3.1"}
         state = {
             "pan_deg": 0.0,
             "tilt_deg": 0.0,
@@ -189,17 +189,13 @@ class TestDerivedSessionId:
             {"max_effects": 10},
             {"max_xsq_bytes": 10},
         ):
-            edited = _job_config(
-                schema_version="3.1", moving_heads={"mode": "physical_v2", **render_only}
-            )
+            edited = _job_config(schema_version="3.1", moving_heads=render_only)
             assert derive_session_id(audio_path=audio_file, configs=(_app_config(), edited)) == (
                 base
             )
-        legacy = derive_session_id(audio_path=audio_file, configs=(_app_config(), _job_config()))
-        assert legacy != base
 
-    def test_legacy_session_ids_are_unchanged_by_render_only_exclusion(self) -> None:
-        """Legacy job dumps carry no render-only field, so their fingerprint is the one
+    def test_default_session_ids_are_unchanged_by_render_only_exclusion(self) -> None:
+        """Job dumps that set no render-only field keep the fingerprint the
         environment-only exclusion always gave."""
         for job in (_job_config(), JobConfig(), _job_config(agent={"max_iterations": 7})):
             assert config_fingerprint(
@@ -211,11 +207,8 @@ class TestDerivedSessionId:
     ) -> None:
         """`reposition_fallback` at its default `error` is left out of the job's dump, so
         neither the planner's session id nor the render fingerprint changes."""
-        physical = {"schema_version": "3.1", "moving_heads": {"mode": "physical_v2"}}
-        explicit = {
-            "schema_version": "3.1",
-            "moving_heads": {"mode": "physical_v2", "reposition_fallback": "error"},
-        }
+        physical = {"schema_version": "3.1"}
+        explicit = {"schema_version": "3.1", "moving_heads": {"reposition_fallback": "error"}}
         assert _job_config(**explicit).model_dump() == _job_config(**physical).model_dump()
         assert derive_session_id(
             audio_path=audio_file, configs=(_app_config(), _job_config(**explicit))
@@ -231,10 +224,9 @@ class TestDerivedSessionId:
     ) -> None:
         """A fallback changes only how the render substitutes cues, never the plan."""
         assert "moving_heads.reposition_fallback" in RENDER_ONLY_CONFIG_KEYS
-        base = _job_config(schema_version="3.1", moving_heads={"mode": "physical_v2"})
+        base = _job_config(schema_version="3.1")
         fallback = _job_config(
-            schema_version="3.1",
-            moving_heads={"mode": "physical_v2", "reposition_fallback": "drop_accent"},
+            schema_version="3.1", moving_heads={"reposition_fallback": "drop_accent"}
         )
         assert derive_session_id(
             audio_path=audio_file, configs=(_app_config(), fallback)

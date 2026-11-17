@@ -20,7 +20,6 @@ from twinklr.core.api.xlights.injection import (
     LiveInjectionWorkflow,
     LiveLayoutReconciliation,
     MemoryOwnershipStore,
-    live_effects_from_segments,
     live_effects_from_sequence,
     reconcile_live_layout,
 )
@@ -90,7 +89,6 @@ __all__ = [
     "XLightsInstanceUnavailableError",
     "XLightsTimeoutError",
     "compare_fseqs",
-    "live_effects_from_segments",
     "live_effects_from_sequence",
     "reconcile_live_layout",
 ]

@@ -10,7 +10,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tests.golden.harness import RIGS, build_beat_grid, build_fixture_group, build_plan
 from tests.support.mh_physical import (
     PHYSICAL_INITIAL_STATE,
     TEMPLATE_ID,
@@ -24,10 +23,10 @@ from tests.support.mh_physical import (
     physical_template_doc,
     physical_test_templates,
     registered_templates,
+    unprofiled_rig,
 )
 from twinklr.core.agents.sequencer.moving_heads.rendering_stage import MovingHeadRenderingStage
 from twinklr.core.audio.models.metadata import EmbeddedMetadata, MetadataBundle
-from twinklr.core.config.models import JobConfig
 from twinklr.core.formats.xlights.layout.models.rgb_effects import Model
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.reporting.evaluation.collect import load_checkpoint, recorded_render
@@ -96,7 +95,7 @@ def test_media_file_falls_back_when_no_audio_bundle(tmp_path: Path) -> None:
 async def test_unsupported_rig_shape_is_reported_as_an_actionable_message(tmp_path: Path) -> None:
     """A template the rig cannot fill fails with guidance, not a traceback.
 
-    `compile_template` raises `UnsupportedRigShapeError` naming the template, the step,
+    The compile raises `UnsupportedRigShapeError` naming the template, the step,
     the group and the roles the rig has (P1P-T5). The stage passes that text through and
     adds what the user can do about it.
     """
@@ -128,18 +127,20 @@ async def test_physical_mode_without_profiles_fails_the_stage(tmp_path: Path) ->
     the missing item, and delivers nothing."""
     stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
     context = _context_with_fixture_path("fixture_config.json")
-    context.session.job_config = JobConfig.model_validate(
-        {"schema_version": "3.1", "moving_heads": {"mode": "physical_v2"}}
-    )
-    context.set_state("beat_grid", build_beat_grid())
-    fixture_group = build_fixture_group(RIGS["mh4_minimal"])
+    context.session.job_config = physical_job()
+    context.set_state("beat_grid", physical_grid())
 
-    with patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=fixture_group):
-        result = await stage.execute({"moving_heads": build_plan()}, context)
+    with (
+        physical_test_templates(),
+        patch.object(
+            MovingHeadRenderingStage, "_load_fixture_config", return_value=unprofiled_rig()
+        ),
+    ):
+        result = await stage.execute({"moving_heads": physical_plan()}, context)
 
     assert not result.success
     assert result.error is not None
-    assert "physical_v2" in result.error
+    assert "cannot render this rig" in result.error
     for fixture_id in ("MH1", "MH2", "MH3", "MH4"):
         assert f"{fixture_id}: physical_profile is missing" in result.error
     assert list(tmp_path.iterdir()) == []
@@ -174,10 +175,7 @@ async def test_physical_job_renders_and_delivers_through_the_stage(tmp_path: Pat
     trace = json.loads(artifacts.trace_path.read_text(encoding="utf-8"))
     assert trace["render"]["renderer"] == "physical_v2"
     assert len(trace["render"]["render_fingerprint"]) == 64
-    segments = context.get_state("rendered_segments")
-    assert all(
-        value.physical is not None for segment in segments for value in segment.channels.values()
-    )
+    assert context.get_state("rendered_segment_count") > 0
 
 
 @pytest.mark.asyncio
@@ -291,7 +289,7 @@ async def test_physical_render_records_itself_in_the_plan_checkpoint(tmp_path: P
     context = _physical_context()
     context.output_dir = tmp_path
     context.set_state("template_admission", admission)
-    checkpoint = _checkpoint(tmp_path, physical_plan(), render_mode="physical_v2")
+    checkpoint = _checkpoint(tmp_path, physical_plan())
     checkpoint.chmod(0o640)
 
     with (
@@ -303,7 +301,7 @@ async def test_physical_render_records_itself_in_the_plan_checkpoint(tmp_path: P
     assert result.success, result.error
     trace = json.loads((tmp_path / "out.xsq.trace.json").read_text(encoding="utf-8"))
     data = load_checkpoint(checkpoint)
-    assert set(data) == {"run_id", "plan", "render_mode", "render"}
+    assert set(data) == {"run_id", "plan", "render"}
     recorded = recorded_render(data)
     assert recorded is not None
     assert recorded.fingerprint == trace["render"]["render_fingerprint"]
@@ -380,24 +378,3 @@ async def test_physical_render_writes_no_checkpoint_the_run_did_not(tmp_path: Pa
 
     assert result.success, result.error
     assert not (tmp_path / "checkpoints").exists()
-
-
-@pytest.mark.asyncio
-async def test_legacy_render_leaves_the_checkpoint_untouched(tmp_path: Path) -> None:
-    stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
-    context = _context_with_fixture_path("fixture_config.json")
-    context.session.job_config = JobConfig()
-    context.output_dir = tmp_path
-    context.set_state("beat_grid", build_beat_grid())
-    checkpoint = _checkpoint(tmp_path, build_plan())
-    before = checkpoint.read_bytes()
-
-    with patch.object(
-        MovingHeadRenderingStage,
-        "_load_fixture_config",
-        return_value=build_fixture_group(RIGS["mh4_minimal"]),
-    ):
-        result = await stage.execute({"moving_heads": build_plan()}, context)
-
-    assert result.success, result.error
-    assert checkpoint.read_bytes() == before

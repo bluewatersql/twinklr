@@ -5,40 +5,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.config.fixtures.capabilities import FixtureCapabilities
 from twinklr.core.config.fixtures.presets import PoseDegrees, RigPresetLibrary
-from twinklr.core.curves.registry import CurveRegistry
 from twinklr.core.sequencer.models.enum import ChannelName, Intensity
 from twinklr.core.sequencer.models.moving_heads.topology import FixtureTopology
-from twinklr.core.sequencer.moving_heads.handlers.registry import (
-    ColorRegistry,
-    DimmerRegistry,
-    GeometryRegistry,
-    GoboRegistry,
-    MovementRegistry,
-    ShutterRegistry,
-)
 from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.timing.musical_phase import MusicalPhaseMap
-
-
-def _default_color_registry() -> ColorRegistry:
-    from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_color_registry
-
-    return create_default_color_registry()
-
-
-def _default_shutter_registry() -> ShutterRegistry:
-    from twinklr.core.sequencer.moving_heads.handlers.defaults import (
-        create_default_shutter_registry,
-    )
-
-    return create_default_shutter_registry()
-
-
-def _default_gobo_registry() -> GoboRegistry:
-    from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_gobo_registry
-
-    return create_default_gobo_registry()
 
 
 class TimedChannelIntent(BaseModel):
@@ -107,17 +78,16 @@ class StepCompileContext(BaseModel):
     Attributes:
         fixture_id: Unique identifier for the fixture.
         role: Role assigned to this fixture (e.g., "FRONT_LEFT").
-        calibration: Fixture calibration data.
+        calibration: Fixture calibration data. Written by the template compile and read
+            by nothing since the old renderer was removed; C1.3 removes it.
         start_ms: Start time in milliseconds.
         duration_ms: Duration in milliseconds.
-        n_samples: Number of samples for curves.
+        n_samples: Written by the template compile and read by nothing since the old
+            renderer was removed; C1.3 removes it.
         beat_grid: Beat grid for timing conversions (needed for period_bars → cycles).
-        template_defaults: The template's own `defaults` (after preset merge). Recorded
-            in segment metadata only; the declared `dimmer_floor_dmx` /
-            `dimmer_ceiling_dmx` bounds are not applied to the output.
-        geometry_registry: Registry of geometry handlers.
-        movement_registry: Registry of movement handlers.
-        dimmer_registry: Registry of dimmer handlers.
+        template_defaults: The template's own `defaults` (after preset merge). Written
+            by the template compile and read by nothing since the old renderer was
+            removed; C1.3 removes it.
         physical_profile: The fixture's physical profile; physical compile only.
         phase_map: The song's musical phase map; physical compile only.
         resolved_components: The step's component references resolved for this
@@ -148,13 +118,6 @@ class StepCompileContext(BaseModel):
     n_samples: int = Field(default=64, ge=2)
 
     beat_grid: BeatGrid  # Added for period_bars → cycles conversion
-    curve_registry: CurveRegistry
-    geometry_registry: GeometryRegistry
-    movement_registry: MovementRegistry
-    dimmer_registry: DimmerRegistry
-    color_registry: ColorRegistry = Field(default_factory=_default_color_registry)
-    shutter_registry: ShutterRegistry = Field(default_factory=_default_shutter_registry)
-    gobo_registry: GoboRegistry = Field(default_factory=_default_gobo_registry)
     physical_profile: FixtureCapabilities | None = None
     phase_map: MusicalPhaseMap | None = None
     resolved_components: ResolvedStepComponents | None = None
@@ -179,15 +142,10 @@ class TemplateCompileContext(BaseModel):
     start_bar: int = Field(default=0, ge=0)
     duration_bars: int = Field(default=0, ge=0)
 
+    # Neither is read since the old renderer was removed; `n_samples` is passed on to
+    # each step context, and `intent` is never set. C1.3 removes both.
     n_samples: int = Field(default=64, ge=2)
 
-    curve_registry: CurveRegistry
-    geometry_registry: GeometryRegistry
-    movement_registry: MovementRegistry
-    dimmer_registry: DimmerRegistry
-    color_registry: ColorRegistry = Field(default_factory=_default_color_registry)
-    shutter_registry: ShutterRegistry = Field(default_factory=_default_shutter_registry)
-    gobo_registry: GoboRegistry = Field(default_factory=_default_gobo_registry)
     intent: SectionRenderIntent = Field(default_factory=SectionRenderIntent)
     # The fixture group's named components; physical compile only.
     presets: RigPresetLibrary = Field(default_factory=RigPresetLibrary)

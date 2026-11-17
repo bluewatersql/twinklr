@@ -90,13 +90,6 @@ class TestBarStartMs:
         assert single.get_bar_start_ms(0) == 1500.0
 
 
-class TestBarSpanMs:
-    def test_span_measures_the_bars_it_actually_covers(self, uneven: BeatGrid) -> None:
-        """One bar starting at index 2 is 1500ms; the average would say 2125ms."""
-        assert uneven.bar_span_ms(2, 1) == 1500.0
-        assert uneven.bar_span_ms(0, 2) == 4500.0
-
-
 class TestNearestBarIndex:
     def test_resolves_to_the_nearest_downbeat_not_the_previous_one(self, uneven: BeatGrid) -> None:
         """The floor was the defect: a start just shy of a downbeat belongs to it.

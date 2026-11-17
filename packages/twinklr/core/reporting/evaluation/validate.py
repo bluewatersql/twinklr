@@ -130,15 +130,11 @@ def load_available_templates(template_dir: Path | None = None) -> list[str]:
 
     Example:
         >>> templates = load_available_templates()
-        >>> "inner_pendulum_breathe" in templates
+        >>> "mirror_wings" in templates
         True
     """
     # Import here to avoid circular dependencies
-    from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
     from twinklr.core.sequencer.moving_heads.templates.library import REGISTRY
-
-    # Ensure built-in templates are loaded
-    load_builtin_templates()
 
     # list_all() returns list[TemplateInfo], extract template_id
     return [info.template_id for info in REGISTRY.list_all()]

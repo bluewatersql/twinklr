@@ -64,7 +64,7 @@ Audio File (.mp3)
 - **Template Library** — pre-built choreography units (fan formations, sweeps, chases, pulses) with presets and phase offsets for fixture-to-fixture coordination
 - **Schema Auto-Injection** — Pydantic models generate the JSON schemas shown to the LLM, eliminating prompt/schema drift
 - **Two-Tier Validation** — fast heuristic checks before expensive LLM evaluation
-- **xLights Delivery** — a fresh `.xsq` with custom value curves, DMX mapping and fixture grouping, plus standalone `.xtiming` timing tracks and an `.xmap` mapping hint; no input sequence is read or rewritten
+- **xLights Delivery** — a fresh `.xsq` (each moving head's DMX as constant effects per run of identical 20 ms frames, display effects with custom value curves), plus standalone `.xtiming` timing tracks and an `.xmap` mapping hint; no input sequence is read or rewritten
 
 ## Quick Start
 
@@ -224,7 +224,7 @@ All commits must pass:
 |---|---|
 | Shell environment | API keys (`OPENAI_API_KEY` for the default cloud provider, plus optional AcoustID, Genius, and HuggingFace keys); `.env.example` is a reference and `.env` is not auto-loaded |
 | `config.json` | App settings — provider/base URL, cache directories, audio processing options, logging |
-| `job_config.json` | Job settings — agent iterations/models, fixture config path, transitions, timing tracks, assets, and final-plan checkpoint writing |
+| `job_config.json` | Job settings — agent iterations/models, fixture config path, moving-head render policy, timing tracks, assets, and final-plan checkpoint writing |
 | `fixture_config.json` | Moving head definitions — fixture names, DMX channels, physical positions |
 
 Review `.env.example` and export the values you need in your shell. Config files are

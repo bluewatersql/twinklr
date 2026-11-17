@@ -7,7 +7,6 @@ import re
 import pytest
 
 from twinklr.core.agents.audio.profile.models import SongSectionRef
-from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
 from twinklr.core.sequencer.display.brightness import event_brightness_percent
 from twinklr.core.sequencer.display.models.palette import ResolvedPalette
 from twinklr.core.sequencer.display.models.render_event import RenderEvent, RenderEventSource
@@ -16,8 +15,6 @@ from twinklr.core.sequencer.display.models.render_plan import (
     RenderLayerPlan,
     RenderPlan,
 )
-from twinklr.core.sequencer.models.enum import ChannelName, Intensity
-from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
 from twinklr.core.sequencer.planning.models import (
     CallResponsePair,
     FocalAssignment,
@@ -32,8 +29,6 @@ from twinklr.core.sequencer.planning.models import (
 )
 from twinklr.core.sequencer.show_coordination import (
     coordinate_display_render_plan,
-    coordinate_moving_head_plan,
-    coordinate_moving_head_segments,
     coordination_schedule,
     moving_head_dark_spans,
     validate_macro_coordination,
@@ -207,34 +202,6 @@ def _two_section_macro() -> MacroPlan:
             ],
         },
         deep=True,
-    )
-
-
-def _mh_plan(template_id: str = "sweep_lr_fan_hold") -> ChoreographyPlan:
-    return ChoreographyPlan(
-        sections=[
-            PlanSection(
-                section_name="drop",
-                start_bar=1,
-                end_bar=2,
-                template_id=template_id,
-                intensity=Intensity.SMOOTH,
-            )
-        ],
-        overall_strategy="fixture",
-    )
-
-
-def _mh_segment() -> FixtureSegment:
-    return FixtureSegment(
-        section_id="drop",
-        segment_id="mh",
-        step_id="sweep",
-        template_id="sweep_lr_fan_hold",
-        fixture_id="MH1",
-        t0_ms=0,
-        t1_ms=4_400,
-        channels={ChannelName.DIMMER: ChannelValue(channel=ChannelName.DIMMER, static_dmx=200)},
     )
 
 
@@ -489,12 +456,8 @@ def test_sparse_focal_roles_preserve_unmentioned_display_and_mh_as_support() -> 
         _graph(),
         moving_head_target_ids={"MOVING_HEADS"},
     )
-    mh = coordinate_moving_head_segments(
-        [_mh_segment()],
-        macro,
-        _grid(),
-        _graph(),
-        moving_head_target_ids={"MOVING_HEADS"},
+    rests = moving_head_dark_spans(
+        macro, _grid(), _graph(), moving_head_target_ids={"MOVING_HEADS"}
     )
 
     assert {group.element_name for group in display.groups} == {
@@ -503,7 +466,7 @@ def test_sparse_focal_roles_preserve_unmentioned_display_and_mh_as_support() -> 
         "ARCH_RIGHT",
     }
     assert _ranges(display, "ARCH_LEFT") == [(0, 4_400)]
-    assert [(segment.t0_ms, segment.t1_ms) for segment in mh] == [(0, 4_400)]
+    assert rests == ()
 
 
 def test_cross_part_call_response_uses_typed_teams_and_irregular_grid() -> None:
@@ -533,22 +496,14 @@ def test_cross_part_call_response_uses_typed_teams_and_irregular_grid() -> None:
         _graph(),
         moving_head_target_ids={"MOVING_HEADS"},
     )
-    mh = coordinate_moving_head_segments(
-        [_mh_segment()],
-        macro,
-        _grid(),
-        _graph(),
-        moving_head_target_ids={"MOVING_HEADS"},
+    rests = moving_head_dark_spans(
+        macro, _grid(), _graph(), moving_head_target_ids={"MOVING_HEADS"}
     )
 
     assert _ranges(display, "ARCH_LEFT") == _ranges(display, "ARCH_RIGHT")
     assert _ranges(display, "ARCH_LEFT")[:2] == [(0, 500), (1_100, 1_600)]
-    assert [(item.t0_ms, item.t1_ms) for item in mh][:2] == [(500, 1_100), (1_600, 2_200)]
-    assert all(
-        call_end <= response_start or response_end <= call_start
-        for call_start, call_end in _ranges(display, "ARCH_LEFT")
-        for response_start, response_end in [(item.t0_ms, item.t1_ms) for item in mh]
-    )
+    # The moving heads respond: they rest exactly while the display calls.
+    assert list(rests) == _ranges(display, "ARCH_LEFT")
 
 
 def test_narrow_pair_preserves_unpaired_display_groups() -> None:
@@ -639,13 +594,7 @@ def test_short_call_response_fails_when_both_phases_do_not_fit(
         ],
     )
     with pytest.raises(ValueError, match="both call and response phases"):
-        coordinate_moving_head_segments(
-            [_mh_segment()],
-            macro,
-            _grid(),
-            _graph(),
-            moving_head_target_ids={"MOVING_HEADS"},
-        )
+        moving_head_dark_spans(macro, _grid(), _graph(), moving_head_target_ids={"MOVING_HEADS"})
 
 
 @pytest.mark.parametrize(
@@ -696,7 +645,7 @@ def test_call_response_units_clip_both_phases_to_section(step_unit: StepUnit, ba
     assert all(0 <= window.start_ms < window.end_ms <= end_ms for window in paired)
 
 
-def test_coordination_mode_changes_emitted_timing_without_reselecting_mh_template() -> None:
+def test_coordination_mode_changes_display_timing_and_moving_head_rests() -> None:
     roles = [
         FocalRole(
             target=PlanTarget(type=TargetType.GROUP, id="MEGA_TREE"),
@@ -733,82 +682,15 @@ def test_coordination_mode_changes_emitted_timing_without_reselecting_mh_templat
         _graph(),
         moving_head_target_ids={"MOVING_HEADS"},
     )
-    unified_mh = coordinate_moving_head_segments(
-        [_mh_segment()],
-        unified_macro,
-        _grid(),
-        _graph(),
-        moving_head_target_ids={"MOVING_HEADS"},
+    unified_rests = moving_head_dark_spans(
+        unified_macro, _grid(), _graph(), moving_head_target_ids={"MOVING_HEADS"}
     )
-    sequenced_mh = coordinate_moving_head_segments(
-        [_mh_segment()],
-        sequenced_macro,
-        _grid(),
-        _graph(),
-        moving_head_target_ids={"MOVING_HEADS"},
+    sequenced_rests = moving_head_dark_spans(
+        sequenced_macro, _grid(), _graph(), moving_head_target_ids={"MOVING_HEADS"}
     )
 
     assert _ranges(unified_display, "MEGA_TREE") != _ranges(sequenced_display, "MEGA_TREE")
-    assert [(item.t0_ms, item.t1_ms) for item in unified_mh] != [
-        (item.t0_ms, item.t1_ms) for item in sequenced_mh
-    ]
-    assert {item.template_id for item in unified_mh + sequenced_mh} == {"sweep_lr_fan_hold"}
-
-
-def test_shared_palette_stop_resolves_mh_color_from_display_primary() -> None:
-    coordinated = coordinate_moving_head_plan(
-        _mh_plan(),
-        _macro(),
-        _grid(),
-        {"MOVING_HEADS"},
-        ["sweep_lr_fan_hold"],
-    )
-    section = coordinated.sections[0]
-    assert section.color_intent.explicit_color is not None
-    assert section.color_intent.explicit_color.value == "red"
-    assert not section.legacy_intent_omitted
-    assert _event("MEGA_TREE").palette.colors[0] == "#E53935"
-
-
-def test_flattened_segment_and_generated_transition_ids_map_to_macro_sections() -> None:
-    macro = _two_section_macro()
-    grid = BeatGrid(
-        bar_boundaries=[0.0, 2_200.0, 4_400.0, 6_600.0, 8_800.0],
-        beat_boundaries=[float(value) for value in range(0, 8_801, 550)],
-        eighth_boundaries=[float(value) for value in range(0, 8_801, 550)],
-        sixteenth_boundaries=[float(value) for value in range(0, 8_801, 550)],
-        tempo_bpm=109.0,
-        beats_per_bar=4,
-        duration_ms=8_800,
-    )
-    flattened = _mh_segment().model_copy(
-        update={"section_id": "drop|segment-a", "t1_ms": 4_400}, deep=True
-    )
-    transition = _mh_segment().model_copy(
-        update={
-            "section_id": "transition_drop|segment-a_to_chorus",
-            "segment_id": "trans_drop|segment-a_to_chorus",
-            "t0_ms": 4_200,
-            "t1_ms": 4_600,
-            "metadata": {
-                "is_transition": "true",
-                "source_id": "drop|segment-a",
-                "target_id": "chorus",
-            },
-        },
-        deep=True,
-    )
-
-    coordinated = coordinate_moving_head_segments(
-        [flattened, transition],
-        macro,
-        grid,
-        _graph(),
-        moving_head_target_ids={"MOVING_HEADS"},
-    )
-
-    assert any(segment.section_id == "drop|segment-a" for segment in coordinated)
-    assert any(segment.metadata.get("is_transition") == "true" for segment in coordinated)
+    assert unified_rests != sequenced_rests
 
 
 def test_repeated_call_response_target_fails_closed() -> None:
@@ -847,39 +729,7 @@ def test_coordination_normalization_is_idempotent_for_cached_branch_outputs() ->
         _graph(),
         moving_head_target_ids={"MOVING_HEADS"},
     )
-    first_mh = coordinate_moving_head_segments(
-        [_mh_segment()],
-        _macro(
-            mode=CoordinationMode.SEQUENCED,
-            roles=[
-                FocalRole(
-                    target=PlanTarget(type=TargetType.GROUP, id="MOVING_HEADS"),
-                    role=FocalRoleKind.LEAD,
-                )
-            ],
-        ),
-        _grid(),
-        _graph(),
-        moving_head_target_ids={"MOVING_HEADS"},
-    )
-    second_mh = coordinate_moving_head_segments(
-        first_mh,
-        _macro(
-            mode=CoordinationMode.SEQUENCED,
-            roles=[
-                FocalRole(
-                    target=PlanTarget(type=TargetType.GROUP, id="MOVING_HEADS"),
-                    role=FocalRoleKind.LEAD,
-                )
-            ],
-        ),
-        _grid(),
-        _graph(),
-        moving_head_target_ids={"MOVING_HEADS"},
-    )
-
     assert second_display == first_display
-    assert second_mh == first_mh
 
 
 @pytest.mark.parametrize(

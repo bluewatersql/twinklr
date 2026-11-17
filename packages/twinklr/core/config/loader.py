@@ -186,7 +186,7 @@ def load_fixture_group(path: str | Path) -> FixtureGroup:
 
     Example:
         >>> group = load_fixture_group("fixture_config.json")
-        >>> mh1 = group.get_fixture("MH1")
+        >>> mh1 = next(f for f in group.expand_fixtures() if f.fixture_id == "MH1")
     """
     raw_config = load_config(path)
     return FixtureGroup.model_validate(raw_config)
@@ -205,13 +205,13 @@ def load_full_config(job_config_path: str | Path) -> tuple[JobConfig, FixtureGro
 
     Raises:
         ValidationError: If either config is invalid
-        UnsupportedRenderModeError: If the job selects a render mode the installed
-            renderer cannot honor for these fixtures
+        UnsupportedRenderModeError: If the moving-head renderer cannot render these
+            fixtures
         FileNotFoundError: If either config file does not exist
 
     Example:
         >>> job_cfg, fixtures = load_full_config("job_config.json")
-        >>> mh1 = fixtures.get_fixture("MH1")
+        >>> mh1 = next(f for f in fixtures.expand_fixtures() if f.fixture_id == "MH1")
     """
     # Load job config
     job_cfg = load_job_config(job_config_path)

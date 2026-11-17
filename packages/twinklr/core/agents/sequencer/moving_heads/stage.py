@@ -404,8 +404,8 @@ class MovingHeadStage:
         and state holds a `regeneration_base_plan`, that base with `plan` in the
         section's place.
 
-        A physical render plans dark repositioning across section edges, so `twinklr
-        regenerate` on a physical job renders the whole song: from the plan of the
+        A render plans dark repositioning across section edges, so `twinklr
+        regenerate` renders the whole song: from the plan of the
         effects already injected, with only the named section re-planned. The section
         keeps its position; one the base lacks goes before the first later section.
 
@@ -471,8 +471,7 @@ class MovingHeadStage:
 
         Historical checkpoints used a `templates:[...]` list shape that today's
         `PlanSection` model no longer has; this writes `plan.model_dump()` directly,
-        which is exactly what `collect.extract_plan` already validates against. A job
-        that renders under a mode other than `legacy_v1` also records `render_mode`.
+        which is exactly what `collect.extract_plan` already validates against.
         """
         if not context.job_config.write_checkpoint or context.output_dir is None:
             return
@@ -482,11 +481,6 @@ class MovingHeadStage:
             "run_id": context.session.session_id,
             "plan": plan.model_dump(mode="json"),
         }
-        # Only a non-legacy mode is written, so legacy checkpoints keep their bytes and a
-        # checkpoint without the key reads as legacy.
-        mode = context.job_config.moving_heads.mode
-        if mode != "legacy_v1":
-            checkpoint_data["render_mode"] = mode
         checkpoint_path.write_text(json.dumps(checkpoint_data, indent=2), encoding="utf-8")
 
     def _handle_metrics(self, result: Any, context: PipelineContext) -> None:

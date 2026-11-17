@@ -275,12 +275,6 @@ class TemplateRegistry:
             allow_override=allow_override,
         )
 
-    def unregister(self, template_id: str) -> None:
-        """Remove a registered template and every alias that points to it."""
-        if template_id not in self._factories_by_id:
-            raise TemplateNotFoundError(f"Unknown template: {template_id}")
-        self._remove_registration(template_id)
-
     def _remove_registration(self, template_id: str) -> None:
         """Remove one registration and every alias that points to it."""
         self._factories_by_id.pop(template_id, None)
@@ -342,23 +336,6 @@ class TemplateRegistry:
 
 # Global registry instance (simple + ergonomic)
 REGISTRY = TemplateRegistry()
-
-
-def register_template(*, aliases: Iterable[str] = ()):
-    """
-    Decorator for registering template factory functions.
-
-    Usage:
-        @register_template(aliases=["Bounce Fan Pulse"])
-        def make_template() -> TemplateDoc: ...
-    """
-
-    def deco(fn: Callable[[], TemplateDoc]) -> Callable[[], TemplateDoc]:
-        # factory is fn; use fn() to pull template_id/name/etc
-        REGISTRY.register(fn, aliases=aliases)
-        return fn
-
-    return deco
 
 
 def get_template(key: str) -> TemplateDoc:

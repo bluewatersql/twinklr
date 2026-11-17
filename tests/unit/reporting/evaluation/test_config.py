@@ -12,10 +12,6 @@ class TestEvalConfig:
     def test_default_config(self):
         """Test creating config with default values."""
         config = EvalConfig()
-        assert config.samples_per_bar == 96
-        assert config.clamp_warning_threshold == 0.05
-        assert config.clamp_error_threshold == 0.20
-        assert config.loop_delta_threshold == 0.05
         assert config.gap_warning_bars == 0.5
         assert config.max_concurrent_layers == 3
         assert config.roles_to_plot is None
@@ -24,36 +20,12 @@ class TestEvalConfig:
         assert "json" in config.output_format
         assert "md" in config.output_format
 
-    def test_custom_thresholds(self):
-        """Test config with custom thresholds."""
-        config = EvalConfig(
-            clamp_warning_threshold=0.10,
-            clamp_error_threshold=0.25,
-            loop_delta_threshold=0.10,
-        )
-        assert config.clamp_warning_threshold == 0.10
-        assert config.clamp_error_threshold == 0.25
-        assert config.loop_delta_threshold == 0.10
-
     def test_output_formats(self):
         """Test config with custom output formats."""
         config = EvalConfig(output_format=["json", "md", "html"])
         assert "json" in config.output_format
         assert "md" in config.output_format
         assert "html" in config.output_format
-
-    def test_validation_samples_per_bar(self):
-        """Test validation of samples_per_bar."""
-        with pytest.raises(ValidationError):
-            EvalConfig(samples_per_bar=0)  # Must be >= 1
-
-    def test_validation_clamp_thresholds(self):
-        """Test validation of clamp thresholds."""
-        with pytest.raises(ValidationError):
-            EvalConfig(clamp_warning_threshold=1.5)  # Must be <= 1.0
-
-        with pytest.raises(ValidationError):
-            EvalConfig(clamp_warning_threshold=-0.1)  # Must be >= 0.0
 
     def test_validation_max_concurrent_layers(self):
         """Test validation of max_concurrent_layers."""
@@ -63,13 +35,11 @@ class TestEvalConfig:
     def test_deserialization(self):
         """Test config deserialization."""
         data = {
-            "samples_per_bar": 128,
-            "clamp_warning_threshold": 0.10,
+            "gap_warning_bars": 1.0,
             "plot_all_roles": True,
             "output_format": ["json"],
         }
         config = EvalConfig.model_validate(data)
 
-        assert config.samples_per_bar == 128
-        assert config.clamp_warning_threshold == 0.10
+        assert config.gap_warning_bars == 1.0
         assert config.plot_all_roles is True

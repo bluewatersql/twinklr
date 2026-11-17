@@ -2,7 +2,7 @@
 
 They are validated, enter render identity, and feed the physical compile, frame
 encoder and preposition pass. Physical-only config paths are evidenced here, not by the
-legacy-output fixture snapshot, because by design they do not change legacy output.
+generic fixture snapshot, because they change only the moving-head render.
 """
 
 from __future__ import annotations
@@ -20,13 +20,16 @@ from pydantic import ValidationError
 import pytest
 
 from tests.config_effects_registry import CONFIG_EFFECTS, ConfigDispositionKind
-from tests.golden.harness import RIGS, build_beat_grid, build_fixture_group, build_plan
 from tests.support.mh_physical import (
     initial_state_payload,
+    physical_catalog,
+    physical_grid,
     physical_segment,
     preposition_profile_payload,
     profile_payload,
+    unprofiled_rig,
 )
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
 from twinklr.core.config.fixtures import (
     AxisCapability,
     FixtureCapabilities,
@@ -35,7 +38,7 @@ from twinklr.core.config.fixtures import (
     InitialFixtureState,
     SimplifiedFixtureInstance,
 )
-from twinklr.core.config.models import JobConfig, MHRenderPolicy, TransitionConfig
+from twinklr.core.config.models import JobConfig, MHRenderPolicy
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import (
     ContinuousTrajectory,
@@ -54,10 +57,13 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
 )
 from twinklr.core.sequencer.moving_heads.identity import (
     LEGACY_BACKEND_ID,
-    LEGACY_RENDERER_REVISION,
+    PHYSICAL_RENDERER_REVISION,
     render_fingerprint,
 )
-from twinklr.core.sequencer.moving_heads.templates import get_template, load_builtin_templates
+from twinklr.core.sequencer.moving_heads.templates.data_loader import (
+    PHYSICAL_TEMPLATE_DIR,
+    load_template_document,
+)
 
 _INSTANCE_PREFIX = "fixture.fixtures[FixtureInstance].config.physical_profile"
 _BASE_PREFIX = "fixture.base_config.physical_profile"
@@ -528,7 +534,7 @@ def test_physical_profile_and_initial_states_load_from_json() -> None:
 
 
 def test_declared_pydantic_floor_honors_exclude_if() -> None:
-    """`exclude_if` keeps absent physical inputs out of legacy fingerprints; pydantic
+    """`exclude_if` keeps absent physical inputs out of render fingerprints; pydantic
     before 2.12 ignores it silently, so no older version may satisfy the floor."""
     core = Path(__file__).parents[3] / "packages/twinklr/core/pyproject.toml"
     dependencies = tomllib.loads(core.read_text(encoding="utf-8"))["project"]["dependencies"]
@@ -545,10 +551,10 @@ def _base_config_group(
     profile: dict[str, Any] | None, overrides: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     """The mh4_minimal rig in base_config form, profile on the shared base config."""
-    harness = build_fixture_group(RIGS["mh4_minimal"]).model_dump(mode="python")
+    rig = unprofiled_rig().model_dump(mode="python")
     base = {
         key: value
-        for key, value in harness["fixtures"][0]["config"].items()
+        for key, value in rig["fixtures"][0]["config"].items()
         if key not in {"fixture_id", "position"}
     }
     if profile is not None:
@@ -562,7 +568,7 @@ def _base_config_group(
 
 
 def _instance_group(profile: dict[str, Any] | None) -> dict[str, Any]:
-    payload = build_fixture_group(RIGS["mh4_minimal"]).model_dump(mode="python")
+    payload = unprofiled_rig().model_dump(mode="python")
     payload["fixtures"][0]["config"]["physical_profile"] = profile
     return payload
 
@@ -634,9 +640,9 @@ def test_invalid_profile_fails_at_group_validation_by_name(
         FixtureGroup.model_validate(payload)
 
 
-def test_other_invalid_fixture_config_keeps_its_legacy_behavior() -> None:
-    """Only the profile surfaces early; an invalid legacy field still loads as before."""
-    payload = build_fixture_group(RIGS["mh4_minimal"]).model_dump(mode="python")
+def test_other_invalid_fixture_config_keeps_its_behavior() -> None:
+    """Only the profile surfaces early; an invalid DMX mapping still loads as before."""
+    payload = unprofiled_rig().model_dump(mode="python")
     payload["fixtures"][0]["config"]["dmx_mapping"] = {"pan_channel": "not-a-channel"}
 
     group = FixtureGroup.model_validate(payload)
@@ -799,16 +805,18 @@ def _split(path: str, prefixes: tuple[str, ...]) -> tuple[str, str]:
 
 @cache
 def _identity_inputs() -> dict[str, Any]:
-    load_builtin_templates()
-    plan = build_plan()
-    template_ids = sorted({s.template_id for s in plan.sections if s.template_id})
+    """Render identity inputs other than the rig and the policy, held constant."""
+    plan = ChoreographyPlan(
+        sections=[
+            PlanSection(section_name="verse", start_bar=1, end_bar=2, template_id="mirror_wings")
+        ]
+    )
     return {
         "plan": plan,
-        "beat_grid": build_beat_grid(),
-        "templates": [get_template(template_id) for template_id in template_ids],
-        "transitions": TransitionConfig(),
+        "beat_grid": physical_grid(),
+        "templates": [load_template_document(PHYSICAL_TEMPLATE_DIR / "mirror_wings.json")],
         "backend_id": LEGACY_BACKEND_ID,
-        "renderer_revision": LEGACY_RENDERER_REVISION,
+        "renderer_revision": PHYSICAL_RENDERER_REVISION,
     }
 
 
@@ -962,8 +970,14 @@ def _contract_snapshot(
         "check": check,
         "preposition": preposition,
         "darkness": darkness,
-        "fingerprint": render_fingerprint(fixtures=group, policy=policy, **_identity_inputs()),
+        "fingerprint": _fingerprint(group, policy),
     }
+
+
+def _fingerprint(group: FixtureGroup, policy: MHRenderPolicy) -> str:
+    # The plan's template id resolves through the shared registry.
+    with physical_catalog():
+        return render_fingerprint(fixtures=group, policy=policy, **_identity_inputs())
 
 
 def test_physical_evidence_paths_cover_every_mutation() -> None:

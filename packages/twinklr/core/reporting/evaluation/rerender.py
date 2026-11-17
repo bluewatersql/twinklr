@@ -1,7 +1,7 @@
 """Re-render choreography plans through the sequencing pipeline.
 
 This module re-executes the full MovingHead sequencing pipeline to generate
-IR segments and, for a physical render, its encoded frames from a saved plan.
+IR segments and the encoded frames from a saved plan.
 """
 
 from __future__ import annotations
@@ -15,12 +15,12 @@ from typing import Any
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.config.fixtures import FixtureCapabilities
 from twinklr.core.config.loader import load_fixture_group
-from twinklr.core.config.models import JobConfig, MHRenderPolicy
+from twinklr.core.config.models import JobConfig
 from twinklr.core.config.render_policy import UnsupportedRenderModeError
 from twinklr.core.reporting.evaluation.collect import RecordedRender
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import EncodedFixtureFrame
 from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
-from twinklr.core.sequencer.moving_heads.templates import get_template, load_builtin_templates
+from twinklr.core.sequencer.moving_heads.templates import get_template
 from twinklr.core.sequencer.moving_heads.templates.data_loader import admit_physical_catalog
 from twinklr.core.sequencer.moving_heads.templates.library import TemplateNotFoundError
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class PhysicalRerender:
-    """What a physical re-render adds to its result.
+    """What a re-render adds to its segments: frames, profiles and identity.
 
     Attributes:
         frames: Every fixture's encoded frames, in rig order.
@@ -67,7 +67,7 @@ class RerenderResult:
         fixture_group: Fixture configuration
         beat_grid: Timing grid for bar/ms conversions
         fixture_contexts: List of fixture contexts with roles
-        physical: A physical re-render's frames, profiles and identity; None for legacy
+        physical: The re-render's frames, profiles and identity
     """
 
     def __init__(
@@ -78,7 +78,7 @@ class RerenderResult:
         fixture_group: Any,
         beat_grid: BeatGrid,
         fixture_contexts: list[Any],
-        physical: PhysicalRerender | None = None,
+        physical: PhysicalRerender,
     ):
         self.segments = segments
         self.song_features = song_features
@@ -88,16 +88,15 @@ class RerenderResult:
         self.physical = physical
 
 
-def admit_plan_templates(plan: ChoreographyPlan, policy: MHRenderPolicy) -> None:
-    """Load the templates a physical plan's run could name, and refuse a plan naming any
-    other: the physical family catalog is admitted as `twinklr run` admits it.
+def admit_plan_templates(plan: ChoreographyPlan) -> None:
+    """Load the templates a plan's run could name, and refuse a plan naming any other:
+    the family catalog is admitted as `twinklr run` admits it.
 
     Raises:
         UnsupportedRenderModeError: Naming each template id the registry does not hold,
             such as one a run loaded with `--template-dir`.
     """
-    load_builtin_templates()
-    admit_physical_catalog(JobConfig(schema_version="3.1", moving_heads=policy))
+    admit_physical_catalog()
     named = {
         selection.template_id
         for section in plan.sections
@@ -113,7 +112,7 @@ def admit_plan_templates(plan: ChoreographyPlan, policy: MHRenderPolicy) -> None
     if missing:
         raise UnsupportedRenderModeError(
             f"`twinklr eval-report` cannot re-render this plan: it names template(s) "
-            f"{missing} that are neither built in nor in the physical catalog; a plan using "
+            f"{missing} that are not in the family catalog; a plan using "
             "`--template-dir` templates cannot be re-rendered by `eval-report`"
         )
 
@@ -123,21 +122,21 @@ async def rerender_plan(
     plan: ChoreographyPlan,
     audio_path: Path,
     fixture_config_path: Path,
-    render_policy: MHRenderPolicy | RecordedRender,
+    recorded: RecordedRender,
 ) -> RerenderResult:
     """Re-render a choreography plan through the sequencing pipeline.
 
     This function re-executes the complete RenderingPipeline to generate
-    IR segments and curves from a saved plan. It uses the same sequencer
+    segments and frames from a saved plan. It uses the same sequencer
     code as production.
 
-    Evaluation reads segments and curves, so nothing here writes a `.xsq` — this used
+    Evaluation reads segments and frames, so nothing here writes a `.xsq` — this used
     to take the user's sequence as a template and drop a `temp_eval.xsq` next to their
     audio on every report. It is the third export-path caller P1P-T11 detached from the
     user's document, and the easiest of the three to miss.
 
-    A `physical_v2` plan is re-rendered from the render its run recorded: under the
-    recorded policy, against the recorded beat grid, over the recorded dark spans (a
+    The plan is re-rendered from the render its run recorded: under the recorded
+    policy, against the recorded beat grid, over the recorded dark spans (a
     show's coordination rests) and with the recorded gate result, which decides the
     variant a section naming no preset renders, with the physical
     family catalog admitted as `twinklr run` admits it (`admit_plan_templates`). The
@@ -148,16 +147,14 @@ async def rerender_plan(
         plan: ChoreographyPlan to render
         audio_path: Path to audio file (for tempo/structure)
         fixture_config_path: Path to fixture configuration
-        render_policy: How the job rendered the plan: its legacy render policy, or the
-            physical render its run recorded, whose policy is used. A plan is never
-            re-rendered under a policy other than its job's.
+        recorded: The render the plan's run recorded, whose policy is used. A plan is
+            never re-rendered under a policy other than its job's.
 
     Returns:
         RerenderResult with segments, audio features, and fixture contexts
 
     Raises:
-        UnsupportedRenderModeError: If `render_policy` is a `physical_v2` policy rather
-            than a recorded render, or the plan names a template that cannot be loaded;
+        UnsupportedRenderModeError: If the plan names a template that cannot be loaded;
             raised before any file is read or audio analyzed
         FileNotFoundError: If any input file doesn't exist
         ValueError: If plan cannot be rendered
@@ -167,27 +164,16 @@ async def rerender_plan(
         ...     plan=plan,
         ...     audio_path=Path("song.mp3"),
         ...     fixture_config_path=Path("fixtures.json"),
-        ...     render_policy=MHRenderPolicy(),
+        ...     recorded=recorded_render(checkpoint_data),
         ... )
         >>> len(result.segments) > 0
         True
     """
-    recorded = render_policy if isinstance(render_policy, RecordedRender) else None
-    policy = recorded.policy if recorded is not None else render_policy
-    assert isinstance(policy, MHRenderPolicy)
-    physical = policy.mode == "physical_v2"
-    if physical and recorded is None:
-        raise UnsupportedRenderModeError(
-            "`twinklr eval-report` re-renders a moving_heads.mode 'physical_v2' plan only "
-            "from the render its run recorded in the checkpoint"
-        )
     job_config = JobConfig(
-        schema_version="3.1" if physical else "3.0",
         fixture_config_path=str(fixture_config_path),
-        moving_heads=policy,
+        moving_heads=recorded.policy,
     )
-    if physical:
-        admit_plan_templates(plan, policy)
+    admit_plan_templates(plan)
 
     # Validate input files exist
     if not audio_path.exists():
@@ -212,12 +198,8 @@ async def rerender_plan(
     async with AudioAnalyzer(app_config=app_config, job_config=job_config) as analyzer:
         song_bundle = await analyzer.analyze(str(audio_path))
 
-    if recorded is not None:
-        # The grid the run rendered against.
-        beat_grid = recorded.beat_grid
-    else:
-        logger.debug("Building beat grid")
-        beat_grid = BeatGrid.from_song_features(song_bundle.features)
+    # The grid the run rendered against.
+    beat_grid = recorded.beat_grid
 
     # Create rendering pipeline
     logger.debug("Creating rendering pipeline")
@@ -228,8 +210,8 @@ async def rerender_plan(
         fixture_group=fixture_group,
         job_config=job_config,
         output_path=None,  # Evaluation reads segments; it writes no sequence file.
-        admission=None if recorded is None else recorded.admission,
-        dark_spans=() if recorded is None else recorded.dark_spans,
+        admission=recorded.admission,
+        dark_spans=recorded.dark_spans,
     )
 
     # Render segments
@@ -241,21 +223,19 @@ async def rerender_plan(
 
     logger.debug(f"Re-rendered {len(segments)} segments")
 
-    physical_rerender = None
-    if recorded is not None:
-        assert pipeline.render_record is not None  # set by a physical render
-        profiles = {}
-        for fixture in fixture_group.expand_fixtures():
-            assert fixture.config.physical_profile is not None  # required by the render
-            profiles[fixture.fixture_id] = fixture.config.physical_profile
-        physical_rerender = PhysicalRerender(
-            frames=pipeline.frames,
-            profiles=profiles,
-            render_record=pipeline.render_record,
-            run_fingerprint=recorded.fingerprint,
-            run_inputs=recorded.inputs,
-            rerender_inputs=pipeline.checkpoint_record()["inputs"],
-        )
+    assert pipeline.render_record is not None  # set by every render
+    profiles = {}
+    for fixture in fixture_group.expand_fixtures():
+        assert fixture.config.physical_profile is not None  # required by the render
+        profiles[fixture.fixture_id] = fixture.config.physical_profile
+    physical_rerender = PhysicalRerender(
+        frames=pipeline.frames,
+        profiles=profiles,
+        render_record=pipeline.render_record,
+        run_fingerprint=recorded.fingerprint,
+        run_inputs=recorded.inputs,
+        rerender_inputs=pipeline.checkpoint_record()["inputs"],
+    )
 
     # Return wrapped result (pass features dict for backward compatibility)
     return RerenderResult(

@@ -267,23 +267,6 @@ class BeatGrid(BaseModel):
         total_duration = self.beat_boundaries[-1] - self.beat_boundaries[0]
         return total_duration / (len(self.beat_boundaries) - 1)
 
-    def get_beat_time_ms(self, beat_index: int) -> float:
-        """Get the time of a specific beat.
-
-        Args:
-            beat_index: Beat index (0-based)
-
-        Returns:
-            Time in milliseconds
-
-        Raises:
-            IndexError: If beat_index is out of range
-
-        Example:
-            >>> beat_time = beat_grid.get_beat_time_ms(32)  # Beat 32
-        """
-        return self.beat_boundaries[beat_index]
-
     # ======================================================================
     # Bar <-> millisecond conversion (the single grid authority)
     #
@@ -352,23 +335,6 @@ class BeatGrid(BaseModel):
         if fraction == 0.0:
             return start
         return start + fraction * (boundaries[floor_index + 1] - start)
-
-    def bar_span_ms(self, start_bar_index: float, span_bars: float) -> float:
-        """Duration of `span_bars` bars beginning at `start_bar_index`.
-
-        Measured against the detected downbeats, so a span over a slowing passage
-        is longer than the same span over a faster one.
-
-        Args:
-            start_bar_index: Bar index (0-based) the span starts on
-            span_bars: Length of the span in bars
-
-        Returns:
-            Duration in milliseconds
-        """
-        return self.get_bar_start_ms(start_bar_index + span_bars) - self.get_bar_start_ms(
-            start_bar_index
-        )
 
     def nearest_bar_index(self, time_ms: float) -> int:
         """Resolve a time to the 0-based index of the *nearest* detected downbeat.

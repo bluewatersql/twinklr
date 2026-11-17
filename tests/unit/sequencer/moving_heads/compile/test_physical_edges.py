@@ -16,7 +16,6 @@ from tests.support.mh_physical import (
     physical_grid,
     physical_rig,
 )
-from twinklr.core.curves.registry import CurveRegistry
 from twinklr.core.sequencer.models.context import TemplateCompileContext
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
 from twinklr.core.sequencer.models.template import Template
@@ -25,7 +24,6 @@ from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
     compile_physical_template,
 )
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
-from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
 from twinklr.core.sequencer.moving_heads.pipeline import physical_cue_limits
 from twinklr.core.sequencer.moving_heads.templates.data_loader import load_template_document
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
@@ -50,7 +48,6 @@ def _compile(
     grid: BeatGrid, *, start_bar: int, duration_bars: int, template: Template | None = None
 ) -> TemplateCompileResult:
     rig = physical_rig()
-    registries = create_default_registries()
     template = template or _template()
     context = TemplateCompileContext(
         section_id="verse",
@@ -59,10 +56,6 @@ def _compile(
         beat_grid=grid,
         start_bar=start_bar,
         duration_bars=duration_bars,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
     )
     phase_map = build_musical_phase_map(grid)
     start_limit, end_limit = physical_cue_limits(phase_map, int(grid.duration_ms))
@@ -145,7 +138,6 @@ def test_phase1_grid_compiles_identical_segments() -> None:
     and the compile is the one Phase 1 made without a start limit."""
     grid = physical_grid()
     rig = physical_rig()
-    registries = create_default_registries()
     context: dict[str, Any] = {
         "section_id": "verse",
         "template_id": TEMPLATE_ID,
@@ -153,10 +145,6 @@ def test_phase1_grid_compiles_identical_segments() -> None:
         "beat_grid": grid,
         "start_bar": 1,
         "duration_bars": 2,
-        "curve_registry": CurveRegistry(),
-        "geometry_registry": registries["geometry"],
-        "movement_registry": registries["movement"],
-        "dimmer_registry": registries["dimmer"],
     }
     phase1 = compile_physical_template(
         _template(),

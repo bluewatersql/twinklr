@@ -13,19 +13,10 @@ from dataclasses import dataclass
 from itertools import pairwise
 import re
 
-from twinklr.core.agents.sequencer.moving_heads.models import (
-    ChoreographyPlan,
-    ColorIntent,
-    ColorIntentKind,
-    ExplicitColorIntent,
-)
 from twinklr.core.sequencer.display.brightness import intensity_to_brightness
 from twinklr.core.sequencer.display.models.palette import ResolvedPalette
 from twinklr.core.sequencer.display.models.render_event import RenderEvent
 from twinklr.core.sequencer.display.models.render_plan import RenderPlan
-from twinklr.core.sequencer.models.enum import Intensity
-from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
-from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
 from twinklr.core.sequencer.planning.models import (
     FocalRoleKind,
     MacroPlan,
@@ -66,36 +57,11 @@ _ROLE_SCALE_FLOOR = {
     / 2,
     FocalRoleKind.REST: 0.0,
 }
-_ROLE_MH_INTENSITY = {
-    FocalRoleKind.LEAD: Intensity.INTENSE,
-    FocalRoleKind.SUPPORT: Intensity.SMOOTH,
-    FocalRoleKind.REST: Intensity.SLOW,
-}
-
 # Display RecipeCompiler raw IDs always terminate in a 64-character SHA-256 hex
 # digest (and overlay/tail variants add non-coordinator suffixes).  Therefore only
 # this exact terminal form is coordinator-owned; template/local/FE IDs may safely
 # contain ``|coord-`` anywhere inside the compiler-generated prefix.
 _COORDINATED_EVENT_SUFFIX = re.compile(r"\|coord-\d+$")
-
-# Stable RGB representatives for the fixture-neutral wheel vocabulary.  Exact DMX
-# positions remain fixture-adapter owned; this table only performs palette projection.
-_PRESET_RGB: tuple[tuple[ColorPreset, tuple[int, int, int]], ...] = (
-    (ColorPreset.RED, (255, 0, 0)),
-    (ColorPreset.BLUE, (0, 0, 255)),
-    (ColorPreset.GREEN, (0, 255, 0)),
-    (ColorPreset.YELLOW, (255, 255, 0)),
-    (ColorPreset.MAGENTA, (255, 0, 255)),
-    (ColorPreset.CYAN, (0, 255, 255)),
-    (ColorPreset.ORANGE, (255, 128, 0)),
-    (ColorPreset.PURPLE, (128, 0, 128)),
-    (ColorPreset.AMBER, (255, 191, 0)),
-    (ColorPreset.LIME, (191, 255, 0)),
-    (ColorPreset.WHITE, (255, 255, 255)),
-    (ColorPreset.WARM_WHITE, (245, 241, 232)),
-    (ColorPreset.COOL_WHITE, (220, 240, 255)),
-    (ColorPreset.UV, (110, 0, 255)),
-)
 
 
 def _expand(expander: TargetExpander, target: PlanTarget) -> tuple[str, ...]:
@@ -316,40 +282,6 @@ def _windows_for(
     ]
 
 
-def _macro_sections_for_emitted_id(
-    emitted_section_id: str,
-    macro_plan: MacroPlan,
-    metadata: dict[str, str] | None = None,
-) -> tuple[MacroSection, ...]:
-    """Resolve compiler-flattened and generated transition identities to macro sections."""
-
-    by_id = {section.section.section_id: section for section in macro_plan.sections}
-    resolved: list[MacroSection] = []
-
-    def add(identifier: str | None) -> None:
-        if not identifier:
-            return
-        section = by_id.get(identifier) or by_id.get(identifier.split("|", 1)[0])
-        if section is not None and section not in resolved:
-            resolved.append(section)
-
-    add(emitted_section_id)
-    if metadata:
-        add(metadata.get("source_id"))
-        add(metadata.get("target_id"))
-    if emitted_section_id.startswith("transition_"):
-        for source_id in by_id:
-            for target_id in by_id:
-                if emitted_section_id == f"transition_{source_id}_to_{target_id}":
-                    add(source_id)
-                    add(target_id)
-    if not resolved:
-        raise ValueError(
-            f"Emitted moving-head section '{emitted_section_id}' does not map to a macro section"
-        )
-    return tuple(resolved)
-
-
 def _event_brightness(event: RenderEvent) -> float:
     """Brightness fraction an event renders at, before role dimming floors apply."""
     return intensity_to_brightness(event.intensity) * event.brightness_scale
@@ -500,60 +432,6 @@ def coordinate_display_render_plan(
     return _normalize_display_role_budgets(coordinated, macro_plan, graph)
 
 
-def _closest_preset(hex_color: str) -> ColorPreset:
-    rgb = tuple(int(hex_color[index : index + 2], 16) for index in (1, 3, 5))
-    return min(
-        _PRESET_RGB,
-        key=lambda item: sum((left - right) ** 2 for left, right in zip(rgb, item[1], strict=True)),
-    )[0]
-
-
-def coordinate_moving_head_plan(
-    plan: ChoreographyPlan,
-    macro_plan: MacroPlan,
-    beat_grid: BeatGrid,
-    moving_head_target_ids: set[str],
-    available_template_ids: Iterable[str] | None = None,
-    coordination_graph: ChoreographyGraph | None = None,
-) -> ChoreographyPlan:
-    """Project shared palette and role intent without changing MH template selection."""
-
-    del beat_grid, available_template_ids
-    graph_target_ids = set(moving_head_target_ids)
-    expander = TargetExpander(coordination_graph) if coordination_graph is not None else None
-    updated = []
-    for planned in plan.sections:
-        macro_section = _macro_sections_for_emitted_id(planned.section_name, macro_plan)[0]
-        palette = _resolved_palette(macro_plan, macro_section.section.section_id)
-        preset = _closest_preset(palette.colors[0])
-        role = FocalRoleKind.SUPPORT
-        for focal in macro_section.focal_roles:
-            resolved = (
-                set(_expand(expander, focal.target)) if expander is not None else {focal.target.id}
-            )
-            if resolved & graph_target_ids:
-                role = focal.role
-                break
-        section_payload = planned.model_dump(mode="python")
-        section_payload.update(
-            {
-                "intensity": _ROLE_MH_INTENSITY[role],
-                "color_intent": ColorIntent(
-                    selection=ExplicitColorIntent(
-                        kind=ColorIntentKind.EXPLICIT,
-                        palette_role=None,
-                        explicit_color=preset,
-                    )
-                ),
-            }
-        )
-        # Revalidation intentionally flips the private legacy-intent provenance marker:
-        # these fields are now explicit macro-derived renderer intent, not compatibility
-        # defaults inherited from the provider fixture.
-        updated.append(planned.__class__.model_validate(section_payload))
-    return plan.model_copy(update={"sections": updated}, deep=True)
-
-
 def moving_head_dark_spans(
     macro_plan: MacroPlan,
     beat_grid: BeatGrid,
@@ -590,54 +468,9 @@ def moving_head_dark_spans(
     return tuple(spans)
 
 
-def coordinate_moving_head_segments(
-    segments: list[FixtureSegment],
-    macro_plan: MacroPlan,
-    beat_grid: BeatGrid,
-    graph: ChoreographyGraph,
-    *,
-    moving_head_target_ids: set[str],
-) -> list[FixtureSegment]:
-    """Slice emitted MH segments against the same immutable coordination schedule."""
-
-    schedule = coordination_schedule(macro_plan, beat_grid, graph)
-    result: list[FixtureSegment] = []
-    for segment in segments:
-        if segment.metadata.get("coordination_source") == "macro_plan+beat_grid":
-            result.append(segment.model_copy(deep=True))
-            continue
-        windows: list[tuple[int, int]] = []
-        macro_sections = _macro_sections_for_emitted_id(
-            segment.section_id, macro_plan, segment.metadata
-        )
-        for macro_section in macro_sections:
-            for target_id in sorted(moving_head_target_ids):
-                windows.extend(_windows_for(schedule, macro_section, target_id))
-        for index, (window_start, window_end) in enumerate(sorted(set(windows))):
-            start = max(segment.t0_ms, window_start)
-            end = min(segment.t1_ms, window_end)
-            if start < end:
-                metadata = dict(segment.metadata)
-                metadata["coordination_source"] = "macro_plan+beat_grid"
-                result.append(
-                    segment.model_copy(
-                        update={
-                            "segment_id": f"{segment.segment_id}|coord-{index}",
-                            "t0_ms": start,
-                            "t1_ms": end,
-                            "metadata": metadata,
-                        },
-                        deep=True,
-                    )
-                )
-    return result
-
-
 __all__ = [
     "CoordinationWindow",
     "coordinate_display_render_plan",
-    "coordinate_moving_head_plan",
-    "coordinate_moving_head_segments",
     "coordination_schedule",
     "moving_head_dark_spans",
     "validate_macro_coordination",

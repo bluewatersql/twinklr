@@ -1,12 +1,9 @@
 # Physical moving-head families
 
-Strict JSON `TemplateDoc` documents for the opt-in `physical_v2` renderer. They load only
-for a `physical_v2` job (`admit_physical_catalog`), after the Python builtins and before
-any `--template-dir`; a legacy run and the 37-entry builtin registry never see them.
-The deterministic selector sees only the families the run's gate admitted, each with its
-effective variant, when it is given that admission (`SelectorAdmission`). They live
-outside `catalog/templates/moving_heads`, whose documents must stay model-equal to their
-Python builtins.
+Strict JSON `TemplateDoc` documents for the moving-head renderer. They load for every
+run (`admit_physical_catalog`), before any `--template-dir`. The deterministic selector
+sees only the families the run's gate admitted, each with its effective variant
+(`SelectorAdmission`).
 
 Before planning, the render preflight dry-compiles each family with no preset and with
 each preset on the run's rig and song (`check_physical_templates`). A family is offered

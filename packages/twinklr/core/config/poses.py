@@ -117,26 +117,6 @@ class PanPose(StrEnum):
     AUDIENCE_LEFT = PoseLibrary.AUDIENCE_LEFT.value
     AUDIENCE_RIGHT = PoseLibrary.AUDIENCE_RIGHT.value
 
-    @property
-    def pose_id(self) -> PoseLibrary:
-        return PoseLibrary(self.value)
-
-    @property
-    def norm_value(self) -> float:
-        values = {
-            PanPose.WIDE_LEFT: 0.1,
-            PanPose.MID_LEFT: 0.2,
-            PanPose.LEFT: 0.3,
-            PanPose.CENTER: 0.5,
-            PanPose.RIGHT: 0.7,
-            PanPose.MID_RIGHT: 0.8,
-            PanPose.WIDE_RIGHT: 0.9,
-            PanPose.AUDIENCE_CENTER: 0.5,
-            PanPose.AUDIENCE_LEFT: 0.3,
-            PanPose.AUDIENCE_RIGHT: 0.7,
-        }
-        return values[self]
-
 
 class TiltPose(StrEnum):
     """Normalized tilt pose positions.
@@ -154,25 +134,6 @@ class TiltPose(StrEnum):
     AUDIENCE_CENTER = PoseLibrary.AUDIENCE_CENTER.value
     AUDIENCE_LEFT = PoseLibrary.AUDIENCE_LEFT.value
     AUDIENCE_RIGHT = PoseLibrary.AUDIENCE_RIGHT.value
-
-    @property
-    def pose_id(self) -> PoseLibrary:
-        return PoseLibrary(self.value)
-
-    @property
-    def norm_value(self) -> float:
-        values = {
-            TiltPose.SKY: 1.0,
-            TiltPose.CEILING: 0.85,
-            TiltPose.HORIZON_UP_45: 0.65,
-            TiltPose.HORIZON: 0.5,
-            TiltPose.CROWD: 0.3,
-            TiltPose.STAGE: 0.1,
-            TiltPose.AUDIENCE_CENTER: 0.3,
-            TiltPose.AUDIENCE_LEFT: 0.3,
-            TiltPose.AUDIENCE_RIGHT: 0.3,
-        }
-        return values[self]
 
 
 def _is_pose_library_id(pose_id: PoseLibrary | str) -> TypeGuard[PoseLibrary]:

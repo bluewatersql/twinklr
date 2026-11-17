@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.config.fixtures import FixtureGroup
-from twinklr.core.config.models import MHRenderPolicy, TransitionConfig
+from twinklr.core.config.models import MHRenderPolicy
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS, XLIGHTS_VERSION_STAMP
 from twinklr.core.sequencer.models.template import TemplateDoc
 from twinklr.core.sequencer.moving_heads.templates import get_template
@@ -25,10 +25,7 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
 LEGACY_BACKEND_ID = "xlights_dmx"
-"""The backend the legacy renderer writes: xLights DMX effects in an `.xsq`."""
-
-LEGACY_RENDERER_REVISION = "1"
-"""Bumped by hand in the commit that intentionally changes legacy rendering."""
+"""The backend the renderer writes: xLights DMX effects in an `.xsq`."""
 
 PHYSICAL_RENDERER_REVISION = "2"
 """Bumped by hand in the commit that intentionally changes physical rendering; the
@@ -42,7 +39,6 @@ def render_fingerprint(
     fixtures: FixtureGroup,
     templates: Sequence[TemplateDoc],
     policy: MHRenderPolicy,
-    transitions: TransitionConfig | None,
     backend_id: str,
     renderer_revision: str,
     seed: int | None = None,
@@ -59,10 +55,8 @@ def render_fingerprint(
         fixtures: The rig; fixture order counts.
         templates: Template documents, presets included; their order does not count.
         policy: The moving-head render policy.
-        transitions: Transition settings, which change legacy segments; None for a
-            renderer that ignores them.
         backend_id: Output backend identity, e.g. `LEGACY_BACKEND_ID`.
-        renderer_revision: Renderer revision, e.g. `LEGACY_RENDERER_REVISION`.
+        renderer_revision: Renderer revision, from `PHYSICAL_RENDERER_REVISION`.
         seed: Seed of any seeded choice the render depends on.
         phase_map: A typed boundary map, when the renderer takes one.
         locks: Render locks the output must honor; hashed only when there are any, so
@@ -87,7 +81,6 @@ def render_fingerprint(
             key=lambda doc: doc["template"]["template_id"],
         ),
         "policy": policy.model_dump(mode="json"),
-        "transitions": transitions.model_dump(mode="json") if transitions is not None else None,
         "backend_id": backend_id,
         "renderer_revision": renderer_revision,
         "seed": seed,

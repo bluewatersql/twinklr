@@ -49,6 +49,8 @@ REMOVED_CONFIG_PATHS = (
     "job.planner_features",
     "job.output_dir",
     "job.project_name",
+    "job.transitions",
+    "job.moving_heads.mode",
     "app.audio_processing.enhancements.metadata_merge_policy_version",
     "app.audio_processing.enhancements.metadata_min_confidence_warn",
     "app.audio_processing.enhancements.http_circuit_breaker_threshold",
@@ -256,6 +258,8 @@ def test_retired_template_config_fails_loudly_with_migration_message(
         (JobConfig, {"planner_features": {"enabled": True}}, "planner_features"),
         (JobConfig, {"output_dir": "artifacts"}, "output_dir"),
         (JobConfig, {"project_name": "probe"}, "project_name"),
+        (JobConfig, {"transitions": {"enabled": False}}, "transitions"),
+        (JobConfig, {"moving_heads": {"mode": "physical_v2"}}, "mode"),
         (
             JobConfig,
             {"agent": {"enforce_token_budget": True}},
@@ -312,11 +316,13 @@ def test_unrelated_future_app_and_job_keys_remain_forward_compatible() -> None:
 def test_fixed_policy_config_paths_are_invariant() -> None:
     """Fixed cost/timing policies reject every alternate value exposed by their types.
 
-    The job schema version accepts only its declared versions, so an undeclared one
-    still fails validation.
+    The job schema version accepts only its one declared version, 3.1, so any other
+    fails validation.
     """
     with pytest.raises(ValidationError):
         JobConfig(schema_version="future")
+    with pytest.raises(ValidationError):
+        JobConfig.model_validate({"schema_version": "3.0"})
 
     for field, value in (
         ("max_image_requests_per_run", 2),
@@ -442,7 +448,6 @@ def test_restored_effect_paths_keep_their_exact_public_nodeids() -> None:
         "fixture.fixtures[SimplifiedFixtureInstance].position.pan_offset_deg": "tests/unit/config/test_fixtures.py::TestFixturePosition::test_offsets_change_public_pose_conversion[simplified-fixture-pan-offset]",
         "fixture.fixtures[SimplifiedFixtureInstance].position.tilt_offset_deg": "tests/unit/config/test_fixtures.py::TestFixturePosition::test_offsets_change_public_pose_conversion[simplified-fixture-tilt-offset]",
         "job.timeline_tracks.sections": "tests/unit/formats/xlights/sequence/test_timeline.py::TestBuildTimelineTracks::test_sections_config_gates_public_track_builder[sections-disabled]",
-        "template.template.steps.geometry.aim_zone": "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_geometry_aim_zone_reaches_compiled_segment_metadata[crowd]",
     }
 
     assert frozenset(expected) == PROTECTED_EXACT_EFFECT_PATHS

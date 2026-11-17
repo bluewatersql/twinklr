@@ -232,10 +232,8 @@ class HeldConstantIdentity(BaseModel):
     template_set_sha256: str = Field(pattern=SHA256_PATTERN)
     renderer_sha256: str = Field(pattern=SHA256_PATTERN)
     evaluation_config_sha256: str = Field(pattern=SHA256_PATTERN)
-    admission_sha256: str | None = Field(
-        default=None, pattern=SHA256_PATTERN, exclude_if=lambda value: value is None
-    )
-    """The song's `AnalysisSnapshot.admission`, hashed; None for an old-renderer run."""
+    admission_sha256: str = Field(pattern=SHA256_PATTERN)
+    """The song's `AnalysisSnapshot.admission`, hashed."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -245,8 +243,7 @@ class AnalysisSnapshot(BaseModel):
 
     `admission` is what the pre-planning gate admitted on the experiment's rig for this
     song: arm A selects only among it, every arm's plan may name only its templates and
-    their admitted presets (or none), and its hash is held constant across the arms. None means an old-renderer run,
-    whose candidates are the registered builtins (until the cutover removes them).
+    their admitted presets (or none), and its hash is held constant across the arms.
     """
 
     song_id: str
@@ -258,9 +255,7 @@ class AnalysisSnapshot(BaseModel):
     template_set_sha256: str = Field(pattern=SHA256_PATTERN)
     renderer_sha256: str = Field(pattern=SHA256_PATTERN)
     evaluation_config_sha256: str = Field(pattern=SHA256_PATTERN)
-    admission: SelectorAdmission | None = Field(
-        default=None, exclude_if=lambda value: value is None
-    )
+    admission: SelectorAdmission
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -277,11 +272,7 @@ class AnalysisSnapshot(BaseModel):
             template_set_sha256=self.template_set_sha256,
             renderer_sha256=self.renderer_sha256,
             evaluation_config_sha256=self.evaluation_config_sha256,
-            admission_sha256=(
-                None
-                if self.admission is None
-                else _identity_hash(self.admission.model_dump(mode="json"))
-            ),
+            admission_sha256=_identity_hash(self.admission.model_dump(mode="json")),
         )
 
 
@@ -1025,32 +1016,28 @@ class ComparisonExperimentRunner:
                 "arm A result plan is not the deterministic plan the run requested"
             )
         admission = request.analysis.admission
-        if admission is not None:
-            planned = {
-                (template_id, preset_id)
-                for section in result.plan.sections
-                for template_id, preset_id in (
-                    (section.template_id, section.preset_id),
-                    *(
-                        (segment.template_id, segment.preset_id)
-                        for segment in section.segments or ()
-                    ),
-                )
-                if template_id is not None
-            }
-            presets = {entry.template_id: entry.admitted_presets for entry in admission.templates}
-            unadmitted = sorted({template_id for template_id, _ in planned} - set(presets))
-            if unadmitted:
+        planned = {
+            (template_id, preset_id)
+            for section in result.plan.sections
+            for template_id, preset_id in (
+                (section.template_id, section.preset_id),
+                *((segment.template_id, segment.preset_id) for segment in section.segments or ()),
+            )
+            if template_id is not None
+        }
+        presets = {entry.template_id: entry.admitted_presets for entry in admission.templates}
+        unadmitted = sorted({template_id for template_id, _ in planned} - set(presets))
+        if unadmitted:
+            raise ExperimentBlockedError(
+                f"arm {result.arm.value} planned {unadmitted}, not admitted on the "
+                "experiment's rig for this song"
+            )
+        for template_id, preset_id in sorted(planned, key=str):
+            if preset_id is not None and preset_id not in presets[template_id]:
                 raise ExperimentBlockedError(
-                    f"arm {result.arm.value} planned {unadmitted}, not admitted on the "
-                    "experiment's rig for this song"
+                    f"arm {result.arm.value} planned {template_id!r} with preset "
+                    f"{preset_id!r}, not admitted on the experiment's rig for this song"
                 )
-            for template_id, preset_id in sorted(planned, key=str):
-                if preset_id is not None and preset_id not in presets[template_id]:
-                    raise ExperimentBlockedError(
-                        f"arm {result.arm.value} planned {template_id!r} with preset "
-                        f"{preset_id!r}, not admitted on the experiment's rig for this song"
-                    )
         if result.regeneration_nonce != (
             None if request.arm is Arm.A else request.regeneration_nonce
         ):

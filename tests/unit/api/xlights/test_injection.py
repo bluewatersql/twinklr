@@ -32,17 +32,11 @@ from twinklr.core.api.xlights.injection import (
     LiveEffect,
     LiveInjectionWorkflow,
     MemoryOwnershipStore,
-    live_effects_from_segments,
     live_effects_from_sequence,
     reconcile_live_layout,
 )
 from twinklr.core.config.fixtures import DmxMapping, FixtureConfig, FixtureGroup, FixtureInstance
-from twinklr.core.formats.xlights.sequence.fresh import build_fresh_sequence
 from twinklr.core.formats.xlights.sequence.parser import XSQParser
-from twinklr.core.sequencer.models.enum import ChannelName
-from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
-from twinklr.core.sequencer.moving_heads.export.dmx_settings_builder import DmxSettingsBuilder
-from twinklr.core.sequencer.moving_heads.export.xsq_adapter import XsqAdapter
 from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
 
 
@@ -84,79 +78,6 @@ def test_getmodels_parsed_into_rig_and_divergence_reported() -> None:
     assert reconciliation.report.live_only_models == ("Unconfigured Prop",)
     assert reconciliation.report.missing_configured_groups == ("GROUP - MOVING HEADS",)
     assert reconciliation.report.has_divergence
-
-
-def test_injection_settings_match_golden_export_builder() -> None:
-    rig = _rig("Dmx MH1")
-    segment = FixtureSegment(
-        section_id="chorus",
-        segment_id="segment",
-        step_id="step",
-        template_id="template",
-        fixture_id="MH1",
-        t0_ms=100,
-        t1_ms=900,
-        channels={
-            ChannelName.PAN: ChannelValue(channel=ChannelName.PAN, static_dmx=11),
-            ChannelName.TILT: ChannelValue(channel=ChannelName.TILT, static_dmx=22),
-            ChannelName.DIMMER: ChannelValue(channel=ChannelName.DIMMER, static_dmx=233),
-        },
-        allow_grouping=False,
-    )
-
-    live = live_effects_from_segments([segment], rig)
-    expected = DmxSettingsBuilder(rig.expand_fixtures()[0]).build_settings_string(segment)
-
-    assert len(live) == 1
-    assert live[0].settings == expected
-    assert live[0].request().to_wire()["settings"] == expected
-
-
-def test_golden_live_layers_preserve_xsq_topology_without_self_overlap() -> None:
-    rig = _rig("Dmx MH1")
-    regular = FixtureSegment(
-        section_id="chorus",
-        segment_id="regular",
-        step_id="step",
-        template_id="template",
-        fixture_id="MH1",
-        t0_ms=0,
-        t1_ms=1000,
-        channels={ChannelName.DIMMER: ChannelValue(channel=ChannelName.DIMMER, static_dmx=200)},
-        allow_grouping=False,
-    )
-    transition = regular.model_copy(
-        update={
-            "segment_id": "transition",
-            "t0_ms": 400,
-            "t1_ms": 600,
-            "metadata": {"is_transition": "true"},
-        }
-    )
-
-    placements = XsqAdapter().convert(
-        [regular, transition],
-        rig,
-        build_fresh_sequence(media_file="golden.wav", duration_ms=1000),
-    )
-    live = live_effects_from_segments([regular, transition], rig)
-
-    expected_topology = sorted(
-        (item.element_name, item.layer_index, item.start_ms, item.end_ms) for item in placements
-    )
-    live_topology = sorted(
-        (
-            item.target,
-            item.layer - TWINKLR_LAYER_BASE,
-            item.start_ms,
-            item.end_ms,
-        )
-        for item in live
-    )
-    assert live_topology == expected_topology
-    assert live[0].target == live[1].target
-    assert live[0].start_ms < live[1].end_ms and live[1].start_ms < live[0].end_ms
-    assert live[0].layer != live[1].layer
 
 
 class _StatefulXLights:
@@ -329,85 +250,6 @@ async def test_dry_run_issues_no_writes_and_reports_exact_commands() -> None:
 
 
 @pytest.mark.anyio
-async def test_regenerate_section_touches_only_that_section() -> None:
-    fake = _StatefulXLights()
-    ownership = MemoryOwnershipStore()
-    intro = LiveEffect(
-        target="Dmx MH1",
-        effect="DMX",
-        settings="intro-old",
-        palette="",
-        start_ms=0,
-        end_ms=1000,
-        section_id="intro",
-    )
-    chorus = _effect(start=1000, end=2000, settings="chorus-old")
-    transition = replace(
-        chorus,
-        settings="transition-old",
-        start_ms=1400,
-        end_ms=1600,
-        layer=TWINKLR_LAYER_BASE + 1,
-    )
-    async with XLightsAutomationClient(transport=fake.transport()) as client:
-        workflow = LiveInjectionWorkflow(client, ownership=ownership)
-        await workflow.inject((intro, chorus, transition))
-        fake.requests.clear()
-        replacement = _effect(start=1000, end=2000, settings="chorus-new")
-        replacement_transition = replace(
-            transition,
-            settings="transition-new",
-        )
-        await workflow.regenerate_section("chorus", (replacement, replacement_transition))
-
-    commands = [request["cmd"] for request in fake.requests]
-    assert commands == [
-        "getOpenSequence",
-        "getEffectIDs",
-        "getEffectSettings",
-        "getEffectSettings",
-        "getEffectSettings",
-        "deleteEffect",
-        "deleteEffect",
-        "addEffect",
-        "addEffect",
-    ]
-    assert any(effect["settings"] == "intro-old" for effect in fake.effects["Dmx MH1"][99])
-    assert any(effect["settings"] == "chorus-new" for effect in fake.effects["Dmx MH1"][99])
-    assert any(effect["settings"] == "transition-new" for effect in fake.effects["Dmx MH1"][100])
-
-
-@pytest.mark.anyio
-async def test_regenerate_empty_section_removes_owned_effects_on_disappearing_target() -> None:
-    fake = _StatefulXLights()
-    ownership = MemoryOwnershipStore()
-    intro = replace(_effect(end=500, settings="intro"), section_id="intro")
-    chorus = LiveEffect(
-        target="Dmx MH2",
-        effect="DMX",
-        settings="chorus",
-        palette="",
-        start_ms=500,
-        end_ms=1000,
-        section_id="chorus",
-    )
-    async with XLightsAutomationClient(transport=fake.transport()) as client:
-        workflow = LiveInjectionWorkflow(client, ownership=ownership)
-        await workflow.inject((intro, chorus))
-        fake.requests.clear()
-        await workflow.regenerate_section("chorus", ())
-
-    assert [request["cmd"] for request in fake.requests] == [
-        "getOpenSequence",
-        "getEffectIDs",
-        "getEffectSettings",
-        "deleteEffect",
-    ]
-    assert fake.effects["Dmx MH2"][99] == []
-    assert fake.effects["Dmx MH1"][99][0]["settings"] == "intro"
-
-
-@pytest.mark.anyio
 async def test_partial_failure_reports_confirmed_injected_set() -> None:
     fake = _StatefulXLights()
     fake.fail_add_number = 2
@@ -522,25 +364,6 @@ def test_physical_live_effects_equal_the_written_xsq_element_by_element(tmp_path
     assert any(effect.section_id == "verse" for effect in live)
 
 
-def test_legacy_live_effects_read_through_the_same_sequence_reader() -> None:
-    rig = _rig("Dmx MH1")
-    segment = FixtureSegment(
-        section_id="chorus",
-        segment_id="segment",
-        step_id="step",
-        template_id="template",
-        fixture_id="MH1",
-        t0_ms=100,
-        t1_ms=900,
-        channels={ChannelName.DIMMER: ChannelValue(channel=ChannelName.DIMMER, static_dmx=233)},
-        allow_grouping=False,
-    )
-    sequence = build_fresh_sequence(media_file="golden.wav", duration_ms=1000)
-    XsqAdapter().convert([segment], rig, sequence)
-
-    assert live_effects_from_segments([segment], rig) == live_effects_from_sequence(sequence)
-
-
 def _runs(
     count: int, *, targets: int = 4, settings: str = "E_SLIDER_DMX1=1"
 ) -> tuple[LiveEffect, ...]:
@@ -641,8 +464,8 @@ async def test_deleting_more_owned_effects_than_the_live_bound_is_refused_before
     ownership = MemoryOwnershipStore()
     workflow = LiveInjectionWorkflow(fake, ownership=ownership)  # type: ignore[arg-type]
     await workflow.inject(_runs(MAX_LIVE_EFFECTS))
-    extra = replace(_runs(MAX_LIVE_EFFECTS + 1)[-1], section_id="other")
-    await workflow.inject((extra,), replace_sections=frozenset({"other"}))
+    # One more owned effect than a command may delete, placed as an earlier run left it.
+    await fake.add_effect(_runs(MAX_LIVE_EFFECTS + 1)[-1].request())
     ownership.save(SCRATCH_SEQUENCE, _runs(MAX_LIVE_EFFECTS + 1))
     fake.requests.clear()
 
@@ -714,9 +537,9 @@ async def test_a_whole_render_replacement_killed_without_cleanup_converges_at_fu
 
 
 @pytest.mark.anyio
-async def test_a_killed_section_regeneration_leaves_no_rows_after_another_section_runs() -> None:
+async def test_a_killed_replacement_leaves_no_unplaced_rows_after_the_next_run() -> None:
     """Rows a killed run recorded but never placed are dropped by the next command that
-    reads their layer, whatever section it replaces."""
+    reads their layer."""
     ownership = MemoryOwnershipStore()
     fake = _Killed(ownership)
     workflow = LiveInjectionWorkflow(fake, ownership=ownership)  # type: ignore[arg-type]
@@ -735,16 +558,16 @@ async def test_a_killed_section_regeneration_leaves_no_rows_after_another_sectio
     await workflow.inject(section("a", 1, 0) + section("b", 1, 1000))
     fake.at, fake.writes = 8 + 2, 0
     with pytest.raises(KeyboardInterrupt):
-        await workflow.regenerate_section("a", section("a", 2, 0))
+        await workflow.inject(section("a", 2, 0) + section("b", 1, 1000))
     fake.at = None
     assert fake.survived is not None
     ownership.save(SCRATCH_SEQUENCE, fake.survived)
 
-    await workflow.regenerate_section("b", section("b", 2, 1000))
+    desired = section("a", 2, 0) + section("b", 2, 1000)
+    await workflow.inject(desired)
 
     recorded = ownership.load(SCRATCH_SEQUENCE)
-    assert _live_form(recorded) == fake.placed()
-    assert sum(effect.section_id == "a" for effect in recorded) == 1
+    assert _live_form(recorded) == fake.placed() == _live_form(desired)
 
 
 class _Interrupted(FakeLiveXLights):

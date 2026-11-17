@@ -46,9 +46,6 @@ from tests.support.mh_physical import (
     zoom_rig,
 )
 from twinklr.cli.main import _run_pipeline_async
-from twinklr.core.agents.sequencer.moving_heads.deterministic_selector import (
-    DeterministicSelector,
-)
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.config.fixtures import AxisCapability, FixtureCapabilities, FixtureGroup
 from twinklr.core.config.models import JobConfig
@@ -69,13 +66,11 @@ from twinklr.core.sequencer.moving_heads.pipeline import (
     TemplateAdmission,
     check_physical_templates,
 )
-from twinklr.core.sequencer.moving_heads.templates import list_templates
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
     PHYSICAL_TEMPLATE_DIR,
     load_template_document,
 )
 from twinklr.core.sequencer.moving_heads.templates.library import (
-    REGISTRY,
     validate_template_document,
 )
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
@@ -152,22 +147,6 @@ async def _cli_offer(
 
 
 @pytest.mark.asyncio
-async def test_legacy_run_with_the_catalog_on_disk_is_unchanged(tmp_path: Path) -> None:
-    """A legacy run never loads the catalog: it offers the 37 builtins, the shared
-    registry holds 37 entries, and the deterministic selector's candidates are the same."""
-    with physical_catalog(admit=False):
-        builtins = [info.template_id for info in list_templates()]
-        candidates = set(DeterministicSelector(seed=7)._documents)
-        offered = await _cli_offer(tmp_path, JobConfig(), physical_rig())
-
-        assert offered == builtins
-        assert len(builtins) == 37
-        assert len(REGISTRY.list_all()) == 37
-        assert set(DeterministicSelector(seed=7)._documents) == candidates
-        assert not set(FAMILY_IDS) & set(offered)
-
-
-@pytest.mark.asyncio
 async def test_physical_run_offers_the_families_and_template_dir_documents(
     tmp_path: Path,
 ) -> None:
@@ -203,23 +182,12 @@ async def test_template_dir_naming_the_physical_catalog_loads_nothing_twice(
 
 
 @pytest.mark.asyncio
-async def test_runs_in_one_process_admit_the_catalog_once_and_a_legacy_run_withdraws_it(
-    tmp_path: Path,
-) -> None:
-    """A second physical run reuses the catalog the first admitted instead of failing on
-    it, and a legacy run after them offers the 37 builtins with the deterministic
-    selector's candidates unchanged."""
+async def test_runs_in_one_process_admit_the_catalog_once(tmp_path: Path) -> None:
+    """A second run reuses the catalog the first admitted instead of failing on it."""
     with physical_catalog(admit=False):
-        builtins = [info.template_id for info in list_templates()]
-        candidates = set(DeterministicSelector(seed=7)._documents)
         for _ in range(2):
             offered = await _cli_offer(tmp_path, family_job(HEADS), family_rig(HEADS))
             assert tuple(sorted(offered)) == CATALOG_IDS
-        offered = await _cli_offer(tmp_path, JobConfig(), physical_rig())
-
-        assert offered == builtins
-        assert len(REGISTRY.list_all()) == 37
-        assert set(DeterministicSelector(seed=7)._documents) == candidates
 
 
 # --- Section succession ----------------------------------------------------------------

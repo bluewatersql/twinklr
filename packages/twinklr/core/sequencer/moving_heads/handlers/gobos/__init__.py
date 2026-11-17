@@ -1,1 +1,0 @@
-"""Gobo-wheel handlers."""

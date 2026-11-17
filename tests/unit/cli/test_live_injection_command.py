@@ -11,7 +11,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tests.golden.harness import RIGS, build_fixture_group
 from tests.support.live_xlights import FakeLiveXLights
 from tests.support.mh_physical import (
     CATALOG_IDS,
@@ -23,6 +22,7 @@ from tests.support.mh_physical import (
     physical_layout_xml,
     physical_rig,
     physical_test_templates,
+    unprofiled_rig,
 )
 from twinklr.cli import main as cli_main
 from twinklr.core.agents.audio.profile.models import (
@@ -60,6 +60,7 @@ from twinklr.core.api.xlights.injection import (
 from twinklr.core.caching.identity import hash_file_content
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import AppConfig, JobConfig
+from twinklr.core.formats.xlights.sequence.fresh import build_fresh_sequence
 from twinklr.core.formats.xlights.sequence.parser import XSQParser
 from twinklr.core.pipeline import PipelineDefinition, StageDefinition
 from twinklr.core.pipeline.result import PipelineResult, success_result
@@ -145,14 +146,17 @@ async def test_run_pipeline_reports_structured_partial_injection_failure(
 
     class SuccessfulExecutor:
         async def execute(self, *, pipeline, initial_input, context):
-            context.set_state("rendered_segments", ())
+            context.set_state(
+                "rendered_sequence",
+                build_fresh_sequence(media_file="song.wav", duration_ms=500),
+            )
             return PipelineResult(success=True)
 
     class FailingWorkflow:
         def __init__(self, client, *, ownership):
             pass
 
-        async def inject(self, effects, *, dry_run=False):
+        async def inject(self, effects, *, dry_run=False, expected_sequence=None):
             raise InjectionPartialError(result)
 
     monkeypatch.setenv("OPENAI_API_KEY", "offline-test-key")
@@ -160,14 +164,16 @@ async def test_run_pipeline_reports_structured_partial_injection_failure(
     monkeypatch.setattr(cli_main, "load_app_config", lambda _: app_config)
     monkeypatch.setattr(cli_main, "load_job_config", lambda _: job_config)
     monkeypatch.setattr(cli_main, "load_fixture_group", lambda _: fixture_group)
-    monkeypatch.setattr(cli_main, "load_builtin_templates", lambda: None)
+    monkeypatch.setattr(cli_main, "admit_physical_catalog", list)
     monkeypatch.setattr(cli_main, "list_templates", list)
+    monkeypatch.setattr(cli_main, "preflight_render_policy", lambda *args: None)
+    monkeypatch.setattr(cli_main, "offered_template_ids", lambda ids: ids)
     monkeypatch.setattr(
         cli_main,
         "reconcile_live_layout",
         lambda *args, **kwargs: SimpleNamespace(
             rig=fixture_group,
-            report=SimpleNamespace(has_divergence=False),
+            report=SimpleNamespace(has_divergence=False, configured_only_models=()),
         ),
     )
     monkeypatch.setattr(
@@ -184,7 +190,7 @@ async def test_run_pipeline_reports_structured_partial_injection_failure(
         ),
     )
     monkeypatch.setattr(cli_main, "PipelineExecutor", SuccessfulExecutor)
-    monkeypatch.setattr(cli_main, "live_effects_from_segments", lambda *args: (effect,))
+    monkeypatch.setattr(cli_main, "live_effects_from_sequence", lambda *args: (effect,))
     monkeypatch.setattr(cli_main, "LiveInjectionWorkflow", FailingWorkflow)
 
     exit_code = await cli_main.run_pipeline_async(
@@ -790,7 +796,7 @@ async def test_live_physical_injection_names_a_fixture_the_live_layout_lacks(
 async def test_live_physical_injection_refuses_a_rig_without_profiles_without_suggesting_legacy(
     tmp_path, monkeypatch, capsys
 ) -> None:
-    rig = build_fixture_group(RIGS["mh4_minimal"])
+    rig = unprofiled_rig()
     fake = FakeLiveXLights(models=tuple(f.xlights_model_name for f in rig.expand_fixtures()))
     captured = _live_physical_cli(monkeypatch, fake)
     monkeypatch.setattr(cli_main, "load_fixture_group", lambda _: rig)
@@ -832,15 +838,10 @@ async def test_run_refuses_a_physical_job_on_a_rig_without_profiles_before_plann
 ) -> None:
     """`twinklr run` checks a physical job against the loaded rig before any analysis
     or provider request, naming each fixture and the missing item."""
-    physical = JobConfig.model_validate(
-        {"schema_version": "3.1", "moving_heads": {"mode": "physical_v2"}}
-    )
     monkeypatch.setenv("OPENAI_API_KEY", "offline-test-key")
     monkeypatch.setattr(cli_main, "load_app_config", lambda _: AppConfig(llm_api_key="k"))
-    monkeypatch.setattr(cli_main, "load_job_config", lambda _: physical)
-    monkeypatch.setattr(
-        cli_main, "load_fixture_group", lambda _: build_fixture_group(RIGS["mh4_minimal"])
-    )
+    monkeypatch.setattr(cli_main, "load_job_config", lambda _: JobConfig())
+    monkeypatch.setattr(cli_main, "load_fixture_group", lambda _: unprofiled_rig())
     monkeypatch.setattr(cli_main, "build_run_pipeline", _stop_if_planning_starts)
 
     exit_code = await cli_main.run_pipeline_async(
@@ -880,7 +881,7 @@ async def test_run_refuses_a_physical_job_when_no_template_has_physical_data(
     templates could render under the physical renderer (here, without the physical
     catalog, which otherwise always supplies some)."""
     calls = _prepared_physical_run(monkeypatch, physical_job(), physical_rig())
-    monkeypatch.setattr(cli_main, "admit_physical_catalog", lambda _: [])
+    monkeypatch.setattr(cli_main, "admit_physical_catalog", list)
 
     exit_code = await cli_main.run_pipeline_async(
         audio_path=tmp_path / "song.wav",
@@ -1000,22 +1001,6 @@ async def test_run_checks_a_physical_rig_against_its_layout_and_hands_it_on(
     assert state["layout_sha256"] == hash_file_content(layout)
 
 
-@pytest.mark.anyio
-async def test_a_layout_changes_nothing_for_a_legacy_run(tmp_path, monkeypatch) -> None:
-    """Legacy runs accept the option and ignore it: same session, same pipeline state."""
-    layout = tmp_path / "xlights_rgbeffects.xml"
-    layout.write_text(physical_layout_xml({"Dmx MH1": {"DisplayAs": "Arches"}}), "utf-8")
-    runs = []
-    for path in (layout, None):
-        captured = _captured_run(monkeypatch, JobConfig(), build_fixture_group(RIGS["mh4_minimal"]))
-        await _run_with(tmp_path, path)
-        runs.append(captured)
-
-    assert runs[0]["session_id"] == runs[1]["session_id"]
-    assert runs[0]["state"].keys() == runs[1]["state"].keys()
-    assert "layout_models" not in runs[0]["state"]
-
-
 def test_run_refuses_a_missing_layout_file(tmp_path, monkeypatch) -> None:
     audio = tmp_path / "song.wav"
     audio.write_bytes(b"synthetic audio")
@@ -1054,8 +1039,7 @@ def test_run_refuses_a_missing_layout_file(tmp_path, monkeypatch) -> None:
 async def test_run_refuses_unusable_model_names_before_planning(
     tmp_path, monkeypatch, capsys, names, message
 ) -> None:
-    """A physical job on a rig with a shared or blank model name stops before analysis;
-    the same rig under legacy_v1 still reaches the pipeline build as before."""
+    """A job on a rig with a shared or blank model name stops before analysis."""
     payload = physical_rig().model_dump(mode="json")
     for fixture, name in zip(payload["fixtures"], names, strict=True):
         fixture["xlights_model_name"] = name
@@ -1066,7 +1050,3 @@ async def test_run_refuses_unusable_model_names_before_planning(
         assert await _run_with(tmp_path, None) == 1
     assert captured["build_calls"] == 0
     assert message in " ".join(capsys.readouterr().out.split())
-
-    captured = _captured_run(monkeypatch, JobConfig(), rig)
-    await _run_with(tmp_path, None)
-    assert captured["build_calls"] == 1

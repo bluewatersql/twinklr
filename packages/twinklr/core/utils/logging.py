@@ -11,11 +11,9 @@ Provides centralized logging configuration with:
 from __future__ import annotations
 
 from datetime import UTC, datetime
-import functools
 import json
 import logging
 import sys
-import time
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -227,11 +225,6 @@ def configure_logging(
     _supress_noisy_loggers()
 
 
-def get_renderer_logger() -> logging.Logger:
-    """Get the renderer logger."""
-    return logging.getLogger("TINKLR_RENDER")
-
-
 def get_logger(name: str, **kwargs: Any) -> logging.Logger | logging.LoggerAdapter:
     """Get a configured logger instance.
 
@@ -252,18 +245,3 @@ def get_logger(name: str, **kwargs: Any) -> logging.Logger | logging.LoggerAdapt
         return logging.LoggerAdapter(logger, kwargs)
 
     return logger
-
-
-def log_performance(func):
-    @functools.wraps(func)
-    def wrapper_timer(*args, **kwargs):
-        start_time = time.perf_counter()
-        result = func(*args, **kwargs)
-        end_time = time.perf_counter()
-        execution_time = end_time - start_time
-        get_renderer_logger().debug(
-            f"Function {func.__name__!r} took {execution_time:.4f} seconds to execute."
-        )
-        return result
-
-    return wrapper_timer

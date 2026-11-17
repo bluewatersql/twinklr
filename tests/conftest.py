@@ -73,24 +73,6 @@ def _catalog_has_motif_tagged_recipes() -> bool:
         return False
 
 
-# ============================================================================
-# --regen-goldens — golden render harness (tests/golden/)
-# ============================================================================
-# Registered here rather than in tests/golden/conftest.py so the flag exists for
-# whole-suite invocations too; pytest only honours pytest_addoption in conftest
-# files loaded at startup. TWINKLR_REGEN_GOLDENS=1 is the equivalent env var.
-
-
-def pytest_addoption(parser: pytest.Parser) -> None:
-    """Register the golden-regeneration flag."""
-    parser.addoption(
-        "--regen-goldens",
-        action="store_true",
-        default=False,
-        help="Rewrite tests/golden/**/*.settings.txt from the current render output.",
-    )
-
-
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """Skip `requires_template_data`-marked tests when corpus-scale data is absent."""
     if _catalog_has_motif_tagged_recipes():
@@ -211,26 +193,6 @@ def mock_fixture_group(mock_fixture_instance: FixtureInstance) -> list[FixtureIn
         fixtures.append(fixture)
 
     return fixtures
-
-
-# ============================================================================
-# Template Fixtures
-# ============================================================================
-
-
-@pytest.fixture
-def mock_template_doc():
-    """Create a mock TemplateDoc for testing.
-
-    Note: Imports moved inside fixture to avoid circular dependencies.
-    """
-    from twinklr.core.sequencer.moving_heads.templates import (
-        get_template,
-        load_builtin_templates,
-    )
-
-    load_builtin_templates()
-    return get_template("bounce_fan_pulse")
 
 
 # ============================================================================

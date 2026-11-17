@@ -1,52 +1,25 @@
-"""CLI contract for moving-head template data conversion and validation."""
+"""CLI contract for moving-head template data validation."""
 
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
 
 from twinklr.cli.main import build_arg_parser
-from twinklr.cli.template_cmd import (
-    run_template_export_command,
-    run_template_validate_command,
-)
+from twinklr.cli.template_cmd import run_template_validate_command
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
+    PHYSICAL_TEMPLATE_DIR,
     load_template_document,
 )
 
 
-def test_template_export_parser_contract(tmp_path: Path) -> None:
-    args = build_arg_parser().parse_args(
-        [
-            "template-export",
-            "--out",
-            str(tmp_path),
-            "--template-id",
-            "ambient_random_wash",
-        ]
-    )
-
-    assert args.cmd == "template-export"
-    assert args.template_id == ["ambient_random_wash"]
-
-
-def test_template_export_and_validate_commands(tmp_path: Path) -> None:
-    export_dir = tmp_path / "export"
-    export_args = build_arg_parser().parse_args(
-        [
-            "template-export",
-            "--out",
-            str(export_dir),
-            "--template-id",
-            "ambient_random_wash",
-        ]
-    )
-
-    assert run_template_export_command(export_args) == 0
-    document = load_template_document(export_dir / "ambient_random_wash.json")
-    assert document.template.template_id == "ambient_random_wash"
+def test_template_validate_command(tmp_path: Path) -> None:
+    shutil.copy(PHYSICAL_TEMPLATE_DIR / "mirror_wings.json", tmp_path / "mirror_wings.json")
+    document = load_template_document(tmp_path / "mirror_wings.json")
+    assert document.template.template_id == "mirror_wings"
 
     validate_args = build_arg_parser().parse_args(
-        ["template-validate", "--template-dir", str(export_dir)]
+        ["template-validate", "--template-dir", str(tmp_path)]
     )
     assert run_template_validate_command(validate_args) == 0
 

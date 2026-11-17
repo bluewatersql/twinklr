@@ -497,7 +497,7 @@ async def test_gate_refuses_a_rig_without_a_profile_before_any_planner(tmp_path:
     assert not result.success
     assert result.failed_stages == ["render_preflight"]
     error = result.stage_results["render_preflight"].error or ""
-    assert "moving_heads.mode 'physical_v2' cannot render this rig" in error
+    assert "the moving-head renderer cannot render this rig" in error
     assert "MH2: physical_profile is missing" in error
     assert calls == []
 
@@ -937,7 +937,7 @@ async def test_eval_report_reproduces_a_show_render_with_its_dark_spans(
             plan=extract_plan(data),
             audio_path=audio_path,
             fixture_config_path=fixture_path,
-            render_policy=recorded_render(data),
+            recorded=recorded_render(data),
         )
     assert rerendered.physical is not None
     values = physical_channel_values(
@@ -1023,6 +1023,5 @@ async def test_a_show_whose_export_is_refused_records_no_render(
     )
 
     data = json.loads((artifact_dir / "checkpoints" / "plans" / "final.json").read_text())
-    assert data["render_mode"] == "physical_v2"
-    assert "render" not in data
+    assert set(data) == {"run_id", "plan"}
     assert not list(artifact_dir.glob("*.xsq"))

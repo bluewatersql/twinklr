@@ -7,18 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from twinklr.core.config.fixtures.dmx import DmxMapping
-from twinklr.core.config.fixtures.instances import FixtureConfig, FixtureInstance
-from twinklr.core.config.models import JobConfig
-from twinklr.core.curves.registry import CurveRegistry
-from twinklr.core.sequencer.models.context import (
-    FixtureContext,
-    SectionRenderIntent,
-    TemplateCompileContext,
-)
 from twinklr.core.sequencer.models.enum import (
-    AimZone,
-    ChaseOrder,
     Intensity,
     TemplateCategory,
     TimingMode,
@@ -28,8 +17,6 @@ from twinklr.core.sequencer.models.template import (
     Dimmer,
     Geometry,
     Movement,
-    PhaseOffset,
-    PhaseOffsetMode,
     RemainderPolicy,
     RepeatContract,
     RepeatMode,
@@ -39,23 +26,10 @@ from twinklr.core.sequencer.models.template import (
     TemplateMetadata,
     TemplateStep,
 )
-from twinklr.core.sequencer.moving_heads.compile.template_compiler import compile_template
-from twinklr.core.sequencer.moving_heads.export.dmx_settings_builder import DmxSettingsBuilder
-from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
 from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
 from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
-from twinklr.core.sequencer.moving_heads.templates import (
-    get_template,
-    list_templates,
-    load_builtin_templates,
-)
-from twinklr.core.sequencer.moving_heads.templates.converter import (
-    dump_template_document,
-    export_registry,
-)
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
-    DEFAULT_DATA_TEMPLATE_DIR,
     PHYSICAL_TEMPLATE_DIR,
     admit_physical_catalog,
     load_template_document,
@@ -65,12 +39,6 @@ from twinklr.core.sequencer.moving_heads.templates.library import (
     InvalidTemplateError,
     TemplateRegistry,
 )
-from twinklr.core.sequencer.timing.beat_grid import BeatGrid
-
-
-@pytest.fixture(scope="module", autouse=True)
-def _load_builtins() -> None:
-    load_builtin_templates()
 
 
 def _doc(
@@ -121,35 +89,19 @@ def _doc(
     )
 
 
+def dump_template_document(document: TemplateDoc) -> str:
+    """Canonical JSON of a template document, as a data template file holds it."""
+    payload = document.model_dump(mode="json")
+    return json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+
+
 def _write_doc(directory: Path, doc: TemplateDoc) -> Path:
     path = directory / f"{doc.template.template_id}.json"
     path.write_text(dump_template_document(doc), encoding="utf-8")
     return path
 
 
-def test_all_builtins_round_trip_through_data_form() -> None:
-    infos = list_templates()
-    assert len(infos) == 37
-
-    for info in infos:
-        original = get_template(info.template_id)
-        restored = TemplateDoc.model_validate_json(dump_template_document(original))
-        assert restored == original, info.template_id
-
-
-def test_converter_exports_all_builtins_round_trip_exact(tmp_path: Path) -> None:
-    written = export_registry(tmp_path / "first")
-    second = export_registry(tmp_path / "second")
-
-    assert len(written) == 37
-    assert [path.name for path in written] == sorted(path.name for path in written)
-    assert [path.read_bytes() for path in written] == [path.read_bytes() for path in second]
-    for path in written:
-        restored = load_template_document(path)
-        assert restored == get_template(restored.template.template_id)
-
-
-def test_data_template_registers_and_renders(tmp_path: Path) -> None:
+def test_data_template_registers(tmp_path: Path) -> None:
     registry = TemplateRegistry()
     _write_doc(tmp_path, _doc())
 
@@ -157,7 +109,6 @@ def test_data_template_registers_and_renders(tmp_path: Path) -> None:
 
     assert loaded == ["data_only"]
     assert registry.get("Data Only").template.template_id == "data_only"
-    assert _emitted_settings(registry.get("data_only"))
 
 
 def test_duplicate_template_id_across_sources_is_loud(tmp_path: Path) -> None:
@@ -172,66 +123,21 @@ def test_duplicate_template_id_across_sources_is_loud(tmp_path: Path) -> None:
         load_templates_from_directory(tmp_path, registry=registry)
 
 
-def _registry_with_python_builtins() -> TemplateRegistry:
+def test_family_catalog_is_admitted_once_into_the_given_registry() -> None:
+    """The family catalog loads into the registry it is given, once however many runs
+    admit it; its documents' source names the catalog directory."""
     registry = TemplateRegistry()
-    for info in list_templates():
-        document = get_template(info.template_id)
-        registry.register(lambda document=document: document, source="python:builtin")
-    return registry
-
-
-def test_tracked_data_proofs_load_alongside_all_python_builtins_only_with_override() -> None:
-    registry = _registry_with_python_builtins()
-
-    with pytest.raises(ValueError, match=r"collision.*python:builtin"):
-        load_templates_from_directory(DEFAULT_DATA_TEMPLATE_DIR, registry=registry)
-
-    registry = _registry_with_python_builtins()
-    loaded = load_templates_from_directory(
-        DEFAULT_DATA_TEMPLATE_DIR,
-        registry=registry,
-        allow_overrides=True,
-    )
-
-    assert loaded == [
-        "accent_snap_tunnel_hit",
-        "ambient_random_wash",
-        "figure8_mirror_strobe",
-    ]
-    assert len(registry.list_all()) == 37
-
-
-def test_physical_catalog_is_admitted_only_under_physical_v2() -> None:
-    """The family catalog sits outside the recursively loaded data directory and loads
-    only for a physical_v2 job, into the registry it is given, once however many runs
-    admit it, and a legacy run withdraws it; its documents' source names the catalog
-    directory."""
-    assert not PHYSICAL_TEMPLATE_DIR.is_relative_to(DEFAULT_DATA_TEMPLATE_DIR)
-    legacy = TemplateRegistry()
-    assert admit_physical_catalog(JobConfig(), registry=legacy) == []
-    assert legacy.list_all() == []
-
-    physical = JobConfig.model_validate(
-        {
-            "schema_version": "3.1",
-            "moving_heads": {"mode": "physical_v2", "initial_states": {}},
-        }
-    )
-    registry = TemplateRegistry()
-    loaded = admit_physical_catalog(physical, registry=registry)
+    loaded = admit_physical_catalog(registry=registry)
 
     assert loaded == [path.stem for path in sorted(PHYSICAL_TEMPLATE_DIR.glob("*.json"))]
     assert len(loaded) == 7  # six P2.4c families and the P2.5 zoom pilot
     for template_id in loaded:
         source = Path(registry.source(template_id).removeprefix("data:"))
         assert source.parent == PHYSICAL_TEMPLATE_DIR
-    assert len(list_templates()) == 37  # the shared registry is untouched
 
-    # A later run in the same process: again physical keeps them, legacy withdraws them.
-    assert admit_physical_catalog(physical, registry=registry) == loaded
+    # A later run in the same process keeps them.
+    assert admit_physical_catalog(registry=registry) == loaded
     assert len(registry.list_all()) == 7
-    assert admit_physical_catalog(JobConfig(), registry=registry) == []
-    assert registry.list_all() == []
 
 
 def test_explicit_override_replaces_python_source(tmp_path: Path) -> None:
@@ -457,156 +363,3 @@ def test_python_factory_and_data_document_share_annotation_linter() -> None:
         TemplateRegistry().register(lambda: doc, source="python:test")
     with pytest.raises(InvalidTemplateError, match="energy_range"):
         TemplateRegistry().register_document(doc, source="data:test")
-
-
-@pytest.mark.parametrize(
-    "template_id",
-    ["accent_snap_tunnel_hit", "ambient_random_wash", "figure8_mirror_strobe"],
-)
-def test_axis_template_data_documents_match_python_builtins(template_id: str) -> None:
-    restored = load_template_document(DEFAULT_DATA_TEMPLATE_DIR / f"{template_id}.json")
-
-    assert restored == get_template(template_id)
-
-
-def _emitted_settings(doc: TemplateDoc) -> list[str]:
-    mapping = DmxMapping(
-        pan_channel=1,
-        tilt_channel=2,
-        dimmer_channel=3,
-        color_channel=4,
-        shutter_channel=5,
-        gobo_channel=6,
-        color_map={"open": 0, "blue": 24},
-        shutter_map={"open": 255, "strobe_fast": 190},
-        gobo_map={"open": 0, "prism": 80},
-    )
-    config = FixtureConfig(fixture_id="MH1", dmx_mapping=mapping)
-    instance = FixtureInstance(fixture_id="MH1", config=config, xlights_model_name="Dmx MH1")
-    fixture = FixtureContext(
-        fixture_id="MH1",
-        role="OUTER_LEFT",
-        calibration={"fixture_config": config},
-    )
-    registries = create_default_registries()
-    cycle_bars = doc.template.repeat.cycle_bars
-    context = TemplateCompileContext(
-        section_id="section",
-        template_id=doc.template.template_id,
-        fixtures=[fixture],
-        beat_grid=BeatGrid.from_tempo(tempo_bpm=120, total_bars=max(2, int(cycle_bars) + 1)),
-        start_bar=1,
-        duration_bars=cycle_bars,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
-        color_registry=registries["color"],
-        shutter_registry=registries["shutter"],
-        gobo_registry=registries["gobo"],
-        intent=SectionRenderIntent(),
-    )
-    result = compile_template(doc.template, context)
-    return [
-        DmxSettingsBuilder(instance).build_settings_string(segment) for segment in result.segments
-    ]
-
-
-@pytest.mark.parametrize(
-    "template_id",
-    ["accent_snap_tunnel_hit", "ambient_random_wash", "figure8_mirror_strobe"],
-)
-def test_axis_template_data_form_emits_byte_identical_settings(template_id: str) -> None:
-    python_doc = get_template(template_id)
-    data_doc = load_template_document(DEFAULT_DATA_TEMPLATE_DIR / f"{template_id}.json")
-
-    assert _emitted_settings(data_doc) == _emitted_settings(python_doc)
-
-
-def test_phase_offset_order_changes_compiled_fixture_schedule() -> None:
-    document = _doc()
-    step = document.template.steps[0]
-    config = FixtureConfig(
-        fixture_id="MH1",
-        dmx_mapping=DmxMapping(pan_channel=1, tilt_channel=2, dimmer_channel=3),
-    )
-    fixtures = [
-        FixtureContext(fixture_id="MH1", role="OUTER_LEFT", calibration={"fixture_config": config}),
-        FixtureContext(
-            fixture_id="MH2", role="OUTER_RIGHT", calibration={"fixture_config": config}
-        ),
-    ]
-    registries = create_default_registries()
-
-    def compile_offsets(order: ChaseOrder) -> dict[str, float]:
-        step.timing.phase_offset = PhaseOffset(
-            mode=PhaseOffsetMode.GROUP_ORDER,
-            order=order,
-            spread_bars=0.5,
-        )
-        context = TemplateCompileContext(
-            section_id="section",
-            template_id=document.template.template_id,
-            fixtures=fixtures,
-            beat_grid=BeatGrid.from_tempo(tempo_bpm=120, total_bars=3),
-            start_bar=1,
-            duration_bars=1,
-            curve_registry=CurveRegistry(),
-            geometry_registry=registries["geometry"],
-            movement_registry=registries["movement"],
-            dimmer_registry=registries["dimmer"],
-            color_registry=registries["color"],
-            shutter_registry=registries["shutter"],
-            gobo_registry=registries["gobo"],
-            intent=SectionRenderIntent(),
-        )
-        result = compile_template(document.template, context)
-        return {
-            segment.fixture_id: float(segment.metadata["phase_offset_norm"])
-            for segment in result.segments
-        }
-
-    assert compile_offsets(ChaseOrder.LEFT_TO_RIGHT) == {"MH1": 0.0, "MH2": 0.5}
-    assert compile_offsets(ChaseOrder.RIGHT_TO_LEFT) == {"MH1": 0.5, "MH2": 0.0}
-
-
-@pytest.mark.parametrize("aim_zone", [AimZone.CROWD, AimZone.SKY], ids=["crowd", "sky"])
-def test_geometry_aim_zone_reaches_compiled_segment_metadata(aim_zone: AimZone) -> None:
-    document = _doc()
-    document.template.steps[0].geometry = Geometry(
-        geometry_type=GeometryType.ROLE_POSE,
-        aim_zone=aim_zone,
-    )
-    config = FixtureConfig(
-        fixture_id="MH1",
-        dmx_mapping=DmxMapping(pan_channel=1, tilt_channel=2, dimmer_channel=3),
-    )
-    fixture = FixtureContext(
-        fixture_id="MH1",
-        role="OUTER_LEFT",
-        calibration={"fixture_config": config},
-    )
-    registries = create_default_registries()
-    context = TemplateCompileContext(
-        section_id="section",
-        template_id=document.template.template_id,
-        fixtures=[fixture],
-        beat_grid=BeatGrid.from_tempo(tempo_bpm=120, total_bars=2),
-        start_bar=1,
-        duration_bars=1,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
-        color_registry=registries["color"],
-        shutter_registry=registries["shutter"],
-        gobo_registry=registries["gobo"],
-    )
-
-    result = compile_template(document.template, context)
-
-    assert result.segments
-    assert all(
-        json.loads(segment.metadata["geometry_params"])["aim_zone"] == aim_zone.value
-        for segment in result.segments
-    )

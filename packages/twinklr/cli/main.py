@@ -39,7 +39,6 @@ from twinklr.cli.recipe_builder_cmd import (
 from twinklr.cli.show_cmd import add_show_subparser, run_show_command
 from twinklr.cli.template_cmd import (
     add_template_subparsers,
-    run_template_export_command,
     run_template_validate_command,
 )
 from twinklr.core.agents.providers.factory import validate_llm_provider_config
@@ -51,7 +50,6 @@ from twinklr.core.api.xlights import (
     LiveEffect,
     LiveInjectionWorkflow,
     XLightsAutomationClient,
-    live_effects_from_segments,
     live_effects_from_sequence,
     reconcile_live_layout,
 )
@@ -80,10 +78,7 @@ from twinklr.core.sequencer.display.xlights_mapping import (
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import PhysicalOutputError
 from twinklr.core.sequencer.moving_heads.export.xsq_adapter import check_physical_models
 from twinklr.core.sequencer.moving_heads.pipeline import offered_template_ids
-from twinklr.core.sequencer.moving_heads.templates import (
-    load_builtin_templates,
-    load_templates_from_directory,
-)
+from twinklr.core.sequencer.moving_heads.templates import load_templates_from_directory
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
     PHYSICAL_TEMPLATE_DIR,
     admit_physical_catalog,
@@ -423,12 +418,12 @@ async def _run_pipeline_async(
             derived from the audio content and configs so an identical re-run
             reuses cached LLM work.
         template_dir: Optional directory of strict JSON moving-head templates, loaded
-            after the builtins and, under physical_v2, after the physical family
-            catalog; a directory that is the catalog is not loaded twice.
+            after the family catalog; a directory that is the catalog is not loaded
+            twice.
         allow_template_overrides: Whether data documents may explicitly shadow
-            colliding Python builtin IDs.
-        layout_path: Optional xLights layout; a physical_v2 job's fixture models are
-            checked against it before analysis. Legacy jobs ignore it.
+            colliding catalog IDs.
+        layout_path: Optional xLights layout; the job's fixture models are checked
+            against it before analysis.
 
     Returns:
         Exit code (0 for success, 1 for failure)
@@ -455,9 +450,8 @@ async def _run_pipeline_async(
 
     # Load templates
     console.print("[bold]Loading templates...[/bold]")
-    load_builtin_templates()
     try:
-        catalog_ids = admit_physical_catalog(job_config)
+        catalog_ids = admit_physical_catalog()
     except (OSError, ValueError) as error:
         console.print(f"[red]ERROR: Could not load the physical template catalog: {error}[/red]")
         return 1
@@ -519,16 +513,12 @@ async def _run_pipeline_async(
             model_names=models.models,
             group_names=groups.models,
         )
-        unplaced = (
-            [
-                fixture
-                for fixture in fixture_group.expand_fixtures()
-                if fixture.xlights_model_name in reconciliation.report.configured_only_models
-                and fixture.fixture_id in job_config.moving_heads.initial_states
-            ]
-            if job_config.moving_heads.mode == "physical_v2"
-            else []
-        )
+        unplaced = [
+            fixture
+            for fixture in fixture_group.expand_fixtures()
+            if fixture.xlights_model_name in reconciliation.report.configured_only_models
+            and fixture.fixture_id in job_config.moving_heads.initial_states
+        ]
         if unplaced:
             console.print(
                 "[red]ERROR: The open sequence's xLights layout has no model for "
@@ -553,12 +543,11 @@ async def _run_pipeline_async(
             )
             return 1
 
-    physical = job_config.moving_heads.mode == "physical_v2"
     live_plans_path = artifact_dir / LIVE_PLANS_FILENAME
     ownership_path = artifact_dir / ".twinklr-live-ownership.json"
     base_plan: ChoreographyPlan | None = None
     regenerated_sequence: Path | None = None
-    if live_client is not None and physical and section_id is not None:
+    if live_client is not None and section_id is not None:
         # A physical render plans each head's dark repositioning across section edges,
         # so one section cannot be swapped in alone: the whole song is re-rendered from
         # the plan of the effects already injected, with only this section re-planned.
@@ -579,7 +568,7 @@ async def _run_pipeline_async(
             return 1
         if recorded is None:
             console.print(
-                "[red]ERROR: `twinklr regenerate` on a physical job re-renders the moving "
+                "[red]ERROR: `twinklr regenerate` re-renders the moving "
                 "heads for the whole song from the plan of the effects already injected, "
                 f"and none is recorded for {regenerated_sequence} in {live_plans_path}; "
                 "run `twinklr inject` first.[/red]"
@@ -596,37 +585,32 @@ async def _run_pipeline_async(
             )
             return 1
 
-    # The rig is final here, so a physical job's fixture prerequisites, and the
+    # The rig is final here, so the job's fixture prerequisites, and the
     # templates the planner may be offered, are checked before any analysis or
     # provider request.
     try:
         preflight_render_policy(job_config, fixture_group)
-        available_templates = offered_template_ids(job_config, available_templates)
+        available_templates = offered_template_ids(available_templates)
     except UnsupportedRenderModeError as error:
         console.print(f"[red]ERROR: {error}[/red]")
         return 1
     layout_models: tuple[Model, ...] | None = None
-    if job_config.moving_heads.mode == "physical_v2":
-        console.print(f"[green]🎛️  Physical templates offered:[/green] {len(available_templates)}")
-        if layout_path is None:
-            console.print(
-                "[yellow]WARNING: the xLights model check was not performed: no --layout "
-                "was given, so nothing verifies that each fixture's model is a "
-                "single-color DMX model with enough channels for its profile.[/yellow]"
-            )
-        else:
-            try:
-                layout = load_layout(layout_path)
-                layout_models = tuple(layout.models.model if layout.models else ())
-                check_physical_models(fixture_group.expand_fixtures(), layout_models)
-            except (OSError, ValueError, PhysicalOutputError) as error:
-                console.print(f"[red]ERROR: xLights layout {layout_path.name}: {error}[/red]")
-                return 1
-            console.print(f"[green]✅ xLights models checked against[/green] {layout_path.name}")
-    elif layout_path is not None:
+    console.print(f"[green]🎛️  Physical templates offered:[/green] {len(available_templates)}")
+    if layout_path is None:
         console.print(
-            f"[dim]--layout is used only by physical_v2; ignored for {job_config.moving_heads.mode}[/dim]"
+            "[yellow]WARNING: the xLights model check was not performed: no --layout "
+            "was given, so nothing verifies that each fixture's model is a "
+            "single-color DMX model with enough channels for its profile.[/yellow]"
         )
+    else:
+        try:
+            layout = load_layout(layout_path)
+            layout_models = tuple(layout.models.model if layout.models else ())
+            check_physical_models(fixture_group.expand_fixtures(), layout_models)
+        except (OSError, ValueError, PhysicalOutputError) as error:
+            console.print(f"[red]ERROR: xLights layout {layout_path.name}: {error}[/red]")
+            return 1
+        console.print(f"[green]✅ xLights models checked against[/green] {layout_path.name}")
 
     # Define pipeline via pipeline definitions module
     console.print("\n[bold]Defining pipeline...[/bold]")
@@ -705,45 +689,35 @@ async def _run_pipeline_async(
             workflow = LiveInjectionWorkflow(
                 live_client, ownership=JsonOwnershipStore(ownership_path)
             )
-            if physical:
-                # The effects the .xsq is written from; every Twinklr-owned effect in
-                # the sequence is replaced, for `regenerate` too (it rendered the song),
-                # into the sequence its plan was loaded for.
-                live_effects = live_effects_from_sequence(
-                    pipeline_context.get_state("rendered_sequence")
-                )
-                console.print(
-                    f"[dim]{len(live_effects)} moving-head effects; xLights takes one "
-                    "request per effect read, replaced or added[/dim]"
-                )
-                injection = await workflow.inject(
-                    live_effects, dry_run=dry_run, expected_sequence=regenerated_sequence
-                )
-            else:
-                segments = list(pipeline_context.get_state("rendered_segments", ()))
-                live_effects = live_effects_from_segments(segments, fixture_group)
-                injection = (
-                    await workflow.regenerate_section(section_id, live_effects, dry_run=dry_run)
-                    if section_id is not None
-                    else await workflow.inject(live_effects, dry_run=dry_run)
-                )
+            # The effects the .xsq is written from; every Twinklr-owned effect in the
+            # sequence is replaced, for `regenerate` too (it rendered the song), into the
+            # sequence its plan was loaded for.
+            live_effects = live_effects_from_sequence(
+                pipeline_context.get_state("rendered_sequence")
+            )
+            console.print(
+                f"[dim]{len(live_effects)} moving-head effects; xLights takes one "
+                "request per effect read, replaced or added[/dim]"
+            )
+            injection = await workflow.inject(
+                live_effects, dry_run=dry_run, expected_sequence=regenerated_sequence
+            )
         except InjectionPartialError as error:
             _print_live_injection_partial(error)
             return 1
         except Exception as error:
             console.print(f"[red]ERROR: Live injection stopped safely: {escape(str(error))}[/red]")
             return 1
-        if physical:
-            if section_id is not None:
-                console.print(
-                    f"Re-planned section {section_id} only, then re-rendered the moving "
-                    "heads for the whole song: a physical render plans each head's dark "
-                    "repositioning across section edges, so one section cannot be swapped "
-                    "in alone. Every Twinklr moving-head effect in the sequence is replaced; "
-                    "identical ones are left in place."
-                )
-            console.print(f"Render fingerprint: {pipeline_context.get_state('render_fingerprint')}")
-        if injection.dry_run and physical:
+        if section_id is not None:
+            console.print(
+                f"Re-planned section {section_id} only, then re-rendered the moving "
+                "heads for the whole song: a physical render plans each head's dark "
+                "repositioning across section edges, so one section cannot be swapped "
+                "in alone. Every Twinklr moving-head effect in the sequence is replaced; "
+                "identical ones are left in place."
+            )
+        console.print(f"Render fingerprint: {pipeline_context.get_state('render_fingerprint')}")
+        if injection.dry_run:
             dry_run_path = artifact_dir / LIVE_DRY_RUN_FILENAME
             dry_run_path.write_text(
                 "".join(
@@ -761,35 +735,30 @@ async def _run_pipeline_async(
             )
             for (command_name, model), count in sorted(counts.items()):
                 console.print(f"   {command_name} {model}: {count}", markup=False)
-        elif injection.dry_run:
-            console.print("[yellow]Dry run; exact planned xLights writes:[/yellow]")
-            for command in injection.commands:
-                console.print(json.dumps(command, sort_keys=True))
         else:
             console.print(
                 f"[green]Live injection complete:[/green] {len(injection.injected)} added, "
                 f"{len(injection.deleted)} replaced, {len(injection.unchanged)} unchanged. "
                 "Twinklr did not save the sequence."
             )
-            if physical:
-                try:
-                    _save_live_plan(
-                        live_plans_path,
-                        injection.sequence_path,
-                        result.outputs["moving_heads"],
-                        _live_plan_identity(
-                            audio_path,
-                            job_config,
-                            fixture_group,
-                            JsonOwnershipStore(ownership_path).load(injection.sequence_path),
-                        ),
-                    )
-                except (OSError, ValueError) as error:
-                    console.print(
-                        f"[yellow]The injected effects are in place, but the plan was not "
-                        f"recorded: {escape(str(error))}. `twinklr regenerate` refuses until an "
-                        "inject records it.[/yellow]"
-                    )
+            try:
+                _save_live_plan(
+                    live_plans_path,
+                    injection.sequence_path,
+                    result.outputs["moving_heads"],
+                    _live_plan_identity(
+                        audio_path,
+                        job_config,
+                        fixture_group,
+                        JsonOwnershipStore(ownership_path).load(injection.sequence_path),
+                    ),
+                )
+            except (OSError, ValueError) as error:
+                console.print(
+                    f"[yellow]The injected effects are in place, but the plan was not "
+                    f"recorded: {escape(str(error))}. `twinklr regenerate` refuses until an "
+                    "inject records it.[/yellow]"
+                )
 
     # Report results
     console.print("\n" + "=" * 50)
@@ -914,10 +883,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--layout",
         default=None,
         help=(
-            "Optional path to the user's xlights_rgbeffects.xml layout. Used only by "
-            "moving_heads.mode physical_v2, to check before analysis that every fixture's "
-            "model is a single-color DMX model with enough channels; without it that check "
-            "is skipped with a warning. Ignored by legacy_v1"
+            "Optional path to the user's xlights_rgbeffects.xml layout, to check before "
+            "analysis that every fixture's model is a single-color DMX model with enough "
+            "channels; without it that check is skipped with a warning"
         ),
     )
 
@@ -980,12 +948,12 @@ def _add_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
         "--template-dir",
         type=Path,
         default=None,
-        help="Directory of strict JSON moving-head templates loaded after Python builtins",
+        help="Directory of strict JSON moving-head templates loaded after the family catalog",
     )
     parser.add_argument(
         "--allow-template-overrides",
         action="store_true",
-        help="Explicitly allow data templates to shadow colliding Python builtin ids",
+        help="Explicitly allow data templates to shadow colliding catalog template ids",
     )
     parser.add_argument("--config", required=True, help="Path to job config JSON")
     parser.add_argument(
@@ -1026,8 +994,6 @@ def main() -> None:
         sys.exit(run_catalog_coverage_command(args))
     elif args.cmd == "review-staged-recipes":
         sys.exit(run_review_staged_recipes_command(args))
-    elif args.cmd == "template-export":
-        sys.exit(run_template_export_command(args))
     elif args.cmd == "template-validate":
         sys.exit(run_template_validate_command(args))
     elif args.cmd == "display":

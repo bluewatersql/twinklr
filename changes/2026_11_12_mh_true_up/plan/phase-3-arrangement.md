@@ -656,3 +656,51 @@ Known and accepted: `run`, `show` and `inject` write one checkpoint path per son
 the last one wins, and a failed re-run leaves an earlier delivery without a record.
 For C1.2: `require_legacy_render` (`config/render_policy.py`) has no caller left, and
 `show_cmd.py`'s `if checkpoint_record is not None` becomes unconditional.
+
+## 2026-11-16: C1.2 done — the old renderer is deleted
+
+The old moving-head renderer and every `mode` branch are removed; the physical renderer
+is the only path. Record:
+[evidence/2026-11-16-c1-2-deletion](../evidence/2026-11-16-c1-2-deletion/README.md).
+The last commit that still holds the old renderer is `5d50580c` (local tag
+`mh-last-with-legacy-renderer`).
+
+- **Proof of unchanged output:** a 360-configuration byte matrix against the tag, run by
+  the author and rerun independently by the reviewer: frames, segments, `.xsq`,
+  `.xtiming`, `.xmap` and gate results identical; only fingerprints and the hashes that
+  embed them differ (`mode` left the policy dump). `PHYSICAL_RENDERER_REVISION` is
+  unchanged. Display baselines (`02_rudolph*`) and display fixtures are byte-identical.
+- **New guards:** `tests/regression/test_mh_physical_pins.py` pins frames for every
+  family and variant, a multi-section plan and one gated render with dark spans; the
+  pinned values were rendered from the tag and reproduced by the reviewer. The config
+  ledger now fails on import when an entry names a missing test.
+- **Review:** independent review requested changes (dead code kept, messages naming a
+  refused key, incomplete breaking-changes list, record inaccuracies); second pass
+  approved. Two low findings from the second pass (ledger and record wording for
+  `xlights_semantic_groups`, stale diff statistics) were corrected by the integrator.
+- **Phase 1 request fingerprints** are now
+  `70267891d1c3429c4b7cf5dd51a799fc439f8b2255c94e6740727be511a13145` (`p1_linear_reveal`)
+  and `41dd84a9869892ab38b53c206bbfb8f1a0acea239092cfd1071f06175a4eefb8`
+  (`p1_linear_reveal_48ch`).
+
+Carried into C1.3:
+
+- The old renderer's fixture fields are still accepted with no output effect. C1.3
+  removes them, after which a config naming them is refused (integrator decision under
+  guardrail 9; the owner was told on 2026-11-16 and may overrule).
+- `fixture.xlights_semantic_groups` has no render effect but `reconcile_live_layout`
+  (`api/xlights/injection.py`) still reads it for `inject`/`regenerate`. C1.3 decides
+  that reader together with the field.
+- `FixtureConfig.degrees_to_dmx`/`dmx_to_degrees` have only test callers.
+- Write-only compile-context fields (`calibration`, `n_samples`, `template_defaults`,
+  `intent`).
+
+Carried into C1.4: the `physical_v2:` log prefixes, the diagnostic at
+`pipeline.py` naming `physical_v2`, the `"renderer": "physical_v2"` record value and the
+revision string. These are output data, so C1.4 changes trace bytes deliberately.
+
+T1 design draft (read-only architect pass, 2026-11-16): the proposed single planner
+contract measures 3 union fields and 26 nodes against Claude's 16 and 68. It drops
+`preset_id` and `variation` from the model in favour of categorical `reach`/`rate`
+resolved through the gate admission. Pending owner answer: whether palette-role colour
+and lyric moment-cue references also leave the contract.

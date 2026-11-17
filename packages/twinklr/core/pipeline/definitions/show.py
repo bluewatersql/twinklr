@@ -99,7 +99,6 @@ def build_combined_show_pipeline(
             xlights_mapping=xlights_mapping,
             recipe_catalog=recipe_catalog,
             moving_head_target_ids=moving_head_target_ids,
-            available_templates=available_templates,
         ),
         inputs=["asset_resolution", "moving_heads"],
         input_type="dict[str, Any]",

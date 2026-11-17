@@ -12,7 +12,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from tests.golden.harness import RIGS, build_fixture_group
 from tests.support.mh_physical import (
     FAMILY_IDS,
     PHYSICAL_INITIAL_STATE,
@@ -31,6 +30,7 @@ from tests.support.mh_physical import (
     physical_template_doc,
     physical_test_templates,
     registered_templates,
+    unprofiled_rig,
 )
 from twinklr.core.agents.audio.lyrics.stage import LyricsStage
 from twinklr.core.agents.audio.profile.stage import AudioProfileStage
@@ -85,20 +85,12 @@ def _long_tail_grid() -> BeatGrid:
 
 
 @pytest.mark.asyncio
-async def test_legacy_job_passes_through_untouched() -> None:
-    result, context = await _run(JobConfig(), templates=["sweep_lr_fan_hold"], rig=None)
-
-    assert result.success and result.output is _BUNDLE
-    assert context.get_state("beat_grid") is None
-
-
-@pytest.mark.asyncio
 async def test_physical_job_on_a_rig_without_profiles_is_refused() -> None:
     with physical_test_templates():
         result, _ = await _run(
             physical_job(),
             templates=[TEMPLATE_ID],
-            rig=build_fixture_group(RIGS["mh4_minimal"]),
+            rig=unprofiled_rig(),
             beat_grid=physical_grid(),
         )
 
@@ -108,17 +100,38 @@ async def test_physical_job_on_a_rig_without_profiles_is_refused() -> None:
 
 @pytest.mark.asyncio
 async def test_physical_job_offered_a_template_without_physical_data_is_refused() -> None:
-    with physical_test_templates():
+    no_physical = TemplateDoc.model_validate(
+        {
+            "template": {
+                "template_id": "no_physical_data",
+                "version": 1,
+                "name": "No Physical Data",
+                "category": "medium_energy",
+                "repeat": {"cycle_bars": 1.0, "loop_step_ids": ["main"]},
+                "steps": [
+                    {
+                        "step_id": "main",
+                        "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
+                        "geometry": {},
+                        "movement": {"movement_type": "sweep_lr"},
+                        "dimmer": {"dimmer_type": "hold"},
+                    }
+                ],
+                "metadata": {"energy_range": [20, 60], "recommended_sections": ["verse"]},
+            }
+        }
+    )
+    with physical_test_templates(), registered_templates(no_physical):
         result, _ = await _run(
             physical_job(),
-            templates=[TEMPLATE_ID, "sweep_lr_fan_hold"],
+            templates=[TEMPLATE_ID, "no_physical_data"],
             rig=physical_rig(),
             beat_grid=physical_grid(),
         )
 
     assert not result.success
     assert "without physical data" in (result.error or "")
-    assert "sweep_lr_fan_hold" in (result.error or "")
+    assert "no_physical_data" in (result.error or "")
 
 
 @pytest.mark.asyncio
@@ -138,7 +151,7 @@ async def test_physical_job_whose_song_has_an_uncovered_tail_is_accepted(
 
     assert result.success, result.error
     # One 400 ms interval past the last beat at 3615 ms; the song runs to 5615 ms.
-    assert "covered span [0.0, 4015.0] ms of the song's [0, 5615.0] ms" in caplog.text
+    assert "covers the span [0.0, 4015.0] ms of the song's [0, 5615.0] ms" in caplog.text
 
 
 @pytest.mark.asyncio

@@ -1,11 +1,10 @@
 """Seeded pure-code planning baseline for the P2P-T13 comparison.
 
 The selector deliberately keeps its small amount of creative policy in one inspectable
-configuration object.  It chooses among an explicit candidate set: under a physical job
-the run's :class:`SelectorAdmission`, the templates the pre-planning gate admitted on
-this rig and song (the same set the LLM path is offered), each named with its effective
-variant; without one, every registered template (the old renderer's builtins, until the
-cutover removes them).  It emits today's schema-v2 :class:`ChoreographyPlan` and never
+configuration object.  It chooses among an explicit candidate set: the run's
+:class:`SelectorAdmission`, the templates the pre-planning gate admitted on this rig and
+song (the same set the LLM path is offered), each named with its effective variant.  It
+emits today's schema-v2 :class:`ChoreographyPlan` and never
 calls a provider.  When no candidate fills a section at any rung of the fallback ladder
 it raises :class:`NoEligibleTemplateError`; the admission is never relaxed.
 """
@@ -24,15 +23,11 @@ from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
     ColorIntent,
     ColorIntentKind,
-    ExplicitColorIntent,
-    GoboEvent,
     PaletteRoleColorIntent,
     PlanSection,
-    ShutterEvent,
 )
 from twinklr.core.sequencer.models.enum import Intensity, TemplateCategory
 from twinklr.core.sequencer.models.template import TemplateDoc
-from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
 from twinklr.core.sequencer.moving_heads.templates.library import REGISTRY
 from twinklr.core.sequencer.vocabulary.visual import PaletteRole
 
@@ -252,13 +247,11 @@ class DeterministicSelector:
         *,
         seed: int,
         config: SelectorConfig | None = None,
-        admission: SelectorAdmission | None = None,
+        admission: SelectorAdmission,
     ) -> None:
         """Choose among `admission`'s templates, each named with its effective variant.
 
-        Without an admission the candidates are every registered template with no preset
-        named: the old renderer's builtins, until the cutover removes that path. The
-        admitted templates' documents are read from the registry, which holds them for
+        The admitted templates' documents are read from the registry, which holds them for
         the run the gate checked (and only with the annotations the ladder reads).
 
         Raises:
@@ -266,15 +259,8 @@ class DeterministicSelector:
         """
         self.seed = seed
         self.config = config or SelectorConfig()
-        if admission is None:
-            load_builtin_templates()
-            template_ids = [info.template_id for info in REGISTRY.list_all()]
-            self._presets: dict[str, str | None] = {}
-        else:
-            template_ids = list(admission.template_ids)
-            self._presets = {
-                entry.template_id: entry.effective_preset for entry in admission.templates
-            }
+        template_ids = list(admission.template_ids)
+        self._presets = {entry.template_id: entry.effective_preset for entry in admission.templates}
         self._documents = {
             template_id: REGISTRY.get(template_id, deep_copy=False) for template_id in template_ids
         }
@@ -438,58 +424,16 @@ class DeterministicSelector:
         self, section: SelectorSection, document: TemplateDoc
     ) -> tuple[PlanSection, tuple[str, ...]]:
         template = document.template
-        first_color = next((step.color for step in template.steps if step.color is not None), None)
-        first_shutter = next(
-            (step.shutter for step in template.steps if step.shutter is not None), None
-        )
-        first_gobo = next((step.gobo for step in template.steps if step.gobo is not None), None)
-
-        if first_color is not None:
-            color_intent = ColorIntent(
-                selection=ExplicitColorIntent(
-                    kind=ColorIntentKind.EXPLICIT,
-                    palette_role=None,
-                    explicit_color=first_color.preset,
-                )
+        color_intent = ColorIntent(
+            selection=PaletteRoleColorIntent(
+                kind=ColorIntentKind.PALETTE_ROLE,
+                palette_role=self._palette_role(section.role),
+                explicit_color=None,
             )
-        else:
-            color_intent = ColorIntent(
-                selection=PaletteRoleColorIntent(
-                    kind=ColorIntentKind.PALETTE_ROLE,
-                    palette_role=self._palette_role(section.role),
-                    explicit_color=None,
-                )
-            )
-
-        shutter_events = (
-            [
-                ShutterEvent(
-                    bar=section.start_bar,
-                    beat=1,
-                    pattern=first_shutter.pattern,
-                    moment_cue_id=None,
-                )
-            ]
-            if first_shutter is not None
-            else []
         )
-        gobo_events = (
-            [
-                GoboEvent(
-                    bar=section.start_bar,
-                    beat=1,
-                    pattern=first_gobo.pattern,
-                    moment_cue_id=None,
-                )
-            ]
-            if first_gobo is not None
-            else []
-        )
-        unresolved = tuple(
-            name
-            for name, value in (("shutter_events", first_shutter), ("gobo_events", first_gobo))
-            if value is None
-        )
+        # The plan schema still carries shutter and gobo events; nothing in a template
+        # resolves them, so they stay empty and are reported unresolved.
+        unresolved = ("shutter_events", "gobo_events")
         planned = PlanSection(
             section_name=section.section_id,
             start_bar=section.start_bar,
@@ -497,7 +441,7 @@ class DeterministicSelector:
             section_role=section.role,
             energy_level=section.energy,
             template_id=template.template_id,
-            preset_id=self._presets.get(template.template_id),
+            preset_id=self._presets[template.template_id],
             modifiers=[],
             reasoning=(
                 "Deterministic annotation join with seeded choice; "
@@ -508,8 +452,8 @@ class DeterministicSelector:
             transition_out=None,
             intensity=self._intensity(section.energy),
             color_intent=color_intent,
-            shutter_events=shutter_events,
-            gobo_events=gobo_events,
+            shutter_events=[],
+            gobo_events=[],
             moment_cues=[],
         )
         if planned.legacy_intent_omitted:

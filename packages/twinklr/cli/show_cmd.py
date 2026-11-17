@@ -38,7 +38,6 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     measure_output,
 )
 from twinklr.core.sequencer.moving_heads.pipeline import offered_template_ids
-from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
 from twinklr.core.sequencer.moving_heads.templates.data_loader import admit_physical_catalog
 from twinklr.core.sequencer.moving_heads.templates.library import list_templates
 from twinklr.core.sequencer.planning import MacroPlan
@@ -94,14 +93,13 @@ async def run_show_pipeline_async(
         job_config = load_job_config(job_config_path)
         fixture_group = load_fixture_group(fixture_config_path)
         # As `twinklr run`: the rig's render prerequisites are checked when it loads,
-        # and the planner is offered only templates the render mode can render; the
-        # render preflight gate repeats both after audio analysis, before any planner.
+        # and the planner is offered only templates the renderer can render; the render
+        # preflight gate repeats both after audio analysis, before any planner.
         preflight_render_policy(job_config, fixture_group)
         fe_bundle = load_display_fe_bundle(fe_output_dir, style_name=style_name)
-        load_builtin_templates()
-        admit_physical_catalog(job_config)
+        admit_physical_catalog()
         available_templates = offered_template_ids(
-            job_config, [template.template_id for template in list_templates()]
+            [template.template_id for template in list_templates()]
         )
         song_name = clean_audio_filename(audio_path.stem)
         wiring = prepare_combined_show_pipeline(
@@ -162,9 +160,10 @@ async def run_show_pipeline_async(
         if not isinstance(render_output, dict):
             raise TypeError("show_render output must be an object")
         checkpoint_record = render_output.get("checkpoint_record")
-        if checkpoint_record is not None:
-            # The show is delivered: record its moving-head render as `twinklr run` does.
-            record_render(checkpoint_record, context)
+        if not isinstance(checkpoint_record, dict):
+            raise TypeError("show_render checkpoint_record must be an object")
+        # The show is delivered: record its moving-head render as `twinklr run` does.
+        record_render(checkpoint_record, context)
         evaluation_contract = render_output.get("evaluation_contract")
         if not isinstance(evaluation_contract, dict):
             raise TypeError("show_render evaluation_contract must be an object")
@@ -203,19 +202,16 @@ def export_show_artifacts(
 ) -> tuple[Path, Path]:
     """Write the combined sequence and its trace-v2 sidecar.
 
-    A physical render's output (`render_record`, `moving_head_runs`) is measured as
-    `twinklr run` measures its delivery: the serialized `.xsq` and the moving heads'
+    The moving-head render's output (`render_record`, `moving_head_runs`) is measured
+    as `twinklr run` measures its delivery: the serialized `.xsq` and the moving heads'
     effect count must fit `policy`'s budgets before anything is written, and the trace
-    carries the render record with that measure under `output`. A legacy render's
-    output carries neither, and its files are written as before. Both files are
-    staged beside the destination and published together, the `.xsq` last, as
+    carries the render record with that measure under `output`. Both files are staged beside the destination and published together, the `.xsq` last, as
     `twinklr run` publishes its delivery (`publish_files`): a failure leaves any
     earlier show in place.
 
     Raises:
         TypeError: If the output is not the combined render stage's.
-        PhysicalOutputError: If the physical output exceeds the budgets; nothing is
-            written.
+        PhysicalOutputError: If the output exceeds the budgets; nothing is written.
         DeliveryRollbackError: If publishing failed and an earlier file could not be
             put back; the staging directory is then kept and named.
     """
@@ -228,6 +224,11 @@ def export_show_artifacts(
     if not isinstance(render_result, RenderResult):
         raise TypeError("show_render.render_result must be a RenderResult")
     record = render_output.get("render_record")
+    runs = render_output.get("moving_head_runs")
+    if not isinstance(record, dict):
+        raise TypeError("show_render.render_record must be an object")
+    if not isinstance(runs, tuple):
+        raise TypeError("show_render.moving_head_runs must be a tuple of frame runs")
     xsq_name = f"{song_name}_twinklr_show.xsq"
     artifact_dir.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{xsq_name}.", dir=artifact_dir))
@@ -236,18 +237,16 @@ def export_show_artifacts(
         started = time.perf_counter()
         XSQExporter().export(sequence, staged_xsq)
         serialization_ms = (time.perf_counter() - started) * 1000
-        render = None
-        if record is not None:
-            measure = measure_output(render_output["moving_head_runs"], staged_xsq.read_bytes())
-            check_output_budget(measure, policy)
-            render = {
-                **record,
-                "output": {
-                    "effect_count": measure.effect_count,
-                    "xsq_bytes": measure.xsq_bytes,
-                    "serialization_ms": round(serialization_ms, 3),
-                },
-            }
+        measure = measure_output(runs, staged_xsq.read_bytes())
+        check_output_budget(measure, policy)
+        render = {
+            **record,
+            "output": {
+                "effect_count": measure.effect_count,
+                "xsq_bytes": measure.xsq_bytes,
+                "serialization_ms": round(serialization_ms, 3),
+            },
+        }
         staged_trace = write_xsq_trace_sidecar(
             staged_xsq,
             render_result.xsq_trace_entries,

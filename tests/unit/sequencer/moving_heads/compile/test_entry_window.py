@@ -39,9 +39,8 @@ from tests.support.mh_physical import (
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import JobConfig
 from twinklr.core.config.render_policy import UnsupportedRenderModeError
-from twinklr.core.curves.registry import CurveRegistry
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
-from twinklr.core.sequencer.models.context import StepCompileContext, TemplateCompileContext
+from twinklr.core.sequencer.models.context import TemplateCompileContext
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import (
     ContinuousTrajectory,
@@ -57,13 +56,11 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
     TRANSACTION_METADATA_KEY,
     plan_prepositions,
 )
-from twinklr.core.sequencer.moving_heads.compile.step_compiler import compile_step
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
     apply_entry_window,
     compile_physical_template,
 )
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import frame_times
-from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
 from twinklr.core.sequencer.moving_heads.pipeline import (
     PhysicalRenderError,
     RenderingPipeline,
@@ -518,8 +515,7 @@ def test_apply_entry_window_cuts_drops_and_skips() -> None:
 
 
 def test_reposition_fallback_is_physical_only_and_absent_from_dumps() -> None:
-    """Unset, the step field is left out of the template's dump (so no fingerprint moves);
-    set, it is physical data, which the legacy compile refuses."""
+    """Unset, the step field is left out of the template's dump (so no fingerprint moves)."""
     payload = {
         "step_id": "legacy",
         "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
@@ -528,26 +524,6 @@ def test_reposition_fallback_is_physical_only_and_absent_from_dumps() -> None:
         "dimmer": {"dimmer_type": "hold"},
     }
     assert "physical_reposition_fallback" not in TemplateStep.model_validate(payload).model_dump()
-    legacy = TemplateStep.model_validate({**payload, "physical_reposition_fallback": "drop_accent"})
-    assert legacy.has_physical_data
-    registries = create_default_registries()
-    context = StepCompileContext(
-        section_id="verse",
-        segment_id="A",
-        template_id="legacy_probe",
-        fixture_id="MH1",
-        role="OUTER_LEFT",
-        calibration={},
-        start_ms=0,
-        duration_ms=1000,
-        beat_grid=_grid(),
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
-    )
-    with pytest.raises(ValueError, match="physical_v2"):
-        compile_step(legacy, context)
 
 
 # --- Review fixes ----------------------------------------------------------------------
@@ -610,10 +586,6 @@ def _plan_uncut(
             beat_grid=grid,
             start_bar=section.start_bar,
             duration_bars=section.end_bar - section.start_bar + 1,
-            curve_registry=pipeline.curve_registry,
-            geometry_registry=pipeline.geometry_registry,
-            movement_registry=pipeline.movement_registry,
-            dimmer_registry=pipeline.dimmer_registry,
         )
         cues += compile_physical_template(
             document.template, context, phase_map=phase_map, start_limit_ms=start, end_limit_ms=end
@@ -983,10 +955,6 @@ def _whole_song_verdict(
             beat_grid=grid,
             start_bar=1,
             duration_bars=bars,
-            curve_registry=pipeline.curve_registry,
-            geometry_registry=pipeline.geometry_registry,
-            movement_registry=pipeline.movement_registry,
-            dimmer_registry=pipeline.dimmer_registry,
         )
         try:
             compiled = compile_physical_template(

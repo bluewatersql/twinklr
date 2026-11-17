@@ -8,16 +8,6 @@ from twinklr.core.curves.models import CurvePoint
 
 
 @pytest.fixture
-def simple_linear_points() -> list[CurvePoint]:
-    """Create simple linear curve points from 0 to 1."""
-    return [
-        CurvePoint(t=0.0, v=0.0),
-        CurvePoint(t=0.5, v=0.5),
-        CurvePoint(t=1.0, v=1.0),
-    ]
-
-
-@pytest.fixture
 def simple_hold_points() -> list[CurvePoint]:
     """Create simple hold curve points at 0.5."""
     return [

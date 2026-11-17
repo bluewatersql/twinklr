@@ -52,7 +52,6 @@ from tests.support.mh_physical import (
 from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup, InitialFixtureState
 from twinklr.core.config.models import JobConfig
 from twinklr.core.config.render_policy import UnsupportedRenderModeError
-from twinklr.core.curves.registry import CurveRegistry
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.models.context import TemplateCompileContext
 from twinklr.core.sequencer.models.enum import ChannelName
@@ -82,7 +81,6 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     frame_times,
 )
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
-from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
 from twinklr.core.sequencer.moving_heads.pipeline import (
     RenderingPipeline,
     check_physical_templates,
@@ -282,7 +280,6 @@ def _compile(
     template: Template, rig: FixtureGroup, *, bars: int = 1, grid: BeatGrid | None = None
 ) -> list[FixtureSegment]:
     grid = grid or _grid()
-    registries = create_default_registries()
     phase_map = build_musical_phase_map(grid)
     start, end = physical_cue_limits(phase_map, int(grid.duration_ms))
     context = TemplateCompileContext(
@@ -292,10 +289,6 @@ def _compile(
         beat_grid=grid,
         start_bar=1,
         duration_bars=bars,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
         presets=rig.presets,
         topology=rig_topology(rig),
         fixture_group_id=rig.group_id,
@@ -459,18 +452,7 @@ def test_invalid_zoom_spec_is_rejected(step: dict[str, Any], match: str) -> None
         TemplateStep.model_validate(step)
 
 
-def test_zoom_spec_is_physical_data() -> None:
-    """A zoom spec makes a step physical, so the legacy compile refuses it."""
-    step = TemplateStep.model_validate(
-        {
-            **hold_step("still", 0.0),
-            "movement": {},
-            "dimmer": {},
-            "physical_shutter_state": None,
-            "physical_zoom": {"shape": "hold", "start_deg": 20.0},
-        }
-    )
-    assert step.has_physical_data
+def test_zoom_spec_is_left_out_of_dumps_when_absent() -> None:
     assert "physical_zoom" not in TemplateStep.model_validate(hold_step("s", 0.0)).model_dump()
 
 

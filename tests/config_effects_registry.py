@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 
 
 class ConfigDispositionKind(StrEnum):
@@ -266,21 +267,15 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
         "public behavior discriminator",
     ),
     "job.schema_version": ConfigDisposition(
-        ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_mh_render_policy.py::test_physical_mode_requires_schema_31",
-        "declared schema version decides whether physical render mode is admissible",
+        ConfigDispositionKind.INVARIANT_TEST,
+        "tests/unit/config/test_config_inventory.py::test_fixed_policy_config_paths_are_invariant",
+        "one accepted version, 3.1; an undeclared one fails validation",
     ),
     "job.moving_heads": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_mh_render_policy.py::"
-        "test_loading_physical_job_without_profiles_is_rejected_before_execution",
-        "selected render policy decides which fixture prerequisites loading the job checks",
-    ),
-    "job.moving_heads.mode": ConfigDisposition(
-        ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_mh_render_policy.py::test_physical_mode_without_profiles_is_rejected",
-        "physical mode refuses a rig without physical profiles, naming each fixture; legacy "
-        "mode renders it",
+        "test_loading_a_job_on_a_rig_without_profiles_is_rejected_before_execution",
+        "the policy's initial states decide whether loading the job with its fixtures passes",
     ),
     "job.fixture_config_path": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
@@ -617,46 +612,6 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
         "tests/unit/agents/sequencer/moving_heads/test_stage.py::TestMovingHeadStageCheckpointWriter::test_checkpoint_disabled_by_config",
         "public behavior discriminator",
     ),
-    "job.transitions": ConfigDisposition(
-        ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/compile/test_transition_planner.py::TestTransitionPlannerBasic::test_plan_with_default_hint",
-        "public behavior discriminator",
-    ),
-    "job.transitions.enabled": ConfigDisposition(
-        ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/compile/test_transition_planner.py::TestTransitionPlannerBasic::test_plan_with_default_hint",
-        "public behavior discriminator",
-    ),
-    "job.transitions.default_duration_bars": ConfigDisposition(
-        ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/compile/test_transition_planner.py::TestTransitionPlannerBasic::test_plan_with_default_hint",
-        "public behavior discriminator",
-    ),
-    "job.transitions.default_mode": ConfigDisposition(
-        ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/compile/test_transition_planner.py::TestTransitionPlannerBasic::test_plan_with_default_hint",
-        "public behavior discriminator",
-    ),
-    "job.transitions.default_curve": ConfigDisposition(
-        ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/compile/test_transition_planner.py::TestTransitionPlannerBasic::test_plan_with_default_hint",
-        "public behavior discriminator",
-    ),
-    "job.transitions.min_section_duration_bars": ConfigDisposition(
-        ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/compile/test_transition_planner.py::TestTransitionPlannerBasic::test_plan_with_default_hint",
-        "public behavior discriminator",
-    ),
-    "job.transitions.allow_overlaps": ConfigDisposition(
-        ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/compile/test_transition_planner.py::TestTransitionPlannerBasic::test_plan_with_default_hint",
-        "public behavior discriminator",
-    ),
-    "job.transitions.per_channel_defaults": ConfigDisposition(
-        ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/compile/test_transition_planner.py::TestTransitionPlannerBasic::test_plan_with_default_hint",
-        "public behavior discriminator",
-    ),
     "job.timeline_tracks": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/formats/xlights/sequence/test_timeline.py::TestBuildTimelineTracks::test_config_disables_tracks",
@@ -849,13 +804,15 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.base_config.dmx_mapping.pan_fine_channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.dmx_mapping.pan_fine_channel]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.dmx_mapping.pan_fine_channel.channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.dmx_mapping.pan_fine_channel.channel]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.dmx_mapping.pan_fine_channel.config": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -894,13 +851,15 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.base_config.dmx_mapping.tilt_fine_channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.dmx_mapping.tilt_fine_channel]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.dmx_mapping.tilt_fine_channel.channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.dmx_mapping.tilt_fine_channel.channel]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.dmx_mapping.tilt_fine_channel.config": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -939,8 +898,9 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.base_config.dmx_mapping.use_16bit_pan_tilt": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.dmx_mapping.use_16bit_pan_tilt]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.dmx_mapping.shutter_channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
@@ -989,38 +949,45 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.base_config.dmx_mapping.shutter_default": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.dmx_mapping.shutter_default]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.dmx_mapping.shutter_map": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.dmx_mapping.shutter_map]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.dmx_mapping.shutter_map.closed": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.dmx_mapping.shutter_map.closed]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.dmx_mapping.shutter_map.open": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.dmx_mapping.shutter_map.open]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.dmx_mapping.shutter_map.strobe_slow": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.dmx_mapping.shutter_map.strobe_slow]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.dmx_mapping.shutter_map.strobe_medium": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.dmx_mapping.shutter_map.strobe_medium]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.dmx_mapping.shutter_map.strobe_fast": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.dmx_mapping.shutter_map.strobe_fast]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.dmx_mapping.color_channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
@@ -1069,8 +1036,9 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.base_config.dmx_mapping.color_map": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.dmx_mapping.color_map]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.dmx_mapping.gobo_channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
@@ -1119,8 +1087,9 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.base_config.dmx_mapping.gobo_map": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.dmx_mapping.gobo_map]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.inversions": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
@@ -1139,23 +1108,27 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.base_config.inversions.dimmer": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.inversions.dimmer]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.inversions.shutter": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.inversions.shutter]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.inversions.color": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.inversions.color]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.inversions.gobo": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_base_config_and_override_change_expanded_fixture_behavior",
-        "separately loaded fixture path changes expanded render/rig behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.base_config.inversions.gobo]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.base_config.pan_tilt_range": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
@@ -1314,8 +1287,9 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.fixtures": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_get_xlights_mapping",
-        "non-default changes public fixture mapping",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[FixtureInstance].fixture_id": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
@@ -1354,18 +1328,21 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_written_channels_unchanged",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[FixtureInstance].config.dmx_mapping]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.pan_channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_written_channels_unchanged",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[FixtureInstance].config.dmx_mapping.pan_channel]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.pan_channel.channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_written_channels_unchanged",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[FixtureInstance].config.dmx_mapping.pan_channel.channel]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.pan_channel.config": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -1404,13 +1381,15 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.tilt_channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_written_channels_unchanged",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[FixtureInstance].config.dmx_mapping.tilt_channel]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.tilt_channel.channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_written_channels_unchanged",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[FixtureInstance].config.dmx_mapping.tilt_channel.channel]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.tilt_channel.config": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -1449,13 +1428,15 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.dimmer_channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_written_channels_unchanged",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[FixtureInstance].config.dmx_mapping.dimmer_channel]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.dimmer_channel.channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_written_channels_unchanged",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[FixtureInstance].config.dmx_mapping.dimmer_channel.channel]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.dimmer_channel.config": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -1494,13 +1475,15 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.pan_fine_channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_inversions_and_16bit_flag_change_emitted_settings",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.dmx_mapping.pan_fine_channel]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.pan_fine_channel.channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_inversions_and_16bit_flag_change_emitted_settings",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.dmx_mapping.pan_fine_channel.channel]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.pan_fine_channel.config": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -1539,13 +1522,15 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.tilt_fine_channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_inversions_and_16bit_flag_change_emitted_settings",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.dmx_mapping.tilt_fine_channel]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.tilt_fine_channel.channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_inversions_and_16bit_flag_change_emitted_settings",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.dmx_mapping.tilt_fine_channel.channel]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.tilt_fine_channel.config": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -1584,18 +1569,21 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.use_16bit_pan_tilt": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_inversions_and_16bit_flag_change_emitted_settings",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.dmx_mapping.use_16bit_pan_tilt]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_written_channels_unchanged",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_channel]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_channel.channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_written_channels_unchanged",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_channel.channel]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_channel.config": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -1634,48 +1622,57 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_default": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_mapped_unwritten_shutter_emits_declared_default",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_default]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_map": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/handlers/test_parameterized_channels.py::test_handlers_resolve_fixture_maps",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_map]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_map.closed": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/handlers/test_parameterized_channels.py::test_handlers_resolve_fixture_maps",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_map.closed]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_map.open": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/handlers/test_parameterized_channels.py::test_handlers_resolve_fixture_maps",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_map.open]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_map.strobe_slow": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/handlers/test_parameterized_channels.py::test_handlers_resolve_fixture_maps",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_map.strobe_slow]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_map.strobe_medium": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/handlers/test_parameterized_channels.py::test_handlers_resolve_fixture_maps",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_map.strobe_medium]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_map.strobe_fast": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/handlers/test_parameterized_channels.py::test_handlers_resolve_fixture_maps",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.dmx_mapping.shutter_map.strobe_fast]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.color_channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_written_channels_unchanged",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[FixtureInstance].config.dmx_mapping.color_channel]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.color_channel.channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_written_channels_unchanged",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[FixtureInstance].config.dmx_mapping.color_channel.channel]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.color_channel.config": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -1714,18 +1711,21 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.color_map": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/handlers/test_parameterized_channels.py::test_unmappable_wheel_preset_falls_back_to_declared_open",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.dmx_mapping.color_map]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.gobo_channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_written_channels_unchanged",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[FixtureInstance].config.dmx_mapping.gobo_channel]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.gobo_channel.channel": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_written_channels_unchanged",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[FixtureInstance].config.dmx_mapping.gobo_channel.channel]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.gobo_channel.config": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -1764,43 +1764,51 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.fixtures[FixtureInstance].config.dmx_mapping.gobo_map": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/handlers/test_parameterized_channels.py::test_unmappable_wheel_preset_falls_back_to_declared_open",
-        "non-default changes emitted DMX behavior",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.dmx_mapping.gobo_map]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.inversions": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_inversions_and_16bit_flag_change_emitted_settings",
-        "non-default changes emitted inversion settings",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[FixtureInstance].config.inversions]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[FixtureInstance].config.inversions.pan": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_inversions_and_16bit_flag_change_emitted_settings",
-        "non-default changes emitted inversion settings",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[FixtureInstance].config.inversions.pan]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[FixtureInstance].config.inversions.tilt": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_inversions_and_16bit_flag_change_emitted_settings",
-        "non-default changes emitted inversion settings",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[FixtureInstance].config.inversions.tilt]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[FixtureInstance].config.inversions.dimmer": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_inversions_and_16bit_flag_change_emitted_settings",
-        "non-default changes emitted inversion settings",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.inversions.dimmer]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.inversions.shutter": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_inversions_and_16bit_flag_change_emitted_settings",
-        "non-default changes emitted inversion settings",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.inversions.shutter]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.inversions.color": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_inversions_and_16bit_flag_change_emitted_settings",
-        "non-default changes emitted inversion settings",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.inversions.color]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.inversions.gobo": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/export/test_dmx_settings_builder.py::test_inversions_and_16bit_flag_change_emitted_settings",
-        "non-default changes emitted inversion settings",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.fixtures[FixtureInstance].config.inversions.gobo]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "fixture.fixtures[FixtureInstance].config.pan_tilt_range": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
@@ -1979,13 +1987,15 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.fixtures[FixtureInstance].xlights_model_name": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_get_xlights_mapping",
-        "full fixture alternative changes public fixture mapping",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[FixtureInstance].xlights_model_name]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[SimplifiedFixtureInstance].xlights_model_name": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_get_xlights_mapping",
-        "shared mapping seam iterates and proves both union alternatives",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.fixtures[SimplifiedFixtureInstance].xlights_model_name]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.fixtures[SimplifiedFixtureInstance].dmx_start_address": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -2019,43 +2029,51 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "fixture.xlights_group": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_get_xlights_mapping",
-        "non-default changes public fixture mapping",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_changes_shipped_behavior_snapshot[fixture.xlights_group]",
+        "exact path changes expansion, rig, pose conversion or the planner's channel listing",
     ),
     "fixture.xlights_semantic_groups": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/config/test_fixtures.py::TestFixtureGroup::test_get_xlights_mapping",
-        "non-default changes public fixture mapping",
+        "tests/unit/config/test_effect_discriminators.py::"
+        "test_fixture_field_of_the_removed_renderer_changes_identity_only[fixture.xlights_semantic_groups]",
+        "no render effect, identity only; twinklr inject/regenerate still read it when reconciling the live layout (reconcile_live_layout); C1.3 settles the field",
     ),
     "template.enabled": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_registration_field_changes_public_registry[template.enabled]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_registration_field_changes_public_registry[template.template]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.template_id": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_registration_field_changes_public_registry[template.template.template_id]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.version": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_registration_field_changes_public_registry[template.template.version]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.name": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_registration_field_changes_public_registry[template.template.name]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.category": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_registration_field_changes_public_registry[template.template.category]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.roles": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -2064,8 +2082,9 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "template.template.repeat": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.repeat]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.repeat.repeatable": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -2074,53 +2093,63 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "template.template.repeat.mode": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.repeat.mode]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.repeat.cycle_bars": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.repeat.cycle_bars]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.repeat.loop_step_ids": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.repeat.loop_step_ids]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.repeat.remainder_policy": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.repeat.remainder_policy]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.defaults": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_field_of_the_removed_renderer_changes_identity_only[template.template.defaults]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "template.template.steps": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.step_id": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.step_id]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.target": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.target]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.timing": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.timing]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.timing.base_timing": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.timing.base_timing]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.timing.base_timing.mode": ConfigDisposition(
         ConfigDispositionKind.INVARIANT_TEST,
@@ -2134,23 +2163,29 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "template.template.steps.timing.base_timing.start_offset_bars": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.timing.base_timing.start_offset_bars]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.timing.base_timing.duration_bars": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.timing.base_timing.duration_bars]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.timing.phase_offset": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/compile/test_phase_offset.py::test_phase_offset_fields_change_calculated_schedule",
-        "non-default changes calculated fixture schedule",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.timing.phase_offset]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, "
+        "or the physical compile refuses its non-default value",
     ),
     "template.template.steps.timing.phase_offset.mode": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/compile/test_phase_offset.py::test_phase_offset_fields_change_calculated_schedule",
-        "non-default changes calculated fixture schedule",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.timing.phase_offset.mode]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, "
+        "or the physical compile refuses its non-default value",
     ),
     "template.template.steps.timing.phase_offset.group": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -2159,13 +2194,16 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "template.template.steps.timing.phase_offset.order": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_phase_offset_order_changes_compiled_fixture_schedule",
-        "non-default changes compiled per-fixture phase schedule",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.timing.phase_offset.order]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.timing.phase_offset.spread_bars": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/compile/test_phase_offset.py::test_phase_offset_fields_change_calculated_schedule",
-        "non-default changes calculated fixture schedule",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.timing.phase_offset.spread_bars]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, "
+        "or the physical compile refuses its non-default value",
     ),
     "template.template.steps.timing.phase_offset.distribution": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -2174,64 +2212,75 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "template.template.steps.timing.phase_offset.wrap": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/compile/test_phase_offset.py::test_phase_offset_fields_change_calculated_schedule",
-        "non-default changes calculated fixture schedule",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.timing.phase_offset.wrap]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, "
+        "or the physical compile refuses its non-default value",
     ),
     "template.template.steps.geometry": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.geometry]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.geometry.geometry_type": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.geometry.geometry_type]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.geometry.params": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.geometry.params]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.geometry.pan_pose_by_role": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.geometry.pan_pose_by_role]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.geometry.tilt_pose": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.geometry.tilt_pose]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.geometry.aim_zone": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_geometry_aim_zone_reaches_compiled_segment_metadata[crowd]",
-        "non-default aim zone reaches compiled geometry parameters and segment metadata",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.geometry.aim_zone]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.movement": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.movement]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.movement.movement_type": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.movement.movement_type]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.movement.intensity": ConfigDisposition(
-        ConfigDispositionKind.INVARIANT_TEST,
-        "tests/unit/config/test_template_effect_discriminators.py::"
-        "test_template_movement_intensity_does_not_change_emitted_snapshot",
-        "P4-F1 reverted on 2026-11-12: the movement handler ignores this field",
+        ConfigDispositionKind.EFFECT_TEST,
+        None,
+        "re-pointed below",
     ),
     "template.template.steps.movement.cycles": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.movement.cycles]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.movement.params": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.movement.params]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.movement.amplitude_override": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -2250,28 +2299,33 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "template.template.steps.dimmer": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.dimmer]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.dimmer.dimmer_type": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.dimmer.dimmer_type]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.dimmer.intensity": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.dimmer.intensity]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.dimmer.min_norm": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.dimmer.min_norm]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.dimmer.max_norm": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.dimmer.max_norm]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.dimmer.cycles": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -2280,18 +2334,21 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "template.template.steps.dimmer.params": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.dimmer.params]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.color": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.color]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.color.preset": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.color.preset]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.color.params": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -2300,13 +2357,15 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "template.template.steps.shutter": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.shutter]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.shutter.pattern": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.shutter.pattern]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.shutter.params": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -2315,13 +2374,15 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "template.template.steps.gobo": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.gobo]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.gobo.pattern": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_compile_field_changes_emitted_snapshot[template.template.steps.gobo.pattern]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.steps.gobo.params": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -2380,88 +2441,105 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
     "template.template.metadata": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_registration_field_changes_public_registry[template.template.metadata]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.metadata.tags": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_registration_field_changes_public_registry[template.template.metadata.tags]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.metadata.recommended_sections": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_metadata_field_changes_planner_prompt_context[template.template.metadata.recommended_sections]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.metadata.energy_range": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_metadata_field_changes_planner_prompt_context[template.template.metadata.energy_range]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.template.metadata.description": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_metadata_field_changes_planner_prompt_context[template.template.metadata.description]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.presets": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_preset_field_changes_compiled_snapshot[template.presets]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.presets.preset_id": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_preset_field_changes_compiled_snapshot[template.presets.preset_id]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.presets.name": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_field_of_the_removed_renderer_changes_identity_only[template.presets.name]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "template.presets.defaults": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_field_of_the_removed_renderer_changes_identity_only[template.presets.defaults]",
+        "identity only: the removed renderer was its only reader; C1.3 removes the field",
     ),
     "template.presets.step_patches": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_preset_field_changes_compiled_snapshot[template.presets.step_patches]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.presets.step_patches.geometry": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_preset_field_changes_compiled_snapshot[template.presets.step_patches.geometry]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.presets.step_patches.movement": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_preset_field_changes_compiled_snapshot[template.presets.step_patches.movement]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.presets.step_patches.dimmer": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_preset_field_changes_compiled_snapshot[template.presets.step_patches.dimmer]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.presets.step_patches.color": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_preset_field_changes_compiled_snapshot[template.presets.step_patches.color]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.presets.step_patches.shutter": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_preset_field_changes_compiled_snapshot[template.presets.step_patches.shutter]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.presets.step_patches.gobo": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_preset_field_changes_compiled_snapshot[template.presets.step_patches.gobo]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "template.presets.step_patches.timing": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_preset_field_changes_compiled_snapshot[template.presets.step_patches.timing]",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or the physical compile refuses its non-default value",
     ),
     "app.audio_processing.cache_enabled": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -2549,9 +2627,63 @@ PROTECTED_EXACT_EFFECT_PATHS = frozenset(
         "fixture.fixtures[SimplifiedFixtureInstance].position.pan_offset_deg",
         "fixture.fixtures[SimplifiedFixtureInstance].position.tilt_offset_deg",
         "job.timeline_tracks.sections",
-        "template.template.steps.geometry.aim_zone",
     }
 )
+
+# The entries above as written, before the loops below route paths to their
+# parameterized tests; the guard at the end of the module checks them.
+_STATIC_EFFECTS = dict(CONFIG_EFFECTS)
+
+# The old renderer's exporter and wheel handlers were the only readers of these fixture
+# fields; it was removed in C1.2. Each exact path now enters render identity (the rig is
+# part of the fingerprint) and changes no encoded frame. C1.3 removes the fields. Their
+# entries above carry this disposition as written; the loop below checks that they do.
+_OLD_RENDERER_FIXTURE_FIELDS = (
+    "dmx_mapping.pan_fine_channel",
+    "dmx_mapping.pan_fine_channel.channel",
+    "dmx_mapping.tilt_fine_channel",
+    "dmx_mapping.tilt_fine_channel.channel",
+    "dmx_mapping.use_16bit_pan_tilt",
+    "dmx_mapping.shutter_default",
+    "dmx_mapping.shutter_map",
+    "dmx_mapping.shutter_map.closed",
+    "dmx_mapping.shutter_map.open",
+    "dmx_mapping.shutter_map.strobe_slow",
+    "dmx_mapping.shutter_map.strobe_medium",
+    "dmx_mapping.shutter_map.strobe_fast",
+    "dmx_mapping.color_map",
+    "dmx_mapping.gobo_map",
+    "inversions.dimmer",
+    "inversions.shutter",
+    "inversions.color",
+    "inversions.gobo",
+)
+_OLD_RENDERER_FIXTURE_PATHS = (
+    *(
+        f"{_prefix}.{_field}"
+        for _prefix in ("fixture.base_config", "fixture.fixtures[FixtureInstance].config")
+        for _field in _OLD_RENDERER_FIXTURE_FIELDS
+    ),
+    # No render code reads it since the removed exporter's xLights mapping went; the live
+    # layout reconciliation behind inject/regenerate still does.
+    "fixture.xlights_semantic_groups",
+)
+_IDENTITY_ONLY_REASONS = {
+    "fixture.xlights_semantic_groups": (
+        "no render effect, identity only; twinklr inject/regenerate s"
+        "till read it when reconciling the live layout (reconcile_live_layout); C1.3 settles the field"
+    ),
+}
+for _fixture_path in _OLD_RENDERER_FIXTURE_PATHS:
+    assert CONFIG_EFFECTS[_fixture_path] == ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/config/test_effect_discriminators.py::"
+        f"test_fixture_field_of_the_removed_renderer_changes_identity_only[{_fixture_path}]",
+        _IDENTITY_ONLY_REASONS.get(
+            _fixture_path,
+            "identity only: the removed renderer was its only reader; C1.3 removes the field",
+        ),
+    ), _fixture_path
 
 # Parameterized discriminators below use the canonical path itself as the pytest ID;
 # each case mutates that exact field and observes a production expansion/export seam.
@@ -2559,18 +2691,19 @@ for _fixture_path, _fixture_disposition in tuple(CONFIG_EFFECTS.items()):
     if _fixture_path.startswith("fixture.") and (
         _fixture_disposition.kind is ConfigDispositionKind.EFFECT_TEST
     ):
-        if _fixture_path in PROTECTED_EXACT_EFFECT_PATHS:
+        if _fixture_path in PROTECTED_EXACT_EFFECT_PATHS or (
+            _fixture_path in _OLD_RENDERER_FIXTURE_PATHS
+        ):
             continue
         CONFIG_EFFECTS[_fixture_path] = ConfigDisposition(
             ConfigDispositionKind.EFFECT_TEST,
             "tests/unit/config/test_effect_discriminators.py::"
             f"test_fixture_field_changes_shipped_behavior_snapshot[{_fixture_path}]",
-            "exact path changes expansion, rig, conversion, wheel-handler, or DMX export behavior",
+            "exact path changes expansion, rig, pose conversion or the planner's channel listing",
         )
 
-# Physical-profile and run initial-state fields feed only the opt-in physical renderer,
-# so by design they cannot change the legacy-output snapshot above. Registered after
-# that loop, each exact path mutates its field and must change the one component of
+# Physical-profile and run initial-state fields feed the physical renderer. Registered
+# after the loop above, each exact path mutates its field and must change the one component of
 # the physical contract its note names. "Identity only" paths have no consumer
 # beyond the render fingerprint; the task that adds one repoints them.
 _PHYSICAL_REJECTED = "exact path's alternative values are rejected by validation"
@@ -2685,13 +2818,19 @@ for _template_path, _template_disposition in tuple(CONFIG_EFFECTS.items()):
         _template_test = "test_template_registration_field_changes_public_registry"
     elif _template_path in _TEMPLATE_METADATA_PATHS:
         _template_test = "test_template_metadata_field_changes_planner_prompt_context"
-    elif _template_path == "template.presets.name":
-        CONFIG_EFFECTS[_template_path] = ConfigDisposition(
+    elif _template_path in {
+        "template.template.defaults",
+        "template.presets.defaults",
+        "template.presets.name",
+    }:
+        # Read only by the old renderer, removed in C1.2; C1.3 removes the field. The
+        # entry above carries this disposition as written; checked here.
+        assert _template_disposition == ConfigDisposition(
             ConfigDispositionKind.EFFECT_TEST,
             "tests/unit/config/test_template_effect_discriminators.py::"
-            "test_template_preset_name_changes_shipped_pipeline_log",
-            "selected preset name changes the shipped pipeline diagnostic",
-        )
+            f"test_template_field_of_the_removed_renderer_changes_identity_only[{_template_path}]",
+            "identity only: the removed renderer was its only reader; C1.3 removes the field",
+        ), _template_path
         continue
     elif _template_path.startswith("template.presets"):
         _template_test = "test_template_preset_field_changes_compiled_snapshot"
@@ -2701,12 +2840,12 @@ for _template_path, _template_disposition in tuple(CONFIG_EFFECTS.items()):
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         f"{_template_test}[{_template_path}]",
-        "exact path changes a shipped registry, planner, preset, or compiled-output seam",
+        "exact path changes a shipped registry, planner, preset, or physical-compile seam, "
+        "or the physical compile refuses its non-default value",
     )
 
-# P1.2 physical template fields. They feed only the opt-in physical compile, so by
-# design they cannot change the legacy snapshot above; registered after that loop,
-# each exact path mutates its field and must either change `compile_physical_step`'s
+# P1.2 physical template fields. They feed the physical compile; registered after the
+# loop above, each exact path mutates its field and must either change `compile_physical_step`'s
 # result or be rejected by physical validation/compile. `shape` is coupled to `mode`,
 # extents and period, so no single-field alternative is valid; its evidence is the
 # kernel test, which fails if the compiler ignored it.
@@ -2750,7 +2889,7 @@ CONFIG_EFFECTS["template.template.steps.movement.physical.shape"] = ConfigDispos
 )
 
 # P1.4 physical discrete template fields: named shutter, color and gobo states held
-# for a step. Like P1.2's, they feed only the opt-in physical compile; each exact
+# for a step. Like P1.2's, they feed the physical compile; each exact
 # path selects another declared state and must change `compile_physical_step`'s
 # result, so a compile that ignored the field fails its case.
 for _field in ("physical_shutter_state", "physical_color", "physical_gobo"):
@@ -2786,7 +2925,7 @@ CONFIG_EFFECTS["job.moving_heads.on_unplayable"] = ConfigDisposition(
 )
 
 # P2.1 named rig components: a fixture group's position and attribute presets and the
-# step references that name them. They feed only the opt-in physical compile; each
+# step references that name them. They feed the physical compile; each
 # exact path mutates its field and must either change `compile_physical_template`'s
 # result or be refused by validation or compile (a reference that no longer resolves).
 for _component_path, _note in {
@@ -2815,7 +2954,7 @@ for _component_path, _note in {
     )
 
 # P2.2 rig topology and phase distribution: a fixture group's canonical rig and the step
-# distributions that spread phase over it. They feed only the opt-in physical compile;
+# distributions that spread phase over it. They feed the physical compile;
 # each exact path mutates its field and must either change the compiled pan, tilt,
 # dimmer or shutter values or be refused (a distribution on a rig left without topology).
 for _topology_path, _note in {
@@ -2841,9 +2980,9 @@ for _topology_path, _note in {
     )
 
 # P2.3 relative paths: the template-owned transform of a circle, lissajous or sweep and
-# the lissajous frequency ratio. They feed only the opt-in physical compile; each exact
+# the lissajous frequency ratio. They feed the physical compile; each exact
 # path mutates its field and must change the compiled pan and tilt values. The `ONCE`
-# repeat value has no path of its own: `template.template.repeat.mode` keeps its legacy
+# repeat value has no path of its own: `template.template.repeat.mode` keeps its
 # discriminator, and ONCE's physical scheduling is tested in the same module.
 for _path_field in (
     "transform",
@@ -2861,7 +3000,7 @@ for _path_field in (
     )
 
 # P2.4b visibility envelopes and attribute overlays: a step's lit window and the
-# template's temporary wheel states. They feed only the opt-in physical compile; each
+# template's temporary wheel states. They feed the physical compile; each
 # exact path mutates its field and must change the compiled cues or be refused. The
 # profile's `discrete.open_state`, identity-only until now, is what an envelope step
 # without a static shutter state is lit through; its records are repointed here.
@@ -3107,29 +3246,6 @@ for _asset_path in (
         "exact path changes the production asset stage result or output root",
     )
 
-CONFIG_EFFECTS["job.transitions.enabled"] = ConfigDisposition(
-    ConfigDispositionKind.EFFECT_TEST,
-    "tests/unit/sequencer/moving_heads/test_rendering_pipeline.py::"
-    "TestTransitionPlanning::test_transition_enabled_changes_render_detector_call[disabled]",
-    "disabled configuration suppresses the production render detector",
-)
-for _transition_path in (
-    "job.transitions",
-    "job.transitions.default_duration_bars",
-    "job.transitions.default_mode",
-    "job.transitions.default_curve",
-    "job.transitions.min_section_duration_bars",
-    "job.transitions.allow_overlaps",
-    "job.transitions.per_channel_defaults",
-):
-    CONFIG_EFFECTS[_transition_path] = ConfigDisposition(
-        ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/compile/test_transition_planner.py::"
-        "TestTransitionPlannerBasic::test_transition_config_field_changes_planned_behavior"
-        f"[{_transition_path}]",
-        "exact path changes planned timing, feasibility, overlap, or channel strategy",
-    )
-
 for _timeline_path in (
     "job.timeline_tracks",
     "job.timeline_tracks.beats",
@@ -3159,3 +3275,24 @@ CONFIG_EFFECTS["job.agent"] = ConfigDisposition(
     "test_job_config_controls_display_planner_iterations_and_threshold",
     "configured agent object changes shipped planner iteration and threshold wiring",
 )
+
+
+# Guard: an entry as written names a test that exists, so an entry a loop above routes
+# elsewhere can never keep pointing at deleted evidence.
+_TESTS_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _names_a_test(nodeid: str) -> bool:
+    """Whether `nodeid`'s file exists and defines its test function."""
+    file, *parts = nodeid.split("::")
+    path = _TESTS_ROOT / file
+    function = parts[-1].split("[")[0] if parts else ""
+    return path.is_file() and f"def {function}(" in path.read_text(encoding="utf-8")
+
+
+_STALE_EFFECTS = sorted(
+    path
+    for path, disposition in _STATIC_EFFECTS.items()
+    if disposition.test_nodeid is not None and not _names_a_test(disposition.test_nodeid)
+)
+assert not _STALE_EFFECTS, f"ledger entries name missing tests: {_STALE_EFFECTS}"

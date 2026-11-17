@@ -34,8 +34,7 @@ from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.fixtures.presets import RigPresetLibrary
 from twinklr.core.config.models import JobConfig
 from twinklr.core.config.render_policy import UnsupportedRenderModeError
-from twinklr.core.curves.registry import CurveRegistry
-from twinklr.core.sequencer.models.context import StepCompileContext, TemplateCompileContext
+from twinklr.core.sequencer.models.context import TemplateCompileContext
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import (
     ContinuousTrajectory,
@@ -49,12 +48,10 @@ from twinklr.core.sequencer.moving_heads.compile.physical import (
     PhysicalCompileError,
     is_physical_template,
 )
-from twinklr.core.sequencer.moving_heads.compile.step_compiler import compile_step
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
     compile_physical_template,
 )
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
-from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
 from twinklr.core.sequencer.moving_heads.pipeline import (
     RenderingPipeline,
     check_physical_templates,
@@ -78,7 +75,6 @@ def _compile(
     preset: TemplatePreset | None = None,
 ) -> list[FixtureSegment]:
     rig = rig or physical_preset_rig()
-    registries = create_default_registries()
     context = TemplateCompileContext(
         section_id="verse",
         template_id=template.template_id,
@@ -86,10 +82,6 @@ def _compile(
         beat_grid=_GRID,
         start_bar=1,
         duration_bars=duration_bars,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
         presets=rig.presets,
     )
     start_limit, end_limit = physical_cue_limits(_PHASE_MAP, int(_GRID.duration_ms))
@@ -410,41 +402,8 @@ def test_attribute_preset_needs_the_channel_on_the_profile() -> None:
 # --- Legacy and identity --------------------------------------------------------------
 
 
-def test_component_refs_rejected_by_legacy_compile() -> None:
-    legacy_with_refs = TemplateStep.model_validate(
-        {
-            "step_id": "legacy",
-            "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
-            "geometry": {},
-            "movement": {"movement_type": "sweep_lr"},
-            "dimmer": {"dimmer_type": "hold"},
-            "component_refs": {"attribute_preset_ids": ["cool"]},
-        }
-    )
-    assert legacy_with_refs.has_physical_data
-    step = TemplateStep.model_validate(referencing_step())
-    assert step.has_physical_data
+def test_component_refs_are_physical_data() -> None:
     assert is_physical_template(_template(referencing_step()))
-    registries = create_default_registries()
-    context = StepCompileContext(
-        section_id="verse",
-        segment_id="A",
-        template_id="p21_probe",
-        fixture_id="MH1",
-        role="OUTER_LEFT",
-        calibration={},
-        start_ms=0,
-        duration_ms=1000,
-        beat_grid=_GRID,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
-    )
-    with pytest.raises(ValueError, match="physical_v2"):
-        compile_step(step, context)
-    with pytest.raises(ValueError, match="physical_v2"):
-        compile_step(legacy_with_refs, context)
 
 
 def test_empty_preset_library_is_left_out_of_the_group_dump() -> None:

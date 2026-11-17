@@ -12,6 +12,14 @@ from pydantic import BaseModel, SecretStr
 import pytest
 
 from tests.config_effects_registry import CONFIG_EFFECTS, ConfigDispositionKind
+from tests.support.mh_physical import (
+    physical_grid,
+    physical_head_profile,
+    physical_job,
+    physical_plan,
+    physical_test_templates,
+)
+from twinklr.cli.main import build_moving_head_graph
 from twinklr.core.audio.analyzer import AudioAnalyzer
 from twinklr.core.audio.enhancement_factory import EnhancementServiceFactory
 from twinklr.core.audio.mir.sources import RhythmAnalysis
@@ -19,15 +27,8 @@ from twinklr.core.audio.models import LyricsBundle, LyricWord
 from twinklr.core.audio.models.enums import StageStatus
 from twinklr.core.config.fixtures import FixtureGroup, Pose
 from twinklr.core.config.models import AppConfig, JobConfig
-from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
-from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
-from twinklr.core.sequencer.moving_heads.export.dmx_settings_builder import DmxSettingsBuilder
-from twinklr.core.sequencer.moving_heads.handlers.wheels import (
-    DefaultColorHandler,
-    DefaultGoboHandler,
-    DefaultShutterHandler,
-)
+from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
 
 
 def _alternate(path: str, value: Any) -> Any:
@@ -301,8 +302,8 @@ FIXTURE_EFFECT_PATHS = tuple(
 )
 
 
-def _fixture_group() -> FixtureGroup:
-    shared = {
+def _shared_config() -> dict[str, Any]:
+    return {
         "dmx_mapping": {
             "pan_channel": {"channel": 1},
             "tilt_channel": {"channel": 2},
@@ -336,6 +337,10 @@ def _fixture_group() -> FixtureGroup:
         "orientation": {"pan_front_dmx": 120, "tilt_zero_dmx": 30},
         "limits": {"pan_min": 10, "pan_max": 245, "tilt_min": 11, "tilt_max": 244},
     }
+
+
+def _fixture_group() -> FixtureGroup:
+    shared = _shared_config()
     full = {**shared, "fixture_id": "A", "position": {"position_index": 2}}
     return FixtureGroup.model_validate(
         {
@@ -406,61 +411,30 @@ def _changed_fixture(path: str) -> FixtureGroup:
 
 
 def _fixture_snapshot(group: FixtureGroup) -> tuple[Any, ...]:
-    segment = FixtureSegment(
-        section_id="section",
-        segment_id="segment",
-        step_id="step",
-        template_id="template",
-        fixture_id="probe",
-        t0_ms=0,
-        t1_ms=1000,
-        channels={
-            channel: ChannelValue(channel=channel, static_dmx=100) for channel in ChannelName
-        },
-    )
-    defaults_segment = segment.model_copy(update={"channels": {}})
     fixture_snapshots = []
     for fixture in group.expand_fixtures():
         mapping = fixture.config.dmx_mapping
-        calibration = {"fixture_config": fixture.config}
         fixture_snapshots.append(
             (
                 fixture.fixture_id,
                 fixture.xlights_model_name,
-                DmxSettingsBuilder(fixture).build_settings_string(segment),
-                DmxSettingsBuilder(fixture).build_settings_string(defaults_segment),
+                # The channel listing the moving-head planner is given (`build_run_pipeline`).
+                {
+                    "pan": mapping.pan,
+                    "tilt": mapping.tilt,
+                    "dimmer": mapping.dimmer,
+                    "color": mapping.color,
+                    "gobo": mapping.gobo,
+                    "shutter": mapping.shutter,
+                },
                 fixture.config.degrees_to_dmx(Pose(pan_deg=170, tilt_deg=90)),
                 fixture.config.degrees_to_dmx(Pose(pan_deg=-170, tilt_deg=-90)),
                 fixture.config.dmx_to_degrees(200, 180).model_dump(mode="json"),
-                tuple(
-                    DefaultColorHandler()
-                    .generate({"preset": preset, "calibration": calibration}, 4)
-                    .model_dump(mode="json")
-                    for preset in ("white", "red")
-                ),
-                tuple(
-                    DefaultShutterHandler()
-                    .generate({"pattern": pattern, "calibration": calibration}, 4)
-                    .model_dump(mode="json")
-                    for pattern in (
-                        "closed",
-                        "open",
-                        "strobe_slow",
-                        "strobe_medium",
-                        "strobe_fast",
-                    )
-                ),
-                tuple(
-                    DefaultGoboHandler()
-                    .generate({"pattern": pattern, "calibration": calibration}, 4)
-                    .model_dump(mode="json")
-                    for pattern in ("open", "circles")
-                ),
-                mapping.use_16bit_pan_tilt,
             )
         )
     return (
-        group.get_xlights_mapping(),
+        # The xLights group mapping `twinklr run` hands the planner.
+        build_moving_head_graph(group)[1].model_dump(mode="json"),
         rig_profile_from_fixture_group(group).model_dump(mode="json"),
         tuple(fixture_snapshots),
     )
@@ -468,5 +442,66 @@ def _fixture_snapshot(group: FixtureGroup) -> tuple[Any, ...]:
 
 @pytest.mark.parametrize("config_path", FIXTURE_EFFECT_PATHS, ids=FIXTURE_EFFECT_PATHS)
 def test_fixture_field_changes_shipped_behavior_snapshot(config_path: str) -> None:
-    """Every fixture path changes expansion, rig, conversion, handler, or export behavior."""
+    """Every fixture path changes expansion, rig, pose conversion or the planner's
+    channel listing."""
     assert _fixture_snapshot(_changed_fixture(config_path)) != _fixture_snapshot(_fixture_group())
+
+
+IDENTITY_ONLY_FIXTURE_PATHS = tuple(
+    path
+    for path, disposition in CONFIG_EFFECTS.items()
+    if disposition.test_nodeid is not None
+    and "test_fixture_field_of_the_removed_renderer_changes_identity_only"
+    in disposition.test_nodeid
+)
+
+
+def _physical_probe_rig(path: str | None = None) -> FixtureGroup:
+    """The probe's DMX mapping and calibration on a renderable two-head rig: MH1 a full
+    fixture instance, MH2 expanding `base_config`; with `path` changed when given."""
+    shared = {**_shared_config(), "physical_profile": physical_head_profile(inverted=False)}
+    payload: dict[str, Any] = {
+        "group_id": "probe-rig",
+        "xlights_semantic_groups": {"LEFT": "GROUP - LEFT"},
+        "base_config": shared,
+        "fixtures": [
+            {
+                "fixture_id": "MH1",
+                "xlights_model_name": "Dmx MH1",
+                "config": {**shared, "fixture_id": "MH1"},
+            },
+            {"fixture_id": "MH2", "xlights_model_name": "Dmx MH2"},
+        ],
+    }
+    if path is not None:
+        parts = _fixture_parts(path)
+        target: Any = payload
+        for part in parts[:-1]:
+            target = target[part]
+        target[parts[-1]] = _alternate_fixture(path, target[parts[-1]])
+    return FixtureGroup.model_validate(payload)
+
+
+def _render(group: FixtureGroup) -> tuple[str, Any]:
+    with physical_test_templates():
+        pipeline = RenderingPipeline(
+            choreography_plan=physical_plan(),
+            beat_grid=physical_grid(),
+            fixture_group=group,
+            job_config=physical_job(),
+        )
+        pipeline.render()
+        return pipeline.fingerprint(), pipeline.frames
+
+
+@pytest.mark.parametrize(
+    "config_path", IDENTITY_ONLY_FIXTURE_PATHS, ids=IDENTITY_ONLY_FIXTURE_PATHS
+)
+def test_fixture_field_of_the_removed_renderer_changes_identity_only(config_path: str) -> None:
+    """The removed renderer was the only reader of these fields: changing one changes
+    the render fingerprint (the rig is part of it) and no encoded frame."""
+    fingerprint, frames = _render(_physical_probe_rig(config_path))
+    base_fingerprint, base_frames = _render(_physical_probe_rig())
+
+    assert fingerprint != base_fingerprint
+    assert frames == base_frames

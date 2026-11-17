@@ -13,7 +13,6 @@ import pytest
 from tests.config_effects_registry import CONFIG_EFFECTS, ConfigDispositionKind
 from tests.support.mh_physical import motion_profile_payload, physical_step_payload
 from twinklr.core.config.fixtures import FixtureCapabilities
-from twinklr.core.curves.registry import CurveRegistry
 from twinklr.core.sequencer.models.context import StepCompileContext
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import (
@@ -29,8 +28,6 @@ from twinklr.core.sequencer.moving_heads.compile.physical import (
     compile_physical_step,
     slice_physical_segment,
 )
-from twinklr.core.sequencer.moving_heads.compile.step_compiler import compile_step
-from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map
 
@@ -60,7 +57,6 @@ def _context(
     profile: dict[str, Any] | None = None,
     with_profile: bool = True,
 ) -> StepCompileContext:
-    registries = create_default_registries()
     return StepCompileContext(
         section_id="verse",
         segment_id="A",
@@ -71,10 +67,6 @@ def _context(
         start_ms=0,
         duration_ms=duration_ms,
         beat_grid=grid,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
         physical_profile=(
             FixtureCapabilities.model_validate(profile or motion_profile_payload())
             if with_profile
@@ -371,11 +363,6 @@ def test_fixture_without_physical_profile_is_rejected() -> None:
         compile_physical_step(_step(), _context(with_profile=False), sample_times_ms=_FRAMES)
 
 
-def test_legacy_compile_refuses_a_physical_step() -> None:
-    with pytest.raises(ValueError, match="physical_v2"):
-        compile_step(_step(), _context())
-
-
 def test_absent_physical_fields_stay_out_of_template_dumps() -> None:
     legacy = TemplateStep.model_validate(
         {
@@ -391,7 +378,6 @@ def test_absent_physical_fields_stay_out_of_template_dumps() -> None:
     assert "physical" not in dumped["movement"]
     assert "physical" not in dumped["dimmer"]
     assert "physical_shutter" not in dumped
-    assert not legacy.has_physical_data
 
 
 @pytest.mark.parametrize(

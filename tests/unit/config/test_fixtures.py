@@ -20,15 +20,7 @@ from twinklr.core.config.fixtures import (
     SimplifiedFixtureInstance,
 )
 from twinklr.core.config.fixtures.physical import Orientation
-from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
-from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
-from twinklr.core.sequencer.moving_heads.export.dmx_settings_builder import DmxSettingsBuilder
-from twinklr.core.sequencer.moving_heads.handlers.wheels import (
-    DefaultColorHandler,
-    DefaultGoboHandler,
-    DefaultShutterHandler,
-)
 
 
 class TestPose:
@@ -348,47 +340,7 @@ class TestFixtureGroup:
 
         group.add_fixture(instance)
 
-        assert len(group) == 1
-        assert group.get_fixture("MH1") is not None
-
-    def test_get_fixture(self) -> None:
-        """Test getting fixture by ID."""
-        group = FixtureGroup(group_id="MOVING_HEADS")
-
-        config = FixtureConfig(
-            fixture_id="MH1",
-            dmx_mapping=DmxMapping(pan_channel=11, tilt_channel=13, dimmer_channel=15),
-        )
-        instance = FixtureInstance(fixture_id="MH1", config=config, xlights_model_name="Dmx MH1")
-        group.add_fixture(instance)
-
-        fixture = group.get_fixture("MH1")
-        assert fixture is not None
-        assert fixture.fixture_id == "MH1"
-
-        missing = group.get_fixture("MH99")
-        assert missing is None
-
-    def test_get_xlights_mapping(self) -> None:
-        """Test generating xLights mapping."""
-        group = FixtureGroup(group_id="MOVING_HEADS", xlights_group="GROUP - MOVING HEADS")
-
-        # Add two fixtures
-        for i in [1, 2]:
-            config = FixtureConfig(
-                fixture_id=f"MH{i}",
-                dmx_mapping=DmxMapping(pan_channel=11, tilt_channel=13, dimmer_channel=15),
-            )
-            instance = FixtureInstance(
-                fixture_id=f"MH{i}", config=config, xlights_model_name=f"Dmx MH{i}"
-            )
-            group.add_fixture(instance)
-
-        mapping = group.get_xlights_mapping()
-
-        assert mapping["ALL"] == "GROUP - MOVING HEADS"
-        assert mapping["MH1"] == "Dmx MH1"
-        assert mapping["MH2"] == "Dmx MH2"
+        assert [fixture.fixture_id for fixture in group.expand_fixtures()] == ["MH1"]
 
     def test_iteration(self) -> None:
         """Test iterating over fixtures in group."""
@@ -491,50 +443,11 @@ class TestFixtureGroup:
 
         expanded, inherited = group.expand_fixtures()
         rig = rig_profile_from_fixture_group(group)
-        segment = FixtureSegment(
-            section_id="s",
-            segment_id="seg",
-            step_id="step",
-            template_id="tmpl",
-            fixture_id="MH1",
-            t0_ms=0,
-            t1_ms=1000,
-            channels={
-                ChannelName.PAN: ChannelValue(channel=ChannelName.PAN, static_dmx=100),
-                ChannelName.TILT: ChannelValue(channel=ChannelName.TILT, static_dmx=100),
-                ChannelName.DIMMER: ChannelValue(channel=ChannelName.DIMMER, static_dmx=200),
-            },
-        )
-        settings = DmxSettingsBuilder(inherited).build_settings_string(segment)
-        calibration = {"fixture_config": inherited.config}
 
         assert expanded.config.dmx_to_degrees(pan_dmx=148, tilt_dmx=22).pan_deg < 0
         assert inherited.config.degrees_to_dmx(Pose(pan_deg=-170.0, tilt_deg=-90.0)) == (170, 120)
         assert rig.rig_id == "heads"
         assert [fixture.fixture_id for fixture in rig.fixtures] == ["MH2", "MH1"]
-        assert group.get_xlights_mapping()["MH1"] == "Dmx MH1"
-        assert all(f"E_CHECKBOX_INVDMX{channel}=1" in settings for channel in range(1, 9))
-        assert "E_SLIDER_DMX6=211" in settings
-        assert "E_SLIDER_DMX7=9" in settings
-        assert "E_SLIDER_DMX8=11" in settings
-        assert (
-            DefaultColorHandler()
-            .generate({"preset": "red", "calibration": calibration}, 4)
-            .static_dmx
-            == 19
-        )
-        assert (
-            DefaultGoboHandler()
-            .generate({"pattern": "circles", "calibration": calibration}, 4)
-            .static_dmx
-            == 21
-        )
-        assert (
-            DefaultShutterHandler()
-            .generate({"pattern": "strobe_medium", "calibration": calibration}, 4)
-            .static_dmx
-            == 121
-        )
 
 
 class TestFixtureGroupBuilder:
@@ -598,13 +511,12 @@ class TestFixtureGroupBuilder:
         assert group.group_id == "MOVING_HEADS"
 
         # Check each fixture has the expected position.
-        mh1 = group.get_fixture("MH1")
-        assert mh1 is not None
+        by_id = {fixture.fixture_id: fixture for fixture in group.expand_fixtures()}
+        mh1 = by_id["MH1"]
         assert mh1.config.position is not None
         assert mh1.config.position.position_index == 1
 
-        mh4 = group.get_fixture("MH4")
-        assert mh4 is not None
+        mh4 = by_id["MH4"]
         assert mh4.config.position is not None
         assert mh4.config.position.position_index == 4
 
@@ -658,10 +570,6 @@ class TestIntegrationScenarios:
                 ),
             ]
         )
-
-        # 3. Test xLights mapping
-        mapping = group.get_xlights_mapping()
-        assert len(mapping) == 5  # ALL + 4 fixtures
 
         # 4. Test standard poses for all fixtures
         for fixture in group:

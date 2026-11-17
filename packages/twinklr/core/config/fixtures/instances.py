@@ -113,14 +113,14 @@ class FixtureConfig(BaseModel):
         default=None, description="Physical mounting position and offsets"
     )
 
-    # Physical renderer profile (optional). Left out of dumps when absent so legacy
-    # render fingerprints are unchanged.
+    # The renderer's profile of this fixture; required to render (or given once as the
+    # group's base_config). Left out of dumps when absent.
     physical_profile: FixtureCapabilities | None = Field(
         default=None,
         exclude_if=lambda value: value is None,
         description=(
-            "Explicit capabilities for the physical_v2 renderer; nothing renders from it "
-            "until that renderer ships"
+            "Explicit capabilities the moving-head renderer needs for this fixture, unless "
+            "the group's base_config gives them"
         ),
     )
 
@@ -236,28 +236,6 @@ class FixtureConfig(BaseModel):
             return False
         return not (self.limits.avoid_backward and abs(pose.pan_deg) > 90)
 
-    def clamp_pan(self, value: int) -> int:
-        """Clamp pan DMX value to movement limits.
-
-        Args:
-            value: Pan DMX value to clamp
-
-        Returns:
-            Clamped pan value within limits
-        """
-        return max(self.limits.pan_min, min(self.limits.pan_max, value))
-
-    def clamp_tilt(self, value: int) -> int:
-        """Clamp tilt DMX value to movement limits.
-
-        Args:
-            value: Tilt DMX value to clamp
-
-        Returns:
-            Clamped tilt value within limits
-        """
-        return max(self.limits.tilt_min, min(self.limits.tilt_max, value))
-
     def is_pan_in_bounds(self, value: int) -> bool:
         """Check if pan DMX value is within movement limits.
 
@@ -280,57 +258,10 @@ class FixtureConfig(BaseModel):
         """
         return self.limits.tilt_min <= value <= self.limits.tilt_max
 
-    def deg_to_pan_dmx(self, deg: float) -> int:
-        """Convert pan degrees to DMX value with automatic clamping.
-
-        Applies inversions and clamps to movement limits automatically.
-
-        Args:
-            deg: Pan angle in degrees (0 = forward, positive = right, negative = left)
-
-        Returns:
-            DMX value (0-255) clamped to movement limits
-        """
-        # Apply inversion
-        adjusted_deg = -deg if self.inversions.pan else deg
-
-        # Convert to DMX
-        pan_dmx = int(
-            self.orientation.pan_front_dmx
-            + (adjusted_deg / self.pan_tilt_range.pan_range_deg) * 255.0
-        )
-
-        # Clamp to limits
-        return self.clamp_pan(pan_dmx)
-
-    def deg_to_tilt_dmx(self, deg: float) -> int:
-        """Convert tilt degrees to DMX value with automatic clamping.
-
-        Applies inversions and clamps to movement limits automatically.
-
-        Args:
-            deg: Tilt angle in degrees (0 = horizon, positive = up, negative = down)
-
-        Returns:
-            DMX value (0-255) clamped to movement limits
-        """
-        # Apply inversion
-        adjusted_deg = -deg if self.inversions.tilt else deg
-
-        # Convert to DMX
-        tilt_dmx = int(
-            self.orientation.tilt_zero_dmx
-            + (adjusted_deg / self.pan_tilt_range.tilt_range_deg) * 255.0
-        )
-
-        # Clamp to limits
-        return self.clamp_tilt(tilt_dmx)
-
     def pan_deg_to_dmx_delta(self, deg: float) -> int:
         """Convert pan degrees to DMX delta (offset) without clamping.
 
         Use this for relative movements or when you need the raw delta value.
-        For absolute positioning, use deg_to_pan_dmx() instead.
 
         Args:
             deg: Pan angle delta in degrees
@@ -344,7 +275,6 @@ class FixtureConfig(BaseModel):
         """Convert tilt degrees to DMX delta (offset) without clamping.
 
         Use this for relative movements or when you need the raw delta value.
-        For absolute positioning, use deg_to_tilt_dmx() instead.
 
         Args:
             deg: Tilt angle delta in degrees

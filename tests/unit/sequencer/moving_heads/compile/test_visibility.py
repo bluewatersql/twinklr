@@ -51,7 +51,6 @@ from tests.support.mh_physical import (
 from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup
 from twinklr.core.config.models import JobConfig
 from twinklr.core.config.render_policy import UnsupportedRenderModeError
-from twinklr.core.curves.registry import CurveRegistry
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.models.context import TemplateCompileContext
 from twinklr.core.sequencer.models.enum import ChannelName
@@ -72,11 +71,9 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
 )
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
     compile_physical_template,
-    compile_template,
 )
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import frame_times
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
-from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
 from twinklr.core.sequencer.moving_heads.pipeline import (
     PhysicalRenderError,
     RenderingPipeline,
@@ -253,7 +250,6 @@ def _compile(
     grid: BeatGrid | None = None,
 ) -> list[FixtureSegment]:
     rig, grid = rig or physical_rig(), grid or _grid()
-    registries = create_default_registries()
     phase_map = build_musical_phase_map(grid)
     start, end = physical_cue_limits(phase_map, int(grid.duration_ms))
     context = TemplateCompileContext(
@@ -263,10 +259,6 @@ def _compile(
         beat_grid=grid,
         start_bar=1,
         duration_bars=bars,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
         presets=rig.presets,
         topology=rig_topology(rig),
         fixture_group_id=rig.group_id,
@@ -937,8 +929,8 @@ def test_overlay_shape_is_refused_where_it_cannot_follow_the_cycle() -> None:
 
 
 def test_envelopes_and_overlays_are_physical_only_and_absent_from_dumps() -> None:
-    """The legacy compile refuses both; at their defaults neither appears in a dump, so
-    every existing template dumps and fingerprints as before."""
+    """At their defaults neither appears in a dump, so every existing template dumps and
+    fingerprints as before."""
     legacy_step = {
         "step_id": "s",
         "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
@@ -948,34 +940,11 @@ def test_envelopes_and_overlays_are_physical_only_and_absent_from_dumps() -> Non
     }
     dumped = TemplateStep.model_validate(legacy_step).model_dump(mode="json")
     assert "physical_visibility" not in dumped
-    step = TemplateStep.model_validate(envelope_step("e", 0.0, 60.0, lit=(0.0, 0.5)))
-    assert step.has_physical_data
-    with pytest.raises(ValueError, match="physical data"):
-        compile_template(_FLY_OUT.template, _legacy_context(_FLY_OUT.template))
     assert (
         "physical_overlays"
         not in physical_template_doc("vis_dump", [hold_step("h", 0.0)]).model_dump(mode="json")[
             "template"
         ]
-    )
-    with pytest.raises(ValueError, match="physical_overlays"):
-        compile_template(_FLICK.template, _legacy_context(_FLICK.template))
-
-
-def _legacy_context(template: Template) -> TemplateCompileContext:
-    registries = create_default_registries()
-    rig = physical_rig()
-    return TemplateCompileContext(
-        section_id="verse",
-        template_id=template.template_id,
-        fixtures=build_fixture_contexts(rig_profile_from_fixture_group(rig), rig),
-        beat_grid=_grid(),
-        start_bar=1,
-        duration_bars=1,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
     )
 
 
@@ -1205,7 +1174,6 @@ def _reference_admits(template_id: str, grid: BeatGrid, rig: FixtureGroup, job: 
     phase_map = build_musical_phase_map(grid)
     start, end = physical_cue_limits(phase_map, int(grid.duration_ms))
     profiles = {f.fixture_id: f.config.physical_profile for f in rig.expand_fixtures()}
-    registries = create_default_registries()
     context = TemplateCompileContext(
         section_id="reference",
         template_id=template_id,
@@ -1213,10 +1181,6 @@ def _reference_admits(template_id: str, grid: BeatGrid, rig: FixtureGroup, job: 
         beat_grid=grid,
         start_bar=1,
         duration_bars=bars,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
         presets=rig.presets,
         topology=rig_topology(rig),
         fixture_group_id=rig.group_id,

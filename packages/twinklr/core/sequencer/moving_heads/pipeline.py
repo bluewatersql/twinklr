@@ -31,20 +31,14 @@ from twinklr.core.config.render_policy import (
     UnsupportedRenderModeError,
     preflight_render_policy,
 )
-from twinklr.core.curves.generator import CurveGenerator
-from twinklr.core.curves.registry import CurveRegistry
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS, resolve_media_file
 from twinklr.core.formats.xlights.sequence.models.xsq import (
     TimeMarker,
     TimingTrack,
     XSequence,
 )
-from twinklr.core.sequencer.models.context import (
-    SectionRenderIntent,
-    TemplateCompileContext,
-    TimedChannelIntent,
-)
-from twinklr.core.sequencer.models.enum import ChannelName, Intensity
+from twinklr.core.sequencer.models.context import TemplateCompileContext
+from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import (
     AXIS_KEYS,
     DISCRETE_KEYS,
@@ -59,9 +53,7 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
 from twinklr.core.sequencer.models.moving_heads.topology import rig_topology
 from twinklr.core.sequencer.models.template import RepeatMode
-from twinklr.core.sequencer.models.transition import TransitionRegistry
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile.channel_blender import ChannelBlender
 from twinklr.core.sequencer.moving_heads.compile.physical import is_physical_template
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     FALLBACK_METADATA_KEY,
@@ -80,21 +72,14 @@ from twinklr.core.sequencer.moving_heads.compile.preset import apply_preset
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
     apply_entry_window,
     compile_physical_template,
-    compile_template,
     whole_period_cycle,
-)
-from twinklr.core.sequencer.moving_heads.compile.transition_detector import TransitionDetector
-from twinklr.core.sequencer.moving_heads.compile.transition_planner import TransitionPlanner
-from twinklr.core.sequencer.moving_heads.compile.transition_segment_compiler import (
-    TransitionSegmentCompiler,
 )
 from twinklr.core.sequencer.moving_heads.delivery import (
     DeliveryArtifacts,
     build_physical_sequence,
-    export_delivery,
     export_physical_delivery,
 )
-from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic, audit_legacy_controls
+from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     ENCODER_VERSION,
     EncodedFixtureFrame,
@@ -109,18 +94,12 @@ from twinklr.core.sequencer.moving_heads.export.xsq_adapter import (
     physical_run_requests,
 )
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
-from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
 from twinklr.core.sequencer.moving_heads.identity import (
     LEGACY_BACKEND_ID,
-    LEGACY_RENDERER_REVISION,
     PHYSICAL_RENDERER_REVISION,
     render_fingerprint,
 )
-from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
-from twinklr.core.sequencer.moving_heads.templates import (
-    get_template,
-    load_builtin_templates,
-)
+from twinklr.core.sequencer.moving_heads.templates import get_template
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.timing.musical_phase import (
     MusicalPhaseError,
@@ -129,124 +108,18 @@ from twinklr.core.sequencer.timing.musical_phase import (
     musical_phase_fraction,
     musical_time_at,
 )
-from twinklr.core.sequencer.vocabulary.visual import PaletteRole
 
 logger = logging.getLogger(__name__)
 
-# --- Module-level constants and helpers ---
 
-ENERGY_TO_INTENSITY: dict[str, Intensity] = {
-    "CHILL": Intensity.SLOW,
-    "MODERATE": Intensity.SMOOTH,
-    "ENERGETIC": Intensity.DRAMATIC,
-    "INTENSE": Intensity.FAST,
-}
-"""Maps energy-level keywords (from preset IDs) to movement Intensity enums."""
-
-PALETTE_ROLE_TO_COLOR: dict[PaletteRole, ColorPreset | None] = {
-    PaletteRole.PRIMARY: ColorPreset.RED,
-    PaletteRole.ACCENT: ColorPreset.MAGENTA,
-    PaletteRole.WARM: ColorPreset.AMBER,
-    PaletteRole.COOL: ColorPreset.CYAN,
-    PaletteRole.NEUTRAL: ColorPreset.WHITE,
-}
-"""Deterministic wheel presets for renderer vocabulary roles.
-
-Legacy omission is tracked separately on ``PlanSection``. Consequently every explicit
-palette role, including PRIMARY, remains an actionable renderer request.
-"""
-
-
-def _log_applied_preset_name(name: str) -> None:
-    """Emit the selected preset's user-facing name through the shipped renderer logger."""
-    logger.debug("Applying preset: %s", name)
-
-
-def resolve_section_preset(
-    section: PlanSection, template_doc: TemplateDoc
-) -> TemplatePreset | None:
-    """Resolve the preset a section applies to its template.
-
-    A preset the document declares wins. Otherwise a preset id naming an energy
-    level becomes a preset patching every step's movement and dimmer intensity.
-    Any other id, or none, applies no preset. `RenderingPipeline.render` and the
-    control audit both resolve presets here.
-
-    Args:
-        section: The (flattened) plan section.
-        template_doc: The section's template document.
-
-    Returns:
-        The preset to apply, or None.
-    """
-    template = template_doc.template
-    preset = None
-    if section.preset_id:
-        try:
-            preset = next(p for p in template_doc.presets if p.preset_id == section.preset_id)
-            _log_applied_preset_name(preset.name)
-        except StopIteration:
-            # Preset not found - try to infer intensity from preset_id
-            from twinklr.core.sequencer.models.template import StepPatch, TemplatePreset
-
-            preset_id_upper = section.preset_id.upper()
-            if preset_id_upper in ENERGY_TO_INTENSITY:
-                # Auto-create preset with inferred intensity
-                intensity = ENERGY_TO_INTENSITY[preset_id_upper]
-                step_patches = {
-                    step.step_id: StepPatch(
-                        movement={"intensity": intensity.value},
-                        dimmer={"intensity": intensity.value},
-                    )
-                    for step in template.steps
-                }
-                preset = TemplatePreset(
-                    preset_id=section.preset_id,
-                    name=section.preset_id.title(),
-                    defaults={},
-                    step_patches=step_patches,
-                )
-                logger.debug(
-                    f"Auto-generated preset '{section.preset_id}' "
-                    f"with intensity {intensity.value} for template '{section.template_id}'"
-                )
-            else:
-                logger.warning(
-                    f"Preset '{section.preset_id}' not found for template "
-                    f"'{section.template_id}' and couldn't infer intensity, using base template"
-                )
-    return preset
-
-
-def _compute_section_duration_ms(start_bar: int, end_bar: int, beat_grid: BeatGrid) -> int:
-    """Compute the duration of a section in milliseconds.
-
-    Measured between the section's detected downbeats rather than as a bar count
-    times a song-wide average, so the duration matches what the renderer emits.
-
-    Args:
-        start_bar: First bar of the section (1-indexed).
-        end_bar: Last bar of the section (1-indexed, inclusive).
-        beat_grid: Beat grid supplying the detected downbeats.
-
-    Returns:
-        Duration in milliseconds (rounded to int).
-    """
-    return int(beat_grid.get_bar_start_ms(end_bar) - beat_grid.get_bar_start_ms(start_bar - 1))
-
-
-def offered_template_ids(job_config: JobConfig, template_ids: Sequence[str]) -> list[str]:
-    """The templates the planner may be offered under the job's render mode.
-
-    `legacy_v1` offers every template. `physical_v2` offers only templates the physical
-    renderer can compile as authored (`is_physical_template`), so a plan never names a
-    template that fails at render after paid planning.
+def offered_template_ids(template_ids: Sequence[str]) -> list[str]:
+    """The templates the planner may be offered: those the renderer can compile as
+    authored (`is_physical_template`), so a plan never names a template that fails at
+    render after paid planning.
 
     Raises:
-        UnsupportedRenderModeError: Under `physical_v2`, when no template qualifies.
+        UnsupportedRenderModeError: When no template qualifies.
     """
-    if job_config.moving_heads.mode == "legacy_v1":
-        return list(template_ids)
     offered = [
         template_id
         for template_id in template_ids
@@ -254,7 +127,7 @@ def offered_template_ids(job_config: JobConfig, template_ids: Sequence[str]) -> 
     ]
     if not offered:
         raise UnsupportedRenderModeError(
-            f"moving_heads.mode 'physical_v2' has no template with physical data to offer the "
+            f"the moving-head renderer has no template with physical data to offer the "
             f"planner: none of the {len(template_ids)} loaded templates carries "
             "movement.physical, without legacy data, on every step. Load physical templates "
             "(--template-dir)"
@@ -799,7 +672,6 @@ def check_physical_templates(
         UnsupportedRigShapeError,
     )
 
-    registries = create_default_registries()
     fixtures = build_fixture_contexts(rig_profile_from_fixture_group(fixture_group), fixture_group)
     profiles = {
         fixture.fixture_id: fixture.config.physical_profile
@@ -858,10 +730,6 @@ def check_physical_templates(
                     beat_grid=beat_grid,
                     start_bar=start_bar,
                     duration_bars=duration_bars,
-                    curve_registry=CurveRegistry(),
-                    geometry_registry=registries["geometry"],
-                    movement_registry=registries["movement"],
-                    dimmer_registry=registries["dimmer"],
                     presets=fixture_group.presets,
                     topology=topology,
                     fixture_group_id=fixture_group.group_id,
@@ -987,7 +855,7 @@ def check_physical_templates(
     refused = [reason for t in template_ids if t not in excludable for reason in reasons(t)]
     if refused:
         raise UnsupportedRenderModeError(
-            "moving_heads.mode 'physical_v2' would offer the planner templates this rig "
+            "the moving-head renderer would offer the planner templates this rig "
             "cannot render: " + "; ".join(refused)
         )
     exclusions = tuple(
@@ -996,7 +864,7 @@ def check_physical_templates(
     admitted = tuple(t for t in template_ids if passing[t])
     if template_ids and not admitted:
         raise UnsupportedRenderModeError(
-            "moving_heads.mode 'physical_v2' has no template this rig can render, so no "
+            "the moving-head renderer has no template this rig can render, so no "
             "template remains to offer the planner: "
             + "; ".join(exclusion["reason"] for exclusion in exclusions)
         )
@@ -1626,22 +1494,21 @@ class RenderingPipeline:
                 placeholder name, since an empty mediaFile makes the file unopenable.
             song: Song title for the sequence head
             artist: Artist for the sequence head
-            locks: Frames a `physical_v2` render must leave as the cues alone make them.
-            layout_models: The xLights layout's models, when known. A `physical_v2`
-                render then refuses any fixture whose model is not a single-color DMX
-                model with enough channels (`check_physical_models`); without them the
-                check is recorded as not performed. A `legacy_v1` render ignores them.
+            locks: Frames the render must leave as the cues alone make them.
+            layout_models: The xLights layout's models, when known. The render then
+                refuses any fixture whose model is not a single-color DMX model with
+                enough channels (`check_physical_models`); without them the check is
+                recorded as not performed.
             layout_sha256: Content hash of the layout file, recorded in the physical
                 trace as evidence. Not render identity: the check passes or refuses
                 and never changes a byte.
-            admission: The pre-planning gate's result, when it ran. A `physical_v2`
-                render plays each template's effective variant in a section naming no
+            admission: The pre-planning gate's result, when it ran. The render plays each template's effective variant in a section naming no
                 preset, or a preset the gate did not admit or the template does not
                 declare (without a result, the base), and its trace records the gate's
                 exclusions as `admission_exclusions` and `admission_preset_exclusions`
                 and each effective variant other than the base as
                 `admission_effective_presets`, when there are any. Not render identity.
-            dark_spans: `[start_ms, end_ms)` spans a `physical_v2` render holds every
+            dark_spans: `[start_ms, end_ms)` spans the render holds every
                 fixture dark over (the combined show's coordination windows that rest
                 the moving heads), each snapped outward to the frame grid, lengthened
                 to the time a closed shutter needs to take effect and merged where
@@ -1653,14 +1520,10 @@ class RenderingPipeline:
                 lengthened and merged; the trace records them so as `dark_spans`.
 
         Raises:
-            UnsupportedRenderModeError: The job's render mode cannot render this rig
-                (see `preflight_render_policy`).
-            ValueError: If locks are given to a `legacy_v1` render, which cannot honor
-                them.
+            UnsupportedRenderModeError: The renderer cannot render this rig (see
+                `preflight_render_policy`).
         """
         preflight_render_policy(job_config, fixture_group)
-        if locks and job_config.moving_heads.mode == "legacy_v1":
-            raise ValueError("render locks apply only to moving_heads.mode 'physical_v2'")
 
         self.choreography_plan = choreography_plan
         self.fixture_group = fixture_group
@@ -1687,224 +1550,60 @@ class RenderingPipeline:
         self.artifacts: DeliveryArtifacts | None = None
         """Set by `render()` when `output_path` is given."""
         self.sequence: XSequence | None = None
-        """Set by a `physical_v2` `render()` when `output_path` is given: the sequence its
+        """Set by `render()` when `output_path` is given: the sequence its
         `.xsq` is written from, which live injection reads (`live_effects_from_sequence`)."""
         self.frames: tuple[EncodedFixtureFrame, ...] = ()
-        """Set by a `physical_v2` `render()`: every fixture's encoded frames, rig order."""
+        """Set by `render()`: every fixture's encoded frames, rig order."""
         self.runs: tuple[FrameRun, ...] = ()
-        """Set by a `physical_v2` `render()`: the frames merged into constant DMX runs."""
+        """Set by `render()`: the frames merged into constant DMX runs."""
         self.requests: tuple[EmissionRequest, ...] = ()
-        """Set by a `physical_v2` `render()`: one DMX effect request per run."""
+        """Set by `render()`: one DMX effect request per run."""
         self.render_record: dict[str, Any] | None = None
-        """Set by a `physical_v2` `render()`: the identity and evidence the trace carries."""
+        """Set by `render()`: the identity and evidence the trace carries."""
         self.unplayable_warning: str | None = None
-        """Set by a `physical_v2` `render()` that kept cues dark under `on_unplayable`:
+        """Set by a `render()` that kept cues dark under `on_unplayable`:
         the one warning it logged, with the counts."""
-
-        # Create shared infrastructure
-        self.curve_generator = CurveGenerator()
-        self.curve_registry = CurveRegistry()
 
         # Create rig profile from fixture group
         self.rig_profile = rig_profile_from_fixture_group(fixture_group)
 
-        # Load builtin templates
-        load_builtin_templates()
-
-        # Create handler registries
-        registries = create_default_registries()
-        self.geometry_registry = registries["geometry"]
-        self.movement_registry = registries["movement"]
-        self.dimmer_registry = registries["dimmer"]
-        self.color_registry = registries["color"]
-        self.shutter_registry = registries["shutter"]
-        self.gobo_registry = registries["gobo"]
-
-        # Create transition components
-        self.transition_detector = TransitionDetector()
-        self.transition_planner = TransitionPlanner(
-            config=job_config.transitions, beat_grid=beat_grid
-        )
-        blender = ChannelBlender(self.curve_generator)
-        self.transition_compiler = TransitionSegmentCompiler(blender)
-
-        logger.debug(
-            f"Initialized RenderingPipeline with {len(self.rig_profile.fixtures)} fixtures "
-            f"and {len(self.choreography_plan.sections)} sections "
-            f"(transitions enabled: {job_config.transitions.enabled})"
-        )
-
     def render(self) -> list[FixtureSegment]:
-        """Render the choreography plan to fixture segments.
-
-        Processes each section in the choreography plan:
-        1. Detect and plan transitions (if enabled)
-        2. For each sequence in section, build template ID from components
-        3. Load template and apply energy-based preset
-        4. Build compile context aligned to beat grid
-        5. Compile template to IR segments
-        6. Generate transition segments (if enabled)
-        7. Merge and aggregate all segments
+        """Render the choreography plan and, with an output path, deliver it
+        (`_render_physical`).
 
         Returns:
-            List of all compiled fixture segments across all sections.
-
-        Raises:
-            ValueError: If template not found or compilation fails.
+            The planned segments: the cues with their transactions and parks.
         """
         logger.debug("Starting plan rendering...")
-        if self.job_config.moving_heads.mode == "physical_v2":
-            return self._render_physical()
-
-        # Step 1: Detect and plan transitions (if enabled)
-        transition_registry = TransitionRegistry()
-        if self.job_config.transitions.enabled:
-            transition_registry = self._detect_and_plan_transitions()
-            logger.debug(f"Detected and planned {len(transition_registry.transitions)} transitions")
-
-        # Step 2: Compile sections
-        section_segments: dict[str, list[FixtureSegment]] = {}
-        time_markers: list[TimeMarker] = []
-
-        for section in self.iterate_plan_sections(self.choreography_plan):
-            if not section.template_id:
-                raise ValueError(f"Section '{section.section_name}' has no template_id")
-
-            logger.debug(
-                f"Rendering section '{section.section_name}' "
-                f"(bars {section.start_bar}-{section.end_bar}, "
-                f"template: {section.template_id}, preset: {section.preset_id})"
-            )
-
-            # Load template
-            try:
-                template_doc = get_template(section.template_id)
-                template = template_doc.template
-                logger.debug(f"Loaded template: {template.name} (v{template.version})")
-            except Exception as e:
-                logger.error(f"Failed to load template '{section.template_id}': {e}")
-                raise ValueError(f"Template not found: {section.template_id}") from e
-
-            # Apply preset if available
-            preset = resolve_section_preset(section, template_doc)
-
-            # Build fixture contexts
-            fixture_contexts = self._build_fixture_contexts()
-
-            # Build compile context aligned to beat grid
-            context = TemplateCompileContext(
-                section_id=section.section_name,
-                template_id=template.template_id,
-                preset_id=preset.preset_id if preset else None,
-                fixtures=fixture_contexts,
-                beat_grid=self.beat_grid,
-                start_bar=section.start_bar,
-                duration_bars=section.end_bar - section.start_bar + 1,
-                curve_registry=self.curve_registry,
-                geometry_registry=self.geometry_registry,
-                movement_registry=self.movement_registry,
-                dimmer_registry=self.dimmer_registry,
-                color_registry=self.color_registry,
-                shutter_registry=self.shutter_registry,
-                gobo_registry=self.gobo_registry,
-                intent=self._resolve_section_intent(section),
-            )
-
-            time_markers.append(
-                TimeMarker(
-                    name=section.section_name, time_ms=context.start_ms, end_time_ms=context.end_ms
-                )
-            )
-
-            logger.debug(
-                f"Compile context: start={context.start_ms}ms, "
-                f"duration={context.duration_ms}ms, "
-                f"bpm={context.bpm}"
-            )
-
-            # Compile template
-            try:
-                result = compile_template(template, context, preset)
-                logger.debug(
-                    f"Compiled {len(result.segments)} segments "
-                    f"({result.num_complete_cycles} complete cycles)"
-                )
-                section_segments[section.section_name] = result.segments
-            except Exception as e:
-                logger.error(f"Compilation failed for section '{section.section_name}': {e}")
-                raise
-
-        # Step 3: Aggregate section segments
-        all_segments: list[FixtureSegment] = []
-        for segments in section_segments.values():
-            all_segments.extend(segments)
-
-        logger.debug(f"Compiled {len(section_segments)} sections into {len(all_segments)} segments")
-
-        # Step 4: Generate transition segments (if enabled)
-        if self.job_config.transitions.enabled and len(transition_registry.transitions) > 0:
-            transition_segments = self._generate_transition_segments(
-                transition_registry, section_segments
-            )
-            logger.debug(f"Generated {len(transition_segments)} transition segments")
-            all_segments.extend(transition_segments)
-
-        logger.debug(f"Render complete: {len(all_segments)} total segments")
-
-        # Step 5: Write the delivery (.xsq + .xtiming + .xmap)
-        if self.output_path:
-            self._export_delivery(all_segments, time_markers)
-
-        return all_segments
-
-    @property
-    def diagnostics(self) -> tuple[MHDiagnostic, ...]:
-        """Requested controls this legacy render ignores, for the plan's templates.
-
-        Computed on access; `render()` never runs it. Resolving each section's
-        preset logs the same lines `render()` does.
-        """
-        return audit_legacy_controls(
-            self.choreography_plan, self.fixture_group, self._plan_templates()
-        )
+        return self._render_physical()
 
     def fingerprint(self) -> str:
         """Functional identity of this render; the output path is not part of it.
 
-        A `physical_v2` render also hashes its renderer and encoder revisions, the
-        musical phase map built from the detected grid, any render locks and, for each
-        section that renders a preset other than the one it names (`_physical_preset`:
-        the effective variant, or none), the preset it renders, and its dark spans as
-        snapped, when there are any, and leaves out the transition settings it does not
-        apply.
+        Hashes the renderer and encoder revisions, the musical phase map built from the
+        detected grid, any render locks and, for each section that renders a preset
+        other than the one it names (`_physical_preset`: the effective variant, or
+        none), the preset it renders, and its dark spans as snapped, when there are any.
         """
-        physical = self.job_config.moving_heads.mode == "physical_v2"
         substitutions: list[tuple[str, str | None]] = []
-        if physical:
-            for section in self.iterate_plan_sections(self.choreography_plan):
-                if not section.template_id:
-                    continue
-                preset = _physical_preset(
-                    section, get_template(section.template_id), [], self.admission
-                )
-                rendered = None if preset is None else preset.preset_id
-                if rendered != (section.preset_id or None):
-                    substitutions.append((section.section_name, rendered))
+        for section in self.iterate_plan_sections(self.choreography_plan):
+            if not section.template_id:
+                continue
+            preset = _physical_preset(
+                section, get_template(section.template_id), [], self.admission
+            )
+            rendered = None if preset is None else preset.preset_id
+            if rendered != (section.preset_id or None):
+                substitutions.append((section.section_name, rendered))
         return render_fingerprint(
             plan=self.choreography_plan,
             beat_grid=self.beat_grid,
             fixtures=self.fixture_group,
             templates=self._plan_templates(),
             policy=self.job_config.moving_heads,
-            # The physical path plans its own dark repositioning and ignores transitions.
-            transitions=None if physical else self.job_config.transitions,
             backend_id=LEGACY_BACKEND_ID,
-            renderer_revision=(
-                f"physical_v2.{PHYSICAL_RENDERER_REVISION}+encoder.{ENCODER_VERSION}"
-                if physical
-                else LEGACY_RENDERER_REVISION
-            ),
-            phase_map=build_musical_phase_map(self.beat_grid) if physical else None,
+            renderer_revision=f"physical_v2.{PHYSICAL_RENDERER_REVISION}+encoder.{ENCODER_VERSION}",
+            phase_map=build_musical_phase_map(self.beat_grid),
             locks=self.locks,
             preset_substitutions=substitutions,
             dark_spans=self.dark_spans,
@@ -1929,11 +1628,11 @@ class RenderingPipeline:
                 xLights layout (`inject`, `regenerate`).
 
         Raises:
-            ValueError: If this pipeline has not rendered a `physical_v2` render.
+            ValueError: If this pipeline has not rendered.
         """
         record = self.render_record
         if record is None:
-            raise ValueError("only a rendered physical_v2 render has a checkpoint record")
+            raise ValueError("only a rendered render has a checkpoint record")
         rig = self.fixture_group.model_dump(mode="json")
         inputs: dict[str, Any] = {
             key: record[key]
@@ -1966,7 +1665,7 @@ class RenderingPipeline:
         return checkpoint
 
     def _render_physical(self) -> list[FixtureSegment]:
-        """Render through the opt-in physical path and, with an output path, deliver it.
+        """Render on the frame grid and, with an output path, deliver it.
 
         Each section's template compiles on the frame grid against the musical phase
         of the detected grid, within its covered span (`physical_cue_limits`); the
@@ -2036,13 +1735,6 @@ class RenderingPipeline:
                 beat_grid=self.beat_grid,
                 start_bar=section.start_bar,
                 duration_bars=section.end_bar - section.start_bar + 1,
-                curve_registry=self.curve_registry,
-                geometry_registry=self.geometry_registry,
-                movement_registry=self.movement_registry,
-                dimmer_registry=self.dimmer_registry,
-                color_registry=self.color_registry,
-                shutter_registry=self.shutter_registry,
-                gobo_registry=self.gobo_registry,
                 presets=self.fixture_group.presets,
                 topology=topology,
                 fixture_group_id=self.fixture_group.group_id,
@@ -2359,56 +2051,6 @@ class RenderingPipeline:
                 docs.setdefault(doc.template.template_id, doc)
         return [docs[template_id] for template_id in sorted(docs)]
 
-    def _resolve_section_intent(self, section: PlanSection) -> SectionRenderIntent:
-        """Translate the approved planner schema into renderer-owned categories."""
-        if section.legacy_intent_omitted:
-            return SectionRenderIntent()
-
-        selection = section.color_intent.selection
-        color: ColorPreset | None
-        if selection.explicit_color is not None:
-            color = selection.explicit_color
-        elif selection.palette_role is not None:
-            color = PALETTE_ROLE_TO_COLOR[selection.palette_role]
-        else:  # pragma: no cover - rejected by ColorIntent's discriminated union
-            color = None
-
-        shutter_events = [
-            TimedChannelIntent(
-                at_ms=self._event_time_ms(event.bar, event.beat),
-                pattern_id=event.pattern.value,
-            )
-            for event in section.shutter_events
-        ]
-        gobo_events = [
-            TimedChannelIntent(
-                at_ms=self._event_time_ms(event.bar, event.beat),
-                pattern_id=event.pattern.value,
-            )
-            for event in section.gobo_events
-        ]
-
-        return SectionRenderIntent(
-            intensity=section.intensity,
-            color=color,
-            shutter_events=shutter_events,
-            gobo_events=gobo_events,
-        )
-
-    def _event_time_ms(self, bar: int, beat: int) -> int:
-        """Place a 1-based bar/beat event on the existing BeatGrid."""
-        if beat > self.beat_grid.beats_per_bar:
-            raise ValueError(
-                f"Beat {beat} is outside a {self.beat_grid.beats_per_bar}/4 bar at bar {bar}"
-            )
-        beat_index = (bar - 1) * self.beat_grid.beats_per_bar + (beat - 1)
-        try:
-            return int(self.beat_grid.get_beat_time_ms(beat_index))
-        except IndexError as error:
-            raise ValueError(
-                f"Event at bar {bar}, beat {beat} is outside the detected beat grid"
-            ) from error
-
     def iterate_plan_sections(self, plan: ChoreographyPlan) -> Iterator[PlanSection]:
         """Iterate over the plan sections and yield each section.
 
@@ -2425,192 +2067,6 @@ class RenderingPipeline:
             else:
                 yield section
 
-    def _detect_and_plan_transitions(self) -> TransitionRegistry:
-        """Detect boundaries and plan transitions.
-
-        Returns:
-            TransitionRegistry containing all planned transitions.
-        """
-        logger.debug("Detecting transition boundaries...")
-
-        flattened_sections = list(self.iterate_plan_sections(self.choreography_plan))
-
-        # Detect section boundaries
-        boundaries = self.transition_detector.detect_section_boundaries(
-            ChoreographyPlan(
-                sections=flattened_sections,
-                overall_strategy=self.choreography_plan.overall_strategy,
-            ),
-            self.beat_grid,
-        )
-
-        logger.debug(f"Detected {len(boundaries)} section boundaries")
-
-        # Build section lookup for duration computation
-        section_lookup: dict[str, PlanSection] = {s.section_name: s for s in flattened_sections}
-
-        # Plan transitions for each boundary
-        registry = TransitionRegistry()
-        fixture_ids = [fx.fixture_id for fx in self.rig_profile.fixtures]
-
-        for boundary in boundaries:
-            # Get transition hint and section durations from the plan
-            hint = None
-            source_section = section_lookup.get(boundary.source_id)
-            target_section = section_lookup.get(boundary.target_id)
-
-            if target_section is not None:
-                hint = target_section.transition_in
-
-            source_duration_ms = (
-                _compute_section_duration_ms(
-                    source_section.start_bar, source_section.end_bar, self.beat_grid
-                )
-                if source_section is not None
-                else 0
-            )
-            target_duration_ms = (
-                _compute_section_duration_ms(
-                    target_section.start_bar, target_section.end_bar, self.beat_grid
-                )
-                if target_section is not None
-                else 0
-            )
-
-            # Plan transition
-            transition_id = f"trans_{boundary.source_id}_to_{boundary.target_id}"
-            transition_plan = self.transition_planner.plan_transition(
-                boundary=boundary,
-                hint=hint,
-                fixtures=fixture_ids,
-                transition_id=transition_id,
-            )
-
-            # A zero-width overlap (a snap, or a transition whose duration collapsed to 0)
-            # has no blend region. Compiling it would emit a zero-duration FixtureSegment
-            # that the emission layer rejects (0 <= start < end), so drop it here rather than
-            # produce a degenerate segment downstream.
-            if transition_plan.overlap_end_ms <= transition_plan.overlap_start_ms:
-                logger.debug(
-                    f"Skipping zero-width transition {transition_id}: overlap collapses at "
-                    f"{transition_plan.overlap_start_ms}ms (nothing to blend)"
-                )
-                continue
-
-            # Validate feasibility using actual section durations
-            is_feasible, warnings = self.transition_planner.validate_transition_feasibility(
-                transition_plan, source_duration_ms, target_duration_ms
-            )
-
-            if not is_feasible:
-                logger.warning(
-                    f"Transition {transition_id} may not be feasible: {', '.join(warnings)}"
-                )
-
-            registry.add_transition(transition_plan)
-
-        logger.debug(f"Planned {len(registry.transitions)} transitions")
-        return registry
-
-    def _generate_transition_segments(
-        self,
-        transition_registry: TransitionRegistry,
-        section_segments: dict[str, list[FixtureSegment]],
-    ) -> list[FixtureSegment]:
-        """Generate transition segments for all planned transitions.
-
-        Args:
-            transition_registry: Registry of planned transitions.
-            section_segments: Compiled segments organized by section name.
-
-        Returns:
-            List of transition FixtureSegments.
-        """
-        logger.debug("Generating transition segments...")
-        all_transition_segments: list[FixtureSegment] = []
-
-        for transition_plan in transition_registry.transitions:
-            # Get source and target segments near the boundary
-            source_segs = self._get_segments_at_boundary(
-                section_segments,
-                transition_plan.boundary.source_id,
-                transition_plan.boundary.time_ms,
-                is_source=True,
-            )
-
-            target_segs = self._get_segments_at_boundary(
-                section_segments,
-                transition_plan.boundary.target_id,
-                transition_plan.boundary.time_ms,
-                is_source=False,
-            )
-
-            logger.debug(
-                f"Compiling transition {transition_plan.transition_id}: "
-                f"{len(source_segs)} source segs, {len(target_segs)} target segs"
-            )
-
-            # Compile transition
-            try:
-                transition_segs = self.transition_compiler.compile_transition(
-                    transition_plan, source_segs, target_segs
-                )
-                all_transition_segments.extend(transition_segs)
-            except Exception as e:
-                logger.error(f"Failed to compile transition {transition_plan.transition_id}: {e}")
-                # Continue with other transitions
-
-        return all_transition_segments
-
-    def _get_segments_at_boundary(
-        self,
-        section_segments: dict[str, list[FixtureSegment]],
-        section_name: str,
-        boundary_time_ms: int,
-        is_source: bool,
-    ) -> list[FixtureSegment]:
-        """Get segments at a boundary time.
-
-        Args:
-            section_segments: Segments organized by section name.
-            section_name: Name of the section.
-            boundary_time_ms: Boundary time in milliseconds.
-            is_source: True if getting source segments, False for target.
-
-        Returns:
-            List of segments at or near the boundary time.
-        """
-        # Get segments for this section
-        segments = section_segments.get(section_name, [])
-
-        if not segments:
-            return []
-
-        # For source: get segments that end near or at the boundary
-        # For target: get segments that start near or at the boundary
-        boundary_segments = []
-
-        for segment in segments:
-            if is_source:
-                # Source: segment should end at or near boundary
-                # Allow some tolerance (e.g., within 100ms)
-                if abs(segment.t1_ms - boundary_time_ms) <= 100:
-                    boundary_segments.append(segment)
-            # Target: segment should start at or near boundary
-            elif abs(segment.t0_ms - boundary_time_ms) <= 100:
-                boundary_segments.append(segment)
-
-        # If no exact matches, get the closest segments
-        if not boundary_segments and segments:
-            if is_source:
-                # Get segments ending closest to boundary
-                boundary_segments = [max(segments, key=lambda s: s.t1_ms)]
-            else:
-                # Get segments starting closest to boundary
-                boundary_segments = [min(segments, key=lambda s: s.t0_ms)]
-
-        return boundary_segments
-
     def _build_fixture_contexts(self) -> list[FixtureContext]:
         """Build fixture contexts from rig profile.
 
@@ -2620,30 +2076,3 @@ class RenderingPipeline:
             List of FixtureContext objects for all fixtures in the rig.
         """
         return build_fixture_contexts(self.rig_profile, self.fixture_group)
-
-    def _export_delivery(
-        self, segments: list[FixtureSegment], time_markers: list[TimeMarker]
-    ) -> None:
-        """Write the run's delivery (.xsq + .xtiming + .xmap).
-
-        Delegates to :func:`export_delivery` in ``delivery``.
-
-        Args:
-            segments: List of fixture segments to export.
-            time_markers: List of time markers to export.
-        """
-        if not self.output_path:
-            logger.warning("No output_path specified, skipping delivery export")
-            return
-
-        self.artifacts = export_delivery(
-            segments,
-            time_markers,
-            fixture_group=self.fixture_group,
-            output_path=self.output_path,
-            media_file=self.media_file,
-            duration_ms=int(self.beat_grid.duration_ms),
-            song=self.song,
-            artist=self.artist,
-            timeline_tracks=self.timeline_tracks,
-        )

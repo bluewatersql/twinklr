@@ -58,8 +58,10 @@ async def test_local_provider_reaches_show_wiring_without_openai_key(
         patch("twinklr.cli.show_cmd.load_app_config", return_value=local_config),
         patch("twinklr.cli.show_cmd.load_job_config", return_value=JobConfig()),
         patch("twinklr.cli.show_cmd.load_fixture_group"),
-        patch("twinklr.cli.show_cmd.load_builtin_templates"),
+        patch("twinklr.cli.show_cmd.preflight_render_policy"),
+        patch("twinklr.cli.show_cmd.admit_physical_catalog"),
         patch("twinklr.cli.show_cmd.list_templates", return_value=[]),
+        patch("twinklr.cli.show_cmd.offered_template_ids", return_value=[]),
         patch(
             "twinklr.cli.show_cmd.prepare_combined_show_pipeline",
             side_effect=ValueError("stop after provider preflight"),
@@ -142,8 +144,10 @@ async def test_show_fe_bundle_and_default_catalog_layers_are_forwarded(
         patch("twinklr.cli.show_cmd.load_job_config", return_value=JobConfig()),
         patch("twinklr.cli.show_cmd.load_fixture_group"),
         patch("twinklr.cli.show_cmd.load_display_fe_bundle", return_value=bundle) as loader,
-        patch("twinklr.cli.show_cmd.load_builtin_templates"),
+        patch("twinklr.cli.show_cmd.preflight_render_policy"),
+        patch("twinklr.cli.show_cmd.admit_physical_catalog"),
         patch("twinklr.cli.show_cmd.list_templates", return_value=[MagicMock(template_id="mh")]),
+        patch("twinklr.cli.show_cmd.offered_template_ids", return_value=["mh"]),
         patch(
             "twinklr.cli.show_cmd.prepare_combined_show_pipeline",
             side_effect=ValueError("stop after wiring"),
@@ -171,13 +175,11 @@ async def test_show_fe_bundle_and_default_catalog_layers_are_forwarded(
 async def test_show_refuses_a_physical_rig_without_profiles_before_any_analysis(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A physical show checks the rig when its fixtures load, as `twinklr run` does, so
-    a rig the renderer cannot render is refused before analysis or any provider call."""
+    """A show checks the rig when its fixtures load, as `twinklr run` does, so a rig the
+    renderer cannot render is refused before analysis or any provider call."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-only")
     job_path = tmp_path / "job.json"
-    job_path.write_text(
-        '{"schema_version": "3.1", "moving_heads": {"mode": "physical_v2"}}', encoding="utf-8"
-    )
+    job_path.write_text("{}", encoding="utf-8")
     rig = FixtureGroup(group_id="MOVING_HEADS", xlights_group="Moving Heads")
     rig.add_fixture(
         FixtureInstance(
@@ -205,6 +207,6 @@ async def test_show_refuses_a_physical_rig_without_profiles_before_any_analysis(
 
     assert exit_code == 1
     output = " ".join(capsys.readouterr().out.split())
-    assert "moving_heads.mode 'physical_v2' cannot render this rig" in output
+    assert "the moving-head renderer cannot render this rig" in output
     assert "MH1: physical_profile is missing" in output
     prepare.assert_not_called()

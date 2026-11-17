@@ -1,4 +1,4 @@
-"""The opt-in physical moving-head renderer end to end: plan to delivered `.xsq` (P1.6).
+"""The physical moving-head renderer end to end: plan to delivered `.xsq` (P1.6).
 
 A synthetic two-head rig (16-bit pan/tilt, shutter on channel 17, the second head
 inverted) plays the test-only `p1_linear_reveal` template over P0's variable-tempo grid,
@@ -17,9 +17,7 @@ from typing import Any
 
 import pytest
 
-from tests.golden.harness import RIGS, build_beat_grid, build_fixture_group, build_plan
 from tests.support.mh_physical import (
-    BUILTIN_TEMPLATE_COUNT,
     PHYSICAL_INITIAL_STATE,
     SUBSET_TEMPLATE_ID,
     TEMPLATE_ID,
@@ -30,18 +28,20 @@ from tests.support.mh_physical import (
     physical_plan,
     physical_rig,
     physical_test_templates,
+    registered_templates,
 )
 from twinklr.cli.main import build_run_pipeline
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
 from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
 from twinklr.core.caching import derive_session_id
 from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup, InitialFixtureState
-from twinklr.core.config.models import AppConfig, JobConfig, TransitionConfig
+from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.formats.xlights.layout.models.rgb_effects import Model
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.formats.xlights.sequence.parser import XSQParser
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import RenderLock
+from twinklr.core.sequencer.models.template import TemplateDoc
 from twinklr.core.sequencer.moving_heads.compile.physical import PhysicalCompileError
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     TRANSACTION_METADATA_KEY,
@@ -54,7 +54,6 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     frame_times,
 )
 from twinklr.core.sequencer.moving_heads.pipeline import PhysicalRenderError, RenderingPipeline
-from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
 from twinklr.core.sequencer.moving_heads.templates.library import REGISTRY
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
@@ -63,6 +62,30 @@ from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 def physical_templates() -> Iterator[None]:
     with physical_test_templates():
         yield
+
+
+_NO_PHYSICAL_DATA = TemplateDoc.model_validate(
+    {
+        "template": {
+            "template_id": "no_physical_data",
+            "version": 1,
+            "name": "No Physical Data",
+            "category": "medium_energy",
+            "repeat": {"cycle_bars": 1.0, "loop_step_ids": ["main"]},
+            "steps": [
+                {
+                    "step_id": "main",
+                    "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
+                    "geometry": {},
+                    "movement": {"movement_type": "sweep_lr"},
+                    "dimmer": {"dimmer_type": "hold"},
+                }
+            ],
+            "metadata": {"energy_range": [20, 60], "recommended_sections": ["verse"]},
+        }
+    }
+)
+"""A template step with no physical data, which the renderer refuses."""
 
 
 def _pipeline(
@@ -205,7 +228,7 @@ def test_trace_records_identity_cue_timing_and_transactions(
 
     assert render == pipeline.render_record | {"output": render["output"]}
     assert render["render_fingerprint"] == pipeline.fingerprint()
-    assert render["policy"]["mode"] == "physical_v2"
+    assert render["policy"] == pipeline.job_config.moving_heads.model_dump(mode="json")
     assert set(render["initial_states"]) == {"MH1", "MH2"}
     assert [f["fixture_id"] for f in render["fixtures"]] == ["MH1", "MH2"]
     assert len({f["profile_sha256"] for f in render["fixtures"]}) == 2
@@ -311,8 +334,8 @@ def test_locks_are_honored_in_the_delivered_output(
     assert not (tmp_path / "gap").exists()
 
 
-def test_physical_identity_ignores_transitions_and_lock_order(physical_templates: None) -> None:
-    """Neither changes a physical frame, so neither changes physical render identity."""
+def test_physical_identity_ignores_lock_order(physical_templates: None) -> None:
+    """Lock order changes no frame, so it does not change render identity."""
     first = RenderLock(
         start_ms=1100, end_ms=1200, fixture_ids=("MH1",), channels=(ChannelName.PAN,)
     )
@@ -328,10 +351,6 @@ def test_physical_identity_ignores_transitions_and_lock_order(physical_templates
     base = _pipeline(None, locks=(first, second)).fingerprint()
 
     assert _pipeline(None, locks=(reordered, first)).fingerprint() == base
-    no_transitions = physical_job().model_copy(
-        update={"transitions": TransitionConfig(enabled=False, default_duration_bars=2.0)}
-    )
-    assert _pipeline(None, job=no_transitions, locks=(first, second)).fingerprint() == base
     assert _pipeline(None, locks=(first,)).fingerprint() != base
 
 
@@ -605,10 +624,10 @@ def test_unchecked_models_are_reported(
             id="byte-budget",
         ),
         pytest.param(
-            {"template_id": "sweep_lr_fan_hold"},
+            {"template_id": "no_physical_data"},
             PhysicalCompileError,
             "no movement.physical data",
-            id="legacy-template",
+            id="template-without-physical-data",
         ),
         pytest.param(
             {
@@ -630,7 +649,7 @@ def test_failure_delivers_nothing(
     message: str,
 ) -> None:
     """A refused compile, transaction, model or budget leaves no file at all."""
-    with pytest.raises(error, match=message):
+    with registered_templates(_NO_PHYSICAL_DATA), pytest.raises(error, match=message):
         _pipeline(tmp_path / "show.xsq", **kwargs).render()
 
     assert list(tmp_path.iterdir()) == []
@@ -722,32 +741,6 @@ def test_layout_check_passes_and_records_the_layout(
     assert output.read_bytes() == plain.read_bytes()
 
 
-def test_a_layout_changes_nothing_in_a_legacy_render(tmp_path: Path) -> None:
-    """Legacy renders ignore the layout: the same bytes, trace and identity."""
-    rig = build_fixture_group(RIGS["mh4_minimal"])
-    layout = [_dmx(f"Dmx MH{index}", DisplayAs="Single Line") for index in range(1, 5)]
-
-    def render(output: Path, **kwargs: Any) -> str:
-        pipeline = RenderingPipeline(
-            choreography_plan=build_plan(),
-            beat_grid=build_beat_grid(),
-            fixture_group=rig,
-            job_config=JobConfig(),
-            output_path=output,
-            media_file="song.wav",
-            **kwargs,
-        )
-        pipeline.render()
-        return pipeline.fingerprint()
-
-    with_layout = render(tmp_path / "a" / "show.xsq", layout_models=layout, layout_sha256="cd" * 32)
-    without = render(tmp_path / "b" / "show.xsq")
-
-    assert with_layout == without
-    for name in ("show.xsq", "show.xsq.trace.json", "show.xmap"):
-        assert (tmp_path / "a" / name).read_bytes() == (tmp_path / "b" / name).read_bytes()
-
-
 def test_failed_removal_during_rollback_keeps_the_staging_directory(
     tmp_path: Path, physical_templates: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -809,21 +802,23 @@ def test_calibration_change_changes_render_identity_not_plan_identity(
     assert planner_inputs(recalibrated) == planner_inputs(base)
 
 
-def test_test_template_leaves_the_shared_registry_at_its_builtins() -> None:
+def test_test_template_leaves_the_shared_registry_as_it_was() -> None:
     """Loading the test template for a test never leaks it into the catalog."""
-    load_builtin_templates()
-    assert len(REGISTRY.list_all()) == BUILTIN_TEMPLATE_COUNT
+    before = {info.template_id for info in REGISTRY.list_all()}
     with physical_test_templates():
-        assert len(REGISTRY.list_all()) == BUILTIN_TEMPLATE_COUNT + 2
-    assert len(REGISTRY.list_all()) == BUILTIN_TEMPLATE_COUNT
-    assert TEMPLATE_ID not in {info.template_id for info in REGISTRY.list_all()}
+        assert {info.template_id for info in REGISTRY.list_all()} == before | {
+            TEMPLATE_ID,
+            SUBSET_TEMPLATE_ID,
+        }
+    assert {info.template_id for info in REGISTRY.list_all()} == before
+    assert TEMPLATE_ID not in before
 
 
-def test_test_template_setup_failure_leaves_the_registry_at_its_builtins(
+def test_test_template_setup_failure_leaves_the_registry_as_it_was(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The subset variant failing to register must not leak the template loaded first."""
-    load_builtin_templates()
+    before = {info.template_id for info in REGISTRY.list_all()}
     register = REGISTRY.register_document
 
     def fail_on_the_variant(document: Any, **kwargs: Any) -> bool:
@@ -835,4 +830,4 @@ def test_test_template_setup_failure_leaves_the_registry_at_its_builtins(
     with pytest.raises(ValueError, match="injected"), physical_test_templates():
         pass
     monkeypatch.undo()
-    assert len(REGISTRY.list_all()) == BUILTIN_TEMPLATE_COUNT
+    assert {info.template_id for info in REGISTRY.list_all()} == before

@@ -166,46 +166,6 @@ class FixtureSegment(BaseModel):
 
         return self
 
-    def add_channel(
-        self,
-        channel: ChannelName,
-        static_dmx: int | None = None,
-        curve: BaseCurve | None = None,
-        value_points: list[CurvePoint] | None = None,
-        base_dmx: int | None = None,
-        amplitude_dmx: int | None = None,
-        offset_centered: bool = False,
-        blend_mode: BlendMode = BlendMode.OVERRIDE,
-        clamp_min: int = 0,
-        clamp_max: int = 255,
-    ) -> None:
-        """Add or update a channel value specification.
-
-        Args:
-            channel: Channel name
-            static_dmx: Static DMX value (mutually exclusive with curve)
-            curve: Curve specification (mutually exclusive with static_dmx)
-            value_points: Optional curve points for smooth transitions
-            base_dmx: Base DMX for offset-centered curves
-            amplitude_dmx: Amplitude for offset-centered curves
-            offset_centered: If True, interpret curve as offset around 0.5
-            blend_mode: How to blend with overlapping segments
-            clamp_min: Minimum DMX value after composition
-            clamp_max: Maximum DMX value after composition
-        """
-        self.channels[channel] = ChannelValue(
-            channel=channel,
-            static_dmx=static_dmx,
-            curve=curve,
-            value_points=value_points,
-            base_dmx=base_dmx,
-            amplitude_dmx=amplitude_dmx,
-            offset_centered=offset_centered,
-            blend_mode=blend_mode,
-            clamp_min=clamp_min,
-            clamp_max=clamp_max,
-        )
-
     def get_channel(self, channel: ChannelName) -> ChannelValue | None:
         """Get channel value specification.
 

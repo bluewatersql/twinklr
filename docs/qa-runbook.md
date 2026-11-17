@@ -71,14 +71,16 @@ uv sync --extra dev --extra anthropic --all-packages
 # Full gate: format check + lint + type-check + tests + coverage
 make validate
 
-# Just the .xsq regression parity harness (MH + display), fast:
-uv run --frozen pytest tests/regression/test_xsq_parity.py -q
+# Just the regression harnesses, fast: display .xsq parity and the moving-head output pins
+uv run --frozen pytest tests/regression -q
 ```
 
 Expected: `make validate` green (0 lint, 0 mypy errors, tests pass ≥65% coverage). The
-regression harness pins the pre-refactor baselines and replays plans through the current
+display harness pins the pre-refactor baseline and replays its plan through the current
 renderer, so any drop in emission sophistication (effect volume, effect-type vocabulary,
-value-curve density, layer depth) fails the gate.
+value-curve density, layer depth) fails the gate. The moving-head pins fix the render
+fingerprint and encoded frames of every catalog family and of one delivered `.xsq`, so
+any unintended moving-head output change fails it.
 
 ---
 
@@ -132,21 +134,11 @@ uv run --frozen twinklr display \
 
 ## 4. Verify output sophistication
 
-Compare the freshly emitted `.xsq` against the pinned baseline metrics:
-
-```bash
-uv run --frozen python - <<'PY'
-from tests.regression.xsq_metrics import extract_xsq_metrics
-m = extract_xsq_metrics("artifacts/qa-run/<song>/<song>_twinklr_mh.xsq")
-print(m.to_dict())
-PY
-```
-
-"On par" means the same emission modality and delivery invariants (20 ms grid, base +
-transition layering), a comparable placed-effect volume, and retained value-curve richness —
-**not** byte-identity (natural LLM variation is expected). The MH baseline
-(`tests/regression/baselines/11_need_a_favor.metrics.json`) is the reference; the live run
-validated 2026-08-30 met or exceeded every axis.
+The moving-head metrics baseline (`11_need_a_favor`) pinned the output of the removed
+second renderer and was deleted with it. A moving-head `.xsq` now holds constant DMX
+frame runs, not value curves, so there is no moving-head metrics reference to compare a
+live run against; its trace (`.xsq.trace.json`) and `twinklr eval-report` describe what
+it rendered.
 
 ---
 
@@ -194,7 +186,7 @@ release.
 
 | Baseline | Kind | Pinned in |
 |---|---|---|
-| `11_need_a_favor` | MH `.xsq` metrics + replay-render parity | `tests/regression/baselines/11_need_a_favor.*` |
+| Moving-head output | Render fingerprint and encoded-frame hashes of every catalog family, and one delivered `.xsq` | `tests/regression/test_mh_physical_pins.py` |
 | `02_rudolph` | Display `.xsq` metrics + hermetic replay parity | `tests/regression/baselines/02_rudolph*` |
 
 Re-pin a baseline only with an explicit decision to move the go-forward reference.

@@ -6,34 +6,57 @@ supplied in, and output paths do not.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
 import pytest
 
-from tests.golden.harness import RIGS, build_beat_grid, build_fixture_group, build_plan
-from tests.support.mh_physical import initial_state_payload, profile_payload
+from tests.support.mh_physical import (
+    family_job,
+    family_rig,
+    initial_state_payload,
+    physical_bars_grid,
+    physical_catalog,
+    physical_sections,
+)
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
 from twinklr.core.config.fixtures import FixtureGroup
-from twinklr.core.config.models import JobConfig, MHRenderPolicy, TransitionConfig
+from twinklr.core.config.models import JobConfig, MHRenderPolicy
 from twinklr.core.sequencer.models.template import TemplateDoc
+from twinklr.core.sequencer.moving_heads.export.frame_encoder import ENCODER_VERSION
 from twinklr.core.sequencer.moving_heads.identity import (
     LEGACY_BACKEND_ID,
-    LEGACY_RENDERER_REVISION,
+    PHYSICAL_RENDERER_REVISION,
     render_fingerprint,
 )
 from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
-from twinklr.core.sequencer.moving_heads.templates import get_template, load_builtin_templates
+from twinklr.core.sequencer.moving_heads.templates import get_template
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map
 
-load_builtin_templates()
+HEADS = ("MH1", "MH2", "MH3", "MH4")
+
+
+@pytest.fixture(autouse=True)
+def _catalog() -> Iterator[None]:
+    with physical_catalog():
+        yield
 
 
 class _PhaseMap(BaseModel):
-    """Stand-in for the typed boundary map P1 introduces."""
+    """Stand-in for a typed boundary map."""
 
     boundaries_ms: list[int]
+
+
+def _plan() -> ChoreographyPlan:
+    return physical_sections(("mirror_wings", 1, 4), ("target_orbit", 5, 8))
+
+
+def _grid() -> BeatGrid:
+    return physical_bars_grid(*([500.0] * 8))
 
 
 def _templates(plan: ChoreographyPlan) -> list[TemplateDoc]:
@@ -42,16 +65,17 @@ def _templates(plan: ChoreographyPlan) -> list[TemplateDoc]:
 
 
 def _inputs() -> dict[str, Any]:
-    plan = build_plan()
+    """What `RenderingPipeline.fingerprint` hashes for `_pipeline()`."""
+    plan = _plan()
     return {
         "plan": plan,
-        "beat_grid": build_beat_grid(),
-        "fixtures": build_fixture_group(RIGS["mh4_minimal"]),
+        "beat_grid": _grid(),
+        "fixtures": family_rig(HEADS),
         "templates": _templates(plan),
-        "policy": MHRenderPolicy(),
-        "transitions": TransitionConfig(),
+        "policy": family_job(HEADS).moving_heads,
         "backend_id": LEGACY_BACKEND_ID,
-        "renderer_revision": LEGACY_RENDERER_REVISION,
+        "renderer_revision": f"physical_v2.{PHYSICAL_RENDERER_REVISION}+encoder.{ENCODER_VERSION}",
+        "phase_map": build_musical_phase_map(_grid()),
     }
 
 
@@ -74,31 +98,38 @@ def test_fingerprint_is_64_hex_and_repeatable() -> None:
 
 
 def test_mapping_key_order_does_not_change_the_hash() -> None:
-    templates = _templates(build_plan())
-    reordered = [
-        _edit_template(doc, defaults=dict(reversed(list(doc.template.defaults.items()))))
-        for doc in templates
-    ]
-    assert list(reordered[0].template.defaults) != list(templates[0].template.defaults)
+    fixtures = family_rig(HEADS)
+    payload = fixtures.model_dump(mode="python")
+    flick = payload["presets"]["attributes"]["flick"]
+    flick["fixtures"] = dict(reversed(list(flick["fixtures"].items())))
+    reordered = FixtureGroup.model_validate(payload)
+    assert list(reordered.presets.attributes["flick"].fixtures) != list(
+        fixtures.presets.attributes["flick"].fixtures
+    )
 
-    assert _fingerprint(templates=reordered) == _fingerprint()
+    assert _fingerprint(fixtures=reordered) == _fingerprint()
 
 
 def test_template_supply_order_does_not_change_the_hash() -> None:
-    templates = _templates(build_plan())
+    templates = _templates(_plan())
 
     assert _fingerprint(templates=list(reversed(templates))) == _fingerprint()
 
 
 def test_template_content_changes_the_hash() -> None:
-    templates = _templates(build_plan())
+    templates = _templates(_plan())
     first = templates[0]
-    steps = [
-        step.model_copy(
-            update={"dimmer": step.dimmer.model_copy(update={"max_norm": 0.5})}, deep=True
+    steps = []
+    for step in first.template.steps:
+        movement = step.movement.physical
+        assert movement is not None and movement.period_beats is not None
+        slower = movement.model_copy(update={"period_beats": movement.period_beats * 2})
+        steps.append(
+            step.model_copy(
+                update={"movement": step.movement.model_copy(update={"physical": slower})},
+                deep=True,
+            )
         )
-        for step in first.template.steps
-    ]
     edited = [_edit_template(first, steps=steps), *templates[1:]]
 
     assert _fingerprint(templates=edited) != _fingerprint()
@@ -111,16 +142,16 @@ def test_preset_content_changes_the_hash() -> None:
                 section_name="verse",
                 start_bar=1,
                 end_bar=4,
-                template_id="cascade_pulse_lr",
-                preset_id="gentle",
+                template_id="mirror_wings",
+                preset_id="narrow",
             )
         ]
     )
-    doc = get_template("cascade_pulse_lr")
-    gentle = next(preset for preset in doc.presets if preset.preset_id == "gentle")
+    doc = get_template("mirror_wings")
+    narrow = next(preset for preset in doc.presets if preset.preset_id == "narrow")
     edited_presets = [
         preset.model_copy(update={"defaults": {**preset.defaults, "extra": 1}}, deep=True)
-        if preset is gentle
+        if preset is narrow
         else preset
         for preset in doc.presets
     ]
@@ -130,7 +161,7 @@ def test_preset_content_changes_the_hash() -> None:
 
 
 def test_fixture_order_changes_the_hash() -> None:
-    fixtures = build_fixture_group(RIGS["mh4_minimal"])
+    fixtures = family_rig(HEADS)
     reordered = FixtureGroup.model_validate(
         {**fixtures.model_dump(), "fixtures": list(reversed(fixtures.model_dump()["fixtures"]))}
     )
@@ -139,18 +170,17 @@ def test_fixture_order_changes_the_hash() -> None:
 
 
 def test_policy_changes_the_hash() -> None:
-    assert _fingerprint(policy=MHRenderPolicy(mode="physical_v2")) != _fingerprint()
+    policy = family_job(HEADS, reposition_fallback="drop_accent").moving_heads
+
+    assert _fingerprint(policy=policy) != _fingerprint()
 
 
 def test_physical_profile_and_initial_states_change_the_hash() -> None:
-    """Explicit physical inputs are functional; their absence leaves legacy dumps as-is."""
-    fixtures = build_fixture_group(RIGS["mh4_minimal"])
-    policy = MHRenderPolicy()
-    assert "physical_profile" not in fixtures.model_dump(mode="json")["fixtures"][0]["config"]
-    assert "initial_states" not in policy.model_dump(mode="json")
+    """Physical inputs are functional; an empty policy dumps no initial states."""
+    assert "initial_states" not in MHRenderPolicy().model_dump(mode="json")
 
-    payload = fixtures.model_dump(mode="python")
-    payload["fixtures"][0]["config"]["physical_profile"] = profile_payload()
+    payload = family_rig(HEADS).model_dump(mode="python")
+    payload["fixtures"][0]["config"]["physical_profile"]["axes"]["pan"]["settle_ms"] = 80
     profiled = FixtureGroup.model_validate(payload)
     started = MHRenderPolicy.model_validate({"initial_states": {"MH1": initial_state_payload()}})
 
@@ -159,7 +189,7 @@ def test_physical_profile_and_initial_states_change_the_hash() -> None:
 
 
 def test_beat_grid_changes_the_hash() -> None:
-    faster = BeatGrid.from_tempo(tempo_bpm=121.0, total_bars=32, beats_per_bar=4)
+    faster = physical_bars_grid(*([495.0] * 8))
 
     assert _fingerprint(beat_grid=faster) != _fingerprint()
 
@@ -183,7 +213,7 @@ def test_omitted_intent_flag_changes_the_hash() -> None:
         "section_name": "verse",
         "start_bar": 1,
         "end_bar": 4,
-        "template_id": "sweep_lr_fan_hold",
+        "template_id": "mirror_wings",
         "preset_id": None,
     }
     omitted = ChoreographyPlan(sections=[PlanSection.model_validate(base)])
@@ -212,13 +242,7 @@ def test_omitted_intent_flag_changes_the_hash() -> None:
 
 def test_pipeline_fingerprint_ignores_the_output_path(tmp_path: Path) -> None:
     def pipeline(output_path: Path | None) -> RenderingPipeline:
-        return RenderingPipeline(
-            choreography_plan=build_plan(),
-            beat_grid=build_beat_grid(),
-            fixture_group=build_fixture_group(RIGS["mh4_minimal"]),
-            job_config=JobConfig(),
-            output_path=output_path,
-        )
+        return _pipeline(_plan(), output_path=output_path)
 
     fingerprint = pipeline(tmp_path / "a" / "show.xsq").fingerprint()
 
@@ -228,55 +252,38 @@ def test_pipeline_fingerprint_ignores_the_output_path(tmp_path: Path) -> None:
     assert not list(tmp_path.iterdir())
 
 
-@pytest.mark.parametrize(
-    "transitions",
-    [
-        pytest.param(TransitionConfig(enabled=False), id="disabled"),
-        pytest.param(TransitionConfig(default_duration_bars=1.0), id="duration"),
-    ],
-)
-def test_transition_settings_change_the_hash(transitions: TransitionConfig) -> None:
-    """Transition settings change the emitted segments, so they are functional."""
-    assert _fingerprint(transitions=transitions) != _fingerprint()
-
-
-def _single_section_pipeline(
-    template_id: str, job_config: JobConfig | None = None
+def _pipeline(
+    plan: ChoreographyPlan, *, output_path: Path | None = None, job: JobConfig | None = None
 ) -> RenderingPipeline:
     return RenderingPipeline(
-        choreography_plan=ChoreographyPlan(
+        choreography_plan=plan,
+        beat_grid=_grid(),
+        fixture_group=family_rig(HEADS),
+        job_config=job or family_job(HEADS),
+        output_path=output_path,
+    )
+
+
+def _single_section_pipeline(template_id: str) -> RenderingPipeline:
+    return _pipeline(
+        ChoreographyPlan(
             sections=[
                 PlanSection(
                     section_name="verse",
                     start_bar=1,
                     end_bar=4,
                     template_id=template_id,
-                    preset_id="chill",
                 )
             ]
-        ),
-        beat_grid=build_beat_grid(),
-        fixture_group=build_fixture_group(RIGS["mh4_minimal"]),
-        job_config=job_config or JobConfig(),
-    )
-
-
-def test_pipeline_fingerprint_follows_the_transition_settings() -> None:
-    disabled = JobConfig.model_validate({"transitions": {"enabled": False}})
-
-    assert (
-        _single_section_pipeline("sweep_lr_fan_hold", disabled).fingerprint()
-        != _single_section_pipeline("sweep_lr_fan_hold").fingerprint()
+        )
     )
 
 
 @pytest.mark.parametrize(
     ("spelling", "canonical"),
     [
-        pytest.param("SWEEP_LR_FAN_HOLD", "sweep_lr_fan_hold", id="upper-case"),
-        pytest.param(
-            "Wave Vertical Spotlight Fade", "wave_vertical_spotlight_fade", id="display-name"
-        ),
+        pytest.param("MIRROR_WINGS", "mirror_wings", id="upper-case"),
+        pytest.param("Fly-In Cascade", "fly_in_cascade", id="display-name"),
     ],
 )
 def test_template_spelling_does_not_change_the_hash(spelling: str, canonical: str) -> None:

@@ -52,13 +52,12 @@ class BaseFixtureConfig(BaseModel):
     )
 
     # Shared physical renderer profile; a fixture's config_overrides entry replaces it.
-    # Left out of dumps when absent so legacy render fingerprints are unchanged.
+    # Left out of dumps when absent.
     physical_profile: FixtureCapabilities | None = Field(
         default=None,
         exclude_if=lambda value: value is None,
         description=(
-            "Explicit capabilities for the physical_v2 renderer, shared by every fixture; "
-            "nothing renders from it until that renderer ships"
+            "Explicit capabilities the moving-head renderer needs, shared by every fixture"
         ),
     )
 
@@ -160,20 +159,19 @@ class FixtureGroup(BaseModel):
         description="Semantic group name -> xLights group model name (e.g., 'LEFT': 'GROUP - MH LEFT')",
     )
 
-    # Named components physical_v2 templates refer to. Left out of dumps when empty so
-    # legacy render fingerprints are unchanged.
+    # Named components templates refer to. Left out of dumps when empty.
     presets: RigPresetLibrary = Field(
         default_factory=RigPresetLibrary,
         exclude_if=lambda value: value.is_empty,
-        description="Position and attribute presets physical_v2 template steps name by id",
+        description="Position and attribute presets template steps name by id",
     )
 
-    # The canonical full rig physical_v2 phase distributions rank heads in. Left out of
-    # dumps when absent so legacy render fingerprints are unchanged.
+    # The canonical full rig phase distributions rank heads in. Left out of dumps when
+    # absent.
     topology: FixtureTopology | None = Field(
         default=None,
         exclude_if=lambda value: value is None,
-        description="Where each head sits in the full rig, for physical_v2 phase distribution",
+        description="Where each head sits in the full rig, for phase distribution",
     )
 
     @model_validator(mode="before")
@@ -282,43 +280,6 @@ class FixtureGroup(BaseModel):
     def add_fixture(self, fixture: FixtureInstance | SimplifiedFixtureInstance) -> None:
         """Add a fixture to the group."""
         self.fixtures.append(fixture)
-
-    def get_fixture(self, fixture_id: str) -> FixtureInstance | None:
-        """Get a fixture by ID.
-
-        Args:
-            fixture_id: Fixture identifier
-
-        Returns:
-            FixtureInstance if found, None otherwise
-
-        Note:
-            For SimplifiedFixtureInstance, this will expand it first.
-        """
-        expanded = self.expand_fixtures()
-        return next((f for f in expanded if f.fixture_id == fixture_id), None)
-
-    def get_xlights_mapping(self) -> dict[str, str]:
-        """Generate complete xLights model mapping.
-
-        Returns:
-            Dictionary mapping fixture IDs/group names to xLights model names.
-            Includes: individual fixtures, "ALL" group, and semantic groups (LEFT, RIGHT, etc.)
-        """
-        mapping = {}
-
-        # Add main group mapping if exists
-        if self.xlights_group:
-            mapping["ALL"] = self.xlights_group
-
-        # Add semantic group mappings (LEFT, RIGHT, ODD, EVEN, etc.)
-        mapping.update(self.xlights_semantic_groups)
-
-        # Add individual fixture mappings
-        for fixture in self.fixtures:
-            mapping[fixture.fixture_id] = fixture.xlights_model_name
-
-        return mapping
 
     def __iter__(self):
         """Allow iteration over fixtures."""

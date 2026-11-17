@@ -1,4 +1,4 @@
-"""Refusal of job render policies the installed renderer cannot honor."""
+"""Refusal of jobs whose rig the moving-head renderer cannot honor."""
 
 from __future__ import annotations
 
@@ -6,14 +6,13 @@ import json
 
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.fixtures.capabilities import PROFILE_GUIDE
-from twinklr.core.config.models import JobConfig, MHRenderPolicy
+from twinklr.core.config.models import JobConfig
 
 
 class UnsupportedRenderModeError(ValueError):
-    """The job selects a moving-head render mode this run cannot honor.
+    """The moving-head renderer cannot honor this job's rig or policy.
 
-    Raised before any analysis, provider request, template load or output write,
-    instead of falling back to the legacy renderer in silence.
+    Raised before any analysis, provider request, template load or output write.
     """
 
 
@@ -22,14 +21,13 @@ def preflight_render_policy(
 ) -> None:
     """Refuse a job whose render policy the renderer cannot honor for this rig.
 
-    `legacy_v1` has no prerequisites. `physical_v2` needs, for every fixture in the
-    rig, a `physical_profile` and a usable run-supplied initial state (the transaction
+    The renderer needs, for every fixture in the rig, a `physical_profile` and a usable run-supplied initial state (the transaction
     pass fails every profiled fixture whose initial state is unknown, unsettled or
     contradicts its profile, whenever its first cue is); an initial state must also
     name a fixture of the rig, and every fixture needs its own, non-blank xLights model
     name, because physical frames are written per fixture. Profiles the DMX backend cannot address are already
     rejected when the fixture file loads. Without a fixture group nothing about the
-    rig is known, so a physical job passes this check until its fixtures are loaded.
+    rig is known, so a job passes this check until its fixtures are loaded.
 
     Args:
         job_config: Job to check.
@@ -41,7 +39,7 @@ def preflight_render_policy(
             profiles' default bytes give, as one object to paste after checking it.
     """
     policy = job_config.moving_heads
-    if policy.mode == "legacy_v1" or fixture_group is None:
+    if fixture_group is None:
         return
 
     problems: list[str] = []
@@ -95,22 +93,8 @@ def preflight_render_policy(
         if missing_profile or suggested:
             guidance.append(f"A minimal profile and initial states: {PROFILE_GUIDE}")
         raise UnsupportedRenderModeError(
-            f"moving_heads.mode {policy.mode!r} cannot render this rig: "
+            "the moving-head renderer cannot render this rig: "
             + "; ".join(problems)
             + "".join(f". {line}" for line in guidance)
             + ". Add the missing items"
-        )
-
-
-def require_legacy_render(policy: MHRenderPolicy, *, command: str) -> None:
-    """Refuse a non-legacy render mode for a command that renders only legacy output.
-
-    Raises:
-        UnsupportedRenderModeError: The policy selects a mode other than `legacy_v1`.
-    """
-    mode = policy.mode
-    if mode != "legacy_v1":
-        raise UnsupportedRenderModeError(
-            f"`twinklr {command}` does not support moving_heads.mode {mode!r}; render the "
-            "physical sequence with `twinklr run`, or set the mode to 'legacy_v1'"
         )

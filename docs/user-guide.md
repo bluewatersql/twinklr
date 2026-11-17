@@ -225,13 +225,13 @@ model; it is not a choreography-quality benchmark. Step-by-step:
 
 ### `job_config.json` (Job Config)
 
-Job-specific settings. Loaded by `JobConfig` in `packages/twinklr/core/config/models.py`. Schema version 3.0 is the default; 3.1 is also accepted.
+Job-specific settings. Loaded by `JobConfig` in `packages/twinklr/core/config/models.py`. Schema version 3.1 is the only one accepted and the default. A job naming a key of the removed second moving-head renderer (`moving_heads.mode`, `transitions`) or `schema_version` `"3.0"` is refused when it loads, naming the key and what to do.
 
 The same registry-backed subset policy applies here.
 
 | JSON field | Default | Observable effect | Ledger path |
 |---|---|---|---|
-| `schema_version` | `"3.0"` | Declares the job schema; `"3.0"` and `"3.1"` are accepted, other values fail validation. `"3.1"` is required to select `moving_heads.mode` `"physical_v2"` | `job.schema_version` |
+| `schema_version` | `"3.1"` | Declares the job schema; only `"3.1"` is accepted, other values fail validation | `job.schema_version` |
 | `fixture_config_path` | `"fixture_config.json"` | Selects the fixture definition loaded for planning/rendering | `job.fixture_config_path` |
 | `agent.max_iterations` | `3` | Sets planner/judge cycles; `0` plans once, runs heuristics, and skips the judge | `job.agent.max_iterations` |
 | `agent.success_threshold` | `70` | Sets the accepted judge score on the single 0-100 configured scale | `job.agent.success_threshold` |
@@ -253,15 +253,13 @@ The same registry-backed subset policy applies here.
 | `assets.image_quality` | `"low"` | Fixed supported image quality; alternatives fail validation | `job.assets.image_quality` |
 | `assets.asset_base_path` | `null` | Changes the generated-asset/catalog root | `job.assets.asset_base_path` |
 | `write_checkpoint` | `true` | Writes the final moving-head plan for `twinklr eval-report`; a physical render adds its record to it ([Evaluation report](#evaluation-report-twinklr-eval-report)); it does not control stage cache reuse | `job.write_checkpoint` |
-| `transitions.enabled` | `true` | Enables section transition planning | `job.transitions.enabled` |
-| `transitions.default_duration_bars` | `0.5` | Sets the fallback transition length | `job.transitions.default_duration_bars` |
 | `timeline_tracks.sections` | `true` | Includes or omits section timing markers | `job.timeline_tracks.sections` |
-| `moving_heads.mode` | `"legacy_v1"` | Selects the moving-head renderer. `"physical_v2"` needs schema `"3.1"`, a `physical_profile` on every fixture and a usable `initial_states` entry for each; a job missing any of them is refused when its fixtures load, naming each fixture and what to add, before any analysis or provider request. The planner is offered only templates that carry explicit physical data: none of the builtins does, but a `physical_v2` run also loads the seven physical families in `catalog/templates/moving_heads_physical` (fly-out and fly-in cascades, target orbit, mirror wings, finite snap hold, masked wheel flick and the synthetic zoom pilot, zoom wave; that directory's README gives each one's motion and needs: the cascades, mirror wings and zoom wave need a rig topology, the flick needs a `flick` attribute preset that sets `color`, the zoom wave needs a `zoom` axis on every head's profile, and every family but the cascades needs the profile to declare a shutter state named exactly `open`; the families are authored in 4/4, where their 2-bar cycles hold whole movement periods; in any meter a repeating cycle that would end mid-period, or before an overlay ends, grows to the smallest whole number of bars that holds them (the rule, which applies in 4/4 too and so to `--template-dir` templates, is under the template keys below), so every family plays in 2/4, 3/4, 6/8 and other meters, over more bars per cycle (that README lists them; physical renderer revision 2); under a topology derived from `position_index`, removing the highest-index head can change the other heads' phases, which a declared `topology` avoids), and a run with none is refused before analysis; right after audio analysis, before any planning, every offered template is dry-compiled on the rig over the whole song (with no preset and with each preset it declares), and the dark repositioning between its own cues is planned from `initial_states` under `reposition_fallback`, so a template whose cues cannot be repositioned between is refused, as is one whose pan, tilt or zoom changes faster than the head can follow (it would fall more than one DMX step behind, which on an 8-bit axis at low speed is reached by sub-degree wobble), and a song whose detected beats cannot establish a musical phase (fewer than two, or beats outside the song) is refused, because the renderer never infers tempo. A family is offered through the first of its variants that passes these checks, its base (no preset) and then each preset it declares, in order: that is its effective variant on this rig and song, which a section naming no preset renders, and so does a section naming a preset that was not admitted (with a warning naming why); each failing variant, the base included, is logged and recorded in the trace's `admission_preset_exclusions` (`preset_id` null for the base), and each effective variant other than the base in `admission_effective_presets`. A family none of whose variants passes is left out of the planner's offer instead, every reason logged and recorded in `admission_exclusions`; the run is refused only when no template remains, and a `--template-dir` template that fails, with or without a preset, still refuses it (it is not laddered). The check takes longer in 3/4 than in 4/4 (and in other meters whose grown cycles span more bars), because a longer cycle is checked at more alignments to the bars. The check also logs each offered template's worst-case section-entry dip: how many beats, at the song's shortest beat, a head may stay dark entering one of its sections. Silence or a fade at either end of the song is not refused: the renderer covers only the detected beats plus one beat interval beyond the first and last (or up to the song's edge when that is nearer), holds every fixture dark outside that covered span, drops a cue that would start outside it and cuts one that runs past its end; the trace records the covered span, the longest gap between detected beats and each dropped cue. A long gap between two detected beats mid-song is one long beat and stays lit. A preset id the template does not declare likewise renders the effective variant, with a warning naming why. Each head enters each section on its own: where its first cues can be played as authored after its previous cue (or the initial state) it starts as authored; otherwise it stays dark for whole beats, long enough for any repositioning into it, then cuts in its cues where they would be, never inside a shutter state too short to take effect (a cue wholly inside that window is dropped and recorded). A head missing from the rig therefore changes no other head's output. The trace's `entry_windows` lists each section's window per fixture, and every `dropped_cues` record gives its `reason`. It writes complete 20 ms frames of constant DMX effects over model-relative channels 1-48, plans dark repositioning between cues instead of applying `transitions`, does not apply planner intent, and records its render identity and evidence in the `.xsq.trace.json`. Any refusal writes no file. `twinklr show` renders it too, resting the heads dark where the show's coordination does ([CLI command](#cli-command)); `inject` and `regenerate` inject the physical render's effects, and `regenerate` re-renders the whole song (see Live injection and section regeneration below); `run`, `show`, `inject` and `regenerate` each record the mode and their render in the plan checkpoint, which `eval-report` re-renders ([Evaluation report](#evaluation-report-twinklr-eval-report)); `twinklr display` renders no moving heads and ignores it | `job.moving_heads.mode` |
-| `moving_heads.initial_states` | `{}` | Run-supplied time-zero state per fixture id (unwrapped `pan_deg`/`tilt_deg`, `zoom_deg` exactly when the fixture's profile declares a `zoom` axis (left out of dumps when absent), `dimmer`, `discrete_states`, and explicit `settled`/`dark` evidence) for the physical renderer. A fixture without an entry has an unknown initial state. Under `physical_v2` every fixture needs a settled entry its profile accepts, and an entry must name a fixture of the rig; otherwise the job is refused when its fixtures load, and for each fixture without an entry the refusal prints the entry its profile's default bytes give, ready to paste after checking it ([Minimal physical profile](#minimal-physical-profile)). Enters render identity and the render trace, but not the planner's session or cache, so editing it re-renders without re-planning | `job.moving_heads.initial_states` |
-| `moving_heads.reposition_fallback` | `"error"` | Applies only to physical (`physical_v2`) output: what the render does with a cue whose dark repositioning cannot be planned. `"error"` refuses the render (before planning when the gate finds it inside a template); `"preserve_aim"` plays the cue at the aim the head holds; `"drop_accent"` keeps the cue dark and plans the next cue from that aim. A fallback applies only to cues of template steps that declare the same `physical_reposition_fallback`, and never covers an unknown initial state, unknown visibility latency, a missing darkness guarantee or a lock; each substituted cue is listed in the trace. A non-default value enters render identity, but not the planner's session or cache | `job.moving_heads.reposition_fallback` |
-| `moving_heads.on_unplayable` | `"dark"` | Applies only to physical (`physical_v2`) output: what the render does with a cue the plan placed where it cannot play honestly, after any `reposition_fallback` the cue and the job both declare. `"dark"` leaves the fixture dark over that cue (it parks there as over any gap) and the render continues: a cue whose dark repositioning still cannot be planned (dropping one can leave the next one too little time, so this repeats until every remaining cue plans), a cue a shutter state too short to take effect lies in (such as a last cue cut to one frame at the song end), a step a fixture cannot play at this section's placement (rate, bounds, pulse or lit-window width) although it plays from bar 1 over the song, and every cue of a section too short for a `ONCE` cycle. Each is listed in the trace's `dropped_cues` with `reason` `"unplayable"`, its `code` and `detail`, the render record carries `unplayable_totals` per code, and the run logs one warning with the counts, which `twinklr run` prints. Never covers an unknown initial state or a lock, and never applies to what is refused before planning: a template that cannot play from bar 1 over the song is still refused, at the gate or at render. `"error"` refuses the render instead. A non-default value enters render identity, but not the planner's session or cache | `job.moving_heads.on_unplayable` |
-| `moving_heads.max_effects` | `1000000` | Applies only to physical (`physical_v2`) output, never to legacy output: the most DMX effects one render may emit after identical adjacent 20 ms frames are merged. More fails the render with `output_budget_exceeded`; frames are never dropped to fit. Must be positive; a non-default value enters render identity. `inject` and `regenerate` have their own, lower bound of 50,000 effects (see Live injection and section regeneration) | `job.moving_heads.max_effects` |
-| `moving_heads.max_xsq_bytes` | `134217728` (128 MiB) | Applies only to physical (`physical_v2`) output, never to legacy output: the largest serialized `.xsq`, in UTF-8 bytes, one render may write. Larger fails the render with `output_budget_exceeded`; frames are never dropped to fit. Must be positive; a non-default value enters render identity | `job.moving_heads.max_xsq_bytes` |
+| `moving_heads` | — | The moving-head render policy. The renderer needs a `physical_profile` on every fixture and a usable `initial_states` entry for each; a job missing any of them is refused when its fixtures load, naming each fixture and what to add, before any analysis or provider request. The planner is offered only templates that carry explicit physical data: every run loads the seven physical families in `catalog/templates/moving_heads_physical` (fly-out and fly-in cascades, target orbit, mirror wings, finite snap hold, masked wheel flick and the synthetic zoom pilot, zoom wave; that directory's README gives each one's motion and needs: the cascades, mirror wings and zoom wave need a rig topology, the flick needs a `flick` attribute preset that sets `color`, the zoom wave needs a `zoom` axis on every head's profile, and every family but the cascades needs the profile to declare a shutter state named exactly `open`; the families are authored in 4/4, where their 2-bar cycles hold whole movement periods; in any meter a repeating cycle that would end mid-period, or before an overlay ends, grows to the smallest whole number of bars that holds them (the rule, which applies in 4/4 too and so to `--template-dir` templates, is under the template keys below), so every family plays in 2/4, 3/4, 6/8 and other meters, over more bars per cycle (that README lists them; physical renderer revision 2); under a topology derived from `position_index`, removing the highest-index head can change the other heads' phases, which a declared `topology` avoids), and a run with none is refused before analysis; right after audio analysis, before any planning, every offered template is dry-compiled on the rig over the whole song (with no preset and with each preset it declares), and the dark repositioning between its own cues is planned from `initial_states` under `reposition_fallback`, so a template whose cues cannot be repositioned between is refused, as is one whose pan, tilt or zoom changes faster than the head can follow (it would fall more than one DMX step behind, which on an 8-bit axis at low speed is reached by sub-degree wobble), and a song whose detected beats cannot establish a musical phase (fewer than two, or beats outside the song) is refused, because the renderer never infers tempo. A family is offered through the first of its variants that passes these checks, its base (no preset) and then each preset it declares, in order: that is its effective variant on this rig and song, which a section naming no preset renders, and so does a section naming a preset that was not admitted (with a warning naming why); each failing variant, the base included, is logged and recorded in the trace's `admission_preset_exclusions` (`preset_id` null for the base), and each effective variant other than the base in `admission_effective_presets`. A family none of whose variants passes is left out of the planner's offer instead, every reason logged and recorded in `admission_exclusions`; the run is refused only when no template remains, and a `--template-dir` template that fails, with or without a preset, still refuses it (it is not laddered). The check takes longer in 3/4 than in 4/4 (and in other meters whose grown cycles span more bars), because a longer cycle is checked at more alignments to the bars. The check also logs each offered template's worst-case section-entry dip: how many beats, at the song's shortest beat, a head may stay dark entering one of its sections. Silence or a fade at either end of the song is not refused: the renderer covers only the detected beats plus one beat interval beyond the first and last (or up to the song's edge when that is nearer), holds every fixture dark outside that covered span, drops a cue that would start outside it and cuts one that runs past its end; the trace records the covered span, the longest gap between detected beats and each dropped cue. A long gap between two detected beats mid-song is one long beat and stays lit. A preset id the template does not declare likewise renders the effective variant, with a warning naming why. Each head enters each section on its own: where its first cues can be played as authored after its previous cue (or the initial state) it starts as authored; otherwise it stays dark for whole beats, long enough for any repositioning into it, then cuts in its cues where they would be, never inside a shutter state too short to take effect (a cue wholly inside that window is dropped and recorded). A head missing from the rig therefore changes no other head's output. The trace's `entry_windows` lists each section's window per fixture, and every `dropped_cues` record gives its `reason`. It writes complete 20 ms frames of constant DMX effects over model-relative channels 1-48, plans dark repositioning between cues, does not apply planner intent, and records its render identity and evidence in the `.xsq.trace.json`. Any refusal writes no file. `twinklr show` renders it too, resting the heads dark where the show's coordination does ([CLI command](#cli-command)); `inject` and `regenerate` inject the physical render's effects, and `regenerate` re-renders the whole song (see Live injection and section regeneration below); `run`, `show`, `inject` and `regenerate` each record their render in the plan checkpoint, which `eval-report` re-renders ([Evaluation report](#evaluation-report-twinklr-eval-report)); `twinklr display` renders no moving heads and ignores it | `job.moving_heads` |
+| `moving_heads.initial_states` | `{}` | Run-supplied time-zero state per fixture id (unwrapped `pan_deg`/`tilt_deg`, `zoom_deg` exactly when the fixture's profile declares a `zoom` axis (left out of dumps when absent), `dimmer`, `discrete_states`, and explicit `settled`/`dark` evidence) for the physical renderer. A fixture without an entry has an unknown initial state. Every fixture needs a settled entry its profile accepts, and an entry must name a fixture of the rig; otherwise the job is refused when its fixtures load, and for each fixture without an entry the refusal prints the entry its profile's default bytes give, ready to paste after checking it ([Minimal physical profile](#minimal-physical-profile)). Enters render identity and the render trace, but not the planner's session or cache, so editing it re-renders without re-planning | `job.moving_heads.initial_states` |
+| `moving_heads.reposition_fallback` | `"error"` | What the render does with a cue whose dark repositioning cannot be planned. `"error"` refuses the render (before planning when the gate finds it inside a template); `"preserve_aim"` plays the cue at the aim the head holds; `"drop_accent"` keeps the cue dark and plans the next cue from that aim. A fallback applies only to cues of template steps that declare the same `physical_reposition_fallback`, and never covers an unknown initial state, unknown visibility latency, a missing darkness guarantee or a lock; each substituted cue is listed in the trace. A non-default value enters render identity, but not the planner's session or cache | `job.moving_heads.reposition_fallback` |
+| `moving_heads.on_unplayable` | `"dark"` | What the render does with a cue the plan placed where it cannot play honestly, after any `reposition_fallback` the cue and the job both declare. `"dark"` leaves the fixture dark over that cue (it parks there as over any gap) and the render continues: a cue whose dark repositioning still cannot be planned (dropping one can leave the next one too little time, so this repeats until every remaining cue plans), a cue a shutter state too short to take effect lies in (such as a last cue cut to one frame at the song end), a step a fixture cannot play at this section's placement (rate, bounds, pulse or lit-window width) although it plays from bar 1 over the song, and every cue of a section too short for a `ONCE` cycle. Each is listed in the trace's `dropped_cues` with `reason` `"unplayable"`, its `code` and `detail`, the render record carries `unplayable_totals` per code, and the run logs one warning with the counts, which `twinklr run` prints. Never covers an unknown initial state or a lock, and never applies to what is refused before planning: a template that cannot play from bar 1 over the song is still refused, at the gate or at render. `"error"` refuses the render instead. A non-default value enters render identity, but not the planner's session or cache | `job.moving_heads.on_unplayable` |
+| `moving_heads.max_effects` | `1000000` | The most DMX effects one render may emit after identical adjacent 20 ms frames are merged. More fails the render with `output_budget_exceeded`; frames are never dropped to fit. Must be positive; a non-default value enters render identity. `inject` and `regenerate` have their own, lower bound of 50,000 effects (see Live injection and section regeneration) | `job.moving_heads.max_effects` |
+| `moving_heads.max_xsq_bytes` | `134217728` (128 MiB) | The largest serialized `.xsq`, in UTF-8 bytes, one render may write. Larger fails the render with `output_budget_exceeded`; frames are never dropped to fit. Must be positive; a non-default value enters render identity | `job.moving_heads.max_xsq_bytes` |
 
 The planner schema may describe up to four narrative assets (`maxItems=4`), but the
 enabled live path authorizes only one image-provider request and reports the rest as
@@ -278,7 +276,7 @@ Minimal example:
 
 ```json
 {
-  "schema_version": "3.0",
+  "schema_version": "3.1",
   "fixture_config_path": "fixture_config.json",
   "agent": {
     "max_iterations": 3,
@@ -313,9 +311,9 @@ run-local and is not shared across judge roles. Changing `success_threshold` or
 
 Defines the physical moving head fixtures — names, DMX channels, and positions. The path is specified in `job_config.json` as `fixture_config_path`, resolved relative to the job config directory.
 
-Each fixture's `dmx_mapping` also declares the value the render exports for that channel when the choreography never writes to it: `shutter_default` (0-255, defaults to `255` — open), and `color_map`/`gobo_map`'s `"open"` entry for color and gobo. A channel the mapping does not declare at all (e.g. `shutter_channel: null`) is omitted from the exported settings string rather than defaulted.
+Each fixture still needs a `dmx_mapping`, which the renderer does not read: its pan, tilt, dimmer, color, gobo and shutter channel numbers are listed to the moving-head planner, and its `shutter_default`, `shutter_map`, `color_map`, `gobo_map`, fine channels and `use_16bit_pan_tilt` no longer affect any output.
 
-A fixture's `config` may also carry an optional `physical_profile` for the opt-in `physical_v2` renderer; in the `base_config` form, `base_config.physical_profile` applies to every fixture and a fixture's `config_overrides.physical_profile` replaces it for that fixture. An invalid profile fails when the fixture file loads, naming the fixture (or `base_config`), the field and the [minimal example](#minimal-physical-profile). The `physical_v2` renderer requires one on every fixture and renders from it alone; the legacy renderer ignores it and refuses a physical channel value rather than exporting nothing. Physical output is written to the fixture's own xLights model, which must be a single-color DMX model with at least `footprint` channels; `twinklr run --layout` checks this before analysis (and records the layout's content hash in the trace), and without a layout the check is skipped with a warning. It declares the fixture explicitly rather than inferring anything from the legacy fields above: `profile_id`, `provenance` (`synthetic`, `manufacturer` or `measured`), the model-relative channel `footprint` (at most 48, the xLights DMX effect's limit) with a default byte for every channel `1..footprint` (an unlisted one is filled, below), continuous `axes` (`pan`/`tilt` in degrees, `dimmer` normalized, and an optional `zoom` beam angle in degrees) with calibrated `physical_min`/`physical_max`, an optional narrower `allowed_min`/`allowed_max` operating window that does not rescale the mapping, coarse/fine offsets, optional `dmx_min`/`dmx_max` for an axis whose calibrated range maps over only part of its DMX word (default `0` and the full word, 255 or 65535 with a fine offset, and left out of dumps at those defaults; a value encodes to `dmx_min` plus its share of the range times `dmx_max - dmx_min`, rounded half up), and inversion, which reflects the word within `dmx_min`..`dmx_max`, `discrete` shutter/color/gobo channels whose named states each select one explicit byte inside a declared, non-overlapping range, and `visibility` (what extinguishes output, and close/open latency). A profile cannot claim darkness it cannot produce: the shutter's `open_state` cannot extinguish, and `dimmer_zero_extinguishes` needs a dimmer axis calibrated from `0` whose operating window admits `0`. Normalized axes lie within `0..1`. Unknown speed, latency and settle times stay `null`; they are never filled in. A profile does not say where a fixture is now; that is `moving_heads.initial_states` in the job config. The retired `capabilities` and `movement_speed` keys stay ignored.
+A fixture's `config` carries a `physical_profile` for the moving-head renderer; in the `base_config` form, `base_config.physical_profile` applies to every fixture and a fixture's `config_overrides.physical_profile` replaces it for that fixture. An invalid profile fails when the fixture file loads, naming the fixture (or `base_config`), the field and the [minimal example](#minimal-physical-profile). The renderer requires one on every fixture and renders from it alone. Physical output is written to the fixture's own xLights model, which must be a single-color DMX model with at least `footprint` channels; `twinklr run --layout` checks this before analysis (and records the layout's content hash in the trace), and without a layout the check is skipped with a warning. It declares the fixture explicitly rather than inferring anything from the legacy fields above: `profile_id`, `provenance` (`synthetic`, `manufacturer` or `measured`), the model-relative channel `footprint` (at most 48, the xLights DMX effect's limit) with a default byte for every channel `1..footprint` (an unlisted one is filled, below), continuous `axes` (`pan`/`tilt` in degrees, `dimmer` normalized, and an optional `zoom` beam angle in degrees) with calibrated `physical_min`/`physical_max`, an optional narrower `allowed_min`/`allowed_max` operating window that does not rescale the mapping, coarse/fine offsets, optional `dmx_min`/`dmx_max` for an axis whose calibrated range maps over only part of its DMX word (default `0` and the full word, 255 or 65535 with a fine offset, and left out of dumps at those defaults; a value encodes to `dmx_min` plus its share of the range times `dmx_max - dmx_min`, rounded half up), and inversion, which reflects the word within `dmx_min`..`dmx_max`, `discrete` shutter/color/gobo channels whose named states each select one explicit byte inside a declared, non-overlapping range, and `visibility` (what extinguishes output, and close/open latency). A profile cannot claim darkness it cannot produce: the shutter's `open_state` cannot extinguish, and `dimmer_zero_extinguishes` needs a dimmer axis calibrated from `0` whose operating window admits `0`. Normalized axes lie within `0..1`. Unknown speed, latency and settle times stay `null`; they are never filled in. A profile does not say where a fixture is now; that is `moving_heads.initial_states` in the job config. The retired `capabilities` and `movement_speed` keys stay ignored.
 
 #### Minimal physical profile
 
@@ -360,7 +358,7 @@ A profile states only what cannot be known: which channel carries which function
 }
 ```
 
-With it the group needs no `topology`. Until the moving-head cutover removes the legacy renderer, a fixture still needs a legacy `dmx_mapping` (`pan_channel`, `tilt_channel` and `dimmer_channel`); the physical renderer never reads it. A fixture's `config_overrides.physical_profile` replaces the shared profile for that fixture.
+With it the group needs no `topology`. A fixture still needs a `dmx_mapping` (`pan_channel`, `tilt_channel` and `dimmer_channel`) until that field is removed; the renderer never reads it. A fixture's `config_overrides.physical_profile` replaces the shared profile for that fixture.
 
 | Profile value | Left out |
 |---|---|
@@ -382,7 +380,7 @@ With it the group needs no `topology`. Until the moving-head cutover removes the
 
 `moving_heads.initial_states` is never defaulted: a fixture without an entry has an unknown initial state and the run is refused before planning, because nothing establishes where a head is when the sequence starts (a previous sequence leaves it wherever it last aimed). The refusal lists every fixture without an entry and prints, as one object ready to paste into `moving_heads.initial_states`, the entry each profile's default bytes give: each axis at the value they encode, each discrete channel in its `default_state`, `settled`, and `dark` exactly when that dimmer level or shutter state extinguishes it. Pasting it asserts that each head really rests there, settled and dark as stated, when the sequence starts.
 
-A fixture group may also declare `presets`, named components that `physical_v2` template steps refer to by id (`component_refs`, below) instead of hard-coding angles and profile state names; the legacy renderer ignores them, and an empty `presets` is left out of the group's dump:
+A fixture group may also declare `presets`, named components that template steps refer to by id (`component_refs`, below) instead of hard-coding angles and profile state names; an empty `presets` is left out of the group's dump:
 
 | Key | Meaning |
 |---|---|
@@ -393,7 +391,7 @@ A fixture group may also declare `presets`, named components that `physical_v2` 
 
 A preset naming a fixture outside the group, a state its profile does not declare, a dimmer level on a profile without a dimmer axis, a fallback that is not declared, or a fallback chain that cycles fails when the fixture file loads. A referenced preset that declares nothing for a fixture, along its whole fallback chain, refuses the render (and, for an offered template, the run before planning); a head is never aimed at a center or default. Presets are rig data: an edit changes the render fingerprint, never the planner's session or cache.
 
-A fixture group may also declare a `topology`, the canonical full rig that a `physical_v2` step's `physical_distribution` (below) spreads phase over; the legacy renderer ignores it, and an absent `topology` is left out of the group's dump:
+A fixture group may also declare a `topology`, the canonical full rig that a step's `physical_distribution` (below) spreads phase over; an absent `topology` is left out of the group's dump:
 
 | Key | Meaning |
 |---|---|
@@ -431,9 +429,9 @@ uv run twinklr run \
 | `--config` | Yes | — | Path to job config JSON |
 | `--out` | No | `.` | Output directory |
 | `--app-config` | No | `config.json` | Path to app config JSON |
-| `--template-dir` | No | — | Load strict JSON moving-head templates from this directory after Python builtins and, for a `physical_v2` job, after the physical family catalog, which loads automatically; naming that catalog directory loads nothing twice |
-| `--allow-template-overrides` | No | `false` | Explicitly permit a data template to replace a colliding Python builtin ID |
-| `--layout` | No | — | Path to your `xlights_rgbeffects.xml`. Used only by `moving_heads.mode` `"physical_v2"`: before any analysis, every fixture's model must be in the layout, a DMX model (`DisplayAs` starting `Dmx`), single color when it records a `StringType`, and declare a channel count of at least its profile's `footprint` (read from `DmxChannelCount`, which xLights 2026.19 writes on DMX models, else from `parm1` as an unverified fallback; a model declaring neither is refused); otherwise the run is refused, naming fixture, model and item. Without it the check is skipped with a warning. A `legacy_v1` run ignores it entirely |
+| `--template-dir` | No | — | Load strict JSON moving-head templates from this directory after the physical family catalog, which loads automatically; naming that catalog directory loads nothing twice |
+| `--allow-template-overrides` | No | `false` | Explicitly permit a data template to replace a colliding catalog template ID |
+| `--layout` | No | — | Path to your `xlights_rgbeffects.xml`. Before any analysis, every fixture's model must be in the layout, a DMX model (`DisplayAs` starting `Dmx`), single color when it records a `StringType`, and declare a channel count of at least its profile's `footprint` (read from `DmxChannelCount`, which xLights 2026.19 writes on DMX models, else from `parm1` as an unverified fallback; a model declaring neither is refused); otherwise the run is refused, naming fixture, model and item. Without it the check is skipped with a warning |
 
 Twinklr takes **no input sequence**. It used to require `--xsq` and rewrite the sequence you
 gave it, which cost you your jukebox state, your per-element display state, anything in the
@@ -491,8 +489,8 @@ Its effective recipe catalog layers tracked recipes, optional local extensions, 
 FE-promoted recipes; an absent/empty catalog or planner/renderer ID mismatch fails
 before provider work.
 
-Under `moving_heads.mode` `"physical_v2"`, `show` renders the moving heads on the
-physical renderer, with the same prerequisites and checks as `twinklr run`: the rig is
+`show` renders the moving heads with the same prerequisites and checks as
+`twinklr run`: the rig is
 refused when its fixtures load if a fixture lacks a profile or initial state, the
 physical family catalog is loaded, and the render preflight gate runs right after
 audio analysis, before any planner, with every fixture's model checked against the
@@ -532,16 +530,15 @@ dark window are left out.
 ### Data-form moving-head templates
 
 Moving-head templates can be supplied as strict JSON `TemplateDoc` files without
-adding a Python module or reinstalling Twinklr. Builtins always load first. Duplicate
+adding a Python module or reinstalling Twinklr. The family catalog always loads first. Duplicate
 normalized ID, display-name, and explicit-alias collisions are rejected by default so
 filesystem order cannot silently decide which choreography runs. An override can replace
 only the exact incumbent template ID and cannot steal an unrelated alias; use
 `--allow-template-overrides` only when replacement is deliberate.
 
-To export the Python library as editable JSON or validate a template directory:
+To validate a template directory:
 
 ```bash
-uv run twinklr template-export --out /tmp/mh-templates
 uv run twinklr template-validate --template-dir /tmp/mh-templates
 ```
 
@@ -555,9 +552,8 @@ uv run twinklr run \
   --allow-template-overrides
 ```
 
-A `physical_v2` template step may name the rig's presets (fixture config, above) instead
-of hard-coding them, with `component_refs`; the legacy renderer refuses a step that
-carries it, and it is left out of dumps when absent:
+A template step may name the rig's presets (fixture config, above) instead of
+hard-coding them, with `component_refs`; it is left out of dumps when absent:
 
 | Key | Meaning |
 |---|---|
@@ -571,8 +567,7 @@ and the SHA-256 of the entry used.
 
 A `physical_v2` template step may spread phase across the rig's heads (chases, cascades,
 mirrored wings) with `physical_distribution`, a list of distributions over the fixture
-group's `topology` (fixture config, above). The legacy renderer refuses a step that
-carries one, and an empty list is left out of dumps:
+group's `topology` (fixture config, above). An empty list is left out of dumps:
 
 | Key | Meaning |
 |---|---|
@@ -601,8 +596,8 @@ the unrotated path, so a circle with pan extent 30 and tilt extent 10 is an elli
 by ±10°. A circle starts at the aim plus its pan extent, a sweep at the aim minus it
 (plus it, when a finite sweep is reversed) and a lissajous at the aim, so the first cue
 of a path enters there. A sweep moves along pan, so its tilt extent must be zero unless
-`rotation_deg` turns it (and its pan extent zero when turned a quarter turn). The legacy
-renderer refuses these shapes, and the fields below are left out of dumps when absent:
+`rotation_deg` turns it (and its pan extent zero when turned a quarter turn). The fields
+below are left out of dumps when absent:
 
 | Key | Meaning |
 |---|---|
@@ -621,8 +616,7 @@ than the head can follow at any frame is refused by the pre-planning dry compile
 any other motion.
 
 A `physical_v2` step may set the beam angle on a fixture's `zoom` axis with
-`physical_zoom`; the legacy renderer refuses a step that carries it, and it is left out
-of dumps when absent:
+`physical_zoom`; it is left out of dumps when absent:
 
 | Key | Meaning |
 |---|---|
@@ -652,8 +646,8 @@ cue. `FADE_OUT` is refused. The pre-planning dry compile checks a `ONCE` templat
 every bar a section could start on, since its single cycle meets that bar's tempo.
 A section shorter than the cycle fails the render, after planning, because the gate
 cannot know the planner's section lengths; a cycle cut by the end of the song or of the
-detected beats is cut without error. The legacy renderer refuses `ONCE`; the planner
-sees template IDs and descriptions, never a repeat mode.
+detected beats is cut without error. The planner sees template IDs and descriptions,
+never a repeat mode.
 
 A repeating (`JOINER` or `PING_PONG`) `physical_v2` cycle restarts its steps' motion
 and pulses at every cycle, so in every meter, 4/4 included, the physical compile grows
@@ -679,8 +673,7 @@ A `physical_v2` step with a period may light only part of its movement with
 for part of every cycle with `physical_overlays`. Neither moves a head in the dark
 itself: the dark spans they leave between cues are repositioned by the same pass as
 every other gap, which darkens the fixture, turns wheels, travels and settles before
-the next reveal. The legacy renderer refuses both, and both are left out of dumps when
-absent:
+the next reveal. Both are left out of dumps when absent:
 
 | Key | Meaning |
 |---|---|
@@ -752,11 +745,9 @@ yet performed that empirical check; it is an owner-local step.
 
 With a sequence already open in windowed xLights, the live workflow reads the actual
 model/group names, plans only against configured moving heads that really exist there,
-and writes DMX effects to reserved layers starting at 99. Relative exporter layers are
-preserved (for example, regular effects use 99 and transitions use 100), so effects that
-the deterministic renderer separated are never flattened into overlaps. Differences
-between the live layout and the
-fixture config are printed; Twinklr never guesses channel mappings for unknown models.
+and writes DMX effects to reserved layers starting at 99. Differences between the live
+layout and the fixture config are printed; Twinklr never guesses channel mappings for
+unknown models.
 
 ```bash
 uv run twinklr inject --audio song.mp3 --config job_config.json --dry-run
@@ -766,11 +757,9 @@ uv run twinklr regenerate chorus_2 --audio song.mp3 --config job_config.json
 
 The dry run prints the exact `deleteEffect`/`addEffect` requests and writes nothing.
 `regenerate` reuses cached audio/profile/lyrics/macro analysis, forces a fresh plan for
-only the canonical section ID, and, for legacy output, leaves other sections untouched (a
-physical job re-renders the whole song; see below). Twinklr tracks its
-reserved-layer ownership in the song artifact directory, stops before touching an
-unowned collision, and never saves the xLights sequence. Replacement is explicit:
-owned effects for the named section are deleted before the new effects are added.
+only the canonical section ID, and re-renders the whole song (see below). Twinklr tracks
+its reserved-layer ownership in the song artifact directory, stops before touching an
+unowned collision, and never saves the xLights sequence.
 
 The xLights automation API has no documented authentication. Any local process can drive
 the application while the port is enabled. Use a trusted machine, inspect the reserved
@@ -780,9 +769,7 @@ reserved layers starting at 99, then run the same command again. Preflight makes
 recovery idempotent, as long as xLights reports each effect back exactly as Twinklr sent
 it, which has not been verified against a running xLights.
 
-#### Physical moving heads (`moving_heads.mode = "physical_v2"`)
-
-What differs from the description above for a physical job:
+#### What is injected, replaced and refused
 
 - **What is injected.** `inject` renders the moving heads as `twinklr run` does, with the
   same pre-planning check, but on the rig as reconciled with the live layout (fixtures
@@ -801,8 +788,8 @@ What differs from the description above for a physical job:
   fingerprint is printed. After a complete (not dry-run) injection Twinklr records, in
   `.twinklr-live-plans.json` beside the ownership manifest, the plan now in that sequence
   and digests of the owned effects, the audio, the job config and the live rig.
-- **`regenerate <section>` re-renders the whole song.** It re-plans only that section, as
-  for legacy output, then renders the moving heads for the **whole song** from the
+- **`regenerate <section>` re-renders the whole song.** It re-plans only that section,
+  then renders the moving heads for the **whole song** from the
   recorded plan of the effects already injected, with that section's plan replaced and
   every other section's plan unchanged. A physical render plans each head's dark
   repositioning across section edges, so one section's effects cannot be swapped in on
@@ -833,8 +820,7 @@ What differs from the description above for a physical job:
   placed or was about to place is treated as Twinklr's and may later be removed.
 - **Dry run.** It prints the number of planned writes per model and operation and writes
   every one, as JSON lines, to `live-dry-run.jsonl` in the artifact directory.
-- **Volume.** A physical render emits far more effects than legacy output, about
-  20,000-30,000 on four heads for a three-minute song. xLights' automation API has no batch
+- **Volume.** A render emits many effects, about 20,000-30,000 on four heads for a three-minute song. xLights' automation API has no batch
   command, so each effect read, deleted or added is one request, sent one at a time;
   replacing a whole render costs about three requests per effect. A command that would add
   more than 50,000 effects is refused before anything is read; one that would delete more
@@ -891,8 +877,7 @@ Artifacts are written to `<output_dir>/<song_name>/`:
 - **`<song_name>_twinklr_display.xsq.trace.json`** — deterministic placement-level
   display render trace used by validation tooling.
 - Stage artifacts and intermediate results (audio analysis data, profiles, plans)
-- **`checkpoints/plans/final.json`** — the moving-head plan and, for a physical job, its
-  render record, which `twinklr eval-report` reads. `twinklr run`, `show` and `inject`
+- **`checkpoints/plans/final.json`** — the moving-head plan and its render record, which `twinklr eval-report` reads. `twinklr run`, `show` and `inject`
   (and `regenerate`) write this same path for a song, so the last command to run wins.
 
 ### Using the Output
@@ -904,8 +889,8 @@ You **import** these into your own sequence rather than opening Twinklr's file a
    `.xmap` to pre-fill the model mapping. Your layout must already contain models the
    mapping can point at — Twinklr names them from your fixture config's
    `xlights_model_name` values.
-3. The imported effects contain value curves for each moving head across all mapped DMX
-   channels (pan, tilt, dimmer, shutter, color, gobo).
+3. The imported effects are constant DMX effects, one per run of identical 20 ms frames,
+   each writing every channel of the head's profile footprint.
 4. Import the `.xtiming` files to get Twinklr's timing tracks. These need **no mapping at
    all** — they import standalone into any sequence, so they are useful even if you take
    none of the effects.
@@ -925,7 +910,7 @@ twinklr eval-report \
 The report re-renders the run's moving-head plan and writes `report.json`, `report.md`
 and per-channel plots under `plots/`; it writes no sequence file.
 
-For a `physical_v2` job, every command that plans and renders the moving heads
+Every command that plans and renders the moving heads
 (`twinklr run`, `show`, `inject`, `regenerate`) adds a `render` record to the plan
 checkpoint once it has written its `.xsq`: the render fingerprint, the render policy, the beat
 grid it rendered against, the pre-planning gate's result, the dark spans a show rested
@@ -943,13 +928,13 @@ rig, a template, the beat grid, the dark spans, a revision), and printed by the 
 the report then describes the re-render, not the delivered sequence. `inject` and
 `regenerate` render on the fixture config as reconciled with the open layout, so where
 that layout lacks a group the config names, no fixture config reproduces the
-render: the mismatch says so and names the field that differs. A physical checkpoint
+render: the mismatch says so and names the field that differs. A checkpoint
 without a readable `render` record is refused before any analysis: the command that
 planned it stopped before it delivered its moving-head render (an output budget refused
 it, for one), or could not write the record (it logs a warning), and re-running that
-command writes it; a record written
-before the record carried the rig's identity is refused as malformed. So is a plan that
-names a template neither built in nor in the physical catalog: `eval-report` has no
+command writes it; a record written before the record carried the rig's identity, or by
+the removed second renderer (its policy names `mode`), is refused as malformed. So is a
+plan that names a template not in the physical catalog: `eval-report` has no
 template directory option, so a plan using `--template-dir` templates cannot be
 re-rendered. A report on a show's checkpoint states its dark spans (how many, and their
 total time): the heads keep moving on their authored paths there, commanded dark, so
@@ -983,10 +968,10 @@ to one word per frame, nor a reveal before the head has finished travelling or s
 
 The report's `physical` block holds both fingerprints, the gate's
 `admission_exclusions`, `admission_preset_exclusions` and `admission_effective_presets`,
-the `unplayable_totals`, and `not_reported`: each legacy metric a physical report leaves
-out, and why. Those metrics are `null` in `report.json`: the clamp percentage (the
+the `unplayable_totals`, and `not_reported`: each metric of the removed curve-based
+report it leaves out, and why. Those metrics are `null` in `report.json`: the clamp percentage (the
 renderer refuses an out-of-range value instead of clamping it), the limited-range and
-static-curve flags (they key on legacy curve types), loop continuity, the curve type,
+static-curve flags (they keyed on curve types physical output does not have), loop continuity, the curve type,
 handler, base position and static DMX, the physics check, template compliance (planner
 modifiers are not applied) and section transitions, with their summary counts. What is
 true instead: a repeating cycle spans whole periods and its gap-free repeats continue
@@ -998,9 +983,6 @@ settle, and acceleration is modelled by nothing. A head that must reposition int
 section does so dark, in its entry window (entry `cut`) or before the section where its
 bound fits there (entry `none`), while a `skipped` head plays through the boundary lit,
 within its travel speed. The lit steps above report what the frames do.
-
-A legacy (`legacy_v1`) checkpoint is reported as before: normalized curves sampled from
-the segments, with those metrics.
 
 ---
 

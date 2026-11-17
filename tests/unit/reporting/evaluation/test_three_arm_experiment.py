@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from collections.abc import Iterator
 from datetime import UTC, datetime
 import hashlib
 import json
@@ -83,6 +84,13 @@ from twinklr.core.reporting.evaluation.vision_judge import (
     VisionTokenUsage,
 )
 from twinklr.core.sequencer.moving_heads.pipeline import check_physical_templates
+
+
+@pytest.fixture(autouse=True)
+def _catalog() -> Iterator[None]:
+    """The runner's process holds the family catalog the admissions name."""
+    with physical_catalog():
+        yield
 
 
 def _sha(value: bytes) -> str:
@@ -364,6 +372,7 @@ class _Backend:
             template_set_sha256="d" * 64,
             renderer_sha256="e" * 64,
             evaluation_config_sha256="f" * 64,
+            admission=_hand_admission(FAMILY_IDS),
         )
 
     async def execute(self, request: ArmExecutionRequest) -> ArmRunResult:
@@ -393,7 +402,7 @@ class _Backend:
                         "end_bar": 4,
                         "section_role": "verse",
                         "energy_level": 45,
-                        "template_id": "fan_pulse",
+                        "template_id": "mirror_wings",
                         "intensity": "SMOOTH",
                         "color_intent": {
                             "selection": {
@@ -846,6 +855,7 @@ def _result(
         template_set_sha256="d" * 64,
         renderer_sha256="e" * 64,
         evaluation_config_sha256="f" * 64,
+        admission_sha256=_identity_sha(_hand_admission(FAMILY_IDS).model_dump(mode="json")),
     )
     roles = {
         Arm.A: ("vision_judge",),
@@ -865,7 +875,7 @@ def _result(
                     "end_bar": 4,
                     "section_role": "verse",
                     "energy_level": 50,
-                    "template_id": "fan_pulse",
+                    "template_id": "mirror_wings",
                     "intensity": "SMOOTH",
                     "color_intent": {
                         "selection": {
@@ -1799,12 +1809,9 @@ def _hand_admission(
 async def _run_physical(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, backend: _PhysicalBackend
 ) -> list[ArmRunResult]:
-    with physical_catalog():
-        runner = ComparisonExperimentRunner(
-            manifest=_calibrated_manifest(tmp_path), backend=backend
-        )
-        monkeypatch.setattr(runner, "_assert_calibrated", lambda: None)
-        return await runner.run(owner_opt_in=True)
+    runner = ComparisonExperimentRunner(manifest=_calibrated_manifest(tmp_path), backend=backend)
+    monkeypatch.setattr(runner, "_assert_calibrated", lambda: None)
+    return await runner.run(owner_opt_in=True)
 
 
 @pytest.mark.asyncio
@@ -1816,24 +1823,21 @@ async def test_physical_run_plans_arm_a_over_the_gate_admission_and_records_it(
     among the admitted families, and every arm's held-constant identity binds the
     same admission."""
     rig, job = family_rig(HEADS), family_job(HEADS)
-    with physical_catalog():
-        gate = check_physical_templates(
-            list(CATALOG_IDS),
-            beat_grid=physical_bars_grid(*[500.0] * 8),
-            fixture_group=rig,
-            initial_states=job.moving_heads.initial_states,
-            failure_mode=job.moving_heads.reposition_fallback,
-            on_unplayable=job.moving_heads.on_unplayable,
-            excludable=list(CATALOG_IDS),
-        )
-        admission = SelectorAdmission.from_gate(gate)
-        backend = _PhysicalBackend(admission, PHYSICAL_SECTIONS)
-        runner = ComparisonExperimentRunner(
-            manifest=_calibrated_manifest(tmp_path), backend=backend
-        )
-        monkeypatch.setattr(runner, "_assert_calibrated", lambda: None)
-        results = await runner.run(owner_opt_in=True)
-        expected = DeterministicSelector(seed=44, admission=admission).select(PHYSICAL_SECTIONS)
+    gate = check_physical_templates(
+        list(CATALOG_IDS),
+        beat_grid=physical_bars_grid(*[500.0] * 8),
+        fixture_group=rig,
+        initial_states=job.moving_heads.initial_states,
+        failure_mode=job.moving_heads.reposition_fallback,
+        on_unplayable=job.moving_heads.on_unplayable,
+        excludable=list(CATALOG_IDS),
+    )
+    admission = SelectorAdmission.from_gate(gate)
+    backend = _PhysicalBackend(admission, PHYSICAL_SECTIONS)
+    runner = ComparisonExperimentRunner(manifest=_calibrated_manifest(tmp_path), backend=backend)
+    monkeypatch.setattr(runner, "_assert_calibrated", lambda: None)
+    results = await runner.run(owner_opt_in=True)
+    expected = DeterministicSelector(seed=44, admission=admission).select(PHYSICAL_SECTIONS)
 
     assert admission.template_ids == FAMILY_IDS
     assert [exclusion.template_id for exclusion in admission.exclusions] == ["zoom_wave"]
@@ -1943,16 +1947,13 @@ async def test_arm_a_without_a_candidate_stops_before_any_run(
     any arm of any song is executed (no planning call, no render)."""
     admitted = tuple(t for t in FAMILY_IDS if t != "target_orbit")
     quiet = [SelectorSection(section_id="intro_1", role="intro", start_bar=1, end_bar=4, energy=10)]
-    with physical_catalog():
-        backend = _PhysicalBackend(
-            _hand_admission(admitted), PHYSICAL_SECTIONS, song_sections={"s5": quiet}
-        )
-        runner = ComparisonExperimentRunner(
-            manifest=_calibrated_manifest(tmp_path), backend=backend
-        )
-        monkeypatch.setattr(runner, "_assert_calibrated", lambda: None)
-        with pytest.raises(NoEligibleTemplateError, match="intro_1"):
-            await runner.run(owner_opt_in=True)
+    backend = _PhysicalBackend(
+        _hand_admission(admitted), PHYSICAL_SECTIONS, song_sections={"s5": quiet}
+    )
+    runner = ComparisonExperimentRunner(manifest=_calibrated_manifest(tmp_path), backend=backend)
+    monkeypatch.setattr(runner, "_assert_calibrated", lambda: None)
+    with pytest.raises(NoEligibleTemplateError, match="intro_1"):
+        await runner.run(owner_opt_in=True)
 
     assert backend.analysis_calls == 6
     assert backend.requests == []

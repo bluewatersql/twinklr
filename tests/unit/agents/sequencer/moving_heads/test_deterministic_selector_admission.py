@@ -12,12 +12,14 @@ import pytest
 from tests.support.mh_physical import CATALOG_IDS, physical_catalog
 from twinklr.core.agents.sequencer.moving_heads.deterministic_selector import (
     AdmittedTemplate,
+    ConstraintRelaxation,
     DeterministicSelector,
     FallbackRule,
     NoEligibleTemplateError,
     SelectorAdmission,
     SelectorSection,
 )
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.sequencer.moving_heads.pipeline import TemplateAdmission
 from twinklr.core.sequencer.moving_heads.templates.library import REGISTRY
 
@@ -255,3 +257,40 @@ def test_admission_rejects_an_unadmitted_effective_variant_and_duplicates() -> N
     entry = AdmittedTemplate(template_id="mirror_wings", effective_preset=None, admitted_presets=())
     with pytest.raises(ValueError, match="mirror_wings"):
         SelectorAdmission(templates=(entry, entry))
+
+
+def test_the_repeat_cap_relaxes_when_the_admission_leaves_too_few_families() -> None:
+    """Two admitted families for five drops: the fifth exceeds the two-use cap, so the
+    cap relaxes (after distinct roles, before consecutive repeats) and the family not
+    played last fills it, with its effective variant."""
+    admission = _admission(("fly_in_cascade", "fly_out_cascade"), {"fly_out_cascade": "slow"})
+    result = DeterministicSelector(seed=7, admission=admission).select(
+        _sections(*[("drop", 80)] * 5)
+    )
+
+    chosen = [trace.selected_template_id for trace in result.traces]
+    assert [trace.relaxed_constraints for trace in result.traces[:4]] == [()] * 4
+    assert result.traces[4].relaxed_constraints == (
+        ConstraintRelaxation.DISTINCT_ROLES,
+        ConstraintRelaxation.REPEAT_CAP,
+    )
+    assert chosen[4] != chosen[3]
+    assert chosen.count(chosen[4]) == 3
+    assert all(a != b for a, b in pairwise(chosen))
+    effective = {"fly_in_cascade": None, "fly_out_cascade": "slow"}
+    assert [s.preset_id for s in result.plan.sections] == [effective[t] for t in chosen]
+
+
+def test_a_selector_plan_round_trips_through_the_plan_schema() -> None:
+    """The plan the selector builds is a complete schema-v2 plan: its JSON dump reads
+    back as the same plan, every intent field set."""
+    admitted = ("finite_snap_hold", "mirror_wings", "target_orbit")
+    admission = _admission(admitted, {"mirror_wings": "narrow"})
+    result = DeterministicSelector(seed=3, admission=admission).select(
+        _sections(("intro", 30), ("verse", 50), ("chorus", 70), ("drop", 90))
+    )
+
+    restored = ChoreographyPlan.model_validate_json(result.plan.model_dump_json())
+    assert restored == result.plan
+    assert restored.model_dump(mode="json") == result.plan.model_dump(mode="json")
+    assert not any(section.legacy_intent_omitted for section in restored.sections)

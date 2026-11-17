@@ -2,7 +2,9 @@
 
 The inventory ledger points at these parameterized tests.  Each parameter ID is
 the canonical schema path it proves; a fixed happy-path load is intentionally not
-accepted as evidence for unrelated fields.
+accepted as evidence for unrelated fields.  A step field the physical compile does not
+apply is evidenced by its refusal there: a non-default value is rejected, never
+ignored.
 """
 
 from __future__ import annotations
@@ -12,22 +14,28 @@ from typing import Any
 
 import pytest
 
-from tests.unit.sequencer.moving_heads.templates.test_data_loader import _doc
-from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
-from twinklr.core.config.fixtures import DmxMapping, FixtureConfig
-from twinklr.core.config.poses import PanPose
-from twinklr.core.curves.registry import CurveRegistry
-from twinklr.core.sequencer.models.context import (
-    FixtureContext,
-    SectionRenderIntent,
-    TemplateCompileContext,
+from tests.support.mh_physical import (
+    hold_step,
+    physical_bars_grid,
+    physical_job,
+    physical_rig,
+    physical_sections,
+    physical_template_doc,
+    registered_templates,
+    sweep_step,
 )
+from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
+from twinklr.core.config.poses import PanPose
+from twinklr.core.sequencer.models.context import TemplateCompileContext
 from twinklr.core.sequencer.models.enum import (
+    AimZone,
     ChaseOrder,
     Intensity,
     SemanticGroupType,
     TemplateCategory,
 )
+from twinklr.core.sequencer.models.moving_heads.physical import PhysicalChannelError
+from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
 from twinklr.core.sequencer.models.template import (
     Color,
     Gobo,
@@ -39,53 +47,39 @@ from twinklr.core.sequencer.models.template import (
     TemplateDoc,
     TemplatePreset,
 )
-from twinklr.core.sequencer.moving_heads.compile.template_compiler import compile_template
-from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
+from twinklr.core.sequencer.moving_heads.compile.physical import PhysicalCompileError
+from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
+    compile_physical_template,
+)
+from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
 from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
 from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
 from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
 from twinklr.core.sequencer.moving_heads.libraries.gobo import GoboPattern
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 from twinklr.core.sequencer.moving_heads.libraries.shutter import ShutterPattern
-from twinklr.core.sequencer.moving_heads.pipeline import _log_applied_preset_name
+from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline, physical_cue_limits
 from twinklr.core.sequencer.moving_heads.templates.library import TemplateRegistry
-from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map
 
 Mutation = Callable[[TemplateDoc], None]
 
 
 def _rich_doc() -> TemplateDoc:
-    document = _doc("effect_probe")
-    template = document.template
-    template.defaults = {"dimmer_floor_dmx": 10, "dimmer_ceiling_dmx": 240}
-    step = template.steps[0]
-    step.timing.base_timing.duration_bars = 0.5
-    step.timing.phase_offset.mode = PhaseOffsetMode.GROUP_ORDER
-    step.timing.phase_offset.spread_bars = 0.25
-    step.color = Color(preset=ColorPreset.BLUE)
-    step.shutter = Shutter(pattern=ShutterPattern.OPEN)
-    step.gobo = Gobo(pattern=GoboPattern.OPEN)
-    second = step.model_copy(deep=True)
-    second.step_id = "second"
-    second.timing.base_timing.start_offset_bars = 0.5
-    template.steps.append(second)
-    template.repeat.loop_step_ids = ["main", "second"]
+    """Two physical steps over a one-bar cycle, and a preset patching the first."""
+    document = physical_template_doc(
+        "effect_probe",
+        [
+            sweep_step("main", -20.0, 40.0, duration=0.5, period_beats=2.0),
+            hold_step("second", 20.0, start=0.5, duration=0.5),
+        ],
+    )
     document.presets = [
         TemplatePreset(
             preset_id="base",
             name="Base",
-            defaults={"dimmer_floor_dmx": 20},
-            step_patches={
-                "main": StepPatch(
-                    geometry={"geometry_type": GeometryType.FAN},
-                    movement={"movement_type": MovementType.HOLD},
-                    dimmer={"dimmer_type": DimmerType.HOLD},
-                    color={"preset": ColorPreset.RED},
-                    shutter={"pattern": ShutterPattern.CLOSED},
-                    gobo={"pattern": GoboPattern.PRISM},
-                    timing={"base_timing": {"duration_bars": 0.5}},
-                )
-            },
+            defaults={"probe": 1},
+            step_patches={"main": StepPatch(timing={"base_timing": {"duration_bars": 0.5}})},
         )
     ]
     return document
@@ -196,74 +190,49 @@ def test_template_metadata_field_changes_planner_prompt_context(
 
 
 def _compile_snapshot(document: TemplateDoc, *, preset: bool = False) -> dict[str, Any]:
-    mapping = DmxMapping(
-        pan_channel=1,
-        tilt_channel=2,
-        dimmer_channel=3,
-        color_channel=4,
-        shutter_channel=5,
-        gobo_channel=6,
-        color_map={"open": 0, "blue": 24, "red": 48},
-        shutter_map={
-            "closed": 0,
-            "open": 255,
-            "strobe_slow": 70,
-            "strobe_medium": 130,
-            "strobe_fast": 190,
-        },
-        gobo_map={"open": 0, "prism": 80},
-    )
-    fixture_config = FixtureConfig(fixture_id="MH1", dmx_mapping=mapping)
-    fixtures = [
-        FixtureContext(
-            fixture_id="MH1",
-            role="OUTER_LEFT",
-            calibration={"fixture_config": fixture_config},
-        ),
-        FixtureContext(
-            fixture_id="MH2",
-            role="OUTER_RIGHT",
-            calibration={"fixture_config": fixture_config},
-        ),
-    ]
-    registries = create_default_registries()
+    """The physical compile of `document` over four bars on the two-head rig, or the
+    type of the refusal."""
+    rig = physical_rig()
+    grid = physical_bars_grid(*([500.0] * 4))
+    phase_map = build_musical_phase_map(grid)
+    start_limit, end_limit = physical_cue_limits(phase_map, int(grid.duration_ms))
+    selected = document.presets[0] if preset and document.presets else None
     context = TemplateCompileContext(
         section_id="section",
         template_id=document.template.template_id,
-        preset_id=document.presets[0].preset_id if preset and document.presets else None,
-        fixtures=fixtures,
-        beat_grid=BeatGrid.from_tempo(tempo_bpm=120, total_bars=5),
+        preset_id=selected.preset_id if selected else None,
+        fixtures=build_fixture_contexts(rig_profile_from_fixture_group(rig), rig),
+        beat_grid=grid,
         start_bar=1,
         duration_bars=4,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
-        color_registry=registries["color"],
-        shutter_registry=registries["shutter"],
-        gobo_registry=registries["gobo"],
-        intent=SectionRenderIntent(),
+        presets=rig.presets,
     )
-    selected = document.presets[0] if preset and document.presets else None
-    return compile_template(document.template, context, selected).model_dump(mode="json")
+    try:
+        result = compile_physical_template(
+            document.template,
+            context,
+            selected,
+            phase_map=phase_map,
+            start_limit_ms=start_limit,
+            end_limit_ms=end_limit,
+        )
+    except (PhysicalCompileError, PhysicalChannelError, ValueError) as error:
+        return {"rejected": type(error).__name__}
+    return result.model_dump(mode="json")
 
 
 _COMPILE_CASES: tuple[tuple[str, Mutation], ...] = (
-    ("template.template.repeat", _set("template.repeat.cycle_bars", 0.5)),
+    ("template.template.repeat", _set("template.repeat.cycle_bars", 2.0)),
     ("template.template.repeat.mode", _set("template.repeat.mode", RepeatMode.PING_PONG)),
-    ("template.template.repeat.cycle_bars", _set("template.repeat.cycle_bars", 0.5)),
+    ("template.template.repeat.cycle_bars", _set("template.repeat.cycle_bars", 2.0)),
     (
         "template.template.repeat.loop_step_ids",
-        _set("template.repeat.loop_step_ids", []),
+        _set("template.repeat.loop_step_ids", ["main"]),
     ),
     (
         "template.template.repeat.remainder_policy",
-        lambda document: (
-            setattr(document.template.repeat, "cycle_bars", 1.5),
-            setattr(document.template.repeat, "remainder_policy", RemainderPolicy.FADE_OUT),
-        ),
+        _set("template.repeat.remainder_policy", RemainderPolicy.FADE_OUT),
     ),
-    ("template.template.defaults", _set("template.defaults", {"dimmer_floor_dmx": 80})),
     (
         "template.template.steps",
         lambda document: (
@@ -304,7 +273,7 @@ _COMPILE_CASES: tuple[tuple[str, Mutation], ...] = (
     ),
     (
         "template.template.steps.timing.phase_offset.mode",
-        _set("template.steps.0.timing.phase_offset.mode", PhaseOffsetMode.NONE),
+        _set("template.steps.0.timing.phase_offset.mode", PhaseOffsetMode.GROUP_ORDER),
     ),
     (
         "template.template.steps.timing.phase_offset.order",
@@ -316,10 +285,7 @@ _COMPILE_CASES: tuple[tuple[str, Mutation], ...] = (
     ),
     (
         "template.template.steps.timing.phase_offset.wrap",
-        lambda document: (
-            setattr(document.template.steps[0].timing.phase_offset, "spread_bars", 0.75),
-            setattr(document.template.steps[0].timing.phase_offset, "wrap", False),
-        ),
+        _set("template.steps.0.timing.phase_offset.wrap", False),
     ),
     (
         "template.template.steps.geometry",
@@ -345,12 +311,20 @@ _COMPILE_CASES: tuple[tuple[str, Mutation], ...] = (
         _set("template.steps.0.geometry.tilt_pose", "ceiling"),
     ),
     (
+        "template.template.steps.geometry.aim_zone",
+        _set("template.steps.0.geometry.aim_zone", AimZone.CROWD),
+    ),
+    (
         "template.template.steps.movement",
         _set("template.steps.0.movement.movement_type", MovementType.HOLD),
     ),
     (
         "template.template.steps.movement.movement_type",
         _set("template.steps.0.movement.movement_type", MovementType.HOLD),
+    ),
+    (
+        "template.template.steps.movement.intensity",
+        _set("template.steps.0.movement.intensity", Intensity.INTENSE),
     ),
     ("template.template.steps.movement.cycles", _set("template.steps.0.movement.cycles", 2.0)),
     (
@@ -375,20 +349,29 @@ _COMPILE_CASES: tuple[tuple[str, Mutation], ...] = (
         "template.template.steps.dimmer.params",
         _set("template.steps.0.dimmer.params", {"period_bars": 0.5}),
     ),
-    ("template.template.steps.color", _set("template.steps.0.color", None)),
+    (
+        "template.template.steps.color",
+        _set("template.steps.0.color", Color(preset=ColorPreset.RED)),
+    ),
     (
         "template.template.steps.color.preset",
-        _set("template.steps.0.color.preset", ColorPreset.RED),
+        _set("template.steps.0.color", Color(preset=ColorPreset.BLUE)),
     ),
-    ("template.template.steps.shutter", _set("template.steps.0.shutter", None)),
+    (
+        "template.template.steps.shutter",
+        _set("template.steps.0.shutter", Shutter(pattern=ShutterPattern.CLOSED)),
+    ),
     (
         "template.template.steps.shutter.pattern",
-        _set("template.steps.0.shutter.pattern", ShutterPattern.CLOSED),
+        _set("template.steps.0.shutter", Shutter(pattern=ShutterPattern.OPEN)),
     ),
-    ("template.template.steps.gobo", _set("template.steps.0.gobo", None)),
+    (
+        "template.template.steps.gobo",
+        _set("template.steps.0.gobo", Gobo(pattern=GoboPattern.PRISM)),
+    ),
     (
         "template.template.steps.gobo.pattern",
-        _set("template.steps.0.gobo.pattern", GoboPattern.PRISM),
+        _set("template.steps.0.gobo", Gobo(pattern=GoboPattern.OPEN)),
     ),
 )
 
@@ -401,37 +384,34 @@ _COMPILE_CASES: tuple[tuple[str, Mutation], ...] = (
 def test_template_compile_field_changes_emitted_snapshot(
     config_path: str, mutation: Mutation
 ) -> None:
+    """Each path changes the physical compile, or makes it refuse the template."""
     baseline = _rich_doc()
     changed = baseline.model_copy(deep=True)
     mutation(changed)
 
+    assert "rejected" not in _compile_snapshot(baseline)
     assert _compile_snapshot(changed) != _compile_snapshot(baseline), config_path
 
 
-def test_template_movement_intensity_does_not_change_emitted_snapshot() -> None:
-    """P4-F1 reverted on 2026-11-12: the movement handler ignores this field.
-
-    It renders from `params.get("intensity", SMOOTH)`, so the step's declared
-    movement intensity leaves the compiled output unchanged.
-    """
-    baseline = _rich_doc()
-    changed = baseline.model_copy(deep=True)
-    _set("template.steps.0.movement.intensity", Intensity.INTENSE)(changed)
-
-    assert _compile_snapshot(changed) == _compile_snapshot(baseline)
-
-
 _PRESET_CASES: tuple[tuple[str, Mutation], ...] = (
-    ("template.presets", _set("presets.0.defaults", {"dimmer_floor_dmx": 90})),
+    (
+        "template.presets",
+        _set(
+            "presets.0.step_patches",
+            {"main": StepPatch(timing={"base_timing": {"duration_bars": 0.25}})},
+        ),
+    ),
     ("template.presets.preset_id", _set("presets.0.preset_id", "changed")),
-    ("template.presets.defaults", _set("presets.0.defaults", {"dimmer_floor_dmx": 90})),
     (
         "template.presets.step_patches",
-        _set("presets.0.step_patches", {"main": StepPatch(dimmer={"max_norm": 0.4})}),
+        _set(
+            "presets.0.step_patches",
+            {"main": StepPatch(timing={"base_timing": {"duration_bars": 0.25}})},
+        ),
     ),
     (
         "template.presets.step_patches.geometry",
-        _set("presets.0.step_patches", {"main": StepPatch(geometry={"geometry_type": "none"})}),
+        _set("presets.0.step_patches", {"main": StepPatch(geometry={"geometry_type": "fan"})}),
     ),
     (
         "template.presets.step_patches.movement",
@@ -471,24 +451,56 @@ _PRESET_CASES: tuple[tuple[str, Mutation], ...] = (
 def test_template_preset_field_changes_compiled_snapshot(
     config_path: str, mutation: Mutation
 ) -> None:
+    """Each path changes the physical compile under the preset, or makes it refuse."""
     baseline = _rich_doc()
     changed = baseline.model_copy(deep=True)
     mutation(changed)
 
+    assert "rejected" not in _compile_snapshot(baseline, preset=True)
     assert _compile_snapshot(changed, preset=True) != _compile_snapshot(baseline, preset=True), (
         config_path
     )
 
 
-def test_template_preset_name_changes_shipped_pipeline_log(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """The human-facing preset name is retained only because the renderer logs it."""
-    # Exercise the same shipped helper called by the preset-selection branch.
-    baseline = _rich_doc().presets[0]
-    changed = baseline.model_copy(update={"name": "Changed Preset"})
-    with caplog.at_level("DEBUG"):
-        _log_applied_preset_name(changed.name)
+_IDENTITY_ONLY_CASES: tuple[tuple[str, Mutation], ...] = (
+    ("template.template.defaults", _set("template.defaults", {"probe": 2})),
+    ("template.presets.defaults", _set("presets.0.defaults", {"probe": 2})),
+    ("template.presets.name", _set("presets.0.name", "Changed Preset")),
+)
 
-    assert baseline.name not in caplog.text
-    assert changed.name in caplog.text
+
+def _render(document: TemplateDoc) -> tuple[str, Any]:
+    plan = physical_sections(("effect_probe", 1, 4))
+    plan = plan.model_copy(
+        update={"sections": [plan.sections[0].model_copy(update={"preset_id": "base"})]}
+    )
+    with registered_templates(document):
+        pipeline = RenderingPipeline(
+            choreography_plan=plan,
+            beat_grid=physical_bars_grid(*([500.0] * 4)),
+            fixture_group=physical_rig(),
+            job_config=physical_job(),
+        )
+        pipeline.render()
+        return pipeline.fingerprint(), pipeline.frames
+
+
+@pytest.mark.parametrize(
+    ("config_path", "mutation"),
+    _IDENTITY_ONLY_CASES,
+    ids=[path for path, _ in _IDENTITY_ONLY_CASES],
+)
+def test_template_field_of_the_removed_renderer_changes_identity_only(
+    config_path: str, mutation: Mutation
+) -> None:
+    """The removed renderer was the only reader of these fields: changing one changes
+    the render fingerprint (the template document is part of it) and no encoded frame."""
+    baseline = _rich_doc()
+    changed = baseline.model_copy(deep=True)
+    mutation(changed)
+
+    fingerprint, frames = _render(changed)
+    base_fingerprint, base_frames = _render(baseline)
+
+    assert fingerprint != base_fingerprint, config_path
+    assert frames == base_frames

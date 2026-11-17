@@ -9,18 +9,21 @@ files it had no need to touch.
 from __future__ import annotations
 
 import inspect
-import json
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 
-from tests.golden.harness import RIGS, build_fixture_group, build_plan
-from twinklr.core.config.models import MHRenderPolicy
-from twinklr.core.config.render_policy import UnsupportedRenderModeError
+from tests.support.mh_physical import (
+    physical_catalog,
+    physical_grid,
+    physical_job,
+    physical_rig,
+    physical_sections,
+)
 from twinklr.core.reporting.evaluation.cli import eval_report_cli
-from twinklr.core.reporting.evaluation.collect import checkpoint_render_policy
+from twinklr.core.reporting.evaluation.collect import RecordedRender
 from twinklr.core.reporting.evaluation.generator import generate_evaluation_report
 from twinklr.core.reporting.evaluation.rerender import rerender_plan
 
@@ -35,11 +38,7 @@ def test_rerender_uses_fresh_path() -> None:
 
 
 def test_rerender_writes_no_sequence_file() -> None:
-    """The pipeline is built with no output path, so nothing is exported.
-
-    `tests/unit/reporting/evaluation/test_end_to_end.py` asserts the same thing from the
-    outside, by running a real report and finding no `.xsq` anywhere beneath it.
-    """
+    """The pipeline is built with no output path, so nothing is exported."""
     assert "output_path=None" in inspect.getsource(rerender_plan)
 
 
@@ -51,30 +50,22 @@ def test_eval_report_cli_has_no_xsq_option() -> None:
 
 
 @pytest.mark.asyncio
-async def test_rerender_refuses_a_physical_policy_before_reading_inputs(tmp_path: Path) -> None:
-    """A plan from a physical job is re-rendered only from the render its run recorded;
-    without one it is refused before any file or audio is read."""
-    with (
-        patch("twinklr.core.audio.analyzer.AudioAnalyzer") as analyzer,
-        pytest.raises(UnsupportedRenderModeError, match=r"eval-report.*physical_v2"),
-    ):
-        await rerender_plan(
-            plan=build_plan(),
-            audio_path=tmp_path / "missing.wav",
-            fixture_config_path=tmp_path / "missing.json",
-            render_policy=MHRenderPolicy(mode="physical_v2"),
-        )
-    analyzer.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_rerender_passes_the_given_policy_to_the_pipeline(tmp_path: Path) -> None:
-    """The policy is a required input and is what the re-render's pipeline runs under."""
+async def test_rerender_passes_the_recorded_policy_to_the_pipeline(tmp_path: Path) -> None:
+    """The recorded render is a required input and its policy is what the re-render's
+    pipeline runs under."""
     audio = tmp_path / "song.wav"
     audio.write_bytes(b"audio")
     fixtures = tmp_path / "fixtures.json"
-    fixtures.write_text(build_fixture_group(RIGS["mh4_minimal"]).model_dump_json())
-    policy = MHRenderPolicy()
+    fixtures.write_text(physical_rig().model_dump_json())
+    policy = physical_job(reposition_fallback="drop_accent").moving_heads
+    recorded = RecordedRender(
+        fingerprint="0" * 64,
+        policy=policy,
+        beat_grid=physical_grid(),
+        admission=None,
+        dark_spans=(),
+        inputs={},
+    )
 
     class FakeAnalyzer:
         def __init__(self, **kwargs: object) -> None:
@@ -90,52 +81,20 @@ async def test_rerender_passes_the_given_policy_to_the_pipeline(tmp_path: Path) 
             return SimpleNamespace(features={})
 
     with (
+        physical_catalog(),
         patch("twinklr.core.audio.analyzer.AudioAnalyzer", FakeAnalyzer),
-        patch("twinklr.core.reporting.evaluation.rerender.BeatGrid"),
         patch("twinklr.core.reporting.evaluation.rerender.RenderingPipeline") as pipeline,
     ):
         pipeline.return_value.render.return_value = []
         await rerender_plan(
-            plan=build_plan(),
+            plan=physical_sections(("mirror_wings", 1, 2)),
             audio_path=audio,
             fixture_config_path=fixtures,
-            render_policy=policy,
+            recorded=recorded,
         )
 
     assert pipeline.call_args.kwargs["job_config"].moving_heads == policy
-    assert inspect.signature(rerender_plan).parameters["render_policy"].default is (
+    assert pipeline.call_args.kwargs["beat_grid"] == recorded.beat_grid
+    assert inspect.signature(rerender_plan).parameters["recorded"].default is (
         inspect.Parameter.empty
     )
-
-
-@pytest.mark.asyncio
-async def test_eval_report_refuses_a_physical_checkpoint_before_analysis(tmp_path: Path) -> None:
-    """A checkpoint written by a physical job names its mode; one that records no render
-    is refused before reading audio, instead of re-rendering the plan as legacy or
-    without the run's gate result."""
-    checkpoint = tmp_path / "final.json"
-    checkpoint.write_text(
-        json.dumps(
-            {
-                "run_id": "physical-run",
-                "plan": build_plan().model_dump(mode="json"),
-                "render_mode": "physical_v2",
-            }
-        )
-    )
-    with (
-        patch("twinklr.core.audio.analyzer.AudioAnalyzer") as analyzer,
-        pytest.raises(UnsupportedRenderModeError, match="physical_v2"),
-    ):
-        await generate_evaluation_report(
-            checkpoint_path=checkpoint,
-            audio_path=tmp_path / "song.wav",
-            fixture_config_path=tmp_path / "fixtures.json",
-            output_dir=tmp_path / "out",
-        )
-    analyzer.assert_not_called()
-
-
-def test_checkpoint_without_a_mode_is_legacy() -> None:
-    assert checkpoint_render_policy({"plan": {}}) == MHRenderPolicy()
-    assert checkpoint_render_policy({"render_mode": "physical_v2"}).mode == "physical_v2"

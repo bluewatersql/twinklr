@@ -215,14 +215,14 @@ generation use `extra="forbid"`.
 ```
 ConfigBase (load_or_default)
 ├── AppConfig           # config.json — provider, cache, audio processing, logging
-└── JobConfig           # job_config.json — agents, fixture path, assets, transitions
+└── JobConfig           # job_config.json — agents, fixture path, assets, moving-head policy
     ├── AgentOrchestrationConfig
     │   ├── AgentConfig (plan, judge, refinement, profile, lyrics, asset enrichment)
     │   ├── LLMLoggingConfig
     │   └── CacheConfig
     ├── AssetGenerationConfig
-    ├── TransitionConfig
-    └── TimelineTracksConfig
+    ├── TimelineTracksConfig
+    └── MHRenderPolicy
 ```
 
 `ConfigBase.load_or_default(path)` loads from a JSON file or falls back to the class's `default_path()`. `AppConfig` has special handling to load `llm_api_key` from the `OPENAI_API_KEY` environment variable.
@@ -248,24 +248,22 @@ Factory: `TwinklrSession.from_directory(config_dir)` discovers `config.json` and
 ### Sequencer & Rendering
 
 **Moving heads** (`packages/twinklr/core/sequencer/moving_heads/`):
-- Template compiler transforms `ChoreographyPlan` sections into DMX fixture segments
-- Each fixture gets per-channel value curves (pan, tilt, dimmer, shutter, color, gobo)
+- The physical template compiler turns `ChoreographyPlan` sections into cues with
+  typed physical trajectories; the transaction pass plans dark repositioning between
+  them, and the frame encoder writes complete 20 ms frames as constant DMX effects
 - Output is a fresh xLights `.xsq` plus `.xtiming`/`.xmap` sidecars, written by `moving_heads/delivery.py`; no user sequence is read
-- The template registry accepts both Python factories and strict JSON `TemplateDoc`
-  files. Python builtins load first; normalized ID/name/alias collisions fail unless
-  an explicit override targets the exact incumbent ID. Tracked moving-head data lives at
-  `catalog/templates/moving_heads/` alongside, but schema-distinct from, display recipes.
+- The template registry accepts strict JSON `TemplateDoc` files. The family catalog
+  (`catalog/templates/moving_heads_physical/`) loads first; normalized ID/name/alias
+  collisions fail unless an explicit override targets the exact incumbent ID.
 
-Export every Python builtin to deterministic JSON and validate any data directory with:
+Validate any data directory with:
 
 ```bash
-uv run twinklr template-export --out /tmp/mh-templates
 uv run twinklr template-validate --template-dir /tmp/mh-templates
 ```
 
-The converter writes one document per template. Registration lints repeat-cycle
-partitioning, timing overruns, energy ranges, recommended sections, and declared
-remainder policy for both Python and data sources.
+Registration lints repeat-cycle partitioning, timing overruns, energy ranges,
+recommended sections, and declared remainder policy.
 
 **Display sequencer** (`packages/twinklr/core/sequencer/display/`):
 - 24 effect handlers for RGB/pixel elements
@@ -283,9 +281,8 @@ remainder policy for both Python and data sources.
 - `.xtiming` and `.xmap` writers for the mapping-free timing deliverable and the import
   mapping hint
 - Typed live automation in `core/api/xlights/`: one stateful async client is pinned to
-  the instance whose `getModels` response drove planning. Injection uses the same
-  `XsqAdapter`/`DmxSettingsBuilder` settings and relative-layer boundary as file export,
-  maps those layers into a reserved namespace starting at 99,
+  the instance whose `getModels` response drove planning. Injection reads the effects
+  the `.xsq` is written from, moves them into a reserved namespace starting at 99,
   preflights `getEffectIDs`/`getEffectSettings`, and never retries an ambiguous POST.
 - Custom value curve support
 - Timeline tracks for beat/section markers
@@ -385,7 +382,6 @@ The complete, category-based inventory and data requirements live in
 |---|---|
 | `scripts/validation/validate_artifacts.py` | Validate generated moving-head/display plans and XSQ artifacts; not wired into Make or CI |
 | `scripts/validation/validate_agent_artifacts.py` | Run saved-response schema and prompt validation; not wired into Make or CI |
-| `scripts/demo_moving_heads_pipeline.py` | Data-dependent moving-head pipeline demo |
 | `scripts/demo_sequencer_pipeline.py` | Compatibility shim forwarding to the production `twinklr display` CLI path |
 | `scripts/test_audio_pipeline.py` | Manual audio harness used by the `make test-audio*` targets; despite its name, pytest does not collect it |
 | `scripts/build/build_pipeline.py` | **Removed** with the ABANDON-candidate unified FE entrypoint on 2026-02-24 (`82aaf38`) |
@@ -418,10 +414,8 @@ The complete, category-based inventory and data requirements live in
 
 Prefer a strict JSON `TemplateDoc` in a configured template directory. Validate it with
 `twinklr template-validate`, then pass the directory to `twinklr run --template-dir`.
-Python factories under `packages/twinklr/core/sequencer/moving_heads/templates/builtins/`
-remain supported as an authoring convenience and load through `load_builtin_templates()`.
-Each form defines the same geometry, movement, dimmer, wheel-axis, metadata, and preset
-contract, and both pass the same registration linter.
+The family catalog's README (`catalog/templates/moving_heads_physical/README.md`)
+describes the physical step data a template must carry.
 
 ### Adding a New LLM Provider
 

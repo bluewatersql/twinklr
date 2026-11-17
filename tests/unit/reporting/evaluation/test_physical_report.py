@@ -548,6 +548,33 @@ async def test_a_physical_checkpoint_without_a_record_is_refused_with_what_is_tr
 
 
 @pytest.mark.asyncio
+async def test_a_record_whose_policy_names_mode_is_refused_with_the_remedy(
+    tmp_path: Path,
+) -> None:
+    """The physical renderer wrote `policy.mode` while a job could choose between two
+    renderers; such a record is refused, not read, naming why and what to do."""
+    with physical_catalog():
+        checkpoint, fixture_path, _ = await _run(tmp_path)
+        data = json.loads(checkpoint.read_text(encoding="utf-8"))
+        data["render"]["policy"]["mode"] = "physical_v2"
+        checkpoint.write_text(json.dumps(data), encoding="utf-8")
+        with (
+            patch("twinklr.core.audio.analyzer.AudioAnalyzer") as analyzer,
+            pytest.raises(UnsupportedRenderModeError) as refused,
+        ):
+            await generate_evaluation_report(
+                checkpoint_path=checkpoint,
+                audio_path=tmp_path / "song.wav",
+                fixture_config_path=fixture_path,
+                output_dir=tmp_path / "report",
+            )
+    analyzer.assert_not_called()
+    message = " ".join(str(refused.value).split())
+    assert "its policy names `mode`" in message
+    assert "re-running the command that planned it plans and records it again" in message
+
+
+@pytest.mark.asyncio
 async def test_a_run_without_a_gate_result_validates_against_the_catalog(tmp_path: Path) -> None:
     """With no recorded gate result, the plan is validated against the registry with the
     physical catalog loaded, as the run loaded it."""

@@ -168,13 +168,8 @@ class TestPlannerAndRendererAgree:
         This is the property the whole task exists for: `_ms_to_bar` and
         `TemplateCompileContext._bar_to_ms` are inverses over the detected range.
         """
-        from twinklr.core.curves.registry import CurveRegistry
         from twinklr.core.sequencer.models.context import TemplateCompileContext
-        from twinklr.core.sequencer.moving_heads.handlers.defaults import (
-            create_default_registries,
-        )
 
-        registries = create_default_registries()
         planner = make_context(uneven)
         renderer = TemplateCompileContext(
             section_id="section",
@@ -183,10 +178,6 @@ class TestPlannerAndRendererAgree:
             beat_grid=uneven,
             start_bar=1,
             duration_bars=1,
-            curve_registry=CurveRegistry(),
-            geometry_registry=registries["geometry"],
-            movement_registry=registries["movement"],
-            dimmer_registry=registries["dimmer"],
         )
 
         for bar in range(1, len(UNEVEN_BARS) + 1):

@@ -40,8 +40,7 @@ from tests.support.mh_physical import (
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import JobConfig
 from twinklr.core.config.render_policy import UnsupportedRenderModeError
-from twinklr.core.curves.registry import CurveRegistry
-from twinklr.core.sequencer.models.context import StepCompileContext, TemplateCompileContext
+from twinklr.core.sequencer.models.context import TemplateCompileContext
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import (
     ContinuousTrajectory,
@@ -59,12 +58,10 @@ from twinklr.core.sequencer.models.template import Template, TemplateStep
 from twinklr.core.sequencer.moving_heads import pipeline as pipeline_module
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.physical import PhysicalCompileError
-from twinklr.core.sequencer.moving_heads.compile.step_compiler import compile_step
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
     compile_physical_template,
 )
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
-from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
 from twinklr.core.sequencer.moving_heads.pipeline import (
     RenderingPipeline,
     check_physical_templates,
@@ -114,7 +111,6 @@ def _template(*steps: dict[str, Any], cycle_bars: float = 1.0) -> Template:
 def _compile(
     template: Template, rig: FixtureGroup, *, duration_bars: int = 1
 ) -> list[FixtureSegment]:
-    registries = create_default_registries()
     context = TemplateCompileContext(
         section_id="verse",
         template_id=template.template_id,
@@ -122,10 +118,6 @@ def _compile(
         beat_grid=_GRID,
         start_bar=1,
         duration_bars=duration_bars,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
         presets=rig.presets,
         topology=rig_topology(rig),
         fixture_group_id=rig.group_id,
@@ -657,7 +649,7 @@ def test_topology_must_place_every_fixture_of_the_group_once() -> None:
 # --- Legacy, dumps and identity --------------------------------------------------------
 
 
-def test_absent_topology_and_distribution_are_left_out_of_dumps_and_legacy_refuses() -> None:
+def test_absent_topology_and_distribution_are_left_out_of_dumps() -> None:
     rig = physical_rig()
     assert rig.topology is None
     assert "topology" not in rig.model_dump(mode="json")
@@ -673,28 +665,6 @@ def test_absent_topology_and_distribution_are_left_out_of_dumps_and_legacy_refus
     assert "physical_distribution" not in TemplateStep.model_validate(legacy).model_dump(
         mode="json"
     )
-    with_distribution = TemplateStep.model_validate(
-        {**legacy, "physical_distribution": [{"domains": ["dimmer"]}]}
-    )
-    assert with_distribution.has_physical_data
-    registries = create_default_registries()
-    context = StepCompileContext(
-        section_id="verse",
-        segment_id="A",
-        template_id="p22_probe",
-        fixture_id="MH1",
-        role="LEFT",
-        calibration={},
-        start_ms=0,
-        duration_ms=1000,
-        beat_grid=_GRID,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
-    )
-    with pytest.raises(ValueError, match="physical_v2"):
-        compile_step(with_distribution, context)
 
 
 def _job(ids: tuple[str, ...]) -> JobConfig:

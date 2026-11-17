@@ -12,10 +12,7 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
 from twinklr.core.config.fixtures.capabilities import InitialFixtureState
-from twinklr.core.curves.library import CurveLibrary
 from twinklr.core.formats.xlights.sequence.timeline import TimelineTracksConfig
-from twinklr.core.sequencer.models.enum import TransitionMode
-from twinklr.core.sequencer.models.transition import TransitionStrategy
 
 DEFAULT_IMAGE_MODEL = "gpt-image-2"
 
@@ -584,59 +581,6 @@ class AppConfig(ConfigBase):
         return Path("config.json")
 
 
-class TransitionConfig(BaseModel):
-    """Global transition behavior configuration.
-
-    Controls default transition behavior and global settings.
-
-    Attributes:
-        enabled: Enable/disable transitions globally.
-        default_duration_bars: Default transition duration when not specified.
-        default_mode: Default transition mode.
-        default_curve: Default interpolation curve.
-        min_section_duration_bars: Minimum section duration to allow transitions.
-        allow_overlaps: Allow transition overlap regions.
-        per_channel_defaults: Default strategy per channel type.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    enabled: bool = Field(default=True, description="Enable transitions globally")
-
-    default_duration_bars: float = Field(
-        default=0.5,
-        ge=0.0,
-        le=4.0,
-        description="Default transition duration when not specified",
-    )
-
-    default_mode: TransitionMode = Field(
-        default=TransitionMode.CROSSFADE, description="Default transition mode"
-    )
-
-    default_curve: CurveLibrary = Field(
-        default=CurveLibrary.EASE_IN_OUT_SINE, description="Default transition curve"
-    )
-
-    min_section_duration_bars: float = Field(
-        default=1.0, ge=0.5, description="Minimum section duration to allow transitions"
-    )
-
-    allow_overlaps: bool = Field(default=True, description="Allow transition overlap regions")
-
-    per_channel_defaults: dict[str, TransitionStrategy] = Field(
-        default_factory=lambda: {
-            "pan": TransitionStrategy.SMOOTH_INTERPOLATION,
-            "tilt": TransitionStrategy.SMOOTH_INTERPOLATION,
-            "dimmer": TransitionStrategy.CROSSFADE,
-            "shutter": TransitionStrategy.SEQUENCE,
-            "color": TransitionStrategy.FADE_VIA_BLACK,
-            "gobo": TransitionStrategy.FADE_VIA_BLACK,
-        },
-        description="Default strategy per channel type",
-    )
-
-
 DEFAULT_MAX_EFFECTS = 1_000_000
 """Default physical effect budget. Eight heads in four minutes of continuous 16-bit
 motion emit about 95,000 effects, so the byte budget is the one that binds."""
@@ -646,23 +590,15 @@ DEFAULT_MAX_XSQ_BYTES = 134_217_728
 
 
 class MHRenderPolicy(BaseModel):
-    """Versioned moving-head render policy.
+    """Moving-head render policy.
 
     Forbids unknown fields so a job written for a newer renderer is rejected rather
-    than silently rendered with legacy behavior.
+    than silently rendered without what it asks for.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    mode: Literal["legacy_v1", "physical_v2"] = Field(
-        default="legacy_v1",
-        description=(
-            "Moving-head renderer. `physical_v2` requires schema_version 3.1, a "
-            "physical_profile on every fixture and a usable initial state for each; "
-            "a job missing them is rejected when its fixtures load, before planning."
-        ),
-    )
-    # Left out of dumps when empty so legacy render fingerprints are unchanged.
+    # Left out of dumps when empty, so it enters render identity only when given.
     initial_states: dict[str, InitialFixtureState] = Field(
         default_factory=dict,
         exclude_if=lambda value: not value,
@@ -671,8 +607,8 @@ class MHRenderPolicy(BaseModel):
             "fixture without an entry has an unknown initial state."
         ),
     )
-    # Left out of dumps at their defaults so legacy render fingerprints are unchanged.
-    # A non-default budget is dumped and so enters render identity.
+    # Left out of dumps at their defaults; a non-default budget is dumped and so enters
+    # render identity.
     max_effects: int = Field(
         default=DEFAULT_MAX_EFFECTS,
         gt=0,
@@ -693,7 +629,7 @@ class MHRenderPolicy(BaseModel):
             "Physical output only. A non-default value is part of render identity."
         ),
     )
-    # Left out of dumps at its default so legacy render fingerprints are unchanged.
+    # Left out of dumps at its default; a non-default value enters render identity.
     reposition_fallback: Literal["error", "preserve_aim", "drop_accent"] = Field(
         default="error",
         exclude_if=lambda value: value == "error",
@@ -705,7 +641,7 @@ class MHRenderPolicy(BaseModel):
             "value is part of render identity."
         ),
     )
-    # Left out of dumps at its default so physical render fingerprints are unchanged.
+    # Left out of dumps at its default; a non-default value enters render identity.
     on_unplayable: Literal["dark", "error"] = Field(
         default="dark",
         exclude_if=lambda value: value == "dark",
@@ -724,7 +660,7 @@ class JobConfig(ConfigBase):
     """Job/task-specific configuration.
 
     This represents one sequencing job: its fixture source, agent settings,
-    asset policy, output identity, transition behavior, and timeline tracks.
+    asset policy, output identity, moving-head render policy, and timeline tracks.
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -749,9 +685,29 @@ class JobConfig(ConfigBase):
                 raise ValueError(
                     f"job fields {removed} were removed because they never affected execution"
                 )
+            # Removed with the second moving-head renderer, which they selected or tuned.
+            if "transitions" in value:
+                raise ValueError(
+                    "job field 'transitions' was removed with the old moving-head renderer: "
+                    "the renderer plans each head's repositioning between cues itself. "
+                    "Delete the key"
+                )
+            moving_heads = value.get("moving_heads")
+            if isinstance(moving_heads, dict) and "mode" in moving_heads:
+                raise ValueError(
+                    "job field 'moving_heads.mode' was removed: moving heads have one "
+                    "renderer, the one 'physical_v2' selected. Delete the key; every fixture "
+                    "needs a physical_profile and a moving_heads.initial_states entry"
+                )
+            if value.get("schema_version") == "3.0":
+                raise ValueError(
+                    "job schema_version '3.0' is no longer accepted: it selected the removed "
+                    "moving-head renderer. Set schema_version to '3.1' or delete it; every "
+                    "fixture needs a physical_profile and a moving_heads.initial_states entry"
+                )
         return value
 
-    schema_version: Literal["3.0", "3.1"] = "3.0"
+    schema_version: Literal["3.1"] = "3.1"
 
     fixture_config_path: str = "fixture_config.json"
 
@@ -766,11 +722,6 @@ class JobConfig(ConfigBase):
         ),
     )
 
-    transitions: TransitionConfig = Field(
-        default_factory=TransitionConfig,
-        description="Transition behavior configuration for smooth blending between sections and steps",
-    )
-
     timeline_tracks: TimelineTracksConfig = Field(
         default_factory=TimelineTracksConfig,
         description=(
@@ -781,14 +732,8 @@ class JobConfig(ConfigBase):
 
     moving_heads: MHRenderPolicy = Field(
         default_factory=MHRenderPolicy,
-        description="Moving-head render policy; omitted jobs keep the legacy renderer",
+        description="Moving-head render policy",
     )
-
-    @model_validator(mode="after")
-    def require_schema_for_render_mode(self) -> Self:
-        if self.moving_heads.mode == "physical_v2" and self.schema_version != "3.1":
-            raise ValueError("moving_heads.mode 'physical_v2' requires schema_version '3.1'")
-        return self
 
     @classmethod
     def default_path(cls) -> Path:

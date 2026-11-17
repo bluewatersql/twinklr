@@ -1,216 +1,78 @@
 """Unit tests for RenderingPipeline.
 
-Covers: initialization, section iteration, fixture context building,
-transition planning (with real durations), and XSQ export with timeline tracks.
+Covers: initialization, section iteration, fixture context building, the plan schema's
+intent fields, and the delivery with timeline tracks.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
-from twinklr.core.agents.sequencer.moving_heads.models import (
-    ChoreographyPlan,
-    ColorIntent,
-    ColorIntentKind,
-    GoboEvent,
-    PlanSection,
-    PlanSegment,
-    ShutterEvent,
+from tests.support.mh_physical import (
+    SUBSET_TEMPLATE_ID,
+    family_job,
+    family_rig,
+    physical_bars_grid,
+    physical_catalog,
+    physical_sections,
+    physical_test_templates,
 )
-from twinklr.core.config.fixtures import FixtureGroup
-from twinklr.core.config.fixtures.dmx import DmxMapping
-from twinklr.core.config.fixtures.instances import FixtureConfig, FixtureInstance
+from twinklr.core.agents.sequencer.moving_heads.models import PlanSection
 from twinklr.core.config.models import JobConfig
 from twinklr.core.formats.xlights.sequence.models.xsq import TimingTrack
-from twinklr.core.sequencer.models.enum import ChannelName, Intensity, TransitionMode
-from twinklr.core.sequencer.models.template import Color
-from twinklr.core.sequencer.models.transition import TransitionHint, TransitionRegistry
-from twinklr.core.sequencer.moving_heads.compile.intent_resolution import apply_template_intent
-from twinklr.core.sequencer.moving_heads.export.dmx_settings_builder import DmxSettingsBuilder
-from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
-from twinklr.core.sequencer.moving_heads.pipeline import (
-    RenderingPipeline,
+from twinklr.core.sequencer.models.enum import TemplateRole
+from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
+    UnsupportedRigShapeError,
 )
-from twinklr.core.sequencer.moving_heads.templates import get_template
+from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
-from twinklr.core.sequencer.vocabulary.visual import PaletteRole
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
+HEADS = ("MH1", "MH2", "MH3", "MH4")
 
 
-def _make_dmx_mapping() -> DmxMapping:
-    return DmxMapping(pan_channel=11, tilt_channel=13, dimmer_channel=15)
+def _make_beat_grid(bars: int = 8) -> BeatGrid:
+    return physical_bars_grid(*([500.0] * bars))
 
 
-def _make_parameterized_mapping() -> DmxMapping:
-    return DmxMapping(
-        pan_channel=1,
-        tilt_channel=2,
-        dimmer_channel=3,
-        color_channel=4,
-        shutter_channel=6,
-        gobo_channel=7,
-        color_map={"open": 0, "magenta": 126},
-        gobo_map={"open": 0, "stars": 60},
+def _job(heads: tuple[str, ...] = HEADS, **fields: Any) -> JobConfig:
+    """`family_job` for `heads`, with other job fields set from `fields`."""
+    payload = family_job(heads).model_dump(mode="json", exclude_unset=True)
+    return JobConfig.model_validate({**payload, **fields})
+
+
+def _pipeline(
+    heads: tuple[str, ...] = HEADS,
+    sections: tuple[tuple[str, int, int], ...] = (
+        ("mirror_wings", 1, 4),
+        ("target_orbit", 5, 8),
+    ),
+    *,
+    beat_grid: BeatGrid | None = None,
+    job_config: JobConfig | None = None,
+    **kwargs: Any,
+) -> RenderingPipeline:
+    return RenderingPipeline(
+        choreography_plan=physical_sections(*sections),
+        beat_grid=beat_grid or _make_beat_grid(),
+        fixture_group=family_rig(heads),
+        job_config=job_config or _job(heads),
+        **kwargs,
     )
 
 
-def _make_fixture_group(count: int = 4) -> FixtureGroup:
-    """Build a minimal FixtureGroup with ``count`` fixtures."""
-    group = FixtureGroup(group_id="test_group")
-    for i in range(count):
-        fid = f"MH{i + 1}"
-        cfg = FixtureConfig(fixture_id=fid, dmx_mapping=_make_dmx_mapping())
-        inst = FixtureInstance(fixture_id=fid, config=cfg, xlights_model_name=f"Dmx {fid}")
-        group.add_fixture(inst)
-    return group
+@pytest.fixture(autouse=True)
+def _catalog() -> Iterator[None]:
+    with physical_catalog():
+        yield
 
 
-def _make_parameterized_fixture_group(count: int = 4) -> FixtureGroup:
-    group = FixtureGroup(group_id="parameterized_group")
-    for i in range(count):
-        fixture_id = f"MH{i + 1}"
-        config = FixtureConfig(fixture_id=fixture_id, dmx_mapping=_make_parameterized_mapping())
-        group.add_fixture(
-            FixtureInstance(
-                fixture_id=fixture_id,
-                config=config,
-                xlights_model_name=f"Dmx {fixture_id}",
-            )
-        )
-    return group
-
-
-def test_schema_v2_intents_reach_emitted_fixture_segments() -> None:
-    plan = ChoreographyPlan(
-        sections=[
-            PlanSection(
-                section_name="chorus",
-                start_bar=1,
-                end_bar=4,
-                template_id="sweep_lr_fan_hold",
-                intensity=Intensity.INTENSE,
-                color_intent=ColorIntent(
-                    kind=ColorIntentKind.PALETTE_ROLE,
-                    palette_role=PaletteRole.ACCENT,
-                    explicit_color=None,
-                ),
-                shutter_events=[
-                    ShutterEvent(bar=1, beat=2, pattern="strobe_fast", moment_cue_id=None)
-                ],
-                gobo_events=[GoboEvent(bar=1, beat=3, pattern="stars", moment_cue_id=None)],
-            )
-        ]
-    )
-    pipeline = RenderingPipeline(
-        choreography_plan=plan,
-        beat_grid=_make_beat_grid(),
-        fixture_group=_make_parameterized_fixture_group(),
-        job_config=JobConfig(),
-    )
-
-    segments = pipeline.render()
-
-    assert any(segment.channels[ChannelName.COLOR].static_dmx == 126 for segment in segments)
-    assert any(
-        (value := segment.channels.get(ChannelName.SHUTTER)) is not None and value.static_dmx == 190
-        for segment in segments
-    )
-    assert any(
-        (value := segment.channels.get(ChannelName.GOBO)) is not None and value.static_dmx == 60
-        for segment in segments
-    )
-    assert any(segment.t0_ms == 500 for segment in segments)
-    assert any(segment.t0_ms == 1000 for segment in segments)
-
-    settings = []
-    for segment in segments:
-        fixture = pipeline.fixture_group.get_fixture(segment.fixture_id)
-        assert fixture is not None
-        settings.append(DmxSettingsBuilder(fixture).build_settings_string(segment))
-    assert any("E_SLIDER_DMX4=126" in value for value in settings)
-    assert any("E_SLIDER_DMX6=190" in value for value in settings)
-    assert any("E_SLIDER_DMX7=60" in value for value in settings)
-
-
-def test_legacy_default_intent_does_not_add_parameterized_channels() -> None:
-    pipeline = RenderingPipeline(
-        choreography_plan=_make_plan([("intro", 1, 4, "sweep_lr_fan_hold")]),
-        beat_grid=_make_beat_grid(),
-        fixture_group=_make_parameterized_fixture_group(),
-        job_config=JobConfig(),
-    )
-
-    segments = pipeline.render()
-
-    assert all(ChannelName.COLOR not in segment.channels for segment in segments)
-    assert all(ChannelName.SHUTTER not in segment.channels for segment in segments)
-    assert all(ChannelName.GOBO not in segment.channels for segment in segments)
-
-
-def test_omitted_legacy_intent_differs_from_explicit_smooth_primary() -> None:
-    legacy_section = PlanSection(
-        section_name="legacy",
-        start_bar=1,
-        end_bar=4,
-        template_id="sweep_lr_fan_hold",
-    )
-    explicit_section = PlanSection(
-        section_name="explicit",
-        start_bar=1,
-        end_bar=4,
-        template_id="sweep_lr_fan_hold",
-        intensity=Intensity.SMOOTH,
-        color_intent=ColorIntent(
-            kind=ColorIntentKind.PALETTE_ROLE,
-            palette_role=PaletteRole.PRIMARY,
-            explicit_color=None,
-        ),
-        shutter_events=[],
-        gobo_events=[],
-        moment_cues=[],
-    )
-    pipeline = RenderingPipeline(
-        choreography_plan=ChoreographyPlan(sections=[legacy_section]),
-        beat_grid=_make_beat_grid(),
-        fixture_group=_make_parameterized_fixture_group(),
-        job_config=JobConfig(),
-    )
-    original = get_template("sweep_lr_fan_hold").template
-    nonmatching_steps = [
-        step.model_copy(
-            update={
-                "movement": step.movement.model_copy(
-                    update={"intensity": Intensity.INTENSE}, deep=True
-                ),
-                "dimmer": step.dimmer.model_copy(
-                    update={"intensity": Intensity.INTENSE}, deep=True
-                ),
-                "color": Color(preset=ColorPreset.BLUE),
-            },
-            deep=True,
-        )
-        for step in original.steps
-    ]
-    nonmatching = original.model_copy(update={"steps": nonmatching_steps}, deep=True)
-
-    legacy = apply_template_intent(nonmatching, pipeline._resolve_section_intent(legacy_section))
-    explicit = apply_template_intent(
-        nonmatching, pipeline._resolve_section_intent(explicit_section)
-    )
-
-    assert all(step.movement.intensity is Intensity.INTENSE for step in legacy.steps)
-    assert all(step.color == Color(preset=ColorPreset.BLUE) for step in legacy.steps)
-    assert all(step.movement.intensity is Intensity.SMOOTH for step in explicit.steps)
-    assert all(step.dimmer.intensity is Intensity.SMOOTH for step in explicit.steps)
-    assert all(step.color == Color(preset=ColorPreset.RED) for step in explicit.steps)
-
+def test_plan_section_schema_requires_every_intent_field() -> None:
     schema = PlanSection.model_json_schema()
     assert "_legacy_intent_omitted" not in schema["properties"]
     assert {
@@ -223,52 +85,55 @@ def test_omitted_legacy_intent_differs_from_explicit_smooth_primary() -> None:
 
 
 def test_one_head_rig_collapses_spatial_groups_to_its_only_fixture() -> None:
-    pipeline = RenderingPipeline(
-        choreography_plan=_make_plan([("intro", 1, 4, "sweep_lr_fan_hold")]),
-        beat_grid=_make_beat_grid(),
-        fixture_group=_make_fixture_group(1),
-        job_config=JobConfig(),
-    )
+    pipeline = _pipeline(("MH1",), (("mirror_wings", 1, 4),))
 
     segments = pipeline.render()
 
     assert segments
     assert {segment.fixture_id for segment in segments} == {"MH1"}
+    assert any(segment.template_id == "mirror_wings" for segment in segments)
 
 
-def _make_beat_grid(bars: int = 8, bpm: float = 120.0) -> BeatGrid:
-    return BeatGrid.from_tempo(tempo_bpm=bpm, total_bars=bars)
+EIGHT = tuple(f"MH{index}" for index in range(1, 9))
 
 
-def _make_plan(sections: list[tuple[str, int, int, str]] | None = None) -> ChoreographyPlan:
-    """Build a ChoreographyPlan from (name, start, end, template_id) tuples."""
-    if sections is None:
-        sections = [
-            ("intro", 1, 4, "sweep_lr_fan_hold"),
-            ("verse", 5, 8, "pendulum_chevron_breathe"),
-        ]
-    return ChoreographyPlan(
-        sections=[
-            PlanSection(
-                section_name=name,
-                start_bar=s,
-                end_bar=e,
-                template_id=tid,
-            )
-            for name, s, e, tid in sections
-        ],
-    )
+def test_8head_rig_renders_its_sections_on_every_head() -> None:
+    """P4-F26: every plan section emits cues, on all eight heads."""
+    segments = _pipeline(EIGHT).render()
+
+    cues = [segment for segment in segments if segment.section_id in {"s1", "s2"}]
+    assert {segment.section_id for segment in cues} == {"s1", "s2"}
+    assert {segment.fixture_id for segment in cues} == set(EIGHT)
+
+
+def test_8head_rig_fixture_roles_are_spatial() -> None:
+    """The mechanism, named so a future reader does not have to re-derive it."""
+    roles = [context.role for context in _pipeline(EIGHT)._build_fixture_contexts()]
+    assert roles == [
+        TemplateRole.FAR_LEFT,
+        TemplateRole.OUTER_LEFT,
+        TemplateRole.MID_LEFT,
+        TemplateRole.INNER_LEFT,
+        TemplateRole.INNER_RIGHT,
+        TemplateRole.MID_RIGHT,
+        TemplateRole.OUTER_RIGHT,
+        TemplateRole.FAR_RIGHT,
+    ]
+
+
+def test_a_group_the_rig_cannot_fill_raises_rather_than_going_dark() -> None:
+    """A template addressing RIGHT on a one-head rig (CENTER only) is a rig/plan mismatch
+    the operator has to see, not a section to skip in silence."""
+    with physical_test_templates():
+        pipeline = _pipeline(("MH1",), ((SUBSET_TEMPLATE_ID, 1, 2),))
+        with pytest.raises(UnsupportedRigShapeError, match=SUBSET_TEMPLATE_ID):
+            pipeline.render()
 
 
 @pytest.fixture
 def pipeline() -> RenderingPipeline:
     """Create a minimal RenderingPipeline for testing."""
-    return RenderingPipeline(
-        choreography_plan=_make_plan(),
-        beat_grid=_make_beat_grid(),
-        fixture_group=_make_fixture_group(4),
-        job_config=JobConfig(),
-    )
+    return _pipeline()
 
 
 # ---------------------------------------------------------------------------
@@ -288,13 +153,7 @@ class TestInit:
 
     def test_timeline_tracks_injected(self) -> None:
         track = TimingTrack(name="beats", markers=[])
-        rp = RenderingPipeline(
-            choreography_plan=_make_plan(),
-            beat_grid=_make_beat_grid(),
-            fixture_group=_make_fixture_group(),
-            job_config=JobConfig(),
-            timeline_tracks=[track],
-        )
+        rp = _pipeline(timeline_tracks=[track])
         assert len(rp.timeline_tracks) == 1
         assert rp.timeline_tracks[0].name == "beats"
 
@@ -317,7 +176,7 @@ class TestIteratePlanSections:
     def test_section_names_match(self, pipeline: RenderingPipeline) -> None:
         sections = list(pipeline.iterate_plan_sections(pipeline.choreography_plan))
         names = [s.section_name for s in sections]
-        assert names == ["intro", "verse"]
+        assert names == ["s1", "s2"]
 
 
 # ---------------------------------------------------------------------------
@@ -326,7 +185,7 @@ class TestIteratePlanSections:
 
 
 class TestBuildFixtureContexts:
-    """Tests for _build_fixture_contexts (role inference, calibration)."""
+    """Tests for _build_fixture_contexts (role inference)."""
 
     def test_returns_context_per_fixture(self, pipeline: RenderingPipeline) -> None:
         contexts = pipeline._build_fixture_contexts()
@@ -338,12 +197,7 @@ class TestBuildFixtureContexts:
         assert roles == ["OUTER_LEFT", "INNER_LEFT", "INNER_RIGHT", "OUTER_RIGHT"]
 
     def test_two_fixture_roles(self) -> None:
-        rp = RenderingPipeline(
-            choreography_plan=_make_plan(),
-            beat_grid=_make_beat_grid(),
-            fixture_group=_make_fixture_group(2),
-            job_config=JobConfig(),
-        )
+        rp = _pipeline(("MH1", "MH2"))
         contexts = rp._build_fixture_contexts()
         roles = [c.role for c in contexts]
         assert roles == ["LEFT", "RIGHT"]
@@ -355,199 +209,12 @@ class TestBuildFixtureContexts:
 
 
 # ---------------------------------------------------------------------------
-# Transition planning uses real durations
-# ---------------------------------------------------------------------------
-
-
-class TestTransitionPlanning:
-    """Verify _detect_and_plan_transitions uses real section durations."""
-
-    def test_transition_boundaries_detected(self) -> None:
-        """Pipeline with transitions enabled should detect 1 boundary for 2 sections."""
-        plan = _make_plan()
-        job = JobConfig()
-        job.transitions.enabled = True
-        rp = RenderingPipeline(
-            choreography_plan=plan,
-            beat_grid=_make_beat_grid(),
-            fixture_group=_make_fixture_group(),
-            job_config=job,
-        )
-        registry = rp._detect_and_plan_transitions()
-        assert len(registry.transitions) == 1
-
-    def test_zero_width_snap_transition_is_not_registered(self) -> None:
-        """A snap boundary (zero-width overlap) must not be registered as a transition.
-
-        A snap is an instantaneous cut with no blend region; ``_calculate_overlap`` returns
-        ``overlap_start == overlap_end``. Registering it compiles a zero-duration
-        ``FixtureSegment`` that ``EmissionRequest`` rejects (``0 <= start < end``) — a live
-        run emitted 12 such segments and aborted the render. The pipeline must drop
-        zero-width overlaps upstream so no degenerate segment is ever produced.
-        """
-        job = JobConfig()
-        job.transitions.enabled = True
-        plan = ChoreographyPlan(
-            sections=[
-                PlanSection(
-                    section_name="intro",
-                    start_bar=1,
-                    end_bar=4,
-                    template_id="sweep_lr_fan_hold",
-                ),
-                PlanSection(
-                    section_name="verse",
-                    start_bar=5,
-                    end_bar=8,
-                    template_id="pendulum_chevron_breathe",
-                    transition_in=TransitionHint(mode=TransitionMode.SNAP, duration_bars=0.0),
-                ),
-            ]
-        )
-        rp = RenderingPipeline(
-            choreography_plan=plan,
-            beat_grid=_make_beat_grid(),
-            fixture_group=_make_fixture_group(),
-            job_config=job,
-        )
-
-        registry = rp._detect_and_plan_transitions()
-
-        assert all(t.overlap_end_ms > t.overlap_start_ms for t in registry.transitions)
-        assert len(registry.transitions) == 0
-
-    def test_no_transitions_when_disabled(self) -> None:
-        """Transitions can be explicitly disabled."""
-        job = JobConfig()
-        job.transitions.enabled = False
-        rp = RenderingPipeline(
-            choreography_plan=_make_plan(),
-            beat_grid=_make_beat_grid(),
-            fixture_group=_make_fixture_group(),
-            job_config=job,
-        )
-        assert rp.job_config.transitions.enabled is False
-
-    @pytest.mark.parametrize("enabled", (True, False), ids=("enabled", "disabled"))
-    def test_transition_enabled_changes_render_detector_call(
-        self, enabled: bool, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """The public config gate controls the production render detector call."""
-        job = JobConfig.model_validate({"transitions": {"enabled": enabled}})
-        pipeline = RenderingPipeline(
-            choreography_plan=_make_plan(),
-            beat_grid=_make_beat_grid(),
-            fixture_group=_make_fixture_group(),
-            job_config=job,
-        )
-        detector = MagicMock(return_value=TransitionRegistry())
-        monkeypatch.setattr(pipeline, "_detect_and_plan_transitions", detector)
-        monkeypatch.setattr(pipeline, "iterate_plan_sections", lambda _plan: iter(()))
-
-        assert pipeline.render() == []
-        assert detector.called is enabled
-
-    def test_segmented_sections_transition_detection_uses_flattened_ids(self) -> None:
-        """Segmented plans should produce transition IDs compatible with flattened section keys."""
-        job = JobConfig()
-        job.transitions.enabled = True
-        plan = ChoreographyPlan(
-            sections=[
-                PlanSection(
-                    section_name="verse",
-                    start_bar=1,
-                    end_bar=8,
-                    segments=[
-                        PlanSegment(
-                            segment_id="A",
-                            start_bar=1,
-                            end_bar=4,
-                            template_id="sweep_lr_fan_hold",
-                        ),
-                        PlanSegment(
-                            segment_id="B",
-                            start_bar=5,
-                            end_bar=8,
-                            template_id="pendulum_chevron_breathe",
-                        ),
-                    ],
-                ),
-                PlanSection(
-                    section_name="chorus",
-                    start_bar=9,
-                    end_bar=12,
-                    template_id="pendulum_chevron_breathe",
-                ),
-            ]
-        )
-        rp = RenderingPipeline(
-            choreography_plan=plan,
-            beat_grid=_make_beat_grid(),
-            fixture_group=_make_fixture_group(),
-            job_config=job,
-        )
-
-        registry = rp._detect_and_plan_transitions()
-
-        assert len(registry.transitions) >= 1
-        transition_ids = [t.transition_id for t in registry.transitions]
-        assert any(
-            "verse|A" in transition_id or "verse|B" in transition_id
-            for transition_id in transition_ids
-        )
-
-
-# ---------------------------------------------------------------------------
-# Full render smoke test (mocked compile)
-# ---------------------------------------------------------------------------
-
-
-class TestRender:
-    """Smoke tests for the full render() path."""
-
-    @patch(
-        "twinklr.core.sequencer.moving_heads.pipeline.compile_template",
-    )
-    def test_render_returns_segments(self, mock_compile: MagicMock) -> None:
-        """Mocking compile_template, render() should return segment lists."""
-        from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
-
-        # compile_template returns a result with .segments and .num_complete_cycles
-        mock_result = MagicMock()
-        mock_result.segments = [
-            FixtureSegment(
-                fixture_id="MH1",
-                section_id="intro",
-                segment_id="seg_0",
-                step_id="step_0",
-                template_id="sweep_lr_fan_hold",
-                t0_ms=0,
-                t1_ms=4000,
-                channels={},
-            )
-        ]
-        mock_result.num_complete_cycles = 1
-        mock_compile.return_value = mock_result
-
-        rp = RenderingPipeline(
-            choreography_plan=_make_plan([("intro", 1, 4, "sweep_lr_fan_hold")]),
-            beat_grid=_make_beat_grid(bars=4),
-            fixture_group=_make_fixture_group(4),
-            job_config=JobConfig(),
-        )
-
-        segments = rp.render()
-        assert len(segments) >= 1
-        assert mock_compile.call_count >= 1
-
-
-# ---------------------------------------------------------------------------
-# XSQ export
+# Delivery
 # ---------------------------------------------------------------------------
 
 
 class TestExportDelivery:
-    """Tests for _export_delivery with timeline tracks."""
+    """The delivery a render with an output path writes, with timeline tracks."""
 
     def _pipeline(self, tmp_path: Path) -> RenderingPipeline:
         from twinklr.core.formats.xlights.sequence.models.xsq import TimeMarker
@@ -556,31 +223,25 @@ class TestExportDelivery:
             name="Twinklr Beats",
             markers=[TimeMarker(name="1", time_ms=0), TimeMarker(name="2", time_ms=500)],
         )
-        return RenderingPipeline(
-            choreography_plan=_make_plan([("intro", 1, 4, "sweep_lr_fan_hold")]),
+        return _pipeline(
+            sections=(("mirror_wings", 1, 4),),
             beat_grid=_make_beat_grid(bars=4),
-            fixture_group=_make_fixture_group(4),
-            job_config=JobConfig(),
             output_path=tmp_path / "test.xsq",
             timeline_tracks=[beat_track],
             media_file="song.mp3",
         )
 
     def test_export_creates_xsq_file(self, tmp_path: Path) -> None:
-        """Export should create an XSQ file with timing layers."""
-        from twinklr.core.formats.xlights.sequence.models.xsq import TimeMarker
-
+        """The render writes an XSQ file."""
         rp = self._pipeline(tmp_path)
-        rp._export_delivery([], [TimeMarker(name="intro", time_ms=0, end_time_ms=4000)])
+        rp.render()
 
         assert (tmp_path / "test.xsq").exists()
 
     def test_export_creates_sidecar_deliverables(self, tmp_path: Path) -> None:
         """The run hands back three kinds of artifact, not just the sequence."""
-        from twinklr.core.formats.xlights.sequence.models.xsq import TimeMarker
-
         rp = self._pipeline(tmp_path)
-        rp._export_delivery([], [TimeMarker(name="intro", time_ms=0, end_time_ms=4000)])
+        rp.render()
 
         assert rp.artifacts is not None
         assert rp.artifacts.xmap_path == tmp_path / "test.xmap"
@@ -617,7 +278,6 @@ class TestExportDelivery:
         from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
             MovingHeadRenderingStage,
         )
-        from twinklr.core.formats.xlights.sequence.models.xsq import TimeMarker
 
         audio_bundle = SimpleNamespace(
             lyrics=SimpleNamespace(words=[SimpleNamespace(text="word", start_ms=100, end_ms=200)]),
@@ -635,22 +295,19 @@ class TestExportDelivery:
             )
             output_dir = tmp_path / name
             output_dir.mkdir()
-            pipeline = RenderingPipeline(
-                choreography_plan=_make_plan([("intro", 1, 4, "sweep_lr_fan_hold")]),
+            pipeline = _pipeline(
+                sections=(("mirror_wings", 1, 4),),
                 beat_grid=_make_beat_grid(bars=4),
-                fixture_group=_make_fixture_group(4),
                 job_config=job,
                 output_path=output_dir / "test.xsq",
                 timeline_tracks=tracks,
                 media_file="song.mp3",
             )
-            pipeline._export_delivery([], [TimeMarker(name="intro", time_ms=0, end_time_ms=4000)])
+            pipeline.render()
             assert pipeline.artifacts is not None
             return {path.name for path in pipeline.artifacts.xtiming_paths}
 
-        baseline = delivery_snapshot(JobConfig(), "baseline")
-        changed = delivery_snapshot(
-            JobConfig.model_validate({"timeline_tracks": payload}), "changed"
-        )
+        baseline = delivery_snapshot(_job(), "baseline")
+        changed = delivery_snapshot(_job(timeline_tracks=payload), "changed")
 
         assert changed != baseline, config_path

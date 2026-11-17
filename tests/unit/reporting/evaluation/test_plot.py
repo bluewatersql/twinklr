@@ -17,7 +17,7 @@ def test_plot_curve_normalized_space(tmp_path: Path):
         samples=samples,
         title="Test Normalized Curve",
         output_path=output_path,
-        space="norm",
+        space="normalized",
         bar_range=(0.0, 4.0),
     )
 
@@ -26,16 +26,16 @@ def test_plot_curve_normalized_space(tmp_path: Path):
     assert output_path.stat().st_size > 0
 
 
-def test_plot_curve_dmx_space(tmp_path: Path):
-    """Generate plot in DMX space."""
-    samples = [i / 99 for i in range(100)]
-    output_path = tmp_path / "test_plot_dmx.png"
+def test_plot_curve_degree_space(tmp_path: Path):
+    """Generate plot in degrees."""
+    samples = [i * 3.6 - 180 for i in range(100)]
+    output_path = tmp_path / "test_plot_degree.png"
 
     plot_curve(
         samples=samples,
-        title="Test DMX Curve",
+        title="Test Degree Curve",
         output_path=output_path,
-        space="dmx",
+        space="degree",
         bar_range=(0.0, 4.0),
     )
 
@@ -53,7 +53,7 @@ def test_plot_curve_empty_samples(tmp_path: Path):
         samples=samples,
         title="Empty Curve",
         output_path=output_path,
-        space="norm",
+        space="normalized",
         bar_range=(0.0, 4.0),
     )
 
@@ -70,7 +70,7 @@ def test_plot_curve_single_sample(tmp_path: Path):
         samples=samples,
         title="Single Sample",
         output_path=output_path,
-        space="norm",
+        space="normalized",
         bar_range=(0.0, 1.0),
     )
 
@@ -89,7 +89,7 @@ def test_plot_curve_long_title(tmp_path: Path):
         samples=samples,
         title=long_title,
         output_path=output_path,
-        space="norm",
+        space="normalized",
         bar_range=(0.0, 4.0),
     )
 
@@ -105,7 +105,7 @@ def test_plot_curve_creates_parent_dirs(tmp_path: Path):
         samples=samples,
         title="Test",
         output_path=output_path,
-        space="norm",
+        space="normalized",
         bar_range=(0.0, 4.0),
     )
 
@@ -123,7 +123,7 @@ def test_plot_curve_overwrite_existing(tmp_path: Path):
         samples=samples,
         title="First",
         output_path=output_path,
-        space="norm",
+        space="normalized",
         bar_range=(0.0, 4.0),
     )
     _first_size = output_path.stat().st_size
@@ -133,7 +133,7 @@ def test_plot_curve_overwrite_existing(tmp_path: Path):
         samples=samples,
         title="Second",
         output_path=output_path,
-        space="norm",
+        space="normalized",
         bar_range=(0.0, 4.0),
     )
 
@@ -151,24 +151,24 @@ def test_plot_curve_normalized_y_range(tmp_path: Path):
         samples=samples,
         title="Test",
         output_path=output_path,
-        space="norm",
+        space="normalized",
         bar_range=(0.0, 2.0),
     )
 
     assert output_path.exists()
 
 
-def test_plot_curve_dmx_y_range(tmp_path: Path):
-    """DMX space should render properly."""
-    samples = [0.0, 0.5, 1.0]
-    output_path = tmp_path / "dmx_range.png"
+def test_plot_curve_degree_y_range(tmp_path: Path):
+    """Degree space should render properly."""
+    samples = [-90.0, 0.0, 90.0]
+    output_path = tmp_path / "degree_range.png"
 
     # Just verify it creates the plot without error
     plot_curve(
         samples=samples,
         title="Test",
         output_path=output_path,
-        space="dmx",
+        space="degree",
         bar_range=(0.0, 2.0),
     )
 
@@ -185,7 +185,7 @@ def test_plot_curve_bar_range_labels(tmp_path: Path):
         samples=samples,
         title="Test",
         output_path=output_path,
-        space="norm",
+        space="normalized",
         bar_range=(0.0, 8.0),
     )
 
@@ -202,7 +202,7 @@ def test_plot_curve_varying_sample_count(tmp_path: Path):
         samples=samples,
         title="Varying Count",
         output_path=output_path,
-        space="norm",
+        space="normalized",
         bar_range=(0.0, 4.0),
     )
 

@@ -87,7 +87,7 @@ class ShowTraceEntry(BaseModel):
             raise ValueError("moving-head trace entries require sources")
         if self.backend == "display" and self.sources is not None:
             raise ValueError("display trace entries may not carry moving-head sources")
-        # Only a physical park, which holds a head dark after its last cue, belongs to
+        # Only a park, which holds a head dark after its last cue, belongs to
         # no section and no template; it then has neither.
         parked = (
             self.backend == "moving_head"
@@ -109,8 +109,8 @@ class ShowTraceV2(BaseModel):
     entry_count: int = Field(ge=0)
     fallback_substitutions: int = Field(ge=0)
     entries: list[ShowTraceEntry]
-    render: dict[str, Any] | None = None
-    """The physical moving-head render record, when the moving heads render physically."""
+    render: dict[str, Any]
+    """The moving-head render record."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 

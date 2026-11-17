@@ -1,4 +1,4 @@
-"""Frame-accurate byte encoding for the opt-in physical moving-head path (P1.3).
+"""Frame-accurate byte encoding for the physical moving-head path (P1.3).
 
 Physical segments are sampled at every 20 ms frame start, composed into the complete
 declared channel footprint, encoded to coarse/fine bytes without carry artifacts,

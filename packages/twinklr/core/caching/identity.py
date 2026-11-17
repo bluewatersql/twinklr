@@ -38,8 +38,7 @@ RENDER_ONLY_CONFIG_KEYS = (
 )
 """Job keys that change only the moving-head render, never the plan. Excluded from
 the derived ID so moving a head's start pose, an output budget, a reposition fallback or
-what becomes of an unplayable cue does not re-key the planner's cache. ``moving_heads.mode`` stays in: it changes what the
-planner is offered. A legacy job's dump carries none of them, so its ID is unchanged."""
+what becomes of an unplayable cue does not re-key the planner's cache."""
 
 
 def hash_file_content(path: Path | str) -> str:

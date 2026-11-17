@@ -22,9 +22,8 @@ def plot_curve(
     *,
     title: str,
     output_path: Path,
-    space: str = "dmx",  # Changed default to DMX
+    space: str,
     bar_range: tuple[float, float],
-    curve_type: str | None = None,
     section_bar_range: tuple[float, float] | None = None,
 ) -> None:
     """Generate curve plot PNG.
@@ -36,20 +35,17 @@ def plot_curve(
         samples: Curve sample values
         title: Plot title
         output_path: Path to save PNG
-        space: Physical values in their unit, "degree" or "normalized"; any other
-            value plots legacy normalized samples in DMX space (0-255)
+        space: The values' unit, "degree" or "normalized"
         bar_range: (start_bar, end_bar) for x-axis
-        curve_type: Optional curve type/name to display
         section_bar_range: Optional (t0, t1) section boundaries to mark
 
     Example:
         >>> plot_curve(
-        ...     samples=[0.0, 0.5, 1.0, 0.5, 0.0],
+        ...     samples=[0.0, 12.5, 25.0, 12.5, 0.0],
         ...     title="Verse 1 • OUTER_LEFT • PAN",
         ...     output_path=Path("plot.png"),
-        ...     space="dmx",
+        ...     space="degree",
         ...     bar_range=(1.0, 21.0),
-        ...     curve_type="movement_sine",
         ...     section_bar_range=(1.0, 21.0),
         ... )
     """
@@ -64,17 +60,11 @@ def plot_curve(
     start_bar, end_bar = bar_range
     x = np.linspace(start_bar, end_bar, len(samples))
 
-    if space in ("degree", "normalized"):
-        # Physical values, in the channel's unit.
-        y = np.array(samples)
-        if space == "normalized":
-            ax.set_ylim(0, 1)
-        ax.set_ylabel("Degrees" if space == "degree" else "Intensity", fontsize=10)
-    else:
-        # Legacy curves: normalized samples shown in DMX space (0-255)
-        y = np.array(samples) * 255
-        ax.set_ylim(0, 255)
-        ax.set_ylabel("DMX Value", fontsize=10)
+    # Values in the channel's unit.
+    y = np.array(samples)
+    if space == "normalized":
+        ax.set_ylim(0, 1)
+    ax.set_ylabel("Degrees" if space == "degree" else "Intensity", fontsize=10)
 
     # Plot main curve
     ax.plot(x, y, linewidth=1.5, color="#2E86AB", label="Curve")
@@ -87,13 +77,8 @@ def plot_curve(
         )
         ax.axvline(t1, color="#E63946", linestyle="--", linewidth=1, alpha=0.7, label="Section End")
 
-    # Add curve type to title if provided
-    display_title = title
-    if curve_type:
-        display_title = f"{title}\n[{curve_type}]"
-
     ax.set_xlabel("Bars", fontsize=10)
-    ax.set_title(display_title, fontsize=10, fontweight="bold")
+    ax.set_title(title, fontsize=10, fontweight="bold")
     ax.grid(True, alpha=0.3, linewidth=0.5)
 
     # Add legend if we have markers

@@ -35,18 +35,12 @@ from twinklr.core.api.xlights.models import (
     GetEffectSettingsRequest,
 )
 from twinklr.core.config.fixtures import FixtureGroup
-from twinklr.core.formats.xlights.sequence.fresh import build_fresh_sequence
-from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
-from twinklr.core.sequencer.moving_heads.export.xsq_adapter import XsqAdapter
 
 if TYPE_CHECKING:
     from twinklr.core.formats.xlights.sequence.models.xsq import XSequence
 
 TWINKLR_LAYER_BASE = 99
 """First xLights layer in Twinklr's identifiable live-injection namespace."""
-
-# Compatibility name for callers that only need the namespace's first layer.
-TWINKLR_LAYER = TWINKLR_LAYER_BASE
 
 MAX_LIVE_EFFECTS = 50_000
 """Most effects one live command may add, and most owned effects it may replace.
@@ -307,11 +301,10 @@ class LiveInjectionWorkflow:
         effects: tuple[LiveEffect, ...],
         *,
         dry_run: bool = False,
-        replace_sections: frozenset[str] | None = None,
         raise_on_partial: bool = True,
         expected_sequence: Path | None = None,
     ) -> InjectionResult:
-        """Replace Twinklr's owned effects in the replaced sections with `effects`.
+        """Replace every effect Twinklr owns in the open sequence with `effects`.
 
         Manifest rows on a target layer that was read but not observed there are absent
         from the sequence and are dropped. Before the first write the manifest is saved
@@ -338,18 +331,11 @@ class LiveInjectionWorkflow:
                 f"{expected_sequence}; nothing was read or written. Run the command again."
             )
         owned = self.ownership.load(sequence.sequence_path)
-        sections = (
-            replace_sections
-            if replace_sections is not None
-            else frozenset(effect.section_id for effect in (*owned, *desired))
-        )
-        if any(effect.section_id not in sections for effect in desired):
-            raise ValueError("Every desired effect must belong to a replaced section")
         # Sanity cap on recorded rows: a pre-write manifest holds at most the owned
         # effects present (no more than the bound, as at most that many were added) and
         # the effects to add (no more than the bound).
         _check_volume(
-            sum(effect.section_id in sections for effect in owned),
+            len(owned),
             "owned effects recorded for this sequence",
             limit=2 * MAX_LIVE_EFFECTS,
         )
@@ -357,11 +343,7 @@ class LiveInjectionWorkflow:
         target_layers = tuple(
             sorted(
                 {(effect.target, effect.layer) for effect in desired}
-                | {
-                    (effect.target, effect.layer)
-                    for effect in owned
-                    if effect.section_id in sections
-                }
+                | {(effect.target, effect.layer) for effect in owned}
             )
         )
         observed = await self._read_targets(target_layers)
@@ -407,8 +389,6 @@ class LiveInjectionWorkflow:
         keep_counts = Counter(effect.signature for effect in unchanged)
         to_delete: list[tuple[_ObservedEffect, LiveEffect]] = []
         for item, effect in classified_owned:
-            if effect.section_id not in sections:
-                continue
             if keep_counts[item.signature] > 0:
                 keep_counts[item.signature] -= 1
             else:
@@ -441,7 +421,6 @@ class LiveInjectionWorkflow:
             *(effect for _, effect in classified_owned),
             *(effect for effect in owned if (effect.target, effect.layer) not in read_layers),
         ]
-        retained = [effect for effect in present if effect.section_id not in sections]
         deleted: list[LiveEffect] = []
         injected: list[LiveEffect] = []
         failed_command: dict[str, str] | None = None
@@ -502,8 +481,7 @@ class LiveInjectionWorkflow:
             self.ownership.save(sequence.sequence_path, tuple(sorted(manifest_state.elements())))
             raise
 
-        resulting = tuple(sorted((*retained, *desired)))
-        self.ownership.save(sequence.sequence_path, resulting)
+        self.ownership.save(sequence.sequence_path, desired)
         return InjectionResult(
             complete=True,
             dry_run=False,
@@ -513,23 +491,6 @@ class LiveInjectionWorkflow:
             deleted=tuple(deleted),
             unchanged=tuple(unchanged),
             recovery="No save was issued; review the Twinklr layer and save manually.",
-        )
-
-    async def regenerate_section(
-        self,
-        section_id: str,
-        effects: tuple[LiveEffect, ...],
-        *,
-        dry_run: bool = False,
-        raise_on_partial: bool = True,
-    ) -> InjectionResult:
-        if not section_id or any(effect.section_id != section_id for effect in effects):
-            raise ValueError("regenerate_section requires effects for exactly one named section")
-        return await self.inject(
-            effects,
-            dry_run=dry_run,
-            replace_sections=frozenset({section_id}),
-            raise_on_partial=raise_on_partial,
         )
 
     async def _read_targets(
@@ -552,28 +513,13 @@ class LiveInjectionWorkflow:
         return tuple(observed)
 
 
-def live_effects_from_segments(
-    segments: list[FixtureSegment], fixture_group: FixtureGroup
-) -> tuple[LiveEffect, ...]:
-    """Serialize using the exact ``XsqAdapter``/``DmxSettingsBuilder`` export seam."""
-    duration_ms = max((segment.t1_ms for segment in segments), default=1)
-    sequence = build_fresh_sequence(
-        media_file="twinklr-live-injection.wav",
-        duration_ms=duration_ms,
-    )
-    placements = XsqAdapter().convert(segments, fixture_group, sequence)
-    if len(sequence.emission_trace_entries) != len(placements):
-        raise InjectionError("MH trace count diverged from injection placements")
-    return live_effects_from_sequence(sequence)
-
-
 def live_effects_from_sequence(sequence: XSequence) -> tuple[LiveEffect, ...]:
     """Every effect a fresh sequence's emission placed, in its live form.
 
     Read from the emission trace, which records for each placement the target, effect,
     EffectDB and palette references, frame-aligned times, live layer and section: the
     values the `.xsq` serializes, with the file layer moved to the reserved live layer.
-    A physical render's sequence is the one its `.xsq` is written from.
+    A render's sequence is the one its `.xsq` is written from.
 
     Raises:
         InjectionError: If a trace entry lacks its settings, palette or provenance.

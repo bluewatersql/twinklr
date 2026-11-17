@@ -14,19 +14,5 @@ __all__ = [
     "REGISTRY",
     "get_template",
     "list_templates",
-    "load_builtin_templates",
     "load_templates_from_directory",
 ]
-
-_loaded = False
-
-
-def load_builtin_templates() -> None:
-    global _loaded
-    if _loaded:
-        return
-
-    # Importing registers builtins
-    from twinklr.core.sequencer.moving_heads.templates import builtins as _builtins  # noqa: F401
-
-    _loaded = True

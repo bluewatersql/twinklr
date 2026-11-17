@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.golden.harness import RIGS, build_fixture_group
+from tests.support.mh_physical import family_rig
 from twinklr.cli.main import build_arg_parser, build_moving_head_graph, build_run_pipeline
 from twinklr.core.agents.audio.profile.models import AudioProfileModel
 from twinklr.core.agents.sequencer.moving_heads.context import (
@@ -32,17 +32,21 @@ _AUDIO_PROFILE_FIXTURE = (
 )
 
 
-@pytest.fixture(params=["mh4_minimal", "mh8_reference"])
+def _heads(count: int) -> tuple[str, ...]:
+    return tuple(f"MH{index}" for index in range(1, count + 1))
+
+
+@pytest.fixture(params=[4, 8])
 def rig(request: pytest.FixtureRequest) -> FixtureGroup:
-    """The tracked golden rigs, as a CLI user's fixture config would supply them."""
-    return build_fixture_group(RIGS[request.param])
+    """A four- and an eight-head rig, as a CLI user's fixture config would supply them."""
+    return family_rig(_heads(request.param))
 
 
 def _pipeline_for(rig: FixtureGroup, job_config: JobConfig | None = None):
     return build_run_pipeline(
         fixture_group=rig,
         job_config=job_config or JobConfig(),
-        available_templates=["sweep_lr_fan_hold"],
+        available_templates=["mirror_wings"],
         xsq_output_path=Path("out/song.xsq"),
         fixture_config_path=Path("fixture_config.json"),
     )
@@ -132,7 +136,7 @@ def test_success_threshold_from_config_single_scale() -> None:
     job_config = JobConfig()
     job_config.agent.success_threshold = 85
 
-    pipeline, _, _ = _pipeline_for(build_fixture_group(RIGS["mh4_minimal"]), job_config)
+    pipeline, _, _ = _pipeline_for(family_rig(_heads(4)), job_config)
     assert _stage(pipeline).min_pass_score == pytest.approx(8.5)
 
     # The field itself is the range validation: 0-100, rejected outside it.
@@ -160,5 +164,5 @@ def _planning_context(fixture_count: int) -> MovingHeadPlanningContext:
     return MovingHeadPlanningContext(
         audio_profile=profile,
         fixtures=FixtureContext(count=fixture_count),
-        available_templates=["sweep_lr_fan_hold"],
+        available_templates=["mirror_wings"],
     )

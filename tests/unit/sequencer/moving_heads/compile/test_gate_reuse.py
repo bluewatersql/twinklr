@@ -44,7 +44,6 @@ from twinklr.core.config.fixtures import (
     InitialFixtureState,
 )
 from twinklr.core.config.fixtures.presets import PoseDegrees
-from twinklr.core.curves.registry import CurveRegistry
 from twinklr.core.sequencer.models.context import TemplateCompileContext
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import (
@@ -72,7 +71,6 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
     plan_prepositions,
 )
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
-from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
 from twinklr.core.sequencer.moving_heads.pipeline import (
     TemplateAdmission,
     _plan_groups,
@@ -145,7 +143,6 @@ def _mixed_rig(edit_mh3: Any, *, zoom: bool = False) -> FixtureGroup:
 def _compile(template: Template, rig: FixtureGroup) -> list[FixtureSegment]:
     grid = physical_grid()
     phase_map = build_musical_phase_map(grid)
-    registries = create_default_registries()
     context = TemplateCompileContext(
         section_id="verse",
         template_id=template.template_id,
@@ -153,10 +150,6 @@ def _compile(template: Template, rig: FixtureGroup) -> list[FixtureSegment]:
         beat_grid=grid,
         start_bar=1,
         duration_bars=3,
-        curve_registry=CurveRegistry(),
-        geometry_registry=registries["geometry"],
-        movement_registry=registries["movement"],
-        dimmer_registry=registries["dimmer"],
         presets=rig.presets,
         topology=rig_topology(rig),
         fixture_group_id=rig.group_id,

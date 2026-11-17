@@ -17,7 +17,6 @@ from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
-from tests.support.mh_true_up import synthetic_case
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
 from twinklr.core.config.fixtures import (
     AxisCapability,
@@ -25,6 +24,8 @@ from twinklr.core.config.fixtures import (
     FixtureGroup,
     InitialFixtureState,
 )
+from twinklr.core.config.fixtures.dmx import ChannelInversions, DmxMapping
+from twinklr.core.config.fixtures.instances import FixtureConfig, FixtureInstance
 from twinklr.core.config.models import JobConfig
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.models.enum import ChannelName, SemanticGroupType
@@ -41,7 +42,6 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     encode_fixture_frames,
     frame_times,
 )
-from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
     PHYSICAL_TEMPLATE_DIR,
     load_template_document,
@@ -259,7 +259,6 @@ TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "moving_heads"
 """Test-only physical templates, loaded by the data loader and never shipped."""
 TEMPLATE_ID = "p1_linear_reveal"
 SUBSET_TEMPLATE_ID = "p1_linear_reveal_right"
-BUILTIN_TEMPLATE_COUNT = 37
 GRID_SHIFT_MS = 15.0
 PHYSICAL_INITIAL_STATE = {
     "pan_deg": 0.0,
@@ -278,7 +277,6 @@ def physical_test_templates() -> Iterator[None]:
     They are never admitted to the production catalog: the process-wide registry,
     which the pipeline and the deterministic selector read, is restored on exit.
     """
-    load_builtin_templates()
     loaded = load_templates_from_directory(TEMPLATE_DIR)
     try:
         document = load_template_document(TEMPLATE_DIR / f"{TEMPLATE_ID}.json")
@@ -314,7 +312,6 @@ def physical_catalog(*, admit: bool = True) -> Iterator[list[str]]:
     """Admit the physical family catalog to the shared registry for one test (with
     `admit=False`, leave that to the code under test) and restore the registry on exit:
     every template registered inside the block is removed again."""
-    load_builtin_templates()
     before = {info.template_id for info in REGISTRY.list_all()}
     try:
         yield load_templates_from_directory(PHYSICAL_TEMPLATE_DIR) if admit else []
@@ -404,7 +401,7 @@ def minimal_family_rig(fixture_ids: Sequence[str]) -> FixtureGroup:
     """`family_rig(fixture_ids)` written minimally: one `minimal_head_profile_payload` in
     `base_config` for every head, `position_index` in place of a declared topology (the
     derived row ranks the heads as `topology_payload` does), the same `flick` preset.
-    `base_config` still needs a legacy `dmx_mapping` until the cutover removes it."""
+    `base_config` still needs a `dmx_mapping` until the fixture model is narrowed."""
     return FixtureGroup.model_validate(
         {
             "group_id": "MOVING_HEADS",
@@ -483,17 +480,18 @@ def zoom_job(fixture_ids: Sequence[str], **policy: Any) -> JobConfig:
 
 
 def physical_grid() -> BeatGrid:
-    """P0's variable-tempo grid (500 ms beats, then 400 ms), moved off the frame grid."""
-    tempo = synthetic_case("tempo").beat_grid
-    beats = [beat + GRID_SHIFT_MS for beat in tempo.beat_boundaries]
+    """P0's variable-tempo grid (500 ms beats in bar 1, then 400 ms in bar 2), moved off
+    the frame grid."""
+    tempo = [0.0, 500.0, 1000.0, 1500.0, 2000.0, 2400.0, 2800.0, 3200.0, 3600.0]
+    beats = [beat + GRID_SHIFT_MS for beat in tempo]
     return BeatGrid(
-        bar_boundaries=[bar + GRID_SHIFT_MS for bar in tempo.bar_boundaries],
+        bar_boundaries=[bar + GRID_SHIFT_MS for bar in (0.0, 2000.0, 3600.0)],
         beat_boundaries=beats,
         eighth_boundaries=BeatGrid._calculate_eighth_boundaries(beats),
         sixteenth_boundaries=BeatGrid._calculate_sixteenth_boundaries(beats),
-        tempo_bpm=tempo.tempo_bpm,
-        beats_per_bar=tempo.beats_per_bar,
-        duration_ms=tempo.duration_ms + GRID_SHIFT_MS,
+        tempo_bpm=60000.0 * (len(tempo) - 1) / (tempo[-1] - tempo[0]),
+        beats_per_bar=4,
+        duration_ms=3600.0 + GRID_SHIFT_MS,
     )
 
 
@@ -682,7 +680,6 @@ def physical_template_doc(
 @contextmanager
 def registered_templates(*documents: TemplateDoc) -> Iterator[None]:
     """Register test-only template documents for one test, then remove them again."""
-    load_builtin_templates()
     added: list[str] = []
     try:
         for document in documents:
@@ -721,9 +718,55 @@ def physical_head_profile(*, inverted: bool, pan_max: float = 270.0) -> dict[str
     return payload
 
 
+def _fine_carry_rig() -> FixtureGroup:
+    """P0's two-head 16-bit rig: each fine channel below its coarse channel and not
+    adjacent to it, MH2 inverted."""
+    mapping = {
+        "pan_channel": 11,
+        "pan_fine_channel": 2,
+        "tilt_channel": 13,
+        "tilt_fine_channel": 9,
+        "dimmer_channel": 15,
+        "use_16bit_pan_tilt": True,
+    }
+    group = FixtureGroup(group_id="MOVING_HEADS", xlights_group="GROUP - MOVING HEADS")
+    for fixture_id, inverted in (("MH1", False), ("MH2", True)):
+        group.add_fixture(
+            FixtureInstance(
+                fixture_id=fixture_id,
+                config=FixtureConfig(
+                    fixture_id=fixture_id,
+                    dmx_mapping=DmxMapping.model_validate(mapping),
+                    inversions=ChannelInversions(pan=inverted, tilt=inverted),
+                ),
+                xlights_model_name=f"Dmx {fixture_id}",
+            )
+        )
+    return group
+
+
+def unprofiled_rig(fixture_count: int = 4) -> FixtureGroup:
+    """`fixture_count` heads mapped pan 11, tilt 13, dimmer 15 and without physical
+    profiles, which the renderer refuses: for fixture-config and refusal tests."""
+    group = FixtureGroup(group_id="MOVING_HEADS", xlights_group="GROUP - MOVING HEADS")
+    for index in range(1, fixture_count + 1):
+        fixture_id = f"MH{index}"
+        group.add_fixture(
+            FixtureInstance(
+                fixture_id=fixture_id,
+                config=FixtureConfig(
+                    fixture_id=fixture_id,
+                    dmx_mapping=DmxMapping(pan_channel=11, tilt_channel=13, dimmer_channel=15),
+                ),
+                xlights_model_name=f"Dmx {fixture_id}",
+            )
+        )
+    return group
+
+
 def physical_rig(*, mh1_pan_max: float = 270.0) -> FixtureGroup:
     """P0's two-head 16-bit rig with a synthetic physical profile per head."""
-    payload = synthetic_case("fine_carry").fixture_groups[0].model_dump(mode="python")
+    payload = _fine_carry_rig().model_dump(mode="python")
     for fixture in payload["fixtures"]:
         mh1 = fixture["fixture_id"] == "MH1"
         fixture["config"]["physical_profile"] = physical_head_profile(
@@ -872,12 +915,10 @@ def sine_step(
 
 
 def physical_job(**policy: Any) -> JobConfig:
-    """A schema-3.1 `physical_v2` job with both heads' known dark initial state."""
+    """A job with both heads' known dark initial state."""
     return JobConfig.model_validate(
         {
-            "schema_version": "3.1",
             "moving_heads": {
-                "mode": "physical_v2",
                 "initial_states": {"MH1": PHYSICAL_INITIAL_STATE, "MH2": PHYSICAL_INITIAL_STATE},
                 **policy,
             },

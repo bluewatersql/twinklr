@@ -3,7 +3,7 @@
 A physical render writes each moving head as constant DMX frame runs, so its trace has
 one entry per run: the dark transactions and parks between cues, every run of a cue,
 and the runs of a cue held dark through a dark span. The metrics count where a cue is
-seen to begin, so they must read the same onsets from it the legacy trace gives.
+seen to begin.
 """
 
 from __future__ import annotations
@@ -104,16 +104,3 @@ def test_cross_part_metrics_read_the_onsets_of_a_physical_trace() -> None:
         ("call", 1_000): 1_000,
         ("response", 1_500): 1_500,
     }
-
-
-def test_a_legacy_trace_is_read_as_before() -> None:
-    """Without a physical render record nothing is collapsed or left out."""
-    rows = trace(
-        entry("display", 0, 500),
-        entry("moving_head", 500, 1_000),
-        entry("moving_head", 1_000, 1_500),
-    )
-
-    assert show_emissions(rows) == sorted(
-        rows.entries, key=lambda item: (item.start_ms, item.backend, item.element_name)
-    )

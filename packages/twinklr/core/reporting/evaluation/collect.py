@@ -50,16 +50,6 @@ def load_checkpoint(checkpoint_path: Path) -> dict[str, Any]:
     return data
 
 
-def checkpoint_render_policy(checkpoint_data: dict) -> MHRenderPolicy:
-    """The render policy the checkpoint's job rendered under: its `render_mode`, or
-    `legacy_v1` when the checkpoint records none.
-
-    Raises:
-        ValidationError: If `render_mode` names no known mode.
-    """
-    return MHRenderPolicy.model_validate({"mode": checkpoint_data.get("render_mode", "legacy_v1")})
-
-
 @with_config(ConfigDict(extra="allow"))
 class _RecordedFixture(TypedDict):
     """One fixture's entry in the run trace's `fixtures` (other keys kept as recorded)."""
@@ -91,7 +81,7 @@ class _RecordedInputs(TypedDict):
 
 @dataclass(frozen=True)
 class RecordedRender:
-    """The physical render a run recorded in its checkpoint (`render`, written by
+    """The render a run recorded in its checkpoint (`render`, written by
     `record_render` from `RenderingPipeline.checkpoint_record`): its fingerprint and the
     inputs a re-render needs to be that render.
 
@@ -115,25 +105,33 @@ class RecordedRender:
     inputs: Mapping[str, Any]
 
 
-def recorded_render(checkpoint_data: dict) -> RecordedRender | None:
-    """The physical render the checkpoint records, or None for a legacy checkpoint.
+def recorded_render(checkpoint_data: dict) -> RecordedRender:
+    """The render the checkpoint records.
 
     Raises:
-        UnsupportedRenderModeError: If the checkpoint names a physical render mode but
-            records no render, or a record that does not read back (one written before
-            the record carried the rig's identity among them).
+        UnsupportedRenderModeError: If the checkpoint records no render (the removed
+            second renderer never wrote one), a record whose policy names `mode` (the
+            physical renderer wrote those while two renderers existed), or a record
+            that does not read back (one written before the record carried the rig's
+            identity).
     """
-    mode = checkpoint_render_policy(checkpoint_data).mode
-    if mode == "legacy_v1":
-        return None
     render = checkpoint_data.get("render")
     if render is None:
         raise UnsupportedRenderModeError(
-            f"`twinklr eval-report` re-renders a moving_heads.mode {mode!r} plan only from "
-            "the render recorded beside it in the checkpoint (`render`), and this "
-            "checkpoint records none: the command that planned it stopped before it "
-            "delivered its moving-head render, or could not write the record (it logs a "
-            "warning when it cannot); re-running that command records it"
+            "`twinklr eval-report` re-renders a plan only from the render recorded beside "
+            "it in the checkpoint (`render`), and this checkpoint records none: the "
+            "command that planned it stopped before it delivered its moving-head render, "
+            "or could not write the record (it logs a warning when it cannot); re-running "
+            "that command records it"
+        )
+    policy = render.get("policy") if isinstance(render, dict) else None
+    if isinstance(policy, dict) and "mode" in policy:
+        raise UnsupportedRenderModeError(
+            "`twinklr eval-report` cannot re-render this checkpoint: its render record was "
+            "written while the job could choose between two moving-head renderers (its "
+            "policy names `mode`), and the render it records is no longer the one this "
+            "version computes; re-running the command that planned it plans and records "
+            "it again"
         )
     try:
         if not isinstance(render, dict):
