@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -68,10 +68,10 @@ class ShowTraceEntry(BaseModel):
     palette_ref: int | None = Field(default=None, ge=0)
     backend: Literal["display", "moving_head"]
     event_id: str = Field(min_length=1)
-    section_id: str = Field(min_length=1)
+    section_id: str
     lane: str = Field(min_length=1)
     group_id: str = Field(min_length=1)
-    template_id: str = Field(min_length=1)
+    template_id: str
     placement_id: str | None = None
     placement_index: int | None = Field(default=None, ge=0)
     fallback_substitution: FallbackSubstitution | None = None
@@ -87,6 +87,18 @@ class ShowTraceEntry(BaseModel):
             raise ValueError("moving-head trace entries require sources")
         if self.backend == "display" and self.sources is not None:
             raise ValueError("display trace entries may not carry moving-head sources")
+        # Only a physical park, which holds a head dark after its last cue, belongs to
+        # no section and no template; it then has neither.
+        parked = (
+            self.backend == "moving_head"
+            and not self.section_id
+            and not self.template_id
+            and all(
+                source.segment_id.endswith("/park/preposition") for source in self.sources or ()
+            )
+        )
+        if not (self.section_id and self.template_id) and not parked:
+            raise ValueError("trace entries other than a park need a section and template")
         return self
 
 
@@ -97,6 +109,8 @@ class ShowTraceV2(BaseModel):
     entry_count: int = Field(ge=0)
     fallback_substitutions: int = Field(ge=0)
     entries: list[ShowTraceEntry]
+    render: dict[str, Any] | None = None
+    """The physical moving-head render record, when the moving heads render physically."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -141,7 +155,10 @@ class ShowEvaluationManifest(BaseModel):
         mapping_ids = [entry.choreo_id for entry in self.xlights_mapping.entries]
         if len(mapping_ids) != len(set(mapping_ids)):
             raise ValueError("xLights mapping contains duplicate choreography ids")
-        if set(mapping_ids) != graph_ids:
+        # A layout also maps each zone its groups lie in (`layout_to_choreography`), so
+        # a plan may target the zone; those aliases are the graph's zone tags.
+        zone_ids = {tag.value for group in self.choreography_graph.groups for tag in group.tags}
+        if not graph_ids <= set(mapping_ids) or set(mapping_ids) - graph_ids - zone_ids:
             raise ValueError(
                 "xLights mapping must cover every choreography graph group exactly once"
             )

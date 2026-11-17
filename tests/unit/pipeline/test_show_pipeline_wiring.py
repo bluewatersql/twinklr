@@ -378,19 +378,30 @@ def test_display_focus_partition_does_not_expose_mh_group_to_display_planner() -
     ]
 
 
-def test_show_wiring_refuses_a_physical_job_before_reading_anything(tmp_path: Path) -> None:
-    """A programmatic show is refused too: the combined show exports legacy segments only."""
-    from twinklr.core.config.render_policy import UnsupportedRenderModeError
-
-    physical = JobConfig.model_validate(
-        {"schema_version": "3.1", "moving_heads": {"mode": "physical_v2"}}
+def test_render_preflight_gates_every_planner_of_the_show(tmp_path: Path) -> None:
+    """The moving-head gate runs right after audio analysis and every planner reads the
+    audio through it, so a job the renderer cannot render is refused before planning;
+    it is given the show's fixture config and the layout's models."""
+    from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
+        RenderPreflightStage,
     )
-    with pytest.raises(UnsupportedRenderModeError, match="twinklr show"):
-        prepare_combined_show_pipeline(
-            layout_path=tmp_path / "missing.xml",
-            fixture_group=MagicMock(),
-            job_config=physical,
-            available_templates=[],
-            song_name="song",
-            catalog_dir=tmp_path / "missing",
-        )
+
+    layout_path = tmp_path / "xlights_rgbeffects.xml"
+    _write_layout(layout_path)
+    fixture_path = tmp_path / "fixtures.json"
+    wiring = _prepare(layout_path, fixture_config_path=fixture_path)
+
+    stages = {stage.id: stage for stage in wiring.pipeline.stages}
+    gate = stages["render_preflight"]
+    assert isinstance(gate.stage, RenderPreflightStage)
+    assert gate.inputs == ["audio"]
+    assert gate.stage.fixture_config_path == fixture_path
+    assert gate.stage.available_templates == ["sweep_lr_fan_hold"]
+    assert stages["profile"].inputs == ["render_preflight"]
+    assert stages["lyrics"].inputs == ["render_preflight"]
+    assert [model.name for model in wiring.layout_models] == [
+        "Dmx MH1",
+        "Dmx MH2",
+        "Mega Tree",
+        "Arch 1",
+    ]

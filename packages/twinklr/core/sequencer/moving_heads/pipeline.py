@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from twinklr.core.formats.xlights.layout.models.rgb_effects import Model
+    from twinklr.core.formats.xlights.sequence.emission import EmissionRequest
     from twinklr.core.sequencer.models.context import FixtureContext
     from twinklr.core.sequencer.models.template import TemplateDoc, TemplatePreset
 
@@ -48,6 +49,7 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
     AXIS_KEYS,
     DISCRETE_KEYS,
     ContinuousTrajectory,
+    DiscretePoint,
     DiscreteTrajectory,
     PhysicalChannelError,
     PhysicalPoint,
@@ -58,7 +60,7 @@ from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixt
 from twinklr.core.sequencer.models.moving_heads.topology import rig_topology
 from twinklr.core.sequencer.models.template import RepeatMode
 from twinklr.core.sequencer.models.transition import TransitionRegistry
-from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
+from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.channel_blender import ChannelBlender
 from twinklr.core.sequencer.moving_heads.compile.physical import is_physical_template
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
@@ -69,7 +71,9 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
     UnplayableMode,
     entry_feasible,
     follow_cues,
+    frame_values,
     plan_prepositions,
+    state_at,
     worst_case_entry_ms,
 )
 from twinklr.core.sequencer.moving_heads.compile.preset import apply_preset
@@ -94,6 +98,7 @@ from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic, audit_
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     ENCODER_VERSION,
     EncodedFixtureFrame,
+    FrameRun,
     coalesce_frames,
     encode_fixture_frames,
     frame_times,
@@ -267,6 +272,159 @@ def physical_cue_limits(phase_map: MusicalPhaseMap, duration_ms: int) -> tuple[i
     start = -(-Fraction(phase_map.covered_start_ms) // EFFECT_GRID_MS) * EFFECT_GRID_MS
     covered_end = Fraction(phase_map.covered_end_ms) // EFFECT_GRID_MS * EFFECT_GRID_MS
     return int(start), int(min(duration_ms // EFFECT_GRID_MS * EFFECT_GRID_MS, covered_end))
+
+
+def _snap_dark_spans(
+    spans: Sequence[tuple[int, int]], *, shortest_dark_ms: int, shortest_lit_ms: int
+) -> tuple[tuple[int, int], ...]:
+    """Spans snapped outward to the frame grid, so every frame touching one is dark,
+    each lengthened to at least `shortest_dark_ms`, then merged, in time order, where
+    they overlap or leave less than `shortest_lit_ms` lit between them."""
+    merged: list[tuple[int, int]] = []
+    for start, end in sorted(
+        (start, max(end, start + shortest_dark_ms))
+        for start, end in (
+            (start // EFFECT_GRID_MS * EFFECT_GRID_MS, -(-end // EFFECT_GRID_MS) * EFFECT_GRID_MS)
+            for start, end in spans
+            if end > start
+        )
+    ):
+        if merged and start - merged[-1][1] < shortest_lit_ms:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return tuple(merged)
+
+
+def _dark_through_dimmer(profile: FixtureCapabilities) -> bool:
+    """Whether a span darkens this profile's cues through the dimmer (its zero
+    extinguishes) rather than through the closed shutter (`_dark_over_spans`)."""
+    return profile.visibility.dimmer_zero_extinguishes and "dimmer" in profile.axes
+
+
+def _span_limits(fixture_group: FixtureGroup) -> tuple[int, int]:
+    """`(shortest dark, shortest lit)` for the rig's dark spans, on the frame grid.
+
+    What the transaction pass's shutter timing requires of a head darkened through its
+    shutter: the closed state holds its close latency plus its settle, and the state a
+    cue relights into its open latency plus its settle (the slowest of the profile's
+    lit states). A head darkened through its dimmer has no such timing. Spans are
+    rig-wide, so the slowest profile sets both; a lit stretch is at least two frames.
+    """
+    dark = lit = 0
+    for fixture in fixture_group.expand_fixtures():
+        profile = fixture.config.physical_profile
+        shutter = None if profile is None else profile.discrete.get("shutter")
+        if profile is None or _dark_through_dimmer(profile) or shutter is None:
+            continue
+        visibility = profile.visibility
+        if shutter.closed_state is not None:
+            closing = shutter.states[shutter.closed_state].settle_ms or 0
+            dark = max(dark, (visibility.close_latency_ms or 0) + closing)
+        opening = max(
+            (
+                state.settle_ms or 0
+                for name, state in shutter.states.items()
+                if name not in visibility.extinguishing_shutter_states
+            ),
+            default=0,
+        )
+        lit = max(lit, (visibility.open_latency_ms or 0) + opening)
+
+    def frames(ms: int) -> int:
+        return -(-ms // EFFECT_GRID_MS) * EFFECT_GRID_MS
+
+    return frames(dark), max(2 * EFFECT_GRID_MS, frames(lit))
+
+
+def _dark_over_spans(
+    cues: Sequence[FixtureSegment],
+    spans: Sequence[tuple[int, int]],
+    profiles: Mapping[str, FixtureCapabilities],
+    *,
+    shortest_lit_ms: int,
+) -> list[FixtureSegment]:
+    """Command each cue dark over the render's dark spans, on its own authored path.
+
+    A cue a span touches keeps every channel as compiled except the one its profile is
+    darkened through: the dimmer, at zero over the span's frames, when the profile
+    declares that zero extinguishes; else the shutter, in the profile's closed state.
+    Through the shutter, a lit remainder between a span and the cue's own start or end
+    shorter than `shortest_lit_ms` (what the shutter needs to open, `_span_limits`) is
+    kept dark too, so the relit state can take effect. Pose, zoom and wheels play on
+    as authored, so the head never leaves the cue's path and needs no re-entry after
+    the span. Every other frame encodes as before. The transaction pass, which runs
+    after, sees the darkness as it sees a visibility envelope's.
+
+    Raises:
+        ValueError: If a profile declares no darkness a cue can command.
+    """
+    out: list[FixtureSegment] = []
+    for cue in cues:
+        times = range(cue.t0_ms, cue.t1_ms, EFFECT_GRID_MS)
+        dark = {t for t in times if any(start <= t < end for start, end in spans)}
+        if not dark:
+            out.append(cue)
+            continue
+        profile = profiles[cue.fixture_id]
+        if not _dark_through_dimmer(profile):
+            if 0 < min(dark) - cue.t0_ms < shortest_lit_ms:
+                dark.update(range(cue.t0_ms, min(dark), EFFECT_GRID_MS))
+            if 0 < cue.t1_ms - (max(dark) + EFFECT_GRID_MS) < shortest_lit_ms:
+                dark.update(range(max(dark) + EFFECT_GRID_MS, cue.t1_ms, EFFECT_GRID_MS))
+        channels = dict(cue.channels)
+        dimmer = profile.axes.get("dimmer")
+        shutter = profile.discrete.get("shutter")
+        authored = channels.get(ChannelName.DIMMER)
+        if profile.visibility.dimmer_zero_extinguishes and dimmer is not None:
+            if authored is not None and isinstance(authored.physical, ContinuousTrajectory):
+                samples = dict(
+                    frame_values(authored.physical, cue.t0_ms, cue.t1_ms, EFFECT_GRID_MS)
+                )
+            else:  # unauthored: the profile's default word, as the encoder writes it
+                word = profile.defaults[dimmer.coarse_offset]
+                if dimmer.fine_offset is not None:
+                    word = word << 8 | profile.defaults[dimmer.fine_offset]
+                samples = dict.fromkeys(times, dimmer.word_center(word))
+            levels: list[PhysicalPoint] = []
+            for t in times:
+                value = 0.0 if t in dark else float(samples[t])
+                if not levels or levels[-1].value != value:
+                    levels.append(PhysicalPoint(t_ms=t, value=value))
+            channels[ChannelName.DIMMER] = ChannelValue(
+                channel=ChannelName.DIMMER,
+                physical=ContinuousTrajectory(
+                    unit="normalized", points=tuple(levels), interpolation="hold"
+                ),
+            )
+        elif (
+            shutter is not None
+            and shutter.closed_state is not None
+            and shutter.closed_state in profile.visibility.extinguishing_shutter_states
+        ):
+            held = channels.get(ChannelName.SHUTTER)
+            events: list[DiscretePoint] = []
+            for t in times:
+                state = (
+                    shutter.closed_state
+                    if t in dark
+                    else state_at(held.physical, t)
+                    if held is not None and isinstance(held.physical, DiscreteTrajectory)
+                    else shutter.default_state
+                )
+                if not events or events[-1].state != state:
+                    events.append(DiscretePoint(t_ms=t, state=state))
+            channels[ChannelName.SHUTTER] = ChannelValue(
+                channel=ChannelName.SHUTTER, physical=DiscreteTrajectory(events=tuple(events))
+            )
+        else:
+            raise ValueError(
+                f"{cue.fixture_id}: a dark span needs the profile to declare a darkness a "
+                "cue can command (dimmer_zero_extinguishes, or a closed_state listed in "
+                "extinguishing_shutter_states)"
+            )
+        out.append(cue.model_copy(update={"channels": channels}))
+    return out
 
 
 _POSE = (ChannelName.PAN, ChannelName.TILT, ChannelName.ZOOM)
@@ -1450,6 +1608,7 @@ class RenderingPipeline:
         layout_models: Sequence[Model] | None = None,
         layout_sha256: str | None = None,
         admission: TemplateAdmission | None = None,
+        dark_spans: Sequence[tuple[int, int]] = (),
     ):
         """Initialize rendering pipeline.
 
@@ -1480,6 +1639,16 @@ class RenderingPipeline:
                 exclusions as `admission_exclusions` and `admission_preset_exclusions`
                 and each effective variant other than the base as
                 `admission_effective_presets`, when there are any. Not render identity.
+            dark_spans: `[start_ms, end_ms)` spans a `physical_v2` render holds every
+                fixture dark over (the combined show's coordination windows that rest
+                the moving heads), each snapped outward to the frame grid, lengthened
+                to the time a closed shutter needs to take effect and merged where
+                they would leave a head lit for less than two frames or less than its
+                shutter needs to open, the rig's slowest profile deciding
+                (`_span_limits`). The cues they cover play on along their authored
+                paths, commanded dark there (`_dark_over_spans`), before section entry
+                and repositioning are planned. Render identity when given, as
+                lengthened and merged; the trace records them so as `dark_spans`.
 
         Raises:
             UnsupportedRenderModeError: The job's render mode cannot render this rig
@@ -1504,6 +1673,15 @@ class RenderingPipeline:
         self.layout_models = layout_models
         self.layout_sha256 = layout_sha256
         self.admission = admission
+        shortest_dark_ms, shortest_lit_ms = _span_limits(fixture_group)
+        self.dark_spans = (
+            _snap_dark_spans(
+                dark_spans, shortest_dark_ms=shortest_dark_ms, shortest_lit_ms=shortest_lit_ms
+            )
+            if dark_spans
+            else ()
+        )
+        self._shortest_lit_ms = shortest_lit_ms
         self.artifacts: DeliveryArtifacts | None = None
         """Set by `render()` when `output_path` is given."""
         self.sequence: XSequence | None = None
@@ -1511,6 +1689,10 @@ class RenderingPipeline:
         `.xsq` is written from, which live injection reads (`live_effects_from_sequence`)."""
         self.frames: tuple[EncodedFixtureFrame, ...] = ()
         """Set by a `physical_v2` `render()`: every fixture's encoded frames, rig order."""
+        self.runs: tuple[FrameRun, ...] = ()
+        """Set by a `physical_v2` `render()`: the frames merged into constant DMX runs."""
+        self.requests: tuple[EmissionRequest, ...] = ()
+        """Set by a `physical_v2` `render()`: one DMX effect request per run."""
         self.render_record: dict[str, Any] | None = None
         """Set by a `physical_v2` `render()`: the identity and evidence the trace carries."""
         self.unplayable_warning: str | None = None
@@ -1690,8 +1872,9 @@ class RenderingPipeline:
         A `physical_v2` render also hashes its renderer and encoder revisions, the
         musical phase map built from the detected grid, any render locks and, for each
         section that renders a preset other than the one it names (`_physical_preset`:
-        the effective variant, or none), the preset it renders, and leaves out the
-        transition settings it does not apply.
+        the effective variant, or none), the preset it renders, and its dark spans as
+        snapped, when there are any, and leaves out the transition settings it does not
+        apply.
         """
         physical = self.job_config.moving_heads.mode == "physical_v2"
         substitutions: list[tuple[str, str | None]] = []
@@ -1722,6 +1905,7 @@ class RenderingPipeline:
             phase_map=build_musical_phase_map(self.beat_grid) if physical else None,
             locks=self.locks,
             preset_substitutions=substitutions,
+            dark_spans=self.dark_spans,
         )
 
     def _render_physical(self) -> list[FixtureSegment]:
@@ -1732,7 +1916,9 @@ class RenderingPipeline:
         transaction pass authors every fixture of the rig over the whole sequence,
         holding it dark outside every cue and so outside the covered span; each
         fixture's complete frames are encoded in rig order and merged into constant DMX
-        runs. Any refusal raises before anything is written,
+        runs. Each section's cues are first commanded dark over the dark spans, on
+        their authored paths (`_dark_over_spans`). Any refusal raises before
+        anything is written,
         and the delivery itself is published only once its size fits the budgets.
 
         Returns:
@@ -1861,7 +2047,12 @@ class RenderingPipeline:
                 )
             dropped.extend(compiled.dropped_steps)
             entered, inside, windows = _enter_section(
-                compiled.segments,
+                _dark_over_spans(
+                    compiled.segments,
+                    self.dark_spans,
+                    profiles,
+                    shortest_lit_ms=self._shortest_lit_ms,
+                ),
                 kept,
                 profiles,
                 policy.initial_states,
@@ -1909,6 +2100,12 @@ class RenderingPipeline:
                 "dropped (held dark); the trace's dropped_cues and entry_windows list them",
                 len(in_window),
             )
+        if self.dark_spans:
+            logger.info(
+                "physical_v2: every fixture is held dark over %d span(s), its cues playing "
+                "on there along their authored paths; the trace's dark_spans lists them",
+                len(self.dark_spans),
+            )
 
         result = plan_prepositions(
             cues,
@@ -1953,6 +2150,8 @@ class RenderingPipeline:
         requests = physical_run_requests(runs, result.segments, targets)
 
         self.frames = tuple(frames)
+        self.runs = runs
+        self.requests = requests
         self.render_record = {
             "renderer": "physical_v2",
             "render_fingerprint": self.fingerprint(),
@@ -2037,6 +2236,9 @@ class RenderingPipeline:
             "transactions": [d.model_dump(mode="json") for d in result.diagnostics],
             "diagnostics": [d.model_dump(mode="json") for d in diagnostics],
         }
+        if self.dark_spans:
+            # Left out when there are none, so earlier traces keep their keys.
+            self.render_record["dark_spans"] = [list(span) for span in self.dark_spans]
         if self.admission is not None:
             # Each key is left out when empty (nothing excluded, every admitted template
             # playing its base), so earlier traces keep their keys.

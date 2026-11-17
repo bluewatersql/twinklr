@@ -254,7 +254,7 @@ def export_physical_delivery(
             "serialization_ms": round(serialization_ms, 3),
         }
         staged = _write_sidecars(xsq, staged_xsq, render={**render, "output": output})
-        _publish(
+        publish_files(
             (*staged.xtiming_paths, staged.xmap_path, staged.trace_path, staged_xsq),
             destination,
             backup_dir=staging / ".replaced",
@@ -274,7 +274,7 @@ def export_physical_delivery(
     )
 
 
-def _publish(files: Sequence[Path], destination: Path, *, backup_dir: Path) -> None:
+def publish_files(files: Sequence[Path], destination: Path, *, backup_dir: Path) -> None:
     """Move `files` into `destination` all or nothing.
 
     A file already at a target is set aside in `backup_dir` first; if any move fails,

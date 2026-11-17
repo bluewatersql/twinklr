@@ -49,6 +49,7 @@ def render_fingerprint(
     phase_map: BaseModel | None = None,
     locks: Sequence[BaseModel] = (),
     preset_substitutions: Sequence[tuple[str, str | None]] = (),
+    dark_spans: Sequence[tuple[int, int]] = (),
 ) -> str:
     """Hash the functional inputs of a render.
 
@@ -70,6 +71,9 @@ def render_fingerprint(
         preset_substitutions: `(section name, preset id or None)` for each section that
             renders a preset other than the one it names; hashed only when there are
             any, so a render without one keeps its earlier identity.
+        dark_spans: `(start_ms, end_ms)` spans every fixture is held dark over, as the
+            renderer snapped and merged them; hashed only when there are any, so a
+            render without one keeps its earlier identity.
 
     Returns:
         A 64-character lowercase SHA-256 hex digest.
@@ -93,6 +97,8 @@ def render_fingerprint(
     }
     if preset_substitutions:
         payload["preset_substitutions"] = [list(item) for item in preset_substitutions]
+    if dark_spans:
+        payload["dark_spans"] = [list(span) for span in dark_spans]
     if locks:
         payload["locks"] = sorted(
             (_canonical_lock(lock.model_dump(mode="json")) for lock in locks),

@@ -36,8 +36,13 @@ def build_combined_show_pipeline(
     max_iterations: int = 3,
     min_pass_score: float = 7.0,
     assets: AssetGenerationConfig | None = None,
+    fixture_config_path: Path | None = None,
 ) -> PipelineDefinition:
-    """Build one DAG whose common prefix executes once before two planning branches."""
+    """Build one DAG whose common prefix executes once before two planning branches.
+
+    The prefix is the moving-head definition's, so its render preflight gate runs right
+    after audio analysis, on the rig at `fixture_config_path`, before any planner.
+    """
 
     display = build_display_pipeline(
         choreo_graph=display_graph,
@@ -52,8 +57,8 @@ def build_combined_show_pipeline(
         xlights_mapping=xlights_mapping,
         macro_choreo_graph=choreo_graph,
     )
-    # The existing MH definition remains the authority for its planner-stage wiring.
-    # Its renderer is replaced by the single combined barrier below.
+    # The existing MH definition remains the authority for its planner-stage wiring and
+    # its render preflight gate. Its renderer is replaced by the combined barrier below.
     moving_heads = build_moving_heads_pipeline(
         display_groups=display_groups,
         fixture_count=len(fixture_group.expand_fixtures()),
@@ -61,6 +66,7 @@ def build_combined_show_pipeline(
         xsq_output_path=Path(f"{song_name}.unused.xsq"),
         max_iterations=max_iterations,
         min_pass_score=min_pass_score,
+        fixture_config_path=fixture_config_path,
         fixture_groups=[
             {
                 "fixture_id": fixture.fixture_id,
@@ -100,7 +106,9 @@ def build_combined_show_pipeline(
         output_type="dict[str, Any]",
         description="Render both branches into one coordinated XSequence",
     )
-    common = [stage for stage in display.stages if stage.id in common_ids]
+    common = [
+        stage for stage in moving_heads.stages if stage.id in {*common_ids, "render_preflight"}
+    ]
     return PipelineDefinition(
         name="combined_show_pipeline",
         description="One macro plan coordinating moving heads and display",

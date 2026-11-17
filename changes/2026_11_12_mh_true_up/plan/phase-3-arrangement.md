@@ -536,10 +536,10 @@ and each ending green:
 
 | Step | Content | State |
 |---|---|---|
-| C1.1a | `twinklr show` renders moving heads physically | started |
-| C1.1b | `eval-report` reads physical output | started |
-| C1.1c | Live `inject` and `regenerate` on physical output (regenerate re-renders the whole song, owner decision) | started |
-| C1.1d | Deterministic selector and three-arm experiment ported to the admitted physical families (D12 folded in) | started |
+| C1.1a | `twinklr show` renders moving heads physically | merged; [record](../evidence/2026-11-16-c1-1a-show-port/README.md) |
+| C1.1b | `eval-report` reads physical output | merged; [record](../evidence/2026-11-16-c1-1b-eval-port/README.md) |
+| C1.1c | Live `inject` and `regenerate` on physical output (regenerate re-renders the whole song, owner decision) | merged, proven against a fake only; [record](../evidence/2026-11-16-c1-1c-live-port/README.md) |
+| C1.1d | Deterministic selector and three-arm experiment ported to the admitted physical families (D12 folded in) | merged; [record](../evidence/2026-11-16-c1-1d-selector-port/README.md) |
 | C1.2 | Atomic flip: remove `mode`, the schema switch, transitions, the old render, compile, handlers, libraries, built-in templates, old export, their tests, goldens and registry records | after C1.1 |
 | C1.3 | Narrow the shared models to the physical payload | after C1.2 |
 | C1.4 | Renames that leave no trace of a second path | after C1.3 |
@@ -602,3 +602,42 @@ reference. The integrator will delete it in C1.2 unless the owner says otherwise
 
 For T2: the capability projection extends `SelectorAdmission` (the selector's
 projection of the gate result); it does not add a second projection beside it.
+
+### Consumer ports merged — 2026-11-16
+
+All four C1.1 ports are on the branch. Each was written by one agent in its own
+worktree, reviewed by a second, fixed, and re-reviewed or verified by a separate agent
+until no critical, high or medium finding remained; each has an evidence record with
+its C1.2 deletion list. The integrator resolved the documentation conflicts between
+them by hand. What each changed beyond its brief, and what the owner should know:
+
+- **`twinklr show`.** Coordination rests are planned as darkness inside the cues they
+  cover: a head keeps moving on its authored path, commanded dark, so nothing
+  re-enters after a rest (integrator decision after the first design lost up to half
+  the lit frames outside rests). Rests are widened to the shortest darkness a
+  shutter-only rig can honestly produce. Optical darkness lags the command by the
+  profile's close latency; commanding it early is an owner option, not built. A
+  pre-existing defect, on `main` since `3629fa90`, made `twinklr show` exit with an
+  error on any layout whose groups are not named for their zones, old renderer
+  included; fixed here in the manifest and metrics readers. Show metrics count onsets,
+  not frame runs, on physical traces.
+- **`eval-report`.** The run's checkpoint records the render (fingerprint, policy,
+  beat grid, admission, input hashes) and the report re-renders from it. Pan and tilt
+  statistics are in degrees and rates per second, so reports from before and after the
+  cutover are not comparable on those numbers. The report shows the largest lit step
+  per fixture and the lit change across each entry a head plays through; a warning for
+  a lit step beyond one frame's travel never fired in 425 renders across every pair of
+  families. That check is per frame and so necessary, not sufficient. A plan using a
+  `--template-dir` template cannot be re-rendered (the command has no such option).
+- **Live `inject` and `regenerate`.** Proven against a fake client only. One request
+  per effect, so a physical render is tens of thousands of requests; a command is
+  bounded at 50,000 effects to place or delete (chosen, not measured). Ownership is
+  recorded before the first write and pruned to what the sequence holds, so a killed
+  run recovers by re-running; an effect on layers 99 and above identical to one
+  Twinklr placed is treated as Twinklr's. `regenerate` needs the plan recorded by the
+  last completed `inject` and refuses a stale one. Sixteen checks need the owner and a
+  running xLights with a scratch sequence.
+- **Selector and three-arm experiment.** See the section above on what the port
+  changes in the experiment.
+
+Not yet done at this point: `make validate` on the merged tree, and C1.2 onward.

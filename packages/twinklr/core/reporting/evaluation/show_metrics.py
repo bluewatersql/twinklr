@@ -98,7 +98,7 @@ def score_show_metrics(
     manifest = load_show_evaluation_manifest(manifest_path)
     trace = load_show_trace(manifest_path.parent / manifest.trace_path)
     beat_grid = beat_grid_from_xsq(manifest_path.parent / manifest.xsq_path)
-    entries = _deduplicate(trace.entries)
+    entries = show_emissions(trace)
     sections = [
         StructureSection(
             name=section.section.name,
@@ -137,8 +137,9 @@ def score_cross_part_alignment(
     trace: ShowTraceV2,
     beat_grid: BeatGrid,
 ) -> CrossPartAlignmentMetrics:
-    """Compare schedule-derived starts with deduplicated trace-v2 emissions."""
-    entries = _deduplicate(trace.entries)
+    """Compare schedule-derived starts with deduplicated trace-v2 emissions
+    (`show_emissions`)."""
+    entries = show_emissions(trace)
     normalized = [_normalize_group(entry, manifest) for entry in entries]
     if not manifest.capability.cross_part_applicable:
         return CrossPartAlignmentMetrics(
@@ -237,6 +238,8 @@ def _normalize_group(entry: ShowTraceEntry, manifest: ShowEvaluationManifest) ->
         return entry
     reverse: dict[str, str] = {}
     for mapping in manifest.xlights_mapping.entries:
+        if mapping.choreo_id not in graph_ids:
+            continue  # a zone alias: its layout group belongs to that group's own entry
         for name in manifest.xlights_mapping.resolve(mapping.choreo_id):
             if name in reverse:
                 raise ValueError(f"xLights element name {name!r} maps to multiple choreography ids")
@@ -251,6 +254,48 @@ def _normalize_group(entry: ShowTraceEntry, manifest: ShowEvaluationManifest) ->
             f"trace entry cannot be normalized to choreography graph: {entry.group_id}"
         )
     return cast("ShowTraceEntry", entry.model_copy(update={"group_id": resolved}))
+
+
+def show_emissions(trace: ShowTraceV2) -> list[ShowTraceEntry]:
+    """The trace's deduplicated emissions, a physical moving head's as seen onsets.
+
+    A trace with a physical render record writes each moving head as constant DMX
+    frame runs. Its runs made only of preposition segments (dark transactions and
+    parks) and those starting inside a recorded dark span (`render.dark_spans`) are
+    dark and left out; the remaining runs of one element are merged while they follow
+    each other with the same representative source, so each is one onset from where a
+    cue is first seen. Visibility inside a cue's own content (an envelope) is not
+    known to the trace and is not taken out. Any other trace is read as it is.
+    """
+    entries = _deduplicate(trace.entries)
+    if trace.render is None:
+        return entries
+    spans = [(int(start), int(end)) for start, end in trace.render.get("dark_spans", [])]
+    onsets: list[ShowTraceEntry] = []
+    current: dict[str, int] = {}  # element -> index of its latest onset
+    for entry in entries:
+        if entry.backend != "moving_head":
+            onsets.append(entry)
+            continue
+        sources = entry.sources or []
+        if all(source.step_id == "preposition" for source in sources) or any(
+            start <= entry.start_ms < end for start, end in spans
+        ):
+            continue
+        index = current.get(entry.element_name)
+        last = None if index is None else onsets[index]
+        if (
+            last is not None
+            and index is not None
+            and last.end_ms == entry.start_ms
+            and last.sources
+            and last.sources[0] == sources[0]
+        ):
+            onsets[index] = last.model_copy(update={"end_ms": entry.end_ms})
+            continue
+        current[entry.element_name] = len(onsets)
+        onsets.append(entry)
+    return onsets
 
 
 def _deduplicate(entries: list[ShowTraceEntry]) -> list[ShowTraceEntry]:
@@ -336,4 +381,5 @@ __all__ = [
     "ShowMetrics",
     "score_cross_part_alignment",
     "score_show_metrics",
+    "show_emissions",
 ]

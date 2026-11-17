@@ -8,9 +8,9 @@ from pathlib import Path
 
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import JobConfig
-from twinklr.core.config.render_policy import require_legacy_render
 from twinklr.core.feature_engineering.loader import FEArtifactBundle
 from twinklr.core.formats.xlights.layout import layout_to_choreography, load_layout
+from twinklr.core.formats.xlights.layout.models.rgb_effects import Model
 from twinklr.core.pipeline.definition import PipelineDefinition
 from twinklr.core.pipeline.definitions.show import build_combined_show_pipeline
 from twinklr.core.pipeline.display_wiring import tracked_catalog_dir
@@ -36,6 +36,8 @@ class CombinedShowWiring:
     recipe_catalog: RecipeCatalog
     fe_bundle: FEArtifactBundle | None
     moving_head_target_ids: frozenset[str]
+    layout_models: tuple[Model, ...]
+    """Every model the layout declares, for the moving-head model check."""
 
 
 def _active(model: object) -> bool:
@@ -132,15 +134,13 @@ def prepare_combined_show_pipeline(
     catalog_dir: Path | None = None,
     local_catalog_dir: Path | None = None,
     fe_bundle: FEArtifactBundle | None = None,
+    fixture_config_path: Path | None = None,
 ) -> CombinedShowWiring:
     """Parse the layout once, reconcile MH ownership, then partition by backend.
 
-    Raises:
-        UnsupportedRenderModeError: The job selects `physical_v2`; the combined show
-            coordinates and exports legacy moving-head segments only.
+    `fixture_config_path` is the file `fixture_group` was loaded from; the moving-head
+    render preflight gate loads the rig from it.
     """
-    require_legacy_render(job_config.moving_heads, command="show")
-
     resolved_catalog = catalog_dir or tracked_catalog_dir()
     expected_index = resolved_catalog / "index.json"
     if not expected_index.is_file():
@@ -201,6 +201,7 @@ def prepare_combined_show_pipeline(
         max_iterations=job_config.agent.max_iterations,
         min_pass_score=job_config.agent.min_pass_score,
         assets=job_config.assets,
+        fixture_config_path=fixture_config_path,
     )
     return CombinedShowWiring(
         pipeline=pipeline,
@@ -211,6 +212,7 @@ def prepare_combined_show_pipeline(
         recipe_catalog=recipe_catalog,
         fe_bundle=fe_bundle,
         moving_head_target_ids=moving_ids,
+        layout_models=tuple(layout.models.model if layout.models else ()),
     )
 
 

@@ -8,6 +8,9 @@ import pytest
 
 from twinklr.cli.main import build_arg_parser
 from twinklr.cli.show_cmd import run_show_command, run_show_pipeline_async
+from twinklr.core.config.fixtures import FixtureGroup, FixtureInstance
+from twinklr.core.config.fixtures.dmx import DmxMapping
+from twinklr.core.config.fixtures.instances import FixtureConfig
 from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.feature_engineering.loader import FEArtifactBundle
 
@@ -165,19 +168,30 @@ async def test_show_fe_bundle_and_default_catalog_layers_are_forwarded(
 
 
 @pytest.mark.asyncio
-async def test_show_refuses_a_physical_job_before_any_analysis(
+async def test_show_refuses_a_physical_rig_without_profiles_before_any_analysis(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """The combined show coordinates and exports legacy moving-head segments only, so a
-    physical job is refused at load instead of failing after planning."""
+    """A physical show checks the rig when its fixtures load, as `twinklr run` does, so
+    a rig the renderer cannot render is refused before analysis or any provider call."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-only")
     job_path = tmp_path / "job.json"
     job_path.write_text(
         '{"schema_version": "3.1", "moving_heads": {"mode": "physical_v2"}}', encoding="utf-8"
     )
+    rig = FixtureGroup(group_id="MOVING_HEADS", xlights_group="Moving Heads")
+    rig.add_fixture(
+        FixtureInstance(
+            fixture_id="MH1",
+            config=FixtureConfig(
+                fixture_id="MH1",
+                dmx_mapping=DmxMapping(pan_channel=1, tilt_channel=2, dimmer_channel=3),
+            ),
+            xlights_model_name="Dmx MH1",
+        )
+    )
     with (
         patch("twinklr.cli.show_cmd.load_app_config", return_value=AppConfig()),
-        patch("twinklr.cli.show_cmd.load_fixture_group") as load_fixtures,
+        patch("twinklr.cli.show_cmd.load_fixture_group", return_value=rig),
         patch("twinklr.cli.show_cmd.prepare_combined_show_pipeline") as prepare,
     ):
         exit_code = await run_show_pipeline_async(
@@ -191,6 +205,6 @@ async def test_show_refuses_a_physical_job_before_any_analysis(
 
     assert exit_code == 1
     output = " ".join(capsys.readouterr().out.split())
-    assert "`twinklr show` does not support moving_heads.mode 'physical_v2'" in output
-    load_fixtures.assert_not_called()
+    assert "moving_heads.mode 'physical_v2' cannot render this rig" in output
+    assert "MH1: physical_profile is missing" in output
     prepare.assert_not_called()

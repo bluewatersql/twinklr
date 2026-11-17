@@ -825,8 +825,17 @@ dip. A song with silence or a fade at
 either end renders only its covered span, the detected beats plus one beat interval
 beyond the first and last (or up to the song's edge when nearer); every fixture is held
 dark outside it and no tempo is inferred there. The gate logs that span, and the trace
-records it with each dropped cue. `twinklr show`,
-`inject` and `regenerate` render legacy output only and refuse it. `eval-report`
+records it with each dropped cue. `twinklr show` renders a physical job's moving heads
+physically: its pipeline starts with the moving-head definition's prefix, so the same
+`render_preflight` gate runs before any planner, and the combined render stage turns the
+coordination schedule's rests for the moving heads, inside each macro section, into the
+renderer's `dark_spans`: the cues they cover keep playing their authored paths there,
+commanded dark, before section entry and repositioning are planned, so no re-entry
+follows a span. The show's export applies the output budgets and publishes the
+sequence and its trace, which carries the physical render record, together. `inject` sends the
+physical render's effects to the open sequence and `regenerate` re-renders the whole
+song's moving heads from the recorded plan
+([user guide](user-guide.md#live-injection-and-section-regeneration-local-only)). `eval-report`
 re-renders a physical checkpoint from the render its run recorded in it and reports
 physical metrics ([user guide](user-guide.md#evaluation-report-twinklr-eval-report)).
 With `twinklr run --layout`, a physical job's fixture models are checked against

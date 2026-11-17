@@ -490,7 +490,7 @@ def dark_throughout(segment: FixtureSegment, profile: FixtureCapabilities, start
         if (
             shutter is not None
             and isinstance(shutter.physical, DiscreteTrajectory)
-            and _state_at(shutter.physical, time_ms) in visibility.extinguishing_shutter_states
+            and state_at(shutter.physical, time_ms) in visibility.extinguishing_shutter_states
         ):
             continue
         return False
@@ -1389,17 +1389,17 @@ class _FixturePlanner:
 
     def _values_at(self, segment: FixtureSegment, time_ms: int) -> _Values:
         def level(channel: ChannelName) -> Fraction | float | None:
-            """The sample (`_frame_values`) of a continuous channel, else None."""
+            """The sample (`frame_values`) of a continuous channel, else None."""
             value = segment.channels.get(channel)
             if value is None or not isinstance(value.physical, ContinuousTrajectory):
                 return None
-            return next(_frame_values(value.physical, time_ms, time_ms + 1, 1))[1]
+            return next(frame_values(value.physical, time_ms, time_ms + 1, 1))[1]
 
         def state(channel: ChannelName) -> str | None:
             value = segment.channels.get(channel)
             if value is None or not isinstance(value.physical, DiscreteTrajectory):
                 return None
-            return _state_at(value.physical, time_ms)
+            return state_at(value.physical, time_ms)
 
         words = {}
         for channel in self.pose_channels:
@@ -1444,7 +1444,7 @@ class _FixturePlanner:
                 continue  # held at the word the head already has: no command moves it
             commands = (
                 (t, self._word(channel, value))
-                for t, value in _frame_values(physical, segment.t0_ms, segment.t1_ms, self.frame_ms)
+                for t, value in frame_values(physical, segment.t0_ms, segment.t1_ms, self.frame_ms)
             )
             motion[channel], _ = self._follow(
                 channel, motion[channel], head.values.words[channel], commands
@@ -1717,11 +1717,11 @@ def _frame_levels(
     trajectory: ContinuousTrajectory, start_ms: int, end_ms: int, step_ms: int
 ) -> Iterator[tuple[int, Fraction]]:
     """The encoder's sample at each frame start in `[start_ms, end_ms)`, in one pass."""
-    for time_ms, value in _frame_values(trajectory, start_ms, end_ms, step_ms):
+    for time_ms, value in frame_values(trajectory, start_ms, end_ms, step_ms):
         yield time_ms, Fraction(value)
 
 
-def _frame_values(
+def frame_values(
     trajectory: ContinuousTrajectory, start_ms: int, end_ms: int, step_ms: int
 ) -> Iterator[tuple[int, Fraction | float]]:
     """`_frame_levels`, with a sample that is a point's own value left as its float."""
@@ -1741,7 +1741,7 @@ def _frame_values(
         yield time_ms, Fraction(left.value) + (Fraction(right.value) - Fraction(left.value)) * share
 
 
-def _state_at(trajectory: DiscreteTrajectory, time_ms: int) -> str:
+def state_at(trajectory: DiscreteTrajectory, time_ms: int) -> str:
     current = [event.state for event in trajectory.events if event.t_ms <= time_ms]
     if not current:
         raise ValueError(f"no discrete state is defined at {time_ms} ms")

@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from tests.unit.reporting.evaluation.show_test_support import entry, grid, manifest, trace
+from tests.unit.reporting.evaluation.show_test_support import (
+    entry,
+    grid,
+    manifest,
+    trace,
+    zoned_manifest,
+)
 from twinklr.core.reporting.evaluation.show_metrics import score_cross_part_alignment
 from twinklr.core.sequencer.planning import CallResponsePair
 from twinklr.core.sequencer.templates.group.models.choreography import ChoreoGroup
@@ -126,3 +132,17 @@ def test_unknown_moving_head_fixture_fallback_fails_with_multiple_owners() -> No
             trace=trace(entry("display", 0, 500), unknown),
             beat_grid=grid(),
         )
+
+
+def test_a_zone_alias_in_the_mapping_does_not_claim_its_group_twice() -> None:
+    """A layout maps a zone a plan may target to the group covering it; that alias names
+    the same layout group, and an emission on it still belongs to the group itself."""
+    on_group = entry("display", 0, 500).model_copy(
+        update={"group_id": "Display Group", "element_name": "Display Group"}
+    )
+    result = score_cross_part_alignment(
+        manifest=zoned_manifest("YARD"),
+        trace=trace(on_group, entry("moving_head", 500, 1_000)),
+        beat_grid=grid(),
+    )
+    assert result.pair_alignments[0].expected[0].observed_start_ms == 0

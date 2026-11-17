@@ -35,6 +35,7 @@ from twinklr.core.sequencer.show_coordination import (
     coordinate_moving_head_plan,
     coordinate_moving_head_segments,
     coordination_schedule,
+    moving_head_dark_spans,
     validate_macro_coordination,
 )
 from twinklr.core.sequencer.templates.group.models.choreography import (
@@ -937,3 +938,51 @@ def test_raw_recipe_ids_containing_coord_marker_are_still_coordinated(
     assert all(event.end_ms - event.start_ms < 4_400 for event in emitted)
     assert all(re.search(r"\|coord-\d+$", event.event_id) for event in emitted)
     assert second == first
+
+
+def _call_response_macro(response: str) -> MacroPlan:
+    house = PlanTarget(type=TargetType.ZONE, id=ChoreoTag.HOUSE.value)
+    responder = PlanTarget(type=TargetType.GROUP, id=response)
+    return _macro(
+        mode=CoordinationMode.CALL_RESPONSE,
+        roles=[
+            FocalRole(target=house, role=FocalRoleKind.LEAD),
+            FocalRole(target=responder, role=FocalRoleKind.SUPPORT),
+        ],
+        pairs=[
+            CallResponsePair(
+                call=house, response=responder, step_unit=StepUnit.BEAT, step_duration=1
+            )
+        ],
+    )
+
+
+@pytest.mark.parametrize(
+    ("macro", "expected"),
+    [
+        (_macro(mode=CoordinationMode.UNIFIED), ()),
+        (_macro(mode=CoordinationMode.COMPLEMENTARY), ()),
+        # The moving heads respond: they rest through every call beat.
+        (
+            _call_response_macro("MOVING_HEADS"),
+            ((0, 500), (1_100, 1_600), (2_200, 2_700), (3_300, 3_800)),
+        ),
+        # Unpaired in a call/response section, they keep the whole section.
+        (_call_response_macro("MEGA_TREE"), ()),
+        # Sequenced over the graph's five targets, they hold beats 1 and 6 only.
+        (_macro(mode=CoordinationMode.SEQUENCED), ((500, 2_700), (3_300, 4_400))),
+        # A ripple keeps them one beat longer each time.
+        (_macro(mode=CoordinationMode.RIPPLE), ((1_100, 2_700), (3_800, 4_400))),
+    ],
+    ids=["unified", "complementary", "mh-responds", "mh-unpaired", "sequenced", "ripple"],
+)
+def test_moving_head_dark_spans_are_where_the_schedule_rests_them(
+    macro: MacroPlan, expected: tuple[tuple[int, int], ...]
+) -> None:
+    """The physical show's yield windows: the time of each section that no window
+    activates the moving heads in, merged and in time order."""
+    spans = moving_head_dark_spans(
+        macro, _grid(), _graph(), moving_head_target_ids={"MOVING_HEADS"}
+    )
+
+    assert spans == expected

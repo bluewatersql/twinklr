@@ -554,6 +554,42 @@ def coordinate_moving_head_plan(
     return plan.model_copy(update={"sections": updated}, deep=True)
 
 
+def moving_head_dark_spans(
+    macro_plan: MacroPlan,
+    beat_grid: BeatGrid,
+    graph: ChoreographyGraph,
+    *,
+    moving_head_target_ids: set[str],
+) -> tuple[tuple[int, int], ...]:
+    """Where the coordination schedule rests the moving heads, for the physical renderer.
+
+    Each macro section's time that no window of the schedule activates a moving-head
+    target in (a call/response phase answered by others, a sequenced or ripple step on
+    another target), merged and in time order; empty when every section keeps them
+    active throughout. The physical renderer plans the heads dark there before it plans
+    section entry and repositioning (`RenderingPipeline(dark_spans=...)`).
+    """
+    schedule = coordination_schedule(macro_plan, beat_grid, graph)
+    spans: list[tuple[int, int]] = []
+    for section in macro_plan.sections:
+        cursor = section.section.start_ms
+        active = sorted(
+            {
+                window
+                for target_id in moving_head_target_ids
+                for window in _windows_for(schedule, section, target_id)
+            }
+        )
+        for start, end in [*active, (section.section.end_ms, section.section.end_ms)]:
+            if start > cursor:
+                if spans and spans[-1][1] == cursor:
+                    spans[-1] = (spans[-1][0], start)
+                else:
+                    spans.append((cursor, start))
+            cursor = max(cursor, end)
+    return tuple(spans)
+
+
 def coordinate_moving_head_segments(
     segments: list[FixtureSegment],
     macro_plan: MacroPlan,
@@ -603,5 +639,6 @@ __all__ = [
     "coordinate_moving_head_plan",
     "coordinate_moving_head_segments",
     "coordination_schedule",
+    "moving_head_dark_spans",
     "validate_macro_coordination",
 ]

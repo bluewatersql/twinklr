@@ -5,14 +5,22 @@ from __future__ import annotations
 import argparse
 import asyncio
 from pathlib import Path
+import shutil
+import tempfile
+import time
 
 from rich.console import Console
 
-from twinklr.cli.display_cmd import export_display_artifacts, load_display_fe_bundle
+from twinklr.cli.display_cmd import load_display_fe_bundle
 from twinklr.core.agents.providers.factory import validate_llm_provider_config
 from twinklr.core.caching import derive_session_id
+from twinklr.core.caching.identity import hash_file_content
 from twinklr.core.config.loader import load_app_config, load_fixture_group, load_job_config
-from twinklr.core.config.render_policy import require_legacy_render
+from twinklr.core.config.models import MHRenderPolicy
+from twinklr.core.config.render_policy import preflight_render_policy
+from twinklr.core.formats.xlights.sequence.exporter import XSQExporter
+from twinklr.core.formats.xlights.sequence.models.xsq import XSequence
+from twinklr.core.formats.xlights.sequence.trace import write_xsq_trace_sidecar
 from twinklr.core.pipeline import PipelineContext, PipelineExecutor
 from twinklr.core.pipeline.display_wiring import (
     default_local_catalog_dir,
@@ -20,8 +28,17 @@ from twinklr.core.pipeline.display_wiring import (
 )
 from twinklr.core.pipeline.show_wiring import prepare_combined_show_pipeline
 from twinklr.core.reporting.evaluation.show_manifest import write_show_evaluation_manifest
+from twinklr.core.sequencer.display.renderer import RenderResult
 from twinklr.core.sequencer.display.xlights_mapping import XLightsMapping
+from twinklr.core.sequencer.moving_heads.delivery import DeliveryRollbackError, publish_files
+from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
+    PhysicalOutputError,
+    check_output_budget,
+    measure_output,
+)
+from twinklr.core.sequencer.moving_heads.pipeline import offered_template_ids
 from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
+from twinklr.core.sequencer.moving_heads.templates.data_loader import admit_physical_catalog
 from twinklr.core.sequencer.moving_heads.templates.library import list_templates
 from twinklr.core.sequencer.planning import MacroPlan
 from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
@@ -74,12 +91,17 @@ async def run_show_pipeline_async(
         app_config = load_app_config(app_config_path)
         validate_llm_provider_config(app_config)
         job_config = load_job_config(job_config_path)
-        # The combined show coordinates and exports legacy moving-head segments only.
-        require_legacy_render(job_config.moving_heads, command="show")
         fixture_group = load_fixture_group(fixture_config_path)
+        # As `twinklr run`: the rig's render prerequisites are checked when it loads,
+        # and the planner is offered only templates the render mode can render; the
+        # render preflight gate repeats both after audio analysis, before any planner.
+        preflight_render_policy(job_config, fixture_group)
         fe_bundle = load_display_fe_bundle(fe_output_dir, style_name=style_name)
         load_builtin_templates()
-        available_templates = [template.template_id for template in list_templates()]
+        admit_physical_catalog(job_config)
+        available_templates = offered_template_ids(
+            job_config, [template.template_id for template in list_templates()]
+        )
         song_name = clean_audio_filename(audio_path.stem)
         wiring = prepare_combined_show_pipeline(
             layout_path=layout_path,
@@ -90,6 +112,7 @@ async def run_show_pipeline_async(
             catalog_dir=tracked_catalog_dir(),
             local_catalog_dir=default_local_catalog_dir(),
             fe_bundle=fe_bundle,
+            fixture_config_path=fixture_config_path,
         )
     except Exception as error:
         console.print(f"[red]ERROR: Could not prepare combined show: {error}[/red]")
@@ -116,6 +139,9 @@ async def run_show_pipeline_async(
     context.set_state("choreo_graph", wiring.choreo_graph)
     context.set_state("xlights_mapping", wiring.xlights_mapping)
     context.set_state("recipe_catalog", wiring.recipe_catalog)
+    # The layout's models, for the moving-head model check the gate and render make.
+    context.set_state("layout_models", wiring.layout_models)
+    context.set_state("layout_sha256", hash_file_content(layout_path))
     result = await PipelineExecutor().execute(
         pipeline=wiring.pipeline,
         initial_input=str(audio_path),
@@ -126,11 +152,11 @@ async def run_show_pipeline_async(
         return 1
     try:
         render_output = result.outputs.get("show_render")
-        xsq_path, trace_path = export_display_artifacts(
+        xsq_path, trace_path = export_show_artifacts(
             render_output,
             artifact_dir=artifact_dir,
             song_name=song_name,
-            artifact_kind="show",
+            policy=job_config.moving_heads,
         )
         if not isinstance(render_output, dict):
             raise TypeError("show_render output must be an object")
@@ -151,6 +177,9 @@ async def run_show_pipeline_async(
             ),
             moving_head_target_ids=set(evaluation_contract.get("moving_head_target_ids", [])),
         )
+    except PhysicalOutputError as error:
+        console.print(f"[red]ERROR: {error}[/red]")
+        return 1
     except (OSError, TypeError, ValueError) as error:
         console.print(f"[red]Combined show returned an invalid render payload: {error}[/red]")
         return 1
@@ -158,6 +187,76 @@ async def run_show_pipeline_async(
     console.print(f"[green]Render trace:[/green] {trace_path}")
     console.print(f"[green]Evaluation manifest:[/green] {manifest_path}")
     return 0
+
+
+def export_show_artifacts(
+    render_output: object,
+    *,
+    artifact_dir: Path,
+    song_name: str,
+    policy: MHRenderPolicy,
+) -> tuple[Path, Path]:
+    """Write the combined sequence and its trace-v2 sidecar.
+
+    A physical render's output (`render_record`, `moving_head_runs`) is measured as
+    `twinklr run` measures its delivery: the serialized `.xsq` and the moving heads'
+    effect count must fit `policy`'s budgets before anything is written, and the trace
+    carries the render record with that measure under `output`. A legacy render's
+    output carries neither, and its files are written as before. Both files are
+    staged beside the destination and published together, the `.xsq` last, as
+    `twinklr run` publishes its delivery (`publish_files`): a failure leaves any
+    earlier show in place.
+
+    Raises:
+        TypeError: If the output is not the combined render stage's.
+        PhysicalOutputError: If the physical output exceeds the budgets; nothing is
+            written.
+        DeliveryRollbackError: If publishing failed and an earlier file could not be
+            put back; the staging directory is then kept and named.
+    """
+    if not isinstance(render_output, dict):
+        raise TypeError("show_render output must be an object")
+    sequence = render_output.get("sequence")
+    render_result = render_output.get("render_result")
+    if not isinstance(sequence, XSequence):
+        raise TypeError("show_render.sequence must be an XSequence")
+    if not isinstance(render_result, RenderResult):
+        raise TypeError("show_render.render_result must be a RenderResult")
+    record = render_output.get("render_record")
+    xsq_name = f"{song_name}_twinklr_show.xsq"
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{xsq_name}.", dir=artifact_dir))
+    try:
+        staged_xsq = staging / xsq_name
+        started = time.perf_counter()
+        XSQExporter().export(sequence, staged_xsq)
+        serialization_ms = (time.perf_counter() - started) * 1000
+        render = None
+        if record is not None:
+            measure = measure_output(render_output["moving_head_runs"], staged_xsq.read_bytes())
+            check_output_budget(measure, policy)
+            render = {
+                **record,
+                "output": {
+                    "effect_count": measure.effect_count,
+                    "xsq_bytes": measure.xsq_bytes,
+                    "serialization_ms": round(serialization_ms, 3),
+                },
+            }
+        staged_trace = write_xsq_trace_sidecar(
+            staged_xsq,
+            render_result.xsq_trace_entries,
+            fallback_substitutions=render_result.fallback_substitutions,
+            render=render,
+        )
+        publish_files((staged_trace, staged_xsq), artifact_dir, backup_dir=staging / ".replaced")
+    except DeliveryRollbackError:
+        raise  # the staging directory holds files that could not be put back
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    shutil.rmtree(staging, ignore_errors=True)
+    return artifact_dir / xsq_name, artifact_dir / staged_trace.name
 
 
 def run_show_command(args: argparse.Namespace) -> None:
@@ -195,4 +294,9 @@ def run_show_command(args: argparse.Namespace) -> None:
     )
 
 
-__all__ = ["add_show_subparser", "run_show_command", "run_show_pipeline_async"]
+__all__ = [
+    "add_show_subparser",
+    "export_show_artifacts",
+    "run_show_command",
+    "run_show_pipeline_async",
+]

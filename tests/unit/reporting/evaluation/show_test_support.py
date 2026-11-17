@@ -41,6 +41,9 @@ from twinklr.core.sequencer.vocabulary import (
     StepUnit,
     TargetType,
 )
+from twinklr.core.sequencer.vocabulary.choreography import (
+    ChoreoTag,
+)
 
 
 def graph() -> ChoreographyGraph:
@@ -184,4 +187,41 @@ def manifest(*, combined: bool = True) -> ShowEvaluationManifest:
             has_moving_heads=combined,
             cross_part_applicable=combined,
         ),
+    )
+
+
+def zoned_manifest(extra_id: str) -> ShowEvaluationManifest:
+    """The shared manifest whose display group lies in the YARD zone, with a mapping
+    entry for `extra_id` pointing at that group, as a layout maps a zone a plan may
+    target to the group covering it."""
+    show_graph = graph().model_copy(
+        update={
+            "groups": [
+                group.model_copy(update={"tags": [ChoreoTag.YARD]})
+                if group.id == "DISPLAY"
+                else group
+                for group in graph().groups
+            ]
+        }
+    )
+    show_mapping = XLightsMapping(
+        entries=[
+            *mapping().entries,
+            XLightsGroupMapping(choreo_id=extra_id, group_name="Display Group"),
+        ]
+    )
+    plan = macro()
+    return ShowEvaluationManifest(
+        xsq_path="show.xsq",
+        trace_path="trace.json",
+        xsq_sha256="0" * 64,
+        trace_sha256="0" * 64,
+        macro_plan_sha256=identity_sha256(plan),
+        choreography_graph_sha256=identity_sha256(show_graph),
+        xlights_mapping_sha256=identity_sha256(show_mapping),
+        macro_plan=plan,
+        choreography_graph=show_graph,
+        xlights_mapping=show_mapping,
+        moving_head_target_ids=["MOVING_HEADS"],
+        capability={"has_display": True, "has_moving_heads": True, "cross_part_applicable": True},
     )
