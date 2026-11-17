@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from tests.support import moving_heads as m
 from tests.support.moving_heads import plan_section
 from twinklr.core.agents.audio.profile.models import (
     AudioProfileModel,
@@ -238,6 +239,7 @@ def _admission(**presets: tuple[str, ...]) -> Any:
         exclusions=(),
         preset_exclusions=(),
         entry_dips={},
+        offer=m.untagged_offer(),
     )
 
 
@@ -498,7 +500,8 @@ class TestMovingHeadStageExecute:
         self, stage: MovingHeadStage, mock_context: MagicMock, valid_input: dict
     ) -> None:
         """A template the render preflight left out of the offer is neither offered nor
-        described to the planner."""
+        described to the planner, and the planner is told what the rig can show (the
+        gate's offer)."""
         from twinklr.core.sequencer.moving_heads.pipeline import TemplateAdmission
 
         admission = TemplateAdmission(
@@ -508,6 +511,7 @@ class TestMovingHeadStageExecute:
             exclusions=({"template_id": "sweep_lr_fan_pulse", "reason": "test"},),
             preset_exclusions=(),
             entry_dips={},
+            offer=m.untagged_offer(),
         )
         mock_context.get_state.side_effect = lambda key, default=None: (
             admission if key == "template_admission" else default
@@ -528,6 +532,7 @@ class TestMovingHeadStageExecute:
         assert [d.template_id for d in planning_context.template_descriptions] == [
             "circle_fan_hold"
         ]
+        assert planning_context.rig_offer == admission.offer
 
 
 class TestMovingHeadStageStateHandler:

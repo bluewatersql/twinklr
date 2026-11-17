@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import asdict
 import hashlib
 import json
@@ -18,7 +19,7 @@ from tempfile import NamedTemporaryFile
 from typing import Any
 from uuid import uuid4
 
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 from rich.console import Console
 from rich.markup import escape
 
@@ -78,6 +79,7 @@ from twinklr.core.sequencer.display.xlights_mapping import (
 )
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import OutputError
 from twinklr.core.sequencer.moving_heads.export.xsq_adapter import check_models
+from twinklr.core.sequencer.moving_heads.song_intent import SectionPalette
 from twinklr.core.sequencer.moving_heads.templates import load_templates_from_directory
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
     TEMPLATE_CATALOG_DIR,
@@ -193,9 +195,9 @@ def _read_live_plans(path: Path) -> dict[str, Any]:
 
 def _load_live_plan(
     path: Path, sequence_path: Path
-) -> tuple[ChoreographyPlan, dict[str, str]] | None:
-    """The plan behind the moving-head effects last injected into `sequence_path` and its
-    recorded identity, if any.
+) -> tuple[ChoreographyPlan, dict[str, str], dict[str, SectionPalette]] | None:
+    """The plan behind the moving-head effects last injected into `sequence_path`, its
+    recorded identity and the section palettes it rendered with, if any.
 
     Raises:
         ValueError: If the file or the sequence's record is unreadable, naming the file,
@@ -210,7 +212,8 @@ def _load_live_plan(
             record["plan"],
             remedy=f"run `twinklr inject` to re-plan the whole song into {sequence_path}",
         )
-        return plan, {key: str(record[key]) for key in LIVE_PLAN_IDENTITY}
+        palettes = TypeAdapter(dict[str, SectionPalette]).validate_python(record["palettes"])
+        return plan, {key: str(record[key]) for key in LIVE_PLAN_IDENTITY}, palettes
     except (KeyError, TypeError, ValidationError) as error:
         raise _unreadable_live_plans(
             path, f"invalid record for {sequence_path}: {error}"
@@ -218,16 +221,28 @@ def _load_live_plan(
 
 
 def _save_live_plan(
-    path: Path, sequence_path: Path, plan: ChoreographyPlan, identity: dict[str, str]
+    path: Path,
+    sequence_path: Path,
+    plan: ChoreographyPlan,
+    identity: dict[str, str],
+    palettes: Mapping[str, SectionPalette],
 ) -> None:
-    """Record, atomically, the plan now injected into `sequence_path` and its identity.
+    """Record, atomically, the plan now injected into `sequence_path`, its identity and the
+    section palettes it rendered with (a section's palette-role colour resolves through
+    its palette, so `regenerate` renders the sections it keeps through the same ones).
 
     Raises:
         ValueError: If the existing file is unreadable, naming it.
         OSError: If the file cannot be written.
     """
     payload = _read_live_plans(path)
-    payload[str(sequence_path)] = {"plan": plan.model_dump(mode="json"), **identity}
+    payload[str(sequence_path)] = {
+        "plan": plan.model_dump(mode="json"),
+        "palettes": {
+            section_id: palette.model_dump(mode="json") for section_id, palette in palettes.items()
+        },
+        **identity,
+    }
     with NamedTemporaryFile(
         "w", encoding="utf-8", dir=path.parent, prefix=f"{path.name}.", delete=False
     ) as handle:
@@ -579,7 +594,7 @@ async def _run_pipeline_async(
                 "run `twinklr inject` first.[/red]"
             )
             return 1
-        base_plan, identity = recorded
+        base_plan, identity, base_palettes = recorded
         stale = [why for key, why in LIVE_PLAN_IDENTITY.items() if identity[key] != current[key]]
         if stale:
             console.print(
@@ -673,6 +688,7 @@ async def _run_pipeline_async(
     if base_plan is not None:
         pipeline_context.set_state("regeneration_base_plan", base_plan)
         pipeline_context.set_state("regeneration_section_id", section_id)
+        pipeline_context.set_state("regeneration_base_palettes", base_palettes)
     if layout_models is not None and layout_path is not None:
         pipeline_context.set_state("layout_models", layout_models)
         pipeline_context.set_state("layout_sha256", hash_file_content(layout_path))
@@ -756,6 +772,7 @@ async def _run_pipeline_async(
                         fixture_group,
                         JsonOwnershipStore(ownership_path).load(injection.sequence_path),
                     ),
+                    pipeline_context.get_state("section_palettes") or {},
                 )
             except (OSError, ValueError) as error:
                 console.print(

@@ -1,9 +1,9 @@
 """What a profile's tagged wheel and shutter states mean, and guidance to tag the rest.
 
 A discrete state may carry one meaning tag (`DiscreteState.hex`, `.pattern`,
-`.strobe`). The lookups here are pure functions of one profile, for the planner's rig
-offer and the resolution of its colour, gobo and strobe choices (song-intent rendering
-W3/W4); nothing renders from a tag yet. An untagged state is never guessed at: it is
+`.strobe`). The lookups here are pure functions of one profile (or of its tagged states),
+which the rig offer and the resolution of the planner's colour and gobo use
+(`sequencer/moving_heads/song_intent.py`). An untagged state is never guessed at: it is
 not offered.
 
 `tag_guidance` prints, for a profile with untagged states, the channels' states ready to
@@ -47,11 +47,11 @@ MIN_LIGHTNESS = 0.15
 dimmer's, so it gets no match."""
 
 EXACT_DISTANCE = 0.02
-"""Oklab difference within which a slot shows the request exactly (about one
-just-noticeable difference)."""
+"""Graded difference (`ColorMatch.graded_distance`) within which a slot shows the request
+exactly (about one just-noticeable difference)."""
 
 CLOSE_DISTANCE = 0.10
-"""Oklab difference within which a slot shows the request closely..."""
+"""Graded difference within which a slot shows the request closely..."""
 CLOSE_HUE = 25.0
 """...when its hue is also within this many degrees."""
 
@@ -63,7 +63,8 @@ MIN_CHROMA_RATIO = 0.6
 chroma, so a tint (a CTO or CTB slot) never stands in for a saturated colour."""
 
 ColorFit = Literal["exact", "close", "approximate", "hue_mismatch"]
-"""How faithfully a matched state shows a requested colour.
+"""How faithfully a matched state shows a requested colour, graded on
+`ColorMatch.graded_distance` (the slot at the dimmer level that brings it nearest).
 
 - `exact`: within `EXACT_DISTANCE`.
 - `close`: within `CLOSE_DISTANCE` and, for colours with a hue, `CLOSE_HUE`.
@@ -88,6 +89,12 @@ class ColorMatch(NamedTuple):
     fit: ColorFit
     neutral_fallback: bool
     """A white slot was returned for a request with a hue because no slot matched it."""
+    graded_distance: float
+    """What `fit` grades: the Oklab difference between the request and the slot dimmed to
+    the level that brings it nearest (never brighter than the slot). A dimmer scales
+    linear RGB, which scales every Oklab coordinate alike, so a request that is the slot's
+    colour at a lower level grades as that colour; a lighter or more saturated request
+    than the slot still counts its difference. Equal to `distance` or less."""
 
 
 def tagged_colors(profile: FixtureCapabilities) -> dict[str, str]:
@@ -99,8 +106,14 @@ def tagged_colors(profile: FixtureCapabilities) -> dict[str, str]:
 
 
 def nearest_color_state(profile: FixtureCapabilities, color: str) -> ColorMatch | None:
-    """The tagged colour state to show `color` (`#RRGGBB` or a colour preset name); None
-    when no colour state is tagged or the request is darker than `MIN_LIGHTNESS`.
+    """`nearest_tagged_color` over the profile's tagged colour states (`tagged_colors`)."""
+    return nearest_tagged_color(tagged_colors(profile), color)
+
+
+def nearest_tagged_color(colors: Mapping[str, str], color: str) -> ColorMatch | None:
+    """The state of `colors` (state name → `#RRGGBB`) to show `color` (`#RRGGBB` or a
+    colour preset name); None when `colors` is empty or the request is darker than
+    `MIN_LIGHTNESS`.
 
     Hue first, in OKLCh:
 
@@ -113,12 +126,13 @@ def nearest_color_state(profile: FixtureCapabilities, color: str) -> ColorMatch 
       When no slot qualifies or the best is more than `HUE_CAP` away, the result is a `hue_mismatch`: the nearest white slot
       (`neutral_fallback`), else the slot with a hue nearest by hue.
 
-    Ties go to the first state name. `fit` grades the result (`ColorFit`).
+    Ties go to the first state name. `fit` grades the result (`ColorFit`) on its
+    `graded_distance`.
 
     Raises:
         ValueError: If `color` is not a colour.
     """
-    slots = {name: (shown, _oklab(shown)) for name, shown in tagged_colors(profile).items()}
+    slots = {name: (shown, _oklab(shown)) for name, shown in sorted(colors.items())}
     wanted = _oklab(canonical_hex(color))
     if not slots or wanted[0] < MIN_LIGHTNESS:
         return None
@@ -143,15 +157,15 @@ def nearest_color_state(profile: FixtureCapabilities, color: str) -> ColorMatch 
             if min(_chroma(wanted), _chroma(lab)) >= NEUTRAL_CHROMA
             else None
         )
+        graded = _dimmed_distance(wanted, lab)
         if fit is None:
-            gap = distance(name)
-            if gap <= EXACT_DISTANCE:
+            if graded <= EXACT_DISTANCE:
                 fit = "exact"
-            elif gap <= CLOSE_DISTANCE and (hue is None or hue <= CLOSE_HUE):
+            elif graded <= CLOSE_DISTANCE and (hue is None or hue <= CLOSE_HUE):
                 fit = "close"
             else:
                 fit = "approximate"
-        return ColorMatch(name, shown, distance(name), hue, fit, fallback)
+        return ColorMatch(name, shown, distance(name), hue, fit, fallback, graded)
 
     def nearest(names: list[str]) -> str:
         return min(names, key=lambda name: (distance(name), name))
@@ -172,6 +186,13 @@ def nearest_color_state(profile: FixtureCapabilities, color: str) -> ColorMatch 
     return result(min(hued, key=lambda name: (*by_hue(name), name)), "hue_mismatch")
 
 
+def oklch(color: str) -> tuple[float, float, float]:
+    """`color` (`#RRGGBB` or a preset name) as OKLCh: lightness, chroma, hue in degrees
+    (0 to 360; meaningless below `NEUTRAL_CHROMA`)."""
+    lab = _oklab(canonical_hex(color))
+    return lab[0], _chroma(lab), math.degrees(math.atan2(lab[2], lab[1])) % 360
+
+
 def color_distance(first: str, second: str) -> float:
     """The Oklab colour difference (ΔE_OK) between two colours (`#RRGGBB` or preset
     names): the Euclidean distance between their Oklab coordinates."""
@@ -182,10 +203,16 @@ def gobo_state(profile: FixtureCapabilities, pattern: GoboPattern | str) -> str 
     """The gobo state tagged with `pattern`; None when none is. Among states sharing a
     pattern, the shortest name, then the first by name: a static `star` before its
     shaking copy `star_shake`."""
-    wanted = GoboPattern(pattern)
     wheel = profile.discrete.get("gobo")
     states = wheel.states.items() if wheel is not None else ()
-    names = [name for name, state in states if state.pattern == wanted]
+    return tagged_gobo({name: state.pattern for name, state in states if state.pattern}, pattern)
+
+
+def tagged_gobo(patterns: Mapping[str, str], pattern: GoboPattern | str) -> str | None:
+    """The state of `patterns` (state name → pattern) showing `pattern`, by `gobo_state`'s
+    rule; None when none does."""
+    wanted = GoboPattern(pattern)
+    names = [name for name, shown in patterns.items() if shown == wanted]
     return min(names, key=lambda name: (len(name), name), default=None)
 
 
@@ -194,78 +221,6 @@ def strobe_state(profile: FixtureCapabilities, speed: StrobeSpeed) -> str | None
     shutter = profile.discrete.get("shutter")
     states = shutter.states.items() if shutter is not None else ()
     return next((name for name, state in states if state.strobe == speed), None)
-
-
-RigColorStatus = Literal["all_exact_or_close", "partial", "unavailable"]
-
-
-class RigColorOffer(NamedTuple):
-    """What a rig makes of one requested colour."""
-
-    matches: dict[str, ColorMatch | None]
-    """Each fixture's match (`nearest_color_state`), by fixture id."""
-    status: RigColorStatus
-    """`all_exact_or_close` when every fixture shows it exactly or closely; `unavailable`
-    when none shows it at all (every match is None or a `hue_mismatch`); else
-    `partial`."""
-    worse: tuple[str, ...]
-    """The fixtures that show it less than closely, in rig order (empty when
-    `all_exact_or_close`)."""
-
-
-def rig_color_offer(profiles: Mapping[str, FixtureCapabilities], color: str) -> RigColorOffer:
-    """`nearest_color_state` for each fixture of a rig (`profiles`, by fixture id) and how
-    the rig as a whole shows `color`.
-
-    Raises:
-        ValueError: If `color` is not a colour.
-    """
-    matches = {fixture_id: nearest_color_state(p, color) for fixture_id, p in profiles.items()}
-    worse = tuple(
-        fixture_id
-        for fixture_id, match in matches.items()
-        if match is None or match.fit not in ("exact", "close")
-    )
-    shown = any(match is not None and match.fit != "hue_mismatch" for match in matches.values())
-    status: RigColorStatus = (
-        "all_exact_or_close" if not worse else "partial" if shown else "unavailable"
-    )
-    return RigColorOffer(matches, status, worse)
-
-
-RigAvailability = Literal["all", "some", "none"]
-
-
-class RigStateOffer(NamedTuple):
-    """Which fixtures of a rig have a state for one gobo pattern or strobe speed."""
-
-    states: dict[str, str | None]
-    """Each fixture's state (`gobo_state` or `strobe_state`), by fixture id."""
-    available: RigAvailability
-    missing: tuple[str, ...]
-    """The fixtures without one, in rig order."""
-
-
-def rig_gobo_offer(
-    profiles: Mapping[str, FixtureCapabilities], pattern: GoboPattern | str
-) -> RigStateOffer:
-    """`gobo_state` for each fixture of a rig (`profiles`, by fixture id)."""
-    return _state_offer({fixture_id: gobo_state(p, pattern) for fixture_id, p in profiles.items()})
-
-
-def rig_strobe_offer(
-    profiles: Mapping[str, FixtureCapabilities], speed: StrobeSpeed
-) -> RigStateOffer:
-    """`strobe_state` for each fixture of a rig (`profiles`, by fixture id)."""
-    return _state_offer({fixture_id: strobe_state(p, speed) for fixture_id, p in profiles.items()})
-
-
-def _state_offer(states: dict[str, str | None]) -> RigStateOffer:
-    missing = tuple(fixture_id for fixture_id, state in states.items() if state is None)
-    available: RigAvailability = (
-        "none" if len(missing) == len(states) else "some" if missing else "all"
-    )
-    return RigStateOffer(states, available, missing)
 
 
 # Oklab (Ottosson 2020): sRGB linearised (IEC 61966-2-1), to LMS, cube root, to Lab.
@@ -293,6 +248,16 @@ def _oklab(hex_color: str) -> tuple[float, float, float]:
     lms = [value ** (1 / 3) for value in times(_SRGB_TO_LMS, rgb)]
     lightness, a, b = times(_LMS_TO_OKLAB, lms)
     return lightness, a, b
+
+
+def _dimmed_distance(wanted: tuple[float, float, float], slot: tuple[float, float, float]) -> float:
+    """The Oklab difference between `wanted` and `slot` scaled by the factor in (0, 1]
+    that brings it nearest: a dimmer level times linear RGB scales each Oklab coordinate
+    by that level's cube root, so the slot at any level is `slot` times one factor."""
+    norm = sum(value * value for value in slot)
+    dot = sum(w * v for w, v in zip(wanted, slot, strict=True))
+    scale = 1.0 if norm == 0 else min(1.0, max(0.0, dot / norm))
+    return math.dist(wanted, tuple(scale * value for value in slot))
 
 
 def _chroma(lab: tuple[float, float, float]) -> float:

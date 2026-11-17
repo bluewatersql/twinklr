@@ -42,6 +42,7 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     encode_fixture_frames,
     frame_times,
 )
+from twinklr.core.sequencer.moving_heads.song_intent import RigOffer, rig_offer
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
     TEMPLATE_CATALOG_DIR,
     load_template_document,
@@ -519,6 +520,32 @@ def bars_grid(*beat_ms: float) -> BeatGrid:
         beats_per_bar=4,
         duration_ms=beats[-1] + GRID_SHIFT_MS,
     )
+
+
+def untagged_offer(fixture_ids: Sequence[str] = ("MH1", "MH2", "MH3", "MH4")) -> RigOffer:
+    """The offer of `family_rig(fixture_ids)`, whose wheel states carry no meaning tag:
+    it offers no colour or gobo, for a gate result built by hand."""
+    return rig_offer(family_rig(fixture_ids), bars_grid(500.0))
+
+
+def tagged_family_rig(fixture_ids: Sequence[str]) -> FixtureGroup:
+    """`family_rig(fixture_ids)` with every colour state tagged with the colour it is named
+    for (white, red, blue) and every gobo state with its pattern (open, dots, stars)."""
+    payload = family_rig(fixture_ids).model_dump(mode="json")
+    patterns = {"open": "open", "dots": "dots", "star": "stars"}
+    for fixture in payload["fixtures"]:
+        discrete = fixture["config"]["physical_profile"]["discrete"]
+        for name, state in discrete["color"]["states"].items():
+            state["hex"] = name
+        for name, state in discrete["gobo"]["states"].items():
+            state["pattern"] = patterns[name]
+    return FixtureGroup.model_validate(payload)
+
+
+def tagged_offer(fixture_ids: Sequence[str] = ("MH1", "MH2", "MH3", "MH4")) -> RigOffer:
+    """The offer of `tagged_family_rig(fixture_ids)`: white, red and blue (so every colour
+    of the fixed palette-role table shows, most approximately) and three gobos."""
+    return rig_offer(tagged_family_rig(fixture_ids), bars_grid(500.0))
 
 
 def hold_step(

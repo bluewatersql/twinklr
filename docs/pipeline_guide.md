@@ -753,18 +753,22 @@ uv run twinklr run \
    - **Plan**: LLM picks, per section, one to three templates (with presets)
      and the section's song intent: intensity, colour, gobo, timed accents tied
      to musical and lyric moments, motif variation, density, entry and exit
-   - **Validate**: Deterministic repair of single items the song cannot hold
-     (recorded, and shown to the planner on its next revision), then heuristic
+   - **Validate**: Deterministic repair of single items the song or the rig cannot
+     hold (a colour or gobo no head shows, against the pre-planning check's rig offer;
+     recorded, and shown to the planner on its next revision), then heuristic
      checks (every song section planned over its own bars, no overlaps, offered
      templates, a real reason per section and an overall strategy)
    - **Judge**: LLM scores the plan (0-10) and provides feedback
    - **Iterate**: If score < threshold, planner revises with feedback
 
 6. **Render** — Compiles the plan's templates against each fixture's profile into
-   complete 20 ms DMX frames and writes the `.xsq` output file. It does not yet render
-   the planner's song intent (intensity, colour, gobo, timed accents and lyric moment
-   cues, motif variation, density, entry and exit transitions): a known regression from
-   the single-renderer cutover, being fixed ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
+   complete 20 ms DMX frames and writes the `.xsq` output file. Each section's colour
+   (a palette role through the section's macro palette) and gobo play the tagged wheel
+   states nearest them, turned only in the dark ([user guide](user-guide.md#how-a-sections-colour-and-gobo-reach-the-lights)).
+   It does not yet render the rest of the planner's song intent (intensity, timed
+   accents and lyric moment cues, entry and exit transitions, motif variation, density,
+   modifiers): a known regression from the single-renderer cutover, being fixed
+   ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 
 ### Demo Scripts
 

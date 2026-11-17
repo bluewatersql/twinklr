@@ -32,8 +32,9 @@ See [product/overview.md](product/overview.md).
   revision. Moving-head sections carry 1-3 template parts and categorical song intent
   (intensity, colour, gobo, timed events tied to lyric MomentCues, motif variation,
   density, entry/exit transitions; contract of 2026-11-17, sent to Claude as an enforced
-  structured output, compiled and enforced live on 2026-11-17); the moving-head renderer does not yet render the intent, a known
-  regression (below).
+  structured output, compiled and enforced live on 2026-11-17); the moving-head renderer renders each
+  section's colour and gobo and not yet the rest of the intent, a known regression
+  (below).
   [architecture/multi-agent-planning.md](architecture/multi-agent-planning.md)
 - **Providers** — OpenAI (default; Responses API strict structured outputs), Claude
   (`llm_provider: anthropic`), and Ollama cloud (`glm-5.3:cloud` through the loopback
@@ -62,19 +63,29 @@ See [product/overview.md](product/overview.md).
     Families play in any meter (a repeating cycle grows to whole periods).
   - Silent song edges are held dark; a cue it cannot play honestly is kept dark
     (`on_unplayable`, default `"dark"`).
-  - **Known regression: the song intent is not rendered yet.** The renderer applies
-    each section's template, preset and bars only. The planner's intensity, section
-    colour, shutter and gobo events, lyric moment cues bound to events and section
-    transitions are accepted and ignored (a per-section trace diagnostic says so), and
-    `twinklr show` does not project the macro palette or focal role onto the heads. The
-    renderer deleted in the cutover rendered these. The owner has directed that all of
-    them be rendered on this renderer, with nothing cut from the planner contract; the
-    work is planned as W0–W9 ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)). The renderer is not
-    complete until then. Profiles can already tag what each wheel and shutter state
-    shows (`hex`, `pattern`, `strobe`; W1), which is what will make those choices
-    available on a rig (or `offer: false` for a state with no such meaning); nothing
-    reads the tags until W3/W4, and `twinklr run` and `show` write paste-ready tags for
-    untagged states to `profile_tags.txt`, noting it in one line.
+  - **Song intent rendered so far: section colour and gobo** (W3/W4, 2026-11-17, not
+    yet seen by the owner). Profiles tag what each wheel and shutter state shows (`hex`,
+    `pattern`, `strobe`; W1; `offer: false` for a state with no such meaning), and
+    `twinklr run` and `show` write paste-ready tags for untagged states to
+    `profile_tags.txt`, noting it in one line. The gate computes the **rig offer** from
+    the tagged states (colours, each section's palette roles on the wheel, gobos,
+    strobe speeds, hit, wheel change time), the planner is shown it, and a colour or
+    gobo no head can show is repaired. Each head plays the section's colour (a palette
+    role through the section's macro palette, under `run` and `show` alike; the fixed
+    role table without one) and gobo as its nearest tagged state, turned only in the
+    dark; a change at a boundary the heads play lit through dips dark for at most half a
+    beat before the section, else the head keeps the previous colour. Renderer revision
+    3. ([user guide](../docs/user-guide.md#how-a-sections-colour-and-gobo-reach-the-lights),
+    [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w3-w4-offer-colour/README.md))
+  - **Known regression: the rest of the song intent is not rendered yet.** The planner's
+    intensity, shutter and gobo events, lyric moment cues bound to events, section
+    transitions, motif variation, density and modifiers are accepted and ignored (a
+    per-section trace diagnostic says so), and `twinklr show` does not project the macro
+    focal role onto the heads. The renderer deleted in the cutover rendered intensity,
+    events and entry transitions. The owner has directed that all of it be rendered on
+    this renderer, with nothing cut from the planner contract; the remaining work is
+    W5–W9 ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)). The renderer is not
+    complete until then.
 
   `twinklr run`, `show`, `eval-report`, `inject` and `regenerate` all use it;
   `regenerate` re-renders the whole song. Gate time on eight heads and a four-minute
@@ -84,7 +95,7 @@ See [product/overview.md](product/overview.md).
   The owner accepted its look for one song on their rig in the house preview on
   2026-11-16. That render applied no planner intensity, colour, events or cues: the
   acceptance covers the templates' motion and timing, not the absence of song intent,
-  which W4–W9 add with owner views. There is no hardware result, and the profile timings
+  which W4–W9 add with owner views (W4's, colour and gobo, is pending). There is no hardware result, and the profile timings
   used were chosen, not measured ([record](../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p3-viewing-render/README.md)).
   `inject` and `regenerate` have been run only against a fake xLights client.
   Reference: [user guide](../docs/user-guide.md#job_configjson-job-config),
@@ -159,7 +170,8 @@ points that shape current behavior:
 Active changes are listed in [changes/ACTIVE.md](../changes/ACTIVE.md). The moving-head
 true-up's single-renderer cutover is complete on the unmerged branch `feat/mh-true-up-p3`
 ([handoff](../changes/2026_11_12_mh_true_up/plan/handoff.md)), with a known regression:
-the planner's song intent is not rendered. Its next work is rendering it, tasks W0–W9 of
+the planner's song intent is only partly rendered (section colour and gobo, W4). Its next
+work is rendering the rest, tasks W5–W9 of
 [song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md). The table below is the
 twinklr-reactivation-review build campaign: its code and tooling are merged and
 independently verified, and what remains is empirical evidence and owner decisions, not

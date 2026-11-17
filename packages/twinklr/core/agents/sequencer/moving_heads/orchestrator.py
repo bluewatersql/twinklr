@@ -39,6 +39,7 @@ from twinklr.core.agents.shared.judge.controller import (
 )
 from twinklr.core.agents.shared.judge.feedback import FeedbackManager
 from twinklr.core.agents.spec import AgentSpec
+from twinklr.core.sequencer.moving_heads.song_intent import repair_rig_intent
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +96,8 @@ def build_planner_variables(
         "macro_palette_arc": prompt_context["macro_palette_arc"],
         "macro_motif_continuity": prompt_context["macro_motif_continuity"],
         "macro_focal_arc": prompt_context["macro_focal_arc"],
+        # What the rig can show of the song intent
+        "rig_offer": prompt_context["rig_offer"],
         # Feedback (for refinement iterations)
         "feedback": feedback,
         "revision_focus": revision_focus,
@@ -147,6 +150,17 @@ def build_judge_variables(
     variables.update(iteration_context.judge_prompt_history())
 
     return variables
+
+
+def normalize_plan(plan: ChoreographyPlan, context: MovingHeadPlanningContext) -> ChoreographyPlan:
+    """What runs on every planner response before validation: canonical section ids, the
+    lyric cues bound to their beats and single items the song cannot hold repaired
+    (`bind_lyric_moment_cues`), then the colours and gobos the rig cannot show repaired
+    (`repair_rig_intent`, when the run has the gate's offer)."""
+    plan = bind_lyric_moment_cues(plan, context.lyric_context, context.beat_grid, context.sections)
+    if context.rig_offer is None:
+        return plan
+    return repair_rig_intent(plan, context.rig_offer, context.palettes)
 
 
 class MovingHeadPlannerOrchestrator:
@@ -259,6 +273,8 @@ class MovingHeadPlannerOrchestrator:
                 if context.template_descriptions is not None
                 else None
             ),
+            # What the planner is told the rig can show, and what repair keeps.
+            "rig_offer": (context.rig_offer.model_dump(mode="json") if context.rig_offer else None),
             # Bar numbers in the plan name positions on this authoritative grid.
             "beat_grid": (context.beat_grid.model_dump(mode="json") if context.beat_grid else None),
             # None is also a valid macro result, so the experiment ablation must
@@ -296,8 +312,8 @@ class MovingHeadPlannerOrchestrator:
 
         Executes the complete MovingHead planner workflow:
         1. Generate initial plan (planner agent)
-        2. Normalise it: canonical section ids, repair of single items the song cannot
-           hold, lyric cues bound to their beats (`bind_lyric_moment_cues`)
+        2. Normalise it: canonical section ids, repair of single items the song or the
+           rig cannot hold, lyric cues bound to their beats (`normalize_plan`)
         3. Validate plan (heuristic validator)
         4. Evaluate plan (judge agent)
         5. Refine if needed (repeat with feedback, including what was repaired); a valid
@@ -354,12 +370,7 @@ class MovingHeadPlannerOrchestrator:
             judge_context_builder=lambda plan, iteration, iteration_context: build_judge_variables(
                 context, plan, iteration, iteration_context
             ),
-            plan_normalizer=lambda plan: bind_lyric_moment_cues(
-                plan,
-                context.lyric_context,
-                context.beat_grid,
-                context.sections,
-            ),
+            plan_normalizer=lambda plan: normalize_plan(plan, context),
             plan_repairs=lambda plan: [repair.describe() for repair in plan.repairs],
             plan_advisories=lambda plan: unanswered_high_cues(
                 plan, context.lyric_context, context.sections

@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from twinklr.core.formats.xlights.sequence.models.xsq import TimingTrack
     from twinklr.core.pipeline.context import PipelineContext
     from twinklr.core.pipeline.result import StageResult
+    from twinklr.core.sequencer.moving_heads.song_intent import SectionPalette
     from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 logger = logging.getLogger(__name__)
@@ -39,11 +40,18 @@ class MovingHeadRenderingStage:
         - "template_admission": the render preflight's result, if any; the render
           applies only the presets it admitted, plays each template's effective
           variant where a section names none, and traces both
+        - "macro_plan": the song's macro plan, if any; a section's palette-role colour
+          resolves through its palette (`render_palettes`), else the fixed role table
+        - "regeneration_base_palettes", "regeneration_section_id": under `twinklr
+          regenerate`, the palettes the injected render used, kept for every section
+          but the re-planned one
 
     State stored:
         - "xsq_output_path": Path to generated XSQ file
         - "delivery_artifacts": DeliveryArtifacts (.xsq, .xtiming files, .xmap)
         - "rendered_segment_count": Number of segments rendered
+        - "section_palettes": the palettes the render resolved palette roles through,
+          which `twinklr inject` records with the plan
         - "rendered_sequence", "render_fingerprint": the render's sequence, the one its
           .xsq is written from and live injection reads, and its render identity
         - "unplayable_warning": the render's warning about the cues it kept
@@ -163,6 +171,7 @@ class MovingHeadRenderingStage:
                 layout_models=context.get_state("layout_models"),
                 layout_sha256=context.get_state("layout_sha256"),
                 admission=admission,
+                palettes=render_palettes(context),
             )
 
             # Render to segments and write the delivery
@@ -178,6 +187,7 @@ class MovingHeadRenderingStage:
             context.set_state("xsq_output_path", self.xsq_output_path)
             context.set_state("delivery_artifacts", pipeline.artifacts)
             context.set_state("rendered_segment_count", len(segments))
+            context.set_state("section_palettes", pipeline.palettes)
             if pipeline.sequence is not None:
                 context.set_state("rendered_sequence", pipeline.sequence)
                 context.set_state("render_fingerprint", record["render_fingerprint"])
@@ -312,6 +322,30 @@ def record_render(record: dict[str, Any], context: PipelineContext) -> None:
             checkpoint_path,
             error,
         )
+
+
+def render_palettes(context: PipelineContext) -> dict[str, SectionPalette]:
+    """The section palettes a render resolves palette-role colours through: the macro
+    plan's in state (`macro_plan`, `section_palettes`). A regeneration
+    (`regeneration_base_palettes`) keeps, for every section but the re-planned one, the
+    palettes the injected render used, so the sections it keeps render as injected."""
+    from twinklr.core.sequencer.moving_heads.song_intent import section_palettes
+    from twinklr.core.sequencer.planning import MacroPlan
+
+    state = context.get_state("macro_plan")
+    macro = (
+        None
+        if state is None
+        else MacroPlan.model_validate(state.model_dump() if hasattr(state, "model_dump") else state)
+    )
+    palettes = section_palettes(macro)
+    base = context.get_state("regeneration_base_palettes")
+    if base is None:
+        return palettes
+    section_id = context.get_state("regeneration_section_id")
+    kept = {key: palette for key, palette in base.items() if key != section_id}
+    replanned = {key: palette for key, palette in palettes.items() if key == section_id}
+    return {**kept, **replanned}
 
 
 def load_render_fixture_group(

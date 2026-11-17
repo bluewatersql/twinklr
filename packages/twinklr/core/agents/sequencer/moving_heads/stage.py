@@ -59,7 +59,8 @@ class MovingHeadStage:
     State consumed:
         - "template_admission": the render preflight's `TemplateAdmission`, when a
           run has one; the planner is then offered its admitted templates
-          instead of `available_templates`
+          instead of `available_templates`, and told what the rig can show (its
+          `offer`), which also repairs the colours and gobos it cannot
 
     State stored:
         - "choreography_plan": ChoreographyPlan (for downstream rendering)
@@ -225,6 +226,7 @@ class MovingHeadStage:
                 macro_plan=macro_plan,
                 macro_planning_enabled=self.macro_planning_enabled,
                 template_descriptions=template_descriptions,
+                rig_offer=admission.offer if isinstance(admission, TemplateAdmission) else None,
             )
 
             # Store planning context for debugging

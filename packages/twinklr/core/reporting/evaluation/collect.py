@@ -17,6 +17,7 @@ from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, 
 from twinklr.core.config.models import MHRenderPolicy
 from twinklr.core.config.render_policy import UnsupportedRenderModeError
 from twinklr.core.reporting.evaluation.models import RunMetadata
+from twinklr.core.sequencer.moving_heads.song_intent import RigOffer, SectionPalette
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 if TYPE_CHECKING:
@@ -77,6 +78,7 @@ class _RecordedInputs(TypedDict):
     encoder_version: str
     rig: _RecordedRig
     dark_spans: NotRequired[list[list[int]]]
+    palettes: NotRequired[dict[str, dict[str, Any]]]
 
 
 @dataclass(frozen=True)
@@ -92,6 +94,8 @@ class RecordedRender:
         admission: The pre-planning gate's result, or None when no gate ran.
         dark_spans: The spans the render held every head dark over, as snapped and
             merged (`twinklr show`'s coordination rests); empty when there were none.
+        palettes: The macro palette each section resolved a palette-role colour
+            through, by section id; empty when none did.
         inputs: The run trace's input hashes (`fixtures`, `template_sha256`,
             `beat_grid_sha256`, `renderer_revision`, `encoder_version`, and
             `dark_spans` when there were any) and the rendered rig's identity (`rig`).
@@ -102,6 +106,7 @@ class RecordedRender:
     beat_grid: BeatGrid
     admission: TemplateAdmission | None
     dark_spans: tuple[tuple[int, int], ...]
+    palettes: Mapping[str, SectionPalette]
     inputs: Mapping[str, Any]
 
 
@@ -155,6 +160,7 @@ def _recorded_render(render: dict[str, Any]) -> RecordedRender:
         dark_spans=TypeAdapter(tuple[tuple[int, int], ...]).validate_python(
             render.get("dark_spans", ())
         ),
+        palettes=TypeAdapter(dict[str, SectionPalette]).validate_python(render.get("palettes", {})),
         admission=None
         if admission is None
         else TemplateAdmission(
@@ -164,6 +170,7 @@ def _recorded_render(render: dict[str, Any]) -> RecordedRender:
             exclusions=tuple(admission["exclusions"]),
             preset_exclusions=tuple(admission["preset_exclusions"]),
             entry_dips=dict(admission["entry_dips"]),
+            offer=RigOffer.model_validate(admission["offer"]),
         ),
     )
 

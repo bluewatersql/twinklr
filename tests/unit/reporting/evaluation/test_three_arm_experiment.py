@@ -20,6 +20,7 @@ from tests.support.moving_heads import (
     family_job,
     family_rig,
     plan_section,
+    tagged_offer,
 )
 from twinklr.core.agents.sequencer.moving_heads.deterministic_selector import (
     AdmittedTemplate,
@@ -1763,7 +1764,8 @@ def _hand_admission(
                 admitted_presets=presets.get(template_id, ("narrow", "slow")),
             )
             for template_id in template_ids
-        )
+        ),
+        offer=tagged_offer(),
     )
 
 

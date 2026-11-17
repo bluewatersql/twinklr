@@ -207,6 +207,7 @@ async def rerender_plan(
         output_path=None,  # Evaluation reads segments; it writes no sequence file.
         admission=recorded.admission,
         dark_spans=recorded.dark_spans,
+        palettes=recorded.palettes,
     )
 
     # Render segments

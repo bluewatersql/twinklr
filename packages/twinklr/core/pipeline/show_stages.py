@@ -63,9 +63,11 @@ class CombinedShowRenderStage:
         and repositioning (`moving_head_dark_spans`), and the output carries the render
         record and frame runs the export traces and budgets, and the record `twinklr
         show` adds to the plan checkpoint once the export is written
-        (`checkpoint_record`), for `eval-report` to re-render. The macro palette and
-        focal role are not projected onto the moving heads yet (a known regression the
-        song-intent rendering plan fixes); the render record says so per section.
+        (`checkpoint_record`), for `eval-report` to re-render. A section's palette-role
+        colour resolves through its macro palette, as under `twinklr run`
+        (`section_palettes`). The macro focal role is not projected onto the moving
+        heads yet (a known regression the song-intent rendering plan fixes); the render
+        record says so per section.
         """
 
         from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
@@ -153,6 +155,7 @@ class CombinedShowRenderStage:
             RenderingPipeline,
             TemplateAdmission,
         )
+        from twinklr.core.sequencer.moving_heads.song_intent import section_palettes
 
         admission = context.get_state("template_admission")
         pipeline = RenderingPipeline(
@@ -174,6 +177,7 @@ class CombinedShowRenderStage:
                 self._graph,
                 moving_head_target_ids=self._moving_head_target_ids,
             ),
+            palettes=section_palettes(macro_plan),
         )
         segments = pipeline.render()
         assert pipeline.render_record is not None  # set by every render
@@ -191,11 +195,12 @@ class CombinedShowRenderStage:
                 code="unsupported_attribute",
                 severity="warning",
                 message=(
-                    f"section {section.section.section_id!r}: the show's macro palette and "
-                    "focal role (colour and intensity) are not projected onto the moving "
-                    "heads yet, a known regression being fixed under "
+                    f"section {section.section.section_id!r}: the show's macro focal role "
+                    "(intensity) is not projected onto the moving heads yet, a known "
+                    "regression being fixed under "
                     "changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md; the "
-                    "heads render their templates as authored"
+                    "heads' colour follows the plan's colour through the section's macro "
+                    "palette"
                 ),
                 section_id=section.section.section_id,
                 action="unchanged",

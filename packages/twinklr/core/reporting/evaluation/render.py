@@ -219,6 +219,7 @@ def _song_intent_markdown(intent: SongIntentReport) -> list[str]:
         f"density {intent.density}",
         f"- entry: {intent.entry or 'default'}; exit: {intent.exit or 'default'}",
     ]
+    lines.extend(f"- played: {line}" for line in intent.played)
     if intent.not_rendered:
         lines.append(
             f"- not rendered yet ({', '.join(intent.not_rendered)}): a known regression, "

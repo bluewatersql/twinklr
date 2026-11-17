@@ -33,10 +33,12 @@ The choreography planner is an iterative refinement loop over structured Pydanti
    or hard-fail (redo). `JudgeVerdict` validation reconciles verdict status to score.
    Structured feedback loops back to the planner. Up to 3 iterations by default.
 
-**Known regression.** The moving-head renderer applies only the selected templates,
-presets and their bars. It does not yet render the plan's song intent; the renderer
-deleted in the single-renderer cutover rendered intensity, section colour, shutter and
-gobo events (cue-bound ones included) and entry transitions. The owner has ruled that
+**Known regression.** The moving-head renderer applies the selected templates, presets
+and their bars, and each section's colour and gobo (resolved on the rig's tagged wheel
+states; the planner is told what the rig can show, and what it cannot is repaired). It
+does not yet render the rest of the plan's song intent; the renderer deleted in the
+single-renderer cutover rendered intensity, section colour, shutter and gobo events
+(cue-bound ones included) and entry transitions. The owner has ruled that
 all of it is rendered on the single path and that nothing leaves the planner contract
 without the owner's word ([song-intent rendering](../../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md),
 [decision](../../memories/decisions/mh-single-renderer.md)). The dated history of that

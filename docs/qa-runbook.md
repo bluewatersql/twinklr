@@ -179,10 +179,11 @@ release.
 - **`temperature` is stripped for the GPT-5 reasoning line** (mutually exclusive with a
   reasoning effort); non-reasoning models (gpt-4.1/gpt-4o) keep it.
 - **Display catalog drift:** plans are bound to the recipe catalog at generation time.
-- **Moving-head song intent is not rendered yet (known regression).** The renderer applies
-  each section's template, preset and bars only; the planner's intensity, section colour,
-  shutter and gobo events, lyric moment cues and section transitions, and `twinklr show`'s
-  palette and focal role, are ignored until the song-intent work lands
+- **Moving-head song intent is only partly rendered (known regression).** The renderer
+  applies each section's template, preset and bars, and its colour and gobo on heads
+  whose wheel states are tagged; the planner's intensity, shutter and gobo events, lyric
+  moment cues and section transitions, and `twinklr show`'s focal role, are ignored
+  until the song-intent work lands
   ([plan](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 - **Owner-local inputs** (audio, layout, `config.json`/`fixture_config.json`/`job_config.json`,
   `.env`, local `data/templates/` overlay) are gitignored and not part of CI.

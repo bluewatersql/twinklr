@@ -9,6 +9,7 @@ import random
 
 import pytest
 
+from tests.support import moving_heads as m
 from tests.support.moving_heads import CATALOG_IDS, family_catalog
 from twinklr.core.agents.sequencer.moving_heads.deterministic_selector import (
     AdmittedTemplate,
@@ -46,7 +47,8 @@ def _admission(
                 admitted_presets=("narrow", "slow"),
             )
             for template_id in template_ids
-        )
+        ),
+        offer=m.tagged_offer(),
     )
 
 
@@ -135,7 +137,9 @@ def test_a_section_no_rung_can_fill_raises_the_typed_error() -> None:
 
 def test_an_empty_admission_raises_the_typed_error() -> None:
     with pytest.raises(NoEligibleTemplateError):
-        DeterministicSelector(seed=5, admission=SelectorAdmission(templates=()))
+        DeterministicSelector(
+            seed=5, admission=SelectorAdmission(templates=(), offer=m.untagged_offer())
+        )
 
 
 def test_same_inputs_same_plan_and_trace_with_a_sha256_tie_break() -> None:
@@ -216,6 +220,7 @@ def test_admission_from_the_gate_keeps_order_variants_and_exclusions() -> None:
             {"template_id": "mirror_wings", "preset_id": None, "reason": "too fast"},
         ),
         entry_dips={},
+        offer=m.untagged_offer(),
     )
 
     admission = SelectorAdmission.from_gate(gate)
@@ -301,12 +306,28 @@ def test_the_palette_role_follows_the_section_role(role: str, color: str) -> Non
     assert result.plan.sections[0].color == color
 
 
+def test_the_palette_role_is_repaired_by_the_rigs_offer_as_the_planners_is() -> None:
+    """The selector reads no macro palette, so a role takes the fixed table's colour; on a
+    rig that shows none (untagged) repair clears it to as authored and says so, as it
+    would the planner's."""
+    admission = _admission(tuple(CATALOG_IDS)).model_copy(update={"offer": m.untagged_offer()})
+
+    result = DeterministicSelector(seed=1, admission=admission).select([_section("chorus", 50, 1)])
+
+    assert result.plan.sections[0].color is None
+    (repair,) = result.plan.repairs
+    assert (
+        repair.item == "colour PALETTE_ACCENT (#FF00FF, fixed table (magenta: no macro "
+        "palette for this section))"
+    )
+
+
 def test_admission_rejects_an_unadmitted_effective_variant_and_duplicates() -> None:
     with pytest.raises(ValueError, match="effective"):
         AdmittedTemplate(template_id="mirror_wings", effective_preset="slow", admitted_presets=())
     entry = AdmittedTemplate(template_id="mirror_wings", effective_preset=None, admitted_presets=())
     with pytest.raises(ValueError, match="mirror_wings"):
-        SelectorAdmission(templates=(entry, entry))
+        SelectorAdmission(templates=(entry, entry), offer=m.untagged_offer())
 
 
 def test_the_repeat_cap_relaxes_when_the_admission_leaves_too_few_families() -> None:

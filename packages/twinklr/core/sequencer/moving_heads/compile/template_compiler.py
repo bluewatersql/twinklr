@@ -22,8 +22,10 @@ from twinklr.core.sequencer.models.context import (
 )
 from twinklr.core.sequencer.models.enum import ChannelName, TemplateRole
 from twinklr.core.sequencer.models.moving_heads.physical import (
+    DiscretePoint,
     DiscreteTrajectory,
     PhysicalChannelError,
+    check_physical_value,
 )
 from twinklr.core.sequencer.models.moving_heads.topology import (
     ResolvedFixturePhase,
@@ -37,7 +39,7 @@ from twinklr.core.sequencer.models.template import (
     TemplatePreset,
     TemplateStep,
 )
-from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
+from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     FALLBACK_METADATA_KEY,
     dark_throughout,
@@ -123,6 +125,7 @@ def compile_template(
     end_limit_ms: int,
     step_cache: dict[tuple[Any, ...], FixtureSegment] | None = None,
     unplayable: list[dict[str, str | int]] | None = None,
+    held_states: Mapping[str, Mapping[ChannelName, str]] | None = None,
 ) -> TemplateCompileResult:
     """Compile a template's scheduled steps for the renderer.
 
@@ -169,6 +172,11 @@ def compile_template(
             instead of raised: fixture, section, template, step, frames, `reason`
             "unplayable", `code` (`compile_refused` or `once_section_too_short`) and
             `detail`. Errors of the template as a whole still raise.
+        held_states: Per fixture, wheel states (color, gobo) its cues hold for their
+            whole length in place of what the steps and their component presets author:
+            a section's colour and gobo (`song_intent.resolve_section_look`). Applied to
+            every cue before the overlays, so an overlay keeps its own state over its
+            window and its cues then return to the held state, not the authored one.
 
     Returns:
         TemplateCompileResult with the segments.
@@ -523,6 +531,8 @@ def compile_template(
                     )
                 )
 
+    if held_states:
+        segments = [_hold_states(segment, held_states, context) for segment in segments]
     if working_template.overlays:
         # A HOLD_LAST_POSE remainder replays the cycle's closing step from a new phase
         # origin; no authored cycle plays it there, so it takes no overlay. A TRUNCATE
@@ -547,6 +557,29 @@ def compile_template(
         provenance=provenance,
         dropped_steps=dropped,
     )
+
+
+def _hold_states(
+    segment: FixtureSegment,
+    held_states: Mapping[str, Mapping[ChannelName, str]],
+    context: TemplateCompileContext,
+) -> FixtureSegment:
+    """`segment` with each of its fixture's `held_states` held from its start to its end."""
+    held = held_states.get(segment.fixture_id)
+    if not held:
+        return segment
+    profile = next(
+        fixture.physical_profile
+        for fixture in context.fixtures
+        if fixture.fixture_id == segment.fixture_id
+    )
+    assert profile is not None  # the segment compiled on it
+    channels = dict(segment.channels)
+    for channel, state in held.items():
+        trajectory = DiscreteTrajectory(events=(DiscretePoint(t_ms=segment.t0_ms, state=state),))
+        check_physical_value(segment.fixture_id, channel, trajectory, profile)
+        channels[channel] = ChannelValue(channel=channel, physical=trajectory)
+    return segment.model_copy(update={"channels": channels})
 
 
 def _step_periods(step: TemplateStep) -> set[Fraction]:

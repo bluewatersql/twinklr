@@ -16,6 +16,12 @@ from twinklr.core.agents.audio.profile.models import (
     AudioProfileModel,
     SongSectionRef,
 )
+from twinklr.core.sequencer.moving_heads.song_intent import (
+    RigOffer,
+    SectionPalette,
+    offer_for_prompt,
+    section_palettes,
+)
 from twinklr.core.sequencer.planning import MacroPlan
 from twinklr.core.sequencer.theming.catalog import get_palette
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
@@ -105,6 +111,13 @@ class MovingHeadPlanningContext(BaseModel):
         description="Whether the macro-planning graph arm was enabled for this plan",
     )
 
+    # What the rig can show of the song intent, from the pre-planning gate
+    rig_offer: RigOffer | None = Field(
+        default=None,
+        description="The rig's offer (colours, gobos, strobes, hit, wheel change time); "
+        "None when no pre-planning gate ran",
+    )
+
     # Template descriptions for prompt enrichment (optional)
     template_descriptions: list[TemplateDescription] | None = Field(
         default=None,
@@ -122,6 +135,11 @@ class MovingHeadPlanningContext(BaseModel):
     def has_macro_plan(self) -> bool:
         """Check if macro plan is available for coordination."""
         return self.macro_plan is not None and bool(self.macro_plan.sections)
+
+    @property
+    def palettes(self) -> dict[str, SectionPalette]:
+        """Each section's macro palette, which its palette roles resolve through."""
+        return section_palettes(self.macro_plan)
 
     @property
     def song_title(self) -> str | None:
@@ -287,6 +305,15 @@ class MovingHeadPlanningContext(BaseModel):
                 macro_contract["motif_continuity"] if macro_contract else None
             ),
             "macro_focal_arc": macro_contract["focal_arc"] if macro_contract else None,
+            "rig_offer": (
+                None
+                if self.rig_offer is None
+                else offer_for_prompt(
+                    self.rig_offer,
+                    self.palettes,
+                    [section.section_id for section in self.sections],
+                )
+            ),
         }
 
     @staticmethod

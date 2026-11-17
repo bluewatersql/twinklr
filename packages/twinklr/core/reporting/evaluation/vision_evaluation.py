@@ -37,6 +37,7 @@ from twinklr.core.reporting.evaluation.vision_judge import (
     build_structure_text,
     judge_frames,
 )
+from twinklr.core.sequencer.moving_heads.song_intent import RENDERED_INTENT_FIELDS
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 
@@ -250,7 +251,13 @@ def _section_intent(section: PlanSection) -> str:
         f"density={section.density.value}; "
         f"entry={section.entry.describe() if section.entry else 'default'}; "
         f"exit={section.exit.describe() if section.exit else 'default'}; "
-        f"not_rendered_yet={','.join(section.set_intent_fields()) or 'none'}"
+        "not_rendered_yet="
+        + (
+            ",".join(
+                name for name in section.set_intent_fields() if name not in RENDERED_INTENT_FIELDS
+            )
+            or "none"
+        )
     )
 
 

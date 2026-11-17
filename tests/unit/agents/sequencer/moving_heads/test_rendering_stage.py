@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from tests.support import moving_heads as m
 from tests.support.moving_heads import (
     INITIAL_STATE,
     TEMPLATE_ID,
@@ -25,7 +26,11 @@ from tests.support.moving_heads import (
     sections_plan,
     unprofiled_rig,
 )
-from twinklr.core.agents.sequencer.moving_heads.rendering_stage import MovingHeadRenderingStage
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
+    MovingHeadRenderingStage,
+    render_palettes,
+)
 from twinklr.core.audio.models.metadata import EmbeddedMetadata, MetadataBundle
 from twinklr.core.formats.xlights.layout.models.rgb_effects import Model
 from twinklr.core.pipeline.context import PipelineContext
@@ -33,6 +38,7 @@ from twinklr.core.reporting.evaluation.collect import load_checkpoint, recorded_
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import UnsupportedRigShapeError
 from twinklr.core.sequencer.moving_heads.identity import RENDERER_REVISION
 from twinklr.core.sequencer.moving_heads.pipeline import TemplateAdmission
+from twinklr.core.sequencer.moving_heads.song_intent import SectionPalette
 
 
 def _context_with_fixture_path(fixture_path: str) -> PipelineContext:
@@ -283,6 +289,7 @@ async def test_render_records_itself_in_the_plan_checkpoint(tmp_path: Path) -> N
         exclusions=({"template_id": "other", "reason": "why"},),
         preset_exclusions=(),
         entry_dips={TEMPLATE_ID: {"fixture_id": "MH1", "bound_ms": 120, "beats": 1}},
+        offer=m.untagged_offer(),
     )
     stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
     context = _render_context()
@@ -377,3 +384,58 @@ async def test_render_writes_no_checkpoint_the_run_did_not(tmp_path: Path) -> No
 
     assert result.success, result.error
     assert not (tmp_path / "checkpoints").exists()
+
+
+@pytest.mark.asyncio
+async def test_a_palette_role_resolves_through_the_macro_plan_and_is_recorded(
+    tmp_path: Path,
+) -> None:
+    """The stage passes each section's macro palette to the render; the palette a section
+    resolves a palette role through is render identity, so the checkpoint records it and
+    `eval-report` re-renders with it."""
+    from tests.regression.test_mh_intent_parity import macro_plan
+
+    plan = ChoreographyPlan(
+        sections=[m.plan_section("s1", 1, 2, TEMPLATE_ID, color="PALETTE_PRIMARY")],
+        overall_strategy="",
+    )
+    stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
+    context = _render_context()
+    context.output_dir = tmp_path
+    context.set_state("macro_plan", macro_plan("spec.cosmic_night"))
+    checkpoint = _checkpoint(tmp_path, plan)
+
+    with (
+        p1_templates(),
+        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=p1_rig()),
+    ):
+        result = await stage.execute({"moving_heads": plan}, context)
+
+    assert result.success, result.error
+    palette = SectionPalette(
+        palette_id="spec.cosmic_night",
+        stops=("#0D47A1", "#2979FF", "#00E5FF", "#D500F9", "#FFFFFF"),
+    )
+    assert context.get_state("section_palettes") == {"s1": palette}
+    data = load_checkpoint(checkpoint)
+    assert data["render"]["palettes"] == {"s1": palette.model_dump(mode="json")}
+    assert data["render"]["inputs"]["palettes"] == data["render"]["palettes"]
+    assert recorded_render(data).palettes == {"s1": palette}
+
+
+def test_a_regeneration_keeps_the_injected_palettes_of_the_sections_it_keeps() -> None:
+    """Under `twinklr regenerate` the re-planned section takes this run's macro palette;
+    every other section the one the injected render used (none where it used none)."""
+    from tests.regression.test_mh_intent_parity import macro_plan
+
+    injected = SectionPalette(palette_id="core.rgb_primary", stops=("#FF1744", "#00E676"))
+    context = _render_context()
+    context.set_state("macro_plan", macro_plan("spec.cosmic_night"))
+
+    assert set(render_palettes(context)) == {"s1"}
+    context.set_state("regeneration_section_id", "s2")
+    context.set_state("regeneration_base_palettes", {"s1": injected, "s2": injected})
+    assert render_palettes(context) == {"s1": injected}
+    context.set_state("regeneration_section_id", "s1")
+    assert render_palettes(context)["s1"].palette_id == "spec.cosmic_night"
+    assert "s2" in render_palettes(context)

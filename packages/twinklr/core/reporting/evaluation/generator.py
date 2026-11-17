@@ -64,6 +64,7 @@ from twinklr.core.reporting.evaluation.validate import (
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import AXIS_KEYS
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import quantize_cue
+from twinklr.core.sequencer.moving_heads.song_intent import RENDERED_INTENT_FIELDS, describe_look
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +75,10 @@ def _expand_plan_sections(plan: ChoreographyPlan) -> list[PlanSection]:
     return [unit for section in plan.sections for unit in flatten_section(section)]
 
 
-def _song_intent(section: PlanSection) -> SongIntentReport:
-    """The section's song intent as planned, for the report."""
+def _song_intent(section: PlanSection, record: Mapping[str, Any]) -> SongIntentReport:
+    """The section's song intent as planned, and what the render (`record`) played of it."""
+    looks = {look["section_id"]: look for look in record.get("section_looks", [])}
+    look = looks.get(section.section_id)
     return SongIntentReport(
         intensity=None if section.intensity is None else section.intensity.value,
         color=None if section.color is None else section.color.value,
@@ -87,7 +90,10 @@ def _song_intent(section: PlanSection) -> SongIntentReport:
         density=section.density.value,
         entry=None if section.entry is None else section.entry.describe(),
         exit=None if section.exit is None else section.exit.describe(),
-        not_rendered=list(section.set_intent_fields()),
+        not_rendered=[
+            name for name in section.set_intent_fields() if name not in RENDERED_INTENT_FIELDS
+        ],
+        played=[] if look is None else describe_look(look),
     )
 
 
@@ -431,7 +437,7 @@ def _process_section(
         time_range_ms=(start_ms, end_ms),
         selected_template=template_selection,
         segments=None,  # Segments are now processed individually
-        song_intent=_song_intent(plan_section),
+        song_intent=_song_intent(plan_section, output.render_record),
         targets=TargetResolution(
             bindings={},
             resolved_roles=[f.role for f in render_data.fixture_contexts],
@@ -470,8 +476,8 @@ def mismatch_message(summary: RenderSummary) -> str:
         "it differs in " + "; ".join(summary.mismatched_inputs)
         if summary.mismatched_inputs
         else "no recorded input differs (fixture profiles and model names, the rig, "
-        "templates, beat grid, dark spans, revisions), so the checkpoint's plan or "
-        "recorded policy, or the recorded identity itself differ"
+        "templates, beat grid, dark spans, section palettes, revisions), so the "
+        "checkpoint's plan or recorded policy, or the recorded identity itself differ"
     )
     return (
         f"the re-render's fingerprint {summary.rerender_fingerprint} does not match the "
@@ -520,6 +526,8 @@ def _mismatched_inputs(run: Mapping[str, Any], rerender: Mapping[str, Any]) -> l
         differs.append("beat grid")
     if run.get("dark_spans", []) != rerender.get("dark_spans", []):
         differs.append("dark spans")
+    if run.get("palettes", {}) != rerender.get("palettes", {}):
+        differs.append("section palettes")
     for key, name in (
         ("renderer_revision", "renderer revision"),
         ("encoder_version", "encoder version"),

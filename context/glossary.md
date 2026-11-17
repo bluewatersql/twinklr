@@ -21,7 +21,13 @@ updated: 2026-11-17
   timings. The moving-head renderer reads only this, never `dmx_mapping`. A wheel or
   shutter state may carry a **meaning tag** (`hex`, `pattern`, `strobe`): what it shows,
   for the planner's colour, gobo and strobe choices, or `offer: false` when it has
-  none; never defaulted, and not read by the renderer until song-intent W3/W4.
+  none; never defaulted. Tagged states with a known settle make up the **rig offer**
+  (what the planner is told the rig can show), and a section's colour and gobo play
+  them.
+- **Rig offer** — what the pre-planning gate tells the planner a rig can show of its
+  song intent: each colour (faithfully, approximately, on some heads, not at all), each
+  section's palette roles on the wheel, gobos, strobe speeds, hit, wheel change time
+  (`TemplateAdmission.offer`, `sequencer/moving_heads/song_intent.py`).
 - **Template** — a moving-head choreography unit, a JSON `TemplateDoc` whose steps state
   motion, dimmer or shutter pulse, wheel states and phase spread across the heads. The
   catalog's seven **families** live in `catalog/templates/moving_heads/`. LLMs select
@@ -43,8 +49,8 @@ updated: 2026-11-17
   per song section, 1-3 parts (template + preset over bars) and the section's **song
   intent** (intensity, colour, gobo, timed events tied to lyric moment cues, motif
   variation, density, entry/exit transitions; an intensity, colour or gobo of
-  `as_authored` keeps the template's own look and needs a reason). Not rendered yet
-  beyond the parts: a known regression being fixed.
+  `as_authored` keeps the template's own look and needs a reason). The parts, colour
+  and gobo render; the rest is a known regression being fixed.
 - **Plan repair** — deterministic normalisation that drops or adjusts one planned item
   the song cannot hold (an unknown cue is dropped; an event outside its section is moved
   into it) instead of refusing the plan, keeping as much of it as the song allows; recorded in the plan's `repairs`, the trace's `plan_repairs` and the

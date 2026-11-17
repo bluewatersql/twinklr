@@ -630,7 +630,9 @@ class TestPlannerUserPromptRendering:
     the sections to plan (2026-11-17 live probe 2 found each of these broken)."""
 
     @staticmethod
-    def _render(hints: object = None, sections: list | None = None) -> str:
+    def _render(
+        hints: object = None, sections: list | None = None, rig_offer: object = None
+    ) -> str:
         from tests.unit.agents.sequencer.moving_heads.test_orchestrator import (
             create_test_audio_profile,
             create_test_macro_plan,
@@ -652,6 +654,7 @@ class TestPlannerUserPromptRendering:
             fixtures=FixtureContext(count=4, groups=[]),
             available_templates=templates,
             macro_plan=create_test_macro_plan(profile),
+            rig_offer=rig_offer,
             template_descriptions=[
                 {
                     "template_id": template_id,
@@ -669,6 +672,43 @@ class TestPlannerUserPromptRendering:
             sections.extend(variables["sections"])
         loader = PromptPackLoader(base_path=PROMPTS_BASE)
         return PromptRenderer().render(loader.load("planner")["user"], variables)
+
+    def test_the_rig_offer_says_what_this_rig_shows(self) -> None:
+        from tests.support import moving_heads as m
+
+        rendered = self._render(rig_offer=m.tagged_offer())
+        section = rendered[rendered.index("## What This Rig Can Show") :]
+        section = section[: section.index("\n## ", 5)]
+
+        for line in (
+            "- **Colours shown faithfully**: red, blue, white, warm_white, cool_white\n",
+            "- **Colours shown approximately**, as the nearest wheel colour: magenta as red, "
+            "cyan as blue, orange as red, purple as blue, amber as red, uv as blue\n",
+            "- **Colours this rig cannot show** (they keep the template's colour): green, "
+            "yellow, lime\n",
+            "  - `intro`, `verse_1`, `chorus_1`, `outro` (`core.christmas_traditional`): "
+            "PALETTE_PRIMARY #E53935 → red; PALETTE_ACCENT #43A047 → not shown; "
+            "PALETTE_WARM #E53935 → red; PALETTE_COOL #43A047 → not shown; "
+            "PALETTE_NEUTRAL #FFFFFF → white\n",
+            "- **Gobos**: on every head: open, stars, dots; not shown: circles, triangles, "
+            "diamonds, clouds, prism, shatter, flame, water, foliage, abstract\n",
+            "- **Strobe speeds**: none tagged\n",
+            "- **Hit** (a dimmer accent): every head\n",
+            "- **A wheel change** takes 160 ms dark (about 0.4 beat)",
+        ):
+            assert line in section, line
+        assert "costs a dark dip of up to half a beat just before the new section" in section
+
+    def test_an_untagged_rig_is_told_no_colour_or_gobo_is_offered(self) -> None:
+        from tests.support import moving_heads as m
+
+        rendered = self._render(rig_offer=m.untagged_offer())
+
+        assert "so no\n  colour is offered; every `color` keeps the template's own colour" in (
+            rendered
+        )
+        assert "so no gobo\n  is offered" in rendered
+        assert "## What This Rig Can Show" not in self._render()
 
     def test_each_template_is_on_its_own_line(self) -> None:
         rendered = self._render()

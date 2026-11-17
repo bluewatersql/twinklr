@@ -47,14 +47,17 @@ The W0 harness (`tests/regression/test_mh_intent_parity.py`, facts in
 `scripts/extract_mh_intent_parity.py`) holds 34 rows: 10 recorded only and **24 strict
 xfails**, each failing on its own target assertion today:
 
-| Task | Rows |
-|---|---|
-| W4 | 5 (explicit colour; palette roles PRIMARY, ACCENT, WARM, COOL resolved through a supplied macro palette, PRIMARY ≠ ACCENT) |
-| W5 | 4 (DRAMATIC, INTENSE; each also on a template that authors its own pulse) |
-| W6 | 6 (CLOSED/OPEN, three strobes, PULSE, the cue-bound shutter event) |
-| W7 | 3 (gobo event, two successive gobo events, the cue-bound gobo event) |
-| W8 | 4 (entry CROSSFADE, MORPH, SWEEP, FADE_VIA_BLACK; MORPH and SWEEP must differ) |
-| W9 | 2 (show palette colour from a palette whose answer differs from the old fixed table; a LEAD section renders hotter than SUPPORT, REST no hotter) |
+| Task | Rows | Status |
+|---|---|---|
+| W4 | 5 (explicit colour; palette roles PRIMARY, ACCENT, WARM, COOL resolved through a supplied macro palette, PRIMARY ≠ ACCENT) | **green** (W4, 2026-11-17; xfails removed) |
+| W5 | 4 (DRAMATIC, INTENSE; each also on a template that authors its own pulse) | strict xfail |
+| W6 | 6 (CLOSED/OPEN, three strobes, PULSE, the cue-bound shutter event) | strict xfail |
+| W7 | 3 (gobo event, two successive gobo events, the cue-bound gobo event) | strict xfail |
+| W8 | 4 (entry CROSSFADE, MORPH, SWEEP, FADE_VIA_BLACK; MORPH and SWEEP must differ) | strict xfail |
+| W9 | 2 (show palette colour from a palette whose answer differs from the old fixed table; a LEAD section renders hotter than SUPPORT, REST no hotter) | show palette colour **green** (W4: `show` resolves palette roles through the macro palette, the resolver `run` uses); focal role strict xfail |
+
+After W3/W4: 18 strict xfails remain (W5 4, W6 6, W7 3, W8 4, W9 1)
+([record](../evidence/2026-11-17-w3-w4-offer-colour/README.md)).
 
 Findings that change the tasks:
 

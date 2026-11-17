@@ -105,8 +105,10 @@ def test_a_neutral_section_reports_no_unrendered_intent() -> None:
 
 
 def test_set_intent_is_reported_unrendered_per_section_and_renders_as_authored() -> None:
-    """Song intent is not rendered yet: the frames are those of the neutral plan, and
-    each section that set intent says which fields, naming the plan that fixes it."""
+    """Intensity is not rendered yet, and on a rig whose colour wheel is not tagged a
+    colour has nothing to play: the frames are those of the neutral plan. Each section
+    that set unrendered intent says which fields, naming the plan that fixes it; the
+    colour, which renders, is not among them."""
     neutral = _pipeline()
     neutral.render()
     plan = neutral.choreography_plan
@@ -131,7 +133,8 @@ def test_set_intent_is_reported_unrendered_per_section_and_renders_as_authored()
     assert pipeline.frames == neutral.frames
     (diagnostic,) = _unrendered(pipeline)
     assert diagnostic["section_id"] == "s1"
-    assert "intensity, colour: a known regression" in diagnostic["message"]
+    assert "intensity: a known regression" in diagnostic["message"]
+    assert "colour" not in diagnostic["message"]
     assert "not rendered by any renderer" not in diagnostic["message"]
     assert "plan/song-intent-rendering.md" in diagnostic["message"]
 

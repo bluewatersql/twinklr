@@ -8,7 +8,7 @@ spelling a plan uses for a template counts.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 import hashlib
 import json
 from typing import TYPE_CHECKING, Any
@@ -27,9 +27,11 @@ if TYPE_CHECKING:
 BACKEND_ID = "xlights_dmx"
 """The backend the renderer writes: xLights DMX effects in an `.xsq`."""
 
-RENDERER_REVISION = "2"
+RENDERER_REVISION = "3"
 """Bumped by hand in the commit that intentionally changes the renderer's output; the
-render identity also carries the frame encoder's own version."""
+render identity also carries the frame encoder's own version. 3: a section's colour and
+gobo are rendered (song-intent rendering W4), so a plan that sets them renders
+differently from revision 2."""
 
 
 def render_fingerprint(
@@ -46,6 +48,7 @@ def render_fingerprint(
     locks: Sequence[BaseModel] = (),
     preset_substitutions: Sequence[tuple[str, str | None]] = (),
     dark_spans: Sequence[tuple[int, int]] = (),
+    palettes: Mapping[str, BaseModel] | None = None,
 ) -> str:
     """Hash the functional inputs of a render.
 
@@ -67,6 +70,9 @@ def render_fingerprint(
             any, so a render without one keeps its earlier identity.
         dark_spans: `(start_ms, end_ms)` spans every fixture is held dark over, as the
             renderer snapped and merged them; hashed only when there are any, so a
+            render without one keeps its earlier identity.
+        palettes: The macro palette each section that names a palette-role colour
+            resolves it through, by section id; hashed only when there are any, so a
             render without one keeps its earlier identity.
 
     Returns:
@@ -92,6 +98,10 @@ def render_fingerprint(
         payload["preset_substitutions"] = [list(item) for item in preset_substitutions]
     if dark_spans:
         payload["dark_spans"] = [list(span) for span in dark_spans]
+    if palettes:
+        payload["palettes"] = {
+            section_id: palette.model_dump(mode="json") for section_id, palette in palettes.items()
+        }
     if locks:
         payload["locks"] = sorted(
             (_canonical_lock(lock.model_dump(mode="json")) for lock in locks),

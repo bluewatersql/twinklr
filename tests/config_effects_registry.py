@@ -2104,21 +2104,39 @@ for _profile_root in (
             f"test_physical_profile_field_changes_contract[{_physical_path}]",
             _note,
         )
-# Song-intent W1 meaning tags on discrete states (`hex`, `pattern`, `strobe`) and the
-# `offer: false` opt-out: validated and part of render identity, but no renderer or
-# planner reads them yet. Each exact path must change the render fingerprint and no
-# frame; W3 (the rig offer) and W4 (section colour and gobo) repoint them to their effect.
+# Song-intent meaning tags on discrete states (W1) and the `offer: false` opt-out. `hex`
+# and `pattern` decide the wheel state a section's colour and gobo play (W4): each path
+# must change the frames of a plan that sets one. `strobe` is part of render identity and
+# the planner's rig offer (W3) but changes no frame until strobe events render (W6);
+# `offer: false` is identity only (an opted-out state is not offered, as an untagged one).
+_TAG_EFFECTS = {
+    "hex": (
+        "test_state_tag_changes_what_a_section_plays",
+        "a section's colour plays the tagged state (song-intent W4)",
+    ),
+    "pattern": (
+        "test_state_tag_changes_what_a_section_plays",
+        "a section's gobo plays the tagged state (song-intent W4)",
+    ),
+    "strobe": (
+        "test_state_tag_changes_identity_not_output",
+        "identity and the rig offer's strobe speeds (W3); no frame until strobe events (W6)",
+    ),
+    "offer": (
+        "test_state_tag_changes_identity_not_output",
+        "identity only: an opted-out state is offered nothing, as an untagged one (W3)",
+    ),
+}
 for _profile_root in (
     "fixture.fixtures[FixtureInstance].config.physical_profile",
     "fixture.base_config.physical_profile",
 ):
-    for _tag in ("hex", "pattern", "strobe", "offer"):
+    for _tag, (_test, _note) in _TAG_EFFECTS.items():
         _tag_path = f"{_profile_root}.discrete.states.{_tag}"
         CONFIG_EFFECTS[_tag_path] = ConfigDisposition(
             ConfigDispositionKind.EFFECT_TEST,
-            "tests/unit/config/test_mh_state_tags.py::"
-            f"test_state_tag_changes_identity_not_output[{_tag_path}]",
-            "identity only; no consumer until song-intent W3 (rig offer) and W4 (colour and gobo)",
+            f"tests/unit/config/test_mh_state_tags.py::{_test}[{_tag_path}]",
+            _note,
         )
 for _field, _note in {
     "": _PROFILE_CHECK,

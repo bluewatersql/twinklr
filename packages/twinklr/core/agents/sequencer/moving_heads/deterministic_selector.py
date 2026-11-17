@@ -5,8 +5,8 @@ configuration object.  It chooses among an explicit candidate set: the run's
 :class:`SelectorAdmission`, the templates the pre-planning gate admitted on this rig and
 song (the same set the LLM path is offered), each named with its effective variant.  It
 emits the planner's :class:`ChoreographyPlan`, with the song intent it can derive from
-the section alone (intensity from its energy, a palette-role colour from its role), and
-never calls a provider.  When no candidate fills a section at any rung of the fallback ladder
+the section alone (intensity from its energy, a palette-role colour from its role, which
+the rig's offer repairs as it repairs the planner's), and never calls a provider.  When no candidate fills a section at any rung of the fallback ladder
 it raises :class:`NoEligibleTemplateError`; the admission is never relaxed.
 """
 
@@ -30,6 +30,7 @@ from twinklr.core.agents.sequencer.moving_heads.models import (
 )
 from twinklr.core.sequencer.models.enum import Intensity, TemplateCategory
 from twinklr.core.sequencer.models.template import TemplateDoc
+from twinklr.core.sequencer.moving_heads.song_intent import RigOffer, repair_rig_intent
 from twinklr.core.sequencer.moving_heads.templates.library import REGISTRY
 from twinklr.core.sequencer.vocabulary.visual import PaletteRole
 
@@ -81,15 +82,18 @@ class ExcludedTemplate(BaseModel):
 
 class SelectorAdmission(BaseModel):
     """The selector's candidate set for one rig and song: the gate's admission
-    (`admit_templates`) in its order, and its whole-template exclusions.
+    (`admit_templates`) in its order, its whole-template exclusions, and the rig's offer.
 
-    The selector reads only `templates`. `exclusions` is provenance: it records why a
-    family is absent, travels in the three-arm `AnalysisSnapshot` and is covered by the
-    held-constant `admission_sha256`, so a result can be read against what was left out.
+    The selector reads `templates`, and `offer` to repair the colours it chooses that the
+    rig cannot show (`repair_rig_intent`), as the planner's are. `exclusions` is
+    provenance: it records why a family is absent, travels in the three-arm
+    `AnalysisSnapshot` and is covered by the held-constant `admission_sha256`, so a result
+    can be read against what was left out.
     """
 
     templates: tuple[AdmittedTemplate, ...]
     exclusions: tuple[ExcludedTemplate, ...] = ()
+    offer: RigOffer
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -122,6 +126,7 @@ class SelectorAdmission(BaseModel):
                 ExcludedTemplate(template_id=entry["template_id"], reason=entry["reason"])
                 for entry in admission.exclusions
             ),
+            offer=admission.offer,
         )
 
 
@@ -261,6 +266,7 @@ class DeterministicSelector:
         """
         self.seed = seed
         self.config = config or SelectorConfig()
+        self._offer = admission.offer
         template_ids = list(admission.template_ids)
         self._presets = {entry.template_id: entry.effective_preset for entry in admission.templates}
         self._documents = {
@@ -352,13 +358,20 @@ class DeterministicSelector:
                 )
             )
 
-        return SelectorResult(
-            plan=ChoreographyPlan(
+        # The selector reads no macro plan, so a palette role takes the fixed role table's
+        # colour, as its render without a macro plan plays it.
+        plan = repair_rig_intent(
+            ChoreographyPlan(
                 sections=plan_sections,
                 overall_strategy=(
                     f"P2P-T13 deterministic baseline/fallback/regression arm; seed={self.seed}"
                 ),
             ),
+            self._offer,
+            {},
+        )
+        return SelectorResult(
+            plan=plan,
             config=self.config,
             traces=traces,
         )

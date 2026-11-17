@@ -760,6 +760,38 @@ async def test_regenerate_refuses_a_plan_recorded_in_the_old_contract_by_name(
 
 
 @pytest.mark.anyio
+async def test_regenerate_renders_the_kept_sections_through_their_injected_palettes(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    """The record keeps the section palettes the injected render used (a palette-role
+    colour resolves through them); a regeneration renders every kept section through the
+    recorded one and records it again. A record without them is refused, to re-inject."""
+    fake = FakeLiveXLights(models=("Dmx MH1", "Dmx MH2"))
+    _live_cli(monkeypatch, fake)
+    injected = {"palette_id": "core.rgb_primary", "stops": ["#FF1744", "#00E676"]}
+
+    with p1_templates():
+        assert await _live(tmp_path) == 0
+        payload = json.loads(_live_plans(tmp_path).read_text(encoding="utf-8"))
+        (record,) = payload.values()
+        assert record["palettes"] == {}  # no macro plan in this run
+        record["palettes"] = {"intro": injected, "chorus": injected}
+        _live_plans(tmp_path).write_text(json.dumps(payload), encoding="utf-8")
+        assert await _live(tmp_path, section_id="chorus") == 0, capsys.readouterr().out
+        (record,) = json.loads(_live_plans(tmp_path).read_text(encoding="utf-8")).values()
+        assert record["palettes"] == {"intro": injected}  # the re-planned one: this run's
+
+        payload = json.loads(_live_plans(tmp_path).read_text(encoding="utf-8"))
+        for entry in payload.values():
+            del entry["palettes"]
+        _live_plans(tmp_path).write_text(json.dumps(payload), encoding="utf-8")
+        capsys.readouterr()
+        assert await _live(tmp_path, section_id="chorus") == 1
+    refused = " ".join(capsys.readouterr().out.split())
+    assert "invalid record" in refused and "palettes" in refused and "delete it" in refused
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize("content", ["{not json", "[]"])
 async def test_a_corrupt_live_plans_file_is_named_on_regenerate_and_on_inject(
     tmp_path, monkeypatch, capsys, content

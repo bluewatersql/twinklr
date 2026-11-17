@@ -52,6 +52,52 @@ V2 Migration: Uses structured context from MovingHeadPlanningContext
 {% endfor %}
 {% endif %}
 
+{% if rig_offer is defined and rig_offer %}
+## What This Rig Can Show
+
+Deterministic code turns your `color` and `gobo` into the rig's wheel colours and
+patterns; a head that cannot show a choice keeps its template's own look there.
+{% if not rig_offer.color_wheel %}
+- **Colour**: this rig has no colour wheel; every `color` keeps the template's own colour.
+{% elif not rig_offer.colors_tagged %}
+- **Colour**: the rig's colour wheel says no colour it shows (no state is tagged), so no
+  colour is offered; every `color` keeps the template's own colour.
+{% else %}
+{% if rig_offer.colors.faithful %}
+- **Colours shown faithfully**: {% for c in rig_offer.colors.faithful %}{{ c.color }}{% if not loop.last %}, {% endif %}{% endfor +%}
+{% endif %}
+{% if rig_offer.colors.approximate %}
+- **Colours shown approximately**, as the nearest wheel colour: {% for c in rig_offer.colors.approximate %}{{ c.color }} as {{ c.shown }}{% if not loop.last %}, {% endif %}{% endfor +%}
+{% endif %}
+{% if rig_offer.colors.partial %}
+- **Colours only some heads show** (the others keep their template's colour): {% for c in rig_offer.colors.partial %}{{ c.color }} as {{ c.shown }} (not {{ c.kept }}){% if not loop.last %}, {% endif %}{% endfor +%}
+{% endif %}
+{% if rig_offer.colors.unavailable %}
+- **Colours this rig cannot show** (they keep the template's colour): {% for c in rig_offer.colors.unavailable %}{{ c.color }}{% if not loop.last %}, {% endif %}{% endfor +%}
+{% endif %}
+{% if rig_offer.no_color_wheel %}
+- Heads without a colour wheel (they keep their template's colour): {{ rig_offer.no_color_wheel | join(', ') }}
+{% endif %}
+- **Palette roles, by section** (the stop each role takes and the wheel colour it lands on):
+{% for section in rig_offer.sections %}
+  - {% for section_id in section.section_ids %}`{{ section_id }}`{% if not loop.last %}, {% endif %}{% endfor %}{% if section.palette_id %} (`{{ section.palette_id }}`){% else %} (no macro palette: the fixed colours){% endif %}: {% for r in section.roles %}{{ r.role }} {{ r.hex }} → {% if r.shown %}{{ r.shown }}{% if r.status != "faithful" %} ({{ r.status }}){% endif %}{% else %}not shown{% endif %}{% if not loop.last %}; {% endif %}{% endfor +%}
+{% endfor %}
+{% endif %}
+{% if not rig_offer.gobo_wheel %}
+- **Gobos**: this rig has no gobo wheel; every `gobo` keeps the template's own pattern.
+{% elif not rig_offer.gobos_tagged %}
+- **Gobos**: the rig's gobo wheel says no pattern it shows (no state is tagged), so no gobo
+  is offered; every `gobo` keeps the template's own pattern.
+{% else %}
+- **Gobos**: {% if rig_offer.gobos.all %}on every head: {{ rig_offer.gobos.all | join(', ') }}{% else %}none on every head{% endif %}{% if rig_offer.gobos.some %}; on some heads: {{ rig_offer.gobos.some | join(', ') }}{% endif %}{% if rig_offer.gobos.none %}; not shown: {{ rig_offer.gobos.none | join(', ') }}{% endif +%}
+{% endif %}
+- **Strobe speeds**: {% if rig_offer.strobes.all or rig_offer.strobes.some %}{{ (rig_offer.strobes.all + rig_offer.strobes.some) | join(', ') }}{% else %}none tagged{% endif +%}
+- **Hit** (a dimmer accent): {{ {"all": "every head", "some": "some heads", "none": "no head"}[rig_offer.hit] }}
+{% if rig_offer.wheel_change_ms is not none %}
+- **A wheel change** takes {{ rig_offer.wheel_change_ms }} ms dark (about {{ rig_offer.wheel_change_beats }} beat): the heads go dark to turn a wheel. A colour or gobo change between two sections the heads play straight through costs a dark dip of up to half a beat just before the new section, so hold a colour across sections that flow into each other and change it where the music turns.
+{% endif %}
+
+{% endif %}
 {% if audio_profile is defined and audio_profile %}
 ## Audio Profile
 

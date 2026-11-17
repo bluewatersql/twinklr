@@ -64,6 +64,7 @@ async def test_rerender_passes_the_recorded_policy_to_the_pipeline(tmp_path: Pat
         beat_grid=p1_grid(),
         admission=None,
         dark_spans=(),
+        palettes={},
         inputs={},
     )
 

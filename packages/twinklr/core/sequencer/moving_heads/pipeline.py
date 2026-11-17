@@ -98,6 +98,15 @@ from twinklr.core.sequencer.moving_heads.identity import (
     RENDERER_REVISION,
     render_fingerprint,
 )
+from twinklr.core.sequencer.moving_heads.song_intent import (
+    HeadWheels,
+    RigOffer,
+    SectionPalette,
+    resolve_section_look,
+    rig_offer,
+    section_palette_for,
+    wheel_change_ms,
+)
 from twinklr.core.sequencer.moving_heads.templates import get_template
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.timing.musical_phase import (
@@ -534,6 +543,177 @@ def _wheel_states(
 
 
 @dataclass(frozen=True)
+class _BoundaryChange:
+    """What a section's first cue does at a boundary a head plays lit through when song
+    intent changes a wheel there (`_boundary_change`)."""
+
+    record: dict[str, Any]
+    dip: tuple[FixtureSegment, HeadFollow] | None
+    """The previous cue with its tail dark and the wheel turned there, and the head as it
+    leaves it."""
+    kept: dict[ChannelName, str]
+    """Without a dip: the wheel states the head keeps from the previous section."""
+
+
+def _half_beat_before(beat_grid: BeatGrid, time_ms: float) -> float:
+    """Half the beat that ends at `time_ms` (a section start); the first beat's at the
+    song's first beat."""
+    beats = beat_grid.beat_boundaries
+    if len(beats) < 2:
+        return 0.0
+    index = min(max(bisect.bisect_left(beats, time_ms), 1), len(beats) - 1)
+    return (beats[index] - beats[index - 1]) / 2
+
+
+def _boundary_change(
+    own: Sequence[FixtureSegment],
+    before: Sequence[HeadFollow],
+    profile: FixtureCapabilities,
+    initial: InitialFixtureState | None,
+    locks: Sequence[RenderLock],
+    failure_mode: FailureMode,
+    *,
+    intent_channels: Collection[ChannelName],
+    half_beat_ms: float,
+    shortest_lit_ms: int,
+) -> _BoundaryChange | None:
+    """Where a head enters a section straight from its previous cue, lit, and song intent
+    (this section's colour or gobo, or the previous section's) changes a wheel there: the
+    tail of the previous cue is commanded dark on its own path (`_dark_over_spans`; the
+    head keeps moving as authored, so it needs no repositioning), the wheel turns once it
+    is dark and settles, and the head reveals on the section's first frame as before.
+    The dark lead is what the darkness, turn and settle need (`wheel_change_ms`), at most
+    half the beat before the boundary and inside the previous cue, and the entry must then
+    play as authored (`_plays_as_authored`, which also times the shutter). Otherwise the
+    head keeps the previous wheel state into the section.
+
+    None where nothing changes, the change is not the song intent's, the head does not
+    enter from its previous cue (a gap, or the section's start), or the entry repositions
+    anyway, so the change rides its entry window (`_enter_section`).
+    """
+    if not own or not before:
+        return None
+    last = before[-1]
+    first = own[0]
+    if last.segment.t1_ms != first.t0_ms or _substitutable(last.segment, failure_mode):
+        return None
+    changes: dict[ChannelName, tuple[str, str]] = {}
+    for channel in _WHEELS:
+        capability = profile.discrete.get(DISCRETE_KEYS[channel])
+        if capability is None or channel not in intent_channels:
+            continue
+        old = _wheel_state(
+            last.segment, channel, last.segment.t1_ms - EFFECT_GRID_MS, capability.default_state
+        )
+        new = _wheel_state(first, channel, first.t0_ms, capability.default_state)
+        if old != new:
+            changes[channel] = (old, new)
+    if not changes:
+        return None
+    unchanged = [_swap_wheels(cue, changes, profile) for cue in own]
+    if not _plays_as_authored(unchanged, profile, last, initial, locks):
+        return None
+    kept = {channel: old for channel, (old, _) in changes.items()}
+    states = {channel.value: {"from": old, "to": new} for channel, (old, new) in changes.items()}
+    settles = [
+        profile.discrete[DISCRETE_KEYS[channel]].states[new].settle_ms
+        for channel, (_, new) in changes.items()
+    ]
+    known = [settle for settle in settles if settle is not None]
+    lead = None if len(known) < len(settles) else wheel_change_ms(profile, max(known))
+    boundary = first.t0_ms
+    reason = "a term of the wheel change (a settle, or the close latency) is unknown"
+    if lead is not None:
+        dark_from = boundary - lead
+        turn = boundary - -(-max(max(known), EFFECT_GRID_MS) // EFFECT_GRID_MS) * EFFECT_GRID_MS
+        reason = (
+            f"the {lead} ms of darkness, turn and settle it needs do not fit half the beat "
+            f"before the boundary ({half_beat_ms:g} ms)"
+        )
+        if lead <= half_beat_ms and dark_from > last.segment.t0_ms:
+            (darkened,) = _dark_over_spans(
+                [last.segment],
+                [(dark_from, boundary)],
+                {last.segment.fixture_id: profile},
+                shortest_lit_ms=shortest_lit_ms,
+            )
+            channels = dict(darkened.channels)
+            for channel, (old, new) in changes.items():
+                channels[channel] = ChannelValue(
+                    channel=channel,
+                    physical=DiscreteTrajectory(
+                        events=(
+                            *_wheel_events(darkened, channel, old, turn),
+                            DiscretePoint(t_ms=turn, state=new),
+                        )
+                    ),
+                )
+            dipped = darkened.model_copy(update={"channels": channels})
+            follow = follow_cues(
+                [dipped],
+                profile,
+                frame_ms=EFFECT_GRID_MS,
+                after=before[-2] if len(before) > 1 else None,
+            )[-1]
+            if _plays_as_authored(own, profile, follow, initial, locks):
+                return _BoundaryChange(
+                    {
+                        "boundary_ms": boundary,
+                        "wheels": states,
+                        "dark_dip": {"from_ms": dark_from, "lead_ms": lead, "turn_ms": turn},
+                    },
+                    (dipped, follow),
+                    {},
+                )
+            reason = "the section's entry does not play as authored after the dark dip"
+        elif lead <= half_beat_ms:
+            reason = f"the previous cue is shorter than the {lead} ms dark dip"
+    return _BoundaryChange(
+        {"boundary_ms": boundary, "wheels": states, "kept_previous": {"reason": reason}},
+        None,
+        kept,
+    )
+
+
+def _wheel_events(
+    cue: FixtureSegment, channel: ChannelName, held: str, before_ms: int
+) -> tuple[DiscretePoint, ...]:
+    """The cue's own selections of `channel` before `before_ms` (`held` from its start
+    where it authors none)."""
+    value = cue.channels.get(channel)
+    if value is None or not isinstance(value.physical, DiscreteTrajectory):
+        return (DiscretePoint(t_ms=cue.t0_ms, state=held),)
+    return tuple(event for event in value.physical.events if event.t_ms < before_ms)
+
+
+def _swap_wheels(
+    cue: FixtureSegment,
+    changes: Mapping[ChannelName, tuple[str, str]],
+    profile: FixtureCapabilities,
+) -> FixtureSegment:
+    """`cue` with each wheel of `changes` that holds the new state throughout holding the
+    old one instead."""
+    channels = dict(cue.channels)
+    for channel, (old, new) in changes.items():
+        default = profile.discrete[DISCRETE_KEYS[channel]].default_state
+        value = cue.channels.get(channel)
+        events = (
+            value.physical.events
+            if value is not None and isinstance(value.physical, DiscreteTrajectory)
+            else None
+        )
+        holds = (events is None and default == new) or (
+            events is not None and {event.state for event in events} == {new}
+        )
+        if holds:
+            channels[channel] = ChannelValue(
+                channel=channel,
+                physical=DiscreteTrajectory(events=(DiscretePoint(t_ms=cue.t0_ms, state=old),)),
+            )
+    return cue.model_copy(update={"channels": channels})
+
+
+@dataclass(frozen=True)
 class TemplateAdmission:
     """What the pre-planning gate offers the planner (`admit_templates`).
 
@@ -549,8 +729,11 @@ class TemplateAdmission:
     `preset_id` None for the base. `entry_dips` holds, per admitted template, its
     worst-case section-entry dip: the largest `worst_case_entry_ms` over its admitted
     rungs and fixtures, from any pose in the union of every admitted rung's poses and
-    the initial pose, with any of their wheel states held, as
-    `{"fixture_id", "bound_ms", "beats"}`, `beats` at the song's shortest beat.
+    the initial pose, with any of their wheel states or any wheel state the rig offers
+    the planner held, into any of their wheel states or any offered one (a section's
+    colour or gobo turns the wheel at its entry), as `{"fixture_id", "bound_ms",
+    "beats"}`, `beats` at the song's shortest beat. `offer` is what the rig can show of
+    the planner's song intent (`song_intent.rig_offer`).
     """
 
     admitted: tuple[str, ...]
@@ -559,6 +742,14 @@ class TemplateAdmission:
     exclusions: tuple[dict[str, str], ...]
     preset_exclusions: tuple[dict[str, str | None], ...]
     entry_dips: dict[str, dict[str, Any]]
+    offer: RigOffer
+
+    def record(self) -> dict[str, Any]:
+        """The admission as JSON values, for the plan checkpoint."""
+        return {
+            **{key: value for key, value in asdict(self).items() if key != "offer"},
+            "offer": self.offer.model_dump(mode="json"),
+        }
 
 
 _Reach = tuple[dict[ChannelName, tuple[float, float]], dict[ChannelName, set[str]]]
@@ -635,8 +826,8 @@ def admit_templates(
     always its base.
 
     Returns:
-        The admitted templates, presets and effective variants, the exclusions and the
-        worst-case entry dips.
+        The admitted templates, presets and effective variants, the exclusions, the
+        worst-case entry dips and the rig's offer (`song_intent.rig_offer`).
 
     Raises:
         UnsupportedRenderModeError: Naming each rung, step, fixture and item that fails,
@@ -795,9 +986,14 @@ def admit_templates(
         (later - earlier for earlier, later in pairwise(beat_grid.beat_boundaries)),
         default=None,
     )
+    offer = rig_offer(fixture_group, beat_grid)
+    offered = {
+        head.fixture_id: {ChannelName.COLOR: set(head.colors), ChannelName.GOBO: set(head.gobos)}
+        for head in offer.heads
+    }
     rungs = {c: per_fixture for c, per_fixture in reach.items() if c not in failures}
     while True:
-        dips, unbounded = _entry_dips(rungs, profiles, initial_states, shortest_beat_ms)
+        dips, unbounded = _entry_dips(rungs, profiles, initial_states, shortest_beat_ms, offered)
         if not unbounded:
             break
         rest = {c: per_fixture for c, per_fixture in rungs.items() if c not in unbounded}
@@ -810,6 +1006,7 @@ def admit_templates(
                 profiles,
                 initial_states,
                 shortest_beat_ms,
+                offered,
             )[1]
         }
         for combination, reason in (certain or unbounded).items():
@@ -885,6 +1082,7 @@ def admit_templates(
         exclusions=exclusions,
         preset_exclusions=preset_exclusions,
         entry_dips=dips,
+        offer=offer,
     )
 
 
@@ -911,6 +1109,7 @@ def _entry_dips(
     profiles: Mapping[str, FixtureCapabilities],
     initial_states: Mapping[str, InitialFixtureState],
     shortest_beat_ms: float | None,
+    offered: Mapping[str, Mapping[ChannelName, Collection[str]]],
 ) -> tuple[dict[str, dict[str, Any]], dict[tuple[str, str | None], str]]:
     """Each template's worst-case section-entry dip, over its rungs in `reach` (keyed by
     template and preset id, None for the base), and each rung without a bound on some
@@ -919,7 +1118,10 @@ def _entry_dips(
 
     The predecessor may be any rung in `reach` or the initial state: per
     fixture, the envelope is the union of their pose ranges and the initial pose, and the
-    wheels held are the union of their wheel states and the initial ones.
+    wheels held are the union of their wheel states and the initial ones. A section's
+    colour or gobo can hold any wheel state the rig offers (`offered`, per fixture), so
+    those join both the states held and each rung's entry states. Offered states all
+    have a known settle, so they never leave a rung without a bound.
     """
     envelope: dict[str, dict[ChannelName, tuple[float, float]]] = {}
     held: dict[str, dict[ChannelName, set[str]]] = defaultdict(lambda: defaultdict(set))
@@ -944,6 +1146,9 @@ def _entry_dips(
                 merged[ch] = (min(merged[ch][0], low), max(merged[ch][1], high))
             for channel, states in wheels.items():
                 held[fixture_id][channel] |= states
+    for fixture_id, by_channel in offered.items():
+        for channel, offered_states in by_channel.items():
+            held[fixture_id][channel] |= set(offered_states)
 
     worst: dict[str, tuple[int, str]] = {}
     unbounded: dict[tuple[str, str | None], str] = {}
@@ -951,10 +1156,14 @@ def _entry_dips(
         found: tuple[int, str] | None = None
         for fixture_id, (poses, wheels) in sorted(per_fixture.items()):
             profile = profiles[fixture_id]
+            entry = {
+                channel: set(states) | set(offered.get(fixture_id, {}).get(channel, ()))
+                for channel, states in wheels.items()
+            }
             bound = worst_case_entry_ms(
                 profile,
                 entry_pose=poses,
-                entry_wheels=wheels,
+                entry_wheels=entry,
                 pose_envelope=envelope[fixture_id],
                 held_wheels=held[fixture_id],
                 frame_ms=EFFECT_GRID_MS,
@@ -966,7 +1175,7 @@ def _entry_dips(
                 unbounded[template_id, preset_id] = (
                     f"{where}: fixture {fixture_id!r} has no worst-case section-entry bound, "
                     "since its profile leaves "
-                    + ", ".join(_unknown_bound_terms(profile, wheels, held[fixture_id]))
+                    + ", ".join(_unknown_bound_terms(profile, entry, held[fixture_id]))
                     + " unknown"
                 )
                 break
@@ -1358,15 +1567,12 @@ _SHUTTER_AND_GOBO_ACTIONS = frozenset(
 def _unrendered_intent_message(section: PlanSection) -> str | None:
     """What of the section's song intent the renderer does not render yet, split into
     what the renderer before the cutover rendered (a regression) and what no renderer
-    has rendered yet; None for a section whose intent is all neutral."""
+    has rendered yet; None for a section that sets none of it. Its colour and gobo
+    render (`song_intent.resolve_section_look`), so they are never listed."""
     regressed: list[str] = []
     new: list[str] = []
     if section.intensity is not None:
         regressed.append("intensity")
-    if section.color is not None:
-        regressed.append("colour")
-    if section.gobo is not None:
-        new.append("section gobo")
     old_events = [e for e in section.events if e.action.value in _SHUTTER_AND_GOBO_ACTIONS]
     if old_events:
         regressed.append("shutter and gobo events")
@@ -1401,8 +1607,8 @@ def _unrendered_intent_message(section: PlanSection) -> str | None:
         f"section {section.section_id!r}: the planner's song intent is not rendered yet; "
         + "; ".join(said)
         + ". Both are being fixed under "
-        "changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md; the template renders "
-        "as authored"
+        "changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md; for these the "
+        "template renders as authored"
     )
 
 
@@ -1512,6 +1718,7 @@ class RenderingPipeline:
         layout_sha256: str | None = None,
         admission: TemplateAdmission | None = None,
         dark_spans: Sequence[tuple[int, int]] = (),
+        palettes: Mapping[str, SectionPalette] | None = None,
     ):
         """Initialize rendering pipeline.
 
@@ -1551,6 +1758,11 @@ class RenderingPipeline:
                 paths, commanded dark there (`_dark_over_spans`), before section entry
                 and repositioning are planned. Render identity when given, as
                 lengthened and merged; the trace records them so as `dark_spans`.
+            palettes: Each song section's macro palette (`song_intent.section_palettes`),
+                by section id. A section whose colour is a palette role takes the stop the
+                role names (`song_intent.requested_color`); without one, the fixed role
+                table's colour. Render identity for the sections that resolve one
+                (`rendered_palettes`); the trace records them as `palettes`.
 
         Raises:
             UnsupportedRenderModeError: The renderer cannot render this rig (see
@@ -1580,6 +1792,7 @@ class RenderingPipeline:
             else ()
         )
         self._shortest_lit_ms = shortest_lit_ms
+        self.palettes = dict(palettes or {})
         self.artifacts: DeliveryArtifacts | None = None
         """Set by `render()` when `output_path` is given."""
         self.sequence: XSequence | None = None
@@ -1616,6 +1829,7 @@ class RenderingPipeline:
             if rendered != (part.preset_id or None):
                 substitutions.append((section.section_id, rendered))
         return render_fingerprint(
+            palettes=self.rendered_palettes(),
             plan=self.choreography_plan,
             beat_grid=self.beat_grid,
             fixtures=self.fixture_group,
@@ -1628,6 +1842,18 @@ class RenderingPipeline:
             preset_substitutions=substitutions,
             dark_spans=self.dark_spans,
         )
+
+    def rendered_palettes(self) -> dict[str, SectionPalette]:
+        """The macro palette each plan section whose colour is a palette role resolves it
+        through (of `palettes`), by section id: render identity, since the stop it takes
+        decides the wheel state."""
+        return {
+            section.section_id: self.palettes[section.section_id]
+            for section in self.choreography_plan.sections
+            if section.color is not None
+            and section.color.value.startswith("PALETTE_")
+            and section.section_id in self.palettes
+        }
 
     def checkpoint_record(self, *, live_layout: bool = False) -> dict[str, Any]:
         """What `twinklr eval-report` re-renders this render from, and what names
@@ -1673,7 +1899,7 @@ class RenderingPipeline:
             "render_fingerprint": record["render_fingerprint"],
             "policy": self.job_config.moving_heads.model_dump(mode="json"),
             "beat_grid": self.beat_grid.model_dump(mode="json"),
-            "admission": None if self.admission is None else asdict(self.admission),
+            "admission": None if self.admission is None else self.admission.record(),
             "inputs": inputs,
         }
         if "dark_spans" in record:
@@ -1682,6 +1908,10 @@ class RenderingPipeline:
             # mismatch.
             checkpoint["dark_spans"] = record["dark_spans"]
             inputs["dark_spans"] = record["dark_spans"]
+        if "palettes" in record:
+            # As the dark spans: the re-render resolves palette roles through them.
+            checkpoint["palettes"] = record["palettes"]
+            inputs["palettes"] = record["palettes"]
         return checkpoint
 
     def render(self) -> list[FixtureSegment]:
@@ -1741,6 +1971,10 @@ class RenderingPipeline:
         time_markers: list[TimeMarker] = []
         diagnostics: list[MHDiagnostic] = []
         fixture_contexts = self._build_fixture_contexts()
+        heads = [HeadWheels.from_profile(f, p) for f, p in profiles.items()]
+        held_by_fixture: dict[str, dict[ChannelName, str]] = {}
+        """Per fixture, the wheel states song intent held in the section of its last cue."""
+        section_looks: list[dict[str, Any]] = []
         for section in self.iterate_plan_sections(self.choreography_plan):
             (part,) = section.parts
             try:
@@ -1776,16 +2010,42 @@ class RenderingPipeline:
                         action="unchanged",
                     )
                 )
-            refused = 0 if unplayable is None else len(unplayable)
-            compiled = compile_template(
-                template_doc.template,
-                context,
-                preset,
-                phase_map=phase_map,
-                start_limit_ms=start_limit,
-                end_limit_ms=end_limit,
-                unplayable=unplayable,
+            look = resolve_section_look(
+                section, heads, section_palette_for(self.palettes, section.section_id)
             )
+            held = look.states
+            refused = 0 if unplayable is None else len(unplayable)
+            compiled_steps: list[dict[str, str | int]] = []
+
+            def compile_section(
+                held_states: Mapping[str, Mapping[ChannelName, str]],
+                template_doc: TemplateDoc = template_doc,
+                context: TemplateCompileContext = context,
+                preset: TemplatePreset | None = preset,
+                refused: int = refused,
+                compiled_steps: list[dict[str, str | int]] = compiled_steps,
+            ) -> list[FixtureSegment]:
+                if unplayable is not None:
+                    del unplayable[refused:]  # a recompile records its refusals again
+                result = compile_template(
+                    template_doc.template,
+                    context,
+                    preset,
+                    phase_map=phase_map,
+                    start_limit_ms=start_limit,
+                    end_limit_ms=end_limit,
+                    unplayable=unplayable,
+                    held_states=held_states,
+                )
+                compiled_steps[:] = result.dropped_steps
+                return _dark_over_spans(
+                    result.segments,
+                    self.dark_spans,
+                    profiles,
+                    shortest_lit_ms=self._shortest_lit_ms,
+                )
+
+            section_cues = compile_section(held)
             key = (template_doc.template.template_id, context.preset_id)
             if unplayable is not None and len(unplayable) > refused and key not in basic_checked:
                 # Only a refusal this placement adds is left dark: one the template shows
@@ -1812,14 +2072,57 @@ class RenderingPipeline:
                     start_limit_ms=start_limit,
                     end_limit_ms=end_limit,
                 )
-            dropped.extend(compiled.dropped_steps)
-            entered, inside, windows = _enter_section(
-                _dark_over_spans(
-                    compiled.segments,
-                    self.dark_spans,
-                    profiles,
+            # A wheel change the song intent makes at a boundary the heads play lit
+            # through: a dark dip before the reveal, else the previous state kept.
+            boundaries: list[dict[str, Any]] = []
+            dips: dict[str, tuple[FixtureSegment, HeadFollow]] = {}
+            keep: dict[str, dict[ChannelName, str]] = {}
+            half_beat = _half_beat_before(self.beat_grid, context.start_ms)
+            for fixture_id in sorted({cue.fixture_id for cue in section_cues}):
+                change = _boundary_change(
+                    sorted(
+                        (cue for cue in section_cues if cue.fixture_id == fixture_id),
+                        key=lambda cue: cue.t0_ms,
+                    ),
+                    kept[fixture_id],
+                    profiles[fixture_id],
+                    policy.initial_states.get(fixture_id),
+                    self.locks,
+                    policy.reposition_fallback,
+                    intent_channels={
+                        *held.get(fixture_id, {}),
+                        *held_by_fixture.get(fixture_id, {}),
+                    },
+                    half_beat_ms=half_beat,
                     shortest_lit_ms=self._shortest_lit_ms,
-                ),
+                )
+                if change is None:
+                    continue
+                boundaries.append({"fixture_id": fixture_id, **change.record})
+                if change.dip is not None:
+                    dips[fixture_id] = change.dip
+                else:
+                    keep[fixture_id] = change.kept
+            if keep:
+                held = {
+                    fixture_id: {**held.get(fixture_id, {}), **keep.get(fixture_id, {})}
+                    for fixture_id in {*held, *keep}
+                }
+                section_cues = compile_section(held)
+            for fixture_id, (dipped, follow) in dips.items():
+                replaced = kept[fixture_id][-1].segment
+                cues[next(i for i, cue in enumerate(cues) if cue is replaced)] = dipped
+                kept[fixture_id][-1] = follow
+            for fixture_id in {cue.fixture_id for cue in section_cues}:
+                held_by_fixture[fixture_id] = dict(held.get(fixture_id, {}))
+            record = look.record()
+            if boundaries:
+                record["boundaries"] = boundaries
+            if len(record) > 1:
+                section_looks.append(record)
+            dropped.extend(compiled_steps)
+            entered, inside, windows = _enter_section(
+                section_cues,
                 kept,
                 profiles,
                 policy.initial_states,
@@ -2005,6 +2308,17 @@ class RenderingPipeline:
         if self.dark_spans:
             # Left out when there are none, so earlier traces keep their keys.
             self.render_record["dark_spans"] = [list(span) for span in self.dark_spans]
+        palettes = self.rendered_palettes()
+        if palettes:
+            # Left out when no section resolves a palette role through one.
+            self.render_record["palettes"] = {
+                section_id: palette.model_dump(mode="json")
+                for section_id, palette in palettes.items()
+            }
+        if section_looks:
+            # What each section's colour and gobo play on each head, and the wheel changes
+            # they make at boundaries; left out when no section sets either.
+            self.render_record["section_looks"] = section_looks
         if self.choreography_plan.repairs:
             # What repair changed in the planner's response; left out when nothing was.
             self.render_record["plan_repairs"] = [

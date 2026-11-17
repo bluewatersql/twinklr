@@ -145,7 +145,8 @@ class SongIntentReport(BaseModel):
 
     Null fields and empty lists are "as the template is authored". `not_rendered` names
     the fields the planner set that the renderer does not render yet (a known regression,
-    `changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md`).
+    `changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md`); `played`, what the
+    render made of the colour and gobo (`song_intent.describe_look`).
     """
 
     intensity: str | None = Field(description="Intensity, or null for as authored")
@@ -159,6 +160,10 @@ class SongIntentReport(BaseModel):
     entry: str | None = Field(description="Transition into the section, or null")
     exit: str | None = Field(description="Transition out of the section, or null")
     not_rendered: list[str] = Field(description="Fields set that are not rendered yet")
+    played: list[str] = Field(
+        default_factory=list,
+        description="What the render played for the colour and gobo, one line each",
+    )
 
     model_config = ConfigDict(frozen=True)
 

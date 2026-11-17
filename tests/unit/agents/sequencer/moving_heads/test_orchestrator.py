@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from tests.support import moving_heads as m
 from tests.support.moving_heads import plan_section
 from twinklr.core.agents.audio.lyrics.models import LyricContextModel, MomentCue
 from twinklr.core.agents.audio.profile.models import (
@@ -34,11 +35,16 @@ from twinklr.core.agents.sequencer.moving_heads.context import (
     MovingHeadPlanningContext,
     TemplateDescription,
 )
-from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
+from twinklr.core.agents.sequencer.moving_heads.models import (
+    ChoreographyPlan,
+    PlanColor,
+    PlanSection,
+)
 from twinklr.core.agents.sequencer.moving_heads.orchestrator import (
     MovingHeadPlannerOrchestrator,
     build_judge_variables,
     build_planner_variables,
+    normalize_plan,
 )
 from twinklr.core.agents.shared.judge.controller import IterationContext
 from twinklr.core.agents.shared.judge.models import JudgeVerdict, VerdictStatus
@@ -1136,3 +1142,70 @@ class TestOrchestratorIntegration:
         assert judged == 2
         assert "the HIGH lyric moment cue 'hook'" in planner_messages[1]
         assert result.context.advisory_sent
+
+
+# --- The rig offer (song-intent rendering W3) ---------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_the_cache_key_tracks_the_rig_offer(
+    planning_context: MovingHeadPlanningContext,
+) -> None:
+    """What the planner is told the rig can show, and what repair keeps, re-keys the plan."""
+    orchestrator = MovingHeadPlannerOrchestrator(provider=MagicMock())
+    tagged = planning_context.model_copy(update={"rig_offer": m.tagged_offer()})
+    untagged = planning_context.model_copy(update={"rig_offer": m.untagged_offer()})
+
+    keys = {
+        await orchestrator.get_cache_key(context)
+        for context in (planning_context, tagged, untagged)
+    }
+
+    assert len(keys) == 3
+
+
+def test_the_normaliser_repairs_what_the_rig_cannot_show() -> None:
+    """Palette roles resolve through each section's macro palette (here
+    `core.christmas_traditional`: red, green, warm white, white): on a white/red/blue
+    wheel the green ACCENT is shown by no head and is repaired to as authored; PRIMARY's
+    red stays. Without the gate's offer nothing is repaired."""
+    profile = create_test_audio_profile()
+    context = MovingHeadPlanningContext(
+        audio_profile=profile,
+        fixtures=FixtureContext(count=4, groups=[]),
+        available_templates=["sweep_lr_fan_pulse"],
+        macro_plan=create_test_macro_plan(profile),
+        rig_offer=m.tagged_offer(),
+    )
+    plan = ChoreographyPlan(
+        sections=[
+            _answered("intro", 1, 2, "sweep_lr_fan_pulse", color="PALETTE_PRIMARY"),
+            _answered("verse_1", 3, 4, "sweep_lr_fan_pulse", color="PALETTE_ACCENT"),
+        ],
+        overall_strategy=STRATEGY,
+    )
+
+    repaired = normalize_plan(plan, context)
+    unrepaired = normalize_plan(plan, context.model_copy(update={"rig_offer": None}))
+
+    assert [section.color for section in repaired.sections] == [PlanColor.PALETTE_PRIMARY, None]
+    (repair,) = repaired.repairs
+    assert repair.section_id == "verse_1"
+    assert repair.item == (
+        "colour PALETTE_ACCENT (#43A047, palette 'core.christmas_traditional' stop 2)"
+    )
+    assert repair.reason.startswith("no head's colour wheel shows anything like it")
+    assert unrepaired.repairs == [] and unrepaired.sections[1].color is PlanColor.PALETTE_ACCENT
+
+
+def test_the_planner_prompt_variables_carry_the_offer(
+    planning_context: MovingHeadPlanningContext,
+) -> None:
+    offered = planning_context.model_copy(update={"rig_offer": m.tagged_offer()})
+
+    assert build_planner_variables(planning_context)["rig_offer"] is None
+    shown = build_planner_variables(offered)["rig_offer"]
+    assert shown["colors_tagged"] is True
+    assert [entry["section_ids"] for entry in shown["sections"]] == [
+        ["intro", "verse_1", "chorus_1", "outro"]
+    ]

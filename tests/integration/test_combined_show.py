@@ -516,8 +516,9 @@ async def test_unified_show_renders_the_heads_as_the_standalone_render(
     assert "dark_spans" not in record
     assert record["render_fingerprint"] == standalone.fingerprint()
     assert record["layout_check"] == "performed"
-    # The macro palette and focal role are not projected onto the heads: said, not done.
-    projected = [d for d in record["diagnostics"] if "macro palette" in d["message"]]
+    # The macro focal role is not projected onto the heads: said, not done. (A palette-role
+    # colour resolves through the section's macro palette, as under `twinklr run`.)
+    projected = [d for d in record["diagnostics"] if "macro focal role" in d["message"]]
     assert [(d["section_id"], d["severity"], d["action"]) for d in projected] == [
         ("drop", "warning", "unchanged")
     ]

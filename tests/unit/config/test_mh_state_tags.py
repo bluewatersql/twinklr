@@ -26,6 +26,7 @@ from tests.support.moving_heads import (
     profile_payload,
     tagged_p1_rig,
 )
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup
 from twinklr.core.config.fixtures.state_tags import (
     CLOSE_DISTANCE,
@@ -34,14 +35,10 @@ from twinklr.core.config.fixtures.state_tags import (
     HUE_CAP,
     MIN_LIGHTNESS,
     ColorMatch,
-    RigStateOffer,
     color_distance,
     gobo_state,
     layout_color_tags,
     nearest_color_state,
-    rig_color_offer,
-    rig_gobo_offer,
-    rig_strobe_offer,
     rig_tag_guidance,
     strobe_state,
     tag_guidance,
@@ -312,12 +309,12 @@ _PRESET_STATES: dict[str, tuple[tuple[str, str], ...]] = {
     "yellow": (("green", _A), ("yellow", _E), ("green", _A), ("white", _M), ("open", _M)),
     "magenta": (("red", _A), ("magenta", _E), ("pink", _A), ("red", _A), ("open", _M)),
     "cyan": (("green", _A), ("cyan", _E), ("green", _A), ("white", _M), ("open", _M)),
-    "orange": (("red", _A), ("orange", _E), ("amber", _C), ("red", _A), ("cto", _A)),
+    "orange": (("red", _A), ("orange", _E), ("amber", _C), ("red", _A), ("cto", _C)),
     "purple": (("blue", _A), ("magenta", _A), ("blue", _A), ("white", _M), ("open", _M)),
     "amber": (("red", _A), ("orange", _C), ("amber", _E), ("red", _A), ("cto", _C)),
     "lime": (("green", _A), ("yellow", _C), ("green", _A), ("white", _M), ("open", _M)),
     "white": (("white", _E), ("white", _E), ("open", _E), ("white", _E), ("open", _E)),
-    "warm_white": (("white", _C), ("white", _C), ("open", _C), ("white", _C), ("open", _C)),
+    "warm_white": (("white", _E), ("white", _E), ("open", _E), ("white", _E), ("open", _E)),
     "cool_white": (("white", _C), ("white", _C), ("open", _C), ("white", _C), ("open", _C)),
     "uv": (("blue", _A), ("blue", _A), ("blue", _A), ("white", _M), ("open", _M)),
 }
@@ -366,6 +363,24 @@ def test_fit_grades_follow_the_stated_thresholds() -> None:
     assert far.hue_difference is not None and CLOSE_HUE < far.hue_difference <= HUE_CAP
 
 
+def test_the_fit_grades_the_slot_at_the_dimmer_level_nearest_the_request() -> None:
+    """A dimmer scales a slot's colour, never brightens or saturates it: a request that is
+    the slot's colour, darker, grades as that colour; a lighter or more saturated one
+    keeps its difference. The state chosen does not change."""
+    profile = _wheel(green="green", red="red", white="white")
+
+    darker = nearest_color_state(profile, "#00E676")  # a palette green, L 0.81 to 0.87
+    dimmed = nearest_color_state(profile, "#7F0000")  # red at a lower level
+    paler = nearest_color_state(profile, "#FF8080")  # lighter and less saturated than red
+
+    assert darker is not None and (darker.state, darker.fit) == ("green", "close")
+    assert darker.distance > CLOSE_DISTANCE >= darker.graded_distance  # raw ΔE: approximate
+    assert dimmed is not None and (dimmed.state, dimmed.fit) == ("red", "exact")
+    assert dimmed.graded_distance < 1e-6 < dimmed.distance
+    assert paler is not None and paler.state == "red" and paler.fit == "approximate"
+    assert paler.graded_distance == pytest.approx(paler.distance, abs=1e-2)
+
+
 _PALETTE_WHITES = {"#FFFFFF", "#F5F1E8"}
 """The catalog palettes' white and warm white stops (OKLCh chroma 0 and 0.013)."""
 _PALETTE_PALE = {"#B3E5FC", "#FFCCBC", "#80DEEA", "#B39DDB"}
@@ -402,9 +417,11 @@ def test_a_pale_tint_takes_a_white_slot_nearer_it_and_a_saturated_slot_otherwise
     peach = nearest_color_state(_wheel(**_W4), "#FFCCBC")
     ice = nearest_color_state(_wheel(**_W8), "#B3E5FC")
 
+    # Graded with the white slot dimmed to the tint's level: only its tint (chroma 0.062)
+    # is left of the difference.
     assert peach is not None and (peach.state, peach.fit, peach.neutral_fallback) == (
         "white",
-        "approximate",
+        "close",
         False,
     )
     assert ice is not None and (ice.state, ice.fit) == ("cyan", "approximate")
@@ -495,7 +512,7 @@ def test_an_exact_slot_is_at_distance_zero() -> None:
     profile = _wheel(red="red", orange="orange", blue="blue")
 
     assert nearest_color_state(profile, "#ff0000") == ColorMatch(
-        "red", "#FF0000", 0.0, 0.0, "exact", False
+        "red", "#FF0000", 0.0, 0.0, "exact", False, 0.0
     )
 
 
@@ -526,71 +543,6 @@ def test_color_distance_is_the_oklab_difference() -> None:
     assert color_distance("#123456", "#123456") == 0.0
     assert color_distance("#FF0000", "#00FF00") == color_distance("#00FF00", "#FF0000")
     assert color_distance("#000000", "#FFFFFF") == pytest.approx(1.0, abs=1e-4)
-
-
-# --- Rig-level offers -------------------------------------------------------------------
-
-
-def _mixed_rig() -> dict[str, FixtureCapabilities]:
-    """MH1 and MH2 on the eight-slot wheel with a gobo `star` and three strobe speeds;
-    MH3 on white/red/blue/green with only a fast strobe; MH4 on white/red, no gobo."""
-    strobes = {
-        "strobe_slow": {"range_min": 100, "range_max": 139, "value": 120, "strobe": "slow"},
-        "strobe_medium": {"range_min": 140, "range_max": 179, "value": 160, "strobe": "medium"},
-        "strobe_fast": {"range_min": 180, "range_max": 219, "value": 200, "strobe": "fast"},
-    }
-
-    def head(colors: dict[str, str], speeds: tuple[str, ...], gobo: bool) -> FixtureCapabilities:
-        payload = _wheel(**colors).model_dump(mode="json")
-        payload["discrete"]["shutter"]["states"] |= {
-            name: state for name, state in strobes.items() if state["strobe"] in speeds
-        }
-        if gobo:
-            payload["discrete"]["gobo"]["states"]["star"]["pattern"] = "stars"
-        return _profile(payload)
-
-    eight = head(_W8, ("slow", "medium", "fast"), gobo=True)
-    return {
-        "MH1": eight,
-        "MH2": eight,
-        "MH3": head(_W4, ("fast",), gobo=True),
-        "MH4": head(_WR, (), gobo=False),
-    }
-
-
-def test_rig_color_offer_grades_a_colour_across_a_mixed_rig() -> None:
-    rig = _mixed_rig()
-
-    red = rig_color_offer(rig, "red")
-    cyan = rig_color_offer(rig, "cyan")
-    amber = rig_color_offer({"MH1": rig["MH1"]}, "amber")
-    lone = rig_color_offer({"MH4": rig["MH4"]}, "blue")
-
-    assert (red.status, red.worse) == ("all_exact_or_close", ())
-    assert (cyan.status, cyan.worse) == ("partial", ("MH3", "MH4"))
-    assert [m.fit for m in cyan.matches.values() if m] == [
-        "exact",
-        "exact",
-        "approximate",
-        "hue_mismatch",
-    ]
-    assert (amber.status, amber.worse) == ("all_exact_or_close", ())
-    assert (lone.status, lone.worse) == ("unavailable", ("MH4",))
-    assert rig_color_offer(rig, "#000000").status == "unavailable"
-
-
-def test_rig_gobo_and_strobe_offers_say_all_some_or_none() -> None:
-    rig = _mixed_rig()
-
-    assert rig_gobo_offer(rig, "stars") == RigStateOffer(
-        {"MH1": "star", "MH2": "star", "MH3": "star", "MH4": None}, "some", ("MH4",)
-    )
-    assert rig_gobo_offer(rig, "flame").available == "none"
-    assert rig_strobe_offer(rig, "fast").available == "some"
-    assert rig_strobe_offer(rig, "fast").missing == ("MH4",)
-    assert rig_strobe_offer({"MH1": rig["MH1"]}, "medium") == RigStateOffer(
-        {"MH1": "strobe_medium"}, "all", ()
-    )
 
 
 def test_gobo_state_prefers_the_shortest_name_among_states_of_one_pattern() -> None:
@@ -714,7 +666,7 @@ def test_a_filled_snippet_pastes_into_the_profile_and_an_unfilled_one_is_refused
     assert gobo_state(profile, "flame") == "gobo4"
     assert strobe_state(profile, "medium") == "strobe"
     assert nearest_color_state(profile, "red") == ColorMatch(
-        "red", "#FF0000", 0.0, 0.0, "exact", False
+        "red", "#FF0000", 0.0, 0.0, "exact", False, 0.0
     )
     assert tag_guidance(profile) is None
 
@@ -911,13 +863,20 @@ _TAG_MUTATIONS: dict[str, tuple[str, str, str | bool]] = {
 """Per path: the channel and state the tag (or the `offer: false` opt-out) goes on, and
 its value. The shutter's `strobe` state is in both renders, so only the tag differs."""
 
-TAG_PATHS = tuple(
-    path
-    for path, disposition in CONFIG_EFFECTS.items()
-    if disposition.kind is ConfigDispositionKind.EFFECT_TEST
-    and disposition.test_nodeid is not None
-    and "::test_state_tag_changes_identity_not_output[" in disposition.test_nodeid
-)
+
+def _tag_paths(test: str) -> tuple[str, ...]:
+    return tuple(
+        path
+        for path, disposition in CONFIG_EFFECTS.items()
+        if disposition.kind is ConfigDispositionKind.EFFECT_TEST
+        and disposition.test_nodeid is not None
+        and f"::{test}[" in disposition.test_nodeid
+    )
+
+
+IDENTITY_TAG_PATHS = _tag_paths("test_state_tag_changes_identity_not_output")
+PLAYED_TAG_PATHS = _tag_paths("test_state_tag_changes_what_a_section_plays")
+TAG_PATHS = IDENTITY_TAG_PATHS + PLAYED_TAG_PATHS
 
 
 def _tag_rig(prefix: str, tag: str | None) -> FixtureGroup:
@@ -945,14 +904,14 @@ def test_every_tag_path_is_registered_to_its_evidence() -> None:
     }
 
     assert set(TAG_PATHS) == expected
-    for path in TAG_PATHS:
-        assert "W3" in CONFIG_EFFECTS[path].note and "W4" in CONFIG_EFFECTS[path].note
+    assert {path.rsplit(".", 1)[1] for path in PLAYED_TAG_PATHS} == {"hex", "pattern"}
+    assert {path.rsplit(".", 1)[1] for path in IDENTITY_TAG_PATHS} == {"strobe", "offer"}
 
 
-@pytest.mark.parametrize("config_path", TAG_PATHS, ids=TAG_PATHS)
+@pytest.mark.parametrize("config_path", IDENTITY_TAG_PATHS, ids=IDENTITY_TAG_PATHS)
 def test_state_tag_changes_identity_not_output(config_path: str) -> None:
-    """A tag enters the render fingerprint (it is rig data) and changes no frame:
-    nothing reads it until the rig offer (W3) and colour and gobo resolution (W4)."""
+    """A strobe tag or an opt-out enters the render fingerprint (it is rig data) and
+    changes no frame: no strobe renders until W6, and an opted-out state is not offered."""
     prefix, _, suffix = config_path.partition(".discrete.")
     plan = m.sections_plan(("masked_wheel_flick", 1, 8))
 
@@ -973,6 +932,38 @@ def test_state_tag_changes_identity_not_output(config_path: str) -> None:
 
     assert untagged.frames
     assert tagged.frames == untagged.frames
+    assert fingerprints[0] != fingerprints[1]
+
+
+@pytest.mark.parametrize("config_path", PLAYED_TAG_PATHS, ids=PLAYED_TAG_PATHS)
+def test_state_tag_changes_what_a_section_plays(config_path: str) -> None:
+    """A colour or gobo tag decides the state a section's colour (red) or gobo (stars)
+    plays: untagged, the section plays the template's own; tagged, the tagged state."""
+    prefix, _, suffix = config_path.partition(".discrete.")
+    channel, state, _ = _TAG_MUTATIONS[f"discrete.{suffix}"]
+
+    def render(tag: str | None) -> RenderingPipeline:
+        section = m.plan_section("s1", 1, 8, "mirror_wings", color="red", gobo="stars")
+        pipeline = RenderingPipeline(
+            choreography_plan=ChoreographyPlan(sections=[section], overall_strategy=""),
+            beat_grid=m.bars_grid(*([500.0] * 8)),
+            fixture_group=_tag_rig(prefix, tag),
+            job_config=m.family_job(_HEADS),
+            media_file="silence.wav",
+        )
+        pipeline.render()
+        return pipeline
+
+    with m.family_catalog():
+        untagged, tagged = render(None), render(f"discrete.{suffix}")
+        fingerprints = untagged.fingerprint(), tagged.fingerprint()
+
+    profile = _tag_rig(prefix, None).expand_fixtures()[0].config.physical_profile
+    assert profile is not None
+    offset = profile.discrete[channel].offset
+    selected = profile.discrete[channel].states[state].value
+    assert selected not in {dict(f.channels)[offset] for f in untagged.frames}
+    assert selected in {dict(f.channels)[offset] for f in tagged.frames}
     assert fingerprints[0] != fingerprints[1]
 
 
