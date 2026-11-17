@@ -28,9 +28,10 @@ from twinklr.core.agents.sequencer.moving_heads.models import (
     PlanSection,
     Variation,
 )
+from twinklr.core.agents.sequencer.moving_heads.rig_repair import repair_rig_intent
 from twinklr.core.sequencer.models.enum import Intensity, TemplateCategory
 from twinklr.core.sequencer.models.template import TemplateDoc
-from twinklr.core.sequencer.moving_heads.song_intent import RigOffer, repair_rig_intent
+from twinklr.core.sequencer.moving_heads.song_intent import RigOffer
 from twinklr.core.sequencer.moving_heads.templates.library import REGISTRY
 from twinklr.core.sequencer.vocabulary.visual import PaletteRole
 

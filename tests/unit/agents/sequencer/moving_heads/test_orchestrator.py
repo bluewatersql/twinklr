@@ -1209,3 +1209,32 @@ def test_the_planner_prompt_variables_carry_the_offer(
     assert [entry["section_ids"] for entry in shown["sections"]] == [
         ["intro", "verse_1", "chorus_1", "outro"]
     ]
+
+
+@pytest.mark.asyncio
+async def test_the_cache_key_hashes_the_palette_stops_not_only_the_palette_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An edit of a catalog palette's stops changes the prompt and the repairs, so it
+    re-keys the plan though the macro plan names the same palette id."""
+    from twinklr.core.sequencer.theming import catalog
+
+    profile = create_test_audio_profile()
+    context = MovingHeadPlanningContext(
+        audio_profile=profile,
+        fixtures=FixtureContext(count=4, groups=[]),
+        available_templates=["sweep_lr_fan_pulse"],
+        macro_plan=create_test_macro_plan(profile),
+    )
+    orchestrator = MovingHeadPlannerOrchestrator(provider=MagicMock())
+    before = await orchestrator.get_cache_key(context)
+    original = catalog.get_palette
+
+    def edited(palette_id: str) -> Any:
+        palette = original(palette_id)
+        first = palette.stops[0].model_copy(update={"hex": "#123456"})
+        return palette.model_copy(update={"stops": [first, *palette.stops[1:]]})
+
+    monkeypatch.setattr(catalog, "get_palette", edited)
+
+    assert await orchestrator.get_cache_key(context) != before

@@ -1,41 +1,41 @@
-"""Song intent resolved on a rig: the palette stop policy, the rig offer, a section's
-look per head, and the repair of what no head can show (song-intent rendering W3/W4)."""
+"""Song intent resolved on a rig: the palette stop policy, the rig offer and a
+section's look per head (song-intent rendering W3/W4). The repair of what no head can
+show is in `tests/unit/agents/sequencer/moving_heads/test_rig_repair.py`."""
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from typing import Any
 
 import pytest
 
 from tests.support import moving_heads as m
 from tests.support.moving_heads import discrete_profile_payload, plan_section
-from twinklr.core.agents.sequencer.moving_heads.models import (
-    ChoreographyPlan,
-    EventAction,
-    PlanColor,
-    PlanEvent,
-    RepairAction,
-)
+from twinklr.core.agents.sequencer.moving_heads.models import PlanColor
 from twinklr.core.config.fixtures import FixtureCapabilities
+from twinklr.core.config.fixtures.state_tags import NEUTRAL_CHROMA, oklch
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.moving_heads.libraries.gobo import GoboPattern
 from twinklr.core.sequencer.moving_heads.song_intent import (
     COOL_HUE,
+    ROLE_HUE_RANGE,
     WARM_HUE,
+    DarkPhases,
     HeadWheels,
-    RigOffer,
     SectionPalette,
+    TemplateOffer,
     color_offer,
     describe_look,
     gobo_offer,
     offer_for_prompt,
     palette_role_color,
-    repair_rig_intent,
     requested_color,
     resolve_section_look,
     rig_offer,
     wheel_change_ms,
 )
+from twinklr.core.sequencer.theming.catalog import get_palette, list_palettes
 from twinklr.core.sequencer.vocabulary.visual import PaletteRole
 
 RGB_PRIMARY = SectionPalette(
@@ -123,22 +123,120 @@ def test_requested_colour_names_its_source() -> None:
         PlanColor.PALETTE_COOL, SectionPalette(palette_id="w", stops=("#FFFFFF", "#FFFFFE"))
     )
 
-    assert (explicit.hex, explicit.source) == ("#0000FF", "explicit")
+    assert (explicit.hex, explicit.source, explicit.role_missing) == ("#0000FF", "explicit", False)
     assert (stop.hex, stop.source) == ("#00E676", "palette 'core.rgb_primary' stop 2")
     assert (fixed.hex, fixed.source) == (
         "#FFA000",
         "fixed table (amber: no macro palette for this section)",
     )
-    assert (whites.hex, whites.source) == (
-        "#00FFFF",
-        "fixed table (cyan: palette 'w' has no stop with a hue)",
+    # A role the palette has no stop for is never substituted from the fixed table: the
+    # palette is the song's. PRIMARY's stop stands in, marked.
+    assert (whites.hex, whites.source, whites.role_missing) == (
+        "#FFFFFF",
+        "palette 'w' has no COOL stop: PRIMARY's stop 1",
+        True,
     )
+
+
+_SMALL_WHEELS = {
+    "w/r/b/g": {"white": "white", "red": "red", "blue": "blue", "green": "green"},
+    "w/r/b": {"white": "white", "red": "red", "blue": "blue"},
+    "open/red/amber/pink/blue/green": {
+        "open": "white",
+        "red": "red",
+        "amber": "amber",
+        "pink": "#FF69B4",
+        "blue": "blue",
+        "green": "green",
+    },
+    "eight-slot": {
+        n: n for n in ("white", "red", "orange", "yellow", "green", "blue", "magenta", "cyan")
+    },
+}
+
+
+def _away(hue: float, target: float) -> float:
+    turn = abs(hue - target) % 360
+    return min(turn, 360 - turn)
+
+
+@pytest.mark.parametrize("palette_id", [info.palette_id for info in list_palettes()])
+def test_every_catalog_palette_resolves_a_role_only_to_a_stop_that_fits_it(
+    palette_id: str,
+) -> None:
+    """WARM and COOL take a stop with a hue within 90° of theirs, NEUTRAL a white; a
+    palette without such a stop has no such role (never a colour from outside it)."""
+    stops = tuple(stop.hex[:7].upper() for stop in get_palette(palette_id).stops)
+    colours = [oklch(stop) for stop in stops]
+    palette = SectionPalette(palette_id=palette_id, stops=stops)
+
+    for role, target in ((PaletteRole.WARM, WARM_HUE), (PaletteRole.COOL, COOL_HUE)):
+        index = palette_role_color(role, stops)
+        fitting = [c for c in colours if c[1] >= NEUTRAL_CHROMA and _away(c[2], target) <= 90]
+        assert (index is None) == (not fitting), (role, stops)
+        if index is not None:
+            assert _away(colours[index][2], target) <= ROLE_HUE_RANGE
+    neutral = palette_role_color(PaletteRole.NEUTRAL, stops)
+    assert (neutral is None) == all(c[1] >= NEUTRAL_CHROMA for c in colours)
+    assert neutral is None or colours[neutral][1] < NEUTRAL_CHROMA
+    for role in PaletteRole:
+        asked = requested_color(f"PALETTE_{role.value}", palette)
+        assert asked.hex in stops  # never the fixed table under a macro palette
+
+
+def test_catalog_palettes_without_a_role_are_named() -> None:
+    """Measured over the 19 catalog palettes (the review's count of misplaced roles)."""
+    missing = {
+        role.value: sorted(
+            info.palette_id
+            for info in list_palettes()
+            if palette_role_color(
+                role, tuple(s.hex[:7].upper() for s in get_palette(info.palette_id).stops)
+            )
+            is None
+        )
+        for role in (PaletteRole.WARM, PaletteRole.COOL, PaletteRole.NEUTRAL)
+    }
+
+    assert missing == {
+        "WARM": [
+            "core.ice_neon",
+            "core.mono_cool",
+            "core.uv_party",
+            "spec.cosmic_night",
+            "spec.futuristic_teal",
+        ],
+        "COOL": ["core.gold_warm", "core.magma", "core.mono_warm", "spec.gritty_embers"],
+        "NEUTRAL": ["core.magma", "core.rainbow_bright"],
+    }
+
+
+@pytest.mark.parametrize("wheel", sorted(_SMALL_WHEELS))
+def test_the_prompt_says_where_two_roles_share_a_wheel_colour(wheel: str) -> None:
+    """On every catalog palette and four realistic wheels, a role that lands on the same
+    wheel colour as an earlier one says so, and a missing role is marked missing."""
+    profile = _wheel(_SMALL_WHEELS[wheel])
+    offer = rig_offer_of({"MH1": profile})
+    for info in list_palettes():
+        stops = tuple(s.hex[:7].upper() for s in get_palette(info.palette_id).stops)
+        palette = SectionPalette(palette_id=info.palette_id, stops=stops)
+        (entry,) = offer_for_prompt(offer, {"s": palette}, ["s"])["sections"]
+        seen: dict[str, str] = {}
+        for role in entry["roles"]:
+            if role["missing"]:
+                assert palette_role_color(PaletteRole(role["role"][8:]), stops) is None
+                continue
+            if role["shown"]:
+                assert role["same_as"] == seen.get(role["shown"], "")
+                seen.setdefault(role["shown"], role["role"])
 
 
 # --- What a head and a rig offer ----------------------------------------------------------
 
 
-def test_a_head_offers_only_tagged_states_with_a_known_settle() -> None:
+def test_a_head_offers_a_wheel_only_when_every_state_has_a_settle() -> None:
+    """A tagged wheel with one state of unknown settle offers nothing (a turn back to the
+    authored state could not be timed); the other wheel is unaffected."""
     payload = discrete_profile_payload()
     payload["discrete"]["color"]["states"]["red"] |= {"hex": "red"}
     payload["discrete"]["color"]["states"]["blue"] |= {"hex": "blue", "settle_ms": None}
@@ -146,9 +244,29 @@ def test_a_head_offers_only_tagged_states_with_a_known_settle() -> None:
 
     head = HeadWheels.from_profile("MH1", FixtureCapabilities.model_validate(payload))
 
-    assert head.colors == {"red": "#FF0000"}  # white is untagged; blue's settle unknown
+    assert head.colors == {}
+    assert head.unsettled == {"color": ("blue",)}
     assert head.gobos == {"star": "stars"}
     assert (head.color_wheel, head.gobo_wheel) == (True, True)
+    settled = FixtureCapabilities.model_validate(
+        payload
+        | {
+            "discrete": payload["discrete"]
+            | {
+                "color": {
+                    **payload["discrete"]["color"],
+                    "states": {
+                        **payload["discrete"]["color"]["states"],
+                        "blue": {
+                            **payload["discrete"]["color"]["states"]["blue"],
+                            "settle_ms": 140,
+                        },
+                    },
+                }
+            }
+        }
+    )
+    assert HeadWheels.from_profile("MH1", settled).colors == {"blue": "#0000FF", "red": "#FF0000"}
 
 
 def test_a_colour_offer_grades_a_mixed_rig() -> None:
@@ -179,10 +297,10 @@ def test_a_gobo_offer_says_all_some_or_none() -> None:
         MH3=_profile(gobo_wheel=False),
     )
 
-    assert gobo_offer(heads, "stars").model_dump() == {
+    assert gobo_offer(heads, "stars").model_dump(mode="json") == {
         "available": "all",
         "states": {"MH1": "star", "MH2": "star"},
-        "missing": (),
+        "missing": [],
     }
     assert gobo_offer(heads, GoboPattern.DOTS).available == "some"
     assert gobo_offer(heads, "flame").available == "none"
@@ -204,6 +322,33 @@ def test_the_rig_offer_lists_gobos_strobes_hit_and_the_wheel_change() -> None:
     assert offer.wheel_change_ms == 160
     assert offer.beat_ms == 500.0 and offer.wheel_change_beats == pytest.approx(0.32)
     assert offer.preset_colors()["red"].status == "faithful"
+
+
+def test_strobe_speeds_say_all_some_or_missing_on_a_mixed_rig() -> None:
+    """Restored from W1's helpers: per speed, the heads with a shutter that have it."""
+    offer = rig_offer_of(
+        {
+            "MH1": _profile(strobes=("slow", "medium", "fast")),
+            "MH2": _profile(strobes=("fast",)),
+            "MH3": _profile(),
+        }
+    )
+
+    assert offer.strobes["fast"].model_dump(mode="json") == {
+        "available": "some",
+        "states": {"MH1": "strobe_fast", "MH2": "strobe_fast"},
+        "missing": ["MH3"],
+    }
+    assert offer.strobes["slow"].missing == ("MH2", "MH3")
+    single = rig_offer_of({"MH1": _profile(strobes=("medium",))})
+    assert single.strobes["medium"].available == "all"
+    assert single.strobes["slow"].available == "none"
+
+
+def test_black_is_shown_by_no_head() -> None:
+    offer = rig_offer_of({"MH1": _profile(TAGGED)})
+
+    assert offer.color("#000000").status == "unavailable"
 
 
 def test_an_untagged_rig_offers_nothing_but_its_hit() -> None:
@@ -257,13 +402,43 @@ def test_a_section_look_holds_each_head_that_shows_it_and_keeps_the_rest() -> No
     assert record["gobo"] == {
         "asked": "stars",
         "available": "some",
-        "heads": {"MH1": "star"},
+        "heads": {"MH1": {"state": "star"}},
         "kept_authored": ["MH2"],
     }
     assert describe_look(record) == [
         "colour PALETTE_COOL (#2979FF, palette 'core.rgb_primary' stop 3): blue (approximate) on "
         "MH1; MH2 keep their authored colour",
         "gobo stars: star on MH1; MH2 keep their authored gobo",
+    ]
+
+
+def test_a_look_record_says_which_heads_turn_late_or_keep_the_previous_colour() -> None:
+    record = {
+        "section_id": "s2",
+        "color": {
+            "asked": "blue",
+            "hex": "#0000FF",
+            "source": "explicit",
+            "status": "faithful",
+            "heads": {"MH1": {"state": "blue", "hex": "#0000FF", "fit": "exact"}},
+            "kept_authored": [],
+            "deferred": {"MH2": {"state": "blue", "from_ms": 9020}},
+            "kept_previous": {"MH3": "red"},
+        },
+        "boundaries": [
+            {
+                "fixture_id": "MH2",
+                "boundary_ms": 8020,
+                "wheels": {"color": {"from": "red", "to": "blue"}},
+                "deferred": {"turn_ms": 9020, "waited_ms": 1000, "late": False, "reason": "x"},
+            }
+        ],
+    }
+
+    assert describe_look(record) == [
+        "colour blue (#0000FF, explicit): blue (exact) on MH1; MH2 turns to blue at 9020 ms; "
+        "MH3 keeps the previous colour red",
+        "MH2 at 8020 ms: color red → blue: turned in a dark window at 9020 ms",
     ]
 
 
@@ -282,93 +457,6 @@ def test_an_as_authored_section_holds_nothing() -> None:
     assert look.states == {} and look.record() == {"section_id": "s1"}
 
 
-def _offer(*profiles: FixtureCapabilities) -> RigOffer:
-    heads = tuple(_heads(**{f"MH{i + 1}": p for i, p in enumerate(profiles)}))
-    return RigOffer(
-        heads=heads,
-        gobos={pattern.value: gobo_offer(heads, pattern) for pattern in GoboPattern},
-        strobes={},
-        hit="all",
-        wheel_change_ms=None,
-        beat_ms=None,
-    )
-
-
-def _event(action: EventAction, **values: Any) -> PlanEvent:
-    return PlanEvent(
-        **{"bar": 2, "beat": 1, "moment_cue_id": None, "color": None, "gobo": None} | values,
-        action=action,
-    )
-
-
-def test_repair_clears_what_no_head_shows_and_records_what_some_cannot() -> None:
-    offer = _offer(_profile(TAGGED, {"star": "stars"}), _profile({"red": "red"}))
-    plan = ChoreographyPlan(
-        sections=[
-            _section(
-                color=PlanColor.GREEN,
-                gobo=GoboPattern.STARS,
-                events=[
-                    _event(EventAction.COLOR, color=PlanColor.YELLOW),
-                    _event(EventAction.COLOR, color=PlanColor.BLUE),
-                    _event(EventAction.GOBO, gobo=GoboPattern.FLAME),
-                    _event(EventAction.HIT),
-                ],
-            )
-        ],
-        overall_strategy="",
-    )
-
-    repaired = repair_rig_intent(plan, offer, {})
-
-    (section,) = repaired.sections
-    assert section.color is None  # green: no head shows anything like it
-    assert section.gobo is GoboPattern.STARS  # MH1 has it; MH2 keeps its own
-    assert [event.action for event in section.events] == [EventAction.COLOR, EventAction.HIT]
-    assert [(r.item.split(" (")[0], r.action) for r in repaired.repairs] == [
-        ("colour green", RepairAction.ADJUSTED),
-        ("gobo stars", RepairAction.RECORDED),
-        ("event at bar 2 beat 1: color yellow", RepairAction.DROPPED),
-        ("event at bar 2 beat 1: color blue", RepairAction.RECORDED),
-        ("event at bar 2 beat 1: gobo flame", RepairAction.DROPPED),
-    ]
-    assert "keeps its authored colour (as_authored)" in repaired.repairs[0].reason
-    assert repaired.repairs[1].reason == (
-        "plays on MH1; MH2 cannot show it and keep their authored look"
-    )
-
-
-def test_repair_leaves_an_approximate_colour_and_a_plan_it_need_not_touch() -> None:
-    offer = _offer(_profile(TAGGED))
-    plan = ChoreographyPlan(sections=[_section(color=PlanColor.MAGENTA)], overall_strategy="")
-
-    assert repair_rig_intent(plan, offer, {}) is plan
-
-
-def test_repair_resolves_a_palette_role_through_the_section_palette() -> None:
-    offer = _offer(_profile({"white": "white", "red": "red"}))
-    plan = ChoreographyPlan(
-        sections=[_section(color=PlanColor.PALETTE_ACCENT)], overall_strategy=""
-    )
-
-    with_palette = repair_rig_intent(plan, offer, {"s1": RGB_PRIMARY})  # green: not shown
-    fixed = repair_rig_intent(plan, offer, {})  # magenta: shown as red
-
-    assert with_palette.sections[0].color is None
-    assert "palette 'core.rgb_primary' stop 2" in with_palette.repairs[0].item
-    assert fixed is plan
-
-
-def test_repair_on_a_rig_without_tags_says_so() -> None:
-    plan = ChoreographyPlan(sections=[_section(color=PlanColor.RED)], overall_strategy="")
-
-    (repair,) = repair_rig_intent(plan, m.untagged_offer(), {}).repairs
-
-    assert repair.reason.startswith(
-        "this rig's colour wheel states carry no `hex` tag, so no colour is offered"
-    )
-
-
 def test_the_prompt_groups_sections_that_share_a_palette() -> None:
     offer = m.tagged_offer(("MH1",))
     palettes = {"verse": RGB_PRIMARY, "chorus": RGB_PRIMARY}
@@ -382,14 +470,108 @@ def test_the_prompt_groups_sections_that_share_a_palette() -> None:
         "section_ids": ["outro"],
         "palette_id": None,
         "roles": [
-            {"role": "PALETTE_PRIMARY", "hex": "#FF0000", "status": "faithful", "shown": "red"},
-            {"role": "PALETTE_ACCENT", "hex": "#FF00FF", "status": "approximate", "shown": "red"},
-            {"role": "PALETTE_WARM", "hex": "#FFA000", "status": "approximate", "shown": "red"},
-            {"role": "PALETTE_COOL", "hex": "#00FFFF", "status": "approximate", "shown": "blue"},
-            {"role": "PALETTE_NEUTRAL", "hex": "#FFFFFF", "status": "faithful", "shown": "white"},
+            _role("PALETTE_PRIMARY", "#FF0000", "faithful", "red"),
+            _role("PALETTE_ACCENT", "#FF00FF", "approximate", "red", "PALETTE_PRIMARY"),
+            _role("PALETTE_WARM", "#FFA000", "approximate", "red", "PALETTE_PRIMARY"),
+            _role("PALETTE_COOL", "#00FFFF", "approximate", "blue"),
+            _role("PALETTE_NEUTRAL", "#FFFFFF", "faithful", "white"),
         ],
     }
     assert shown["colors"]["unavailable"] == [
         {"color": c, "kept": "MH1"} for c in ("green", "yellow", "lime")
     ]
     assert shown["wheel_change_beats"] == "0.4"
+
+
+def _role(role: str, hex_: str, status: str, shown: str, same_as: str = "") -> dict[str, Any]:
+    return {
+        "role": role,
+        "missing": False,
+        "hex": hex_,
+        "status": status,
+        "shown": shown,
+        "same_as": same_as,
+    }
+
+
+def test_the_prompt_says_whether_a_wheel_change_fits_half_a_beat_and_where_it_can_wait() -> None:
+    """At 200 BPM (beat 300 ms) a 160 ms change does not fit half a beat: the prompt says
+    so and names the templates with a dark phase long enough."""
+    phases = DarkPhases(cycle_beats=8.0, heads={"MH1": ((2.0, 3.0),)})
+    short = DarkPhases(cycle_beats=8.0, heads={"MH1": ((1.0, 1.25),)})
+    fast = rig_offer(
+        m.tagged_family_rig(("MH1",)),
+        m.bars_grid(300.0, 300.0),
+        {
+            "masked_wheel_flick": TemplateOffer(variants={"base": phases}),
+            "mirror_wings": TemplateOffer(variants={"base": short}),
+        },
+    )
+    slow = m.tagged_offer(("MH1",))
+
+    shown = offer_for_prompt(fast, {}, ["s"])
+
+    assert (shown["dip_fits"], shown["half_beat_ms"]) == (False, 150)
+    assert shown["dark_windows"] == ["masked_wheel_flick (from beat 2 of its cycle)"]
+    assert offer_for_prompt(slow, {}, ["s"])["dip_fits"] is True
+
+
+def test_a_template_exclusion_removes_states_from_its_offer_only() -> None:
+    offer = m.tagged_offer(("MH1", "MH2")).model_copy(
+        update={
+            "templates": {
+                "masked_wheel_flick": TemplateOffer(
+                    variants={}, excluded={"MH1": {"color": ("blue",)}}
+                )
+            }
+        }
+    )
+
+    flick = offer.for_templates({"masked_wheel_flick"})
+
+    assert set(flick.color("blue").heads) == {"MH2"}
+    assert set(offer.for_templates({"mirror_wings"}).color("blue").heads) == {"MH1", "MH2"}
+    assert offer_for_prompt(offer, {}, ["s"])["exclusions"] == [
+        {"template_id": "masked_wheel_flick", "states": ["blue"]}
+    ]
+
+
+def rig_offer_of(profiles: dict[str, FixtureCapabilities]) -> Any:
+    """`rig_offer` over a hand-made rig of these profiles."""
+    from twinklr.core.config.fixtures import FixtureGroup
+
+    payload = m.family_rig(tuple(profiles)).model_dump(mode="json")
+    for fixture in payload["fixtures"]:
+        fixture["config"]["physical_profile"] = profiles[fixture["fixture_id"]].model_dump(
+            mode="json"
+        )
+    payload.pop("presets", None)
+    return rig_offer(FixtureGroup.model_validate(payload), m.bars_grid(500.0))
+
+
+def _wheel(colors: dict[str, str]) -> FixtureCapabilities:
+    payload = discrete_profile_payload()
+    payload["discrete"]["color"]["states"] = {
+        name: {"value": index * 10, "settle_ms": 120, "hex": color}
+        for index, (name, color) in enumerate(colors.items())
+    }
+    del payload["discrete"]["color"]["default_state"]
+    return FixtureCapabilities.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    "module",
+    [
+        "twinklr.core.sequencer.moving_heads.song_intent",
+        "twinklr.core.agents.sequencer.moving_heads.rig_repair",
+        "twinklr.core.sequencer.moving_heads.pipeline",
+        "twinklr.core.agents.sequencer.moving_heads.context",
+    ],
+)
+def test_each_module_imports_first_in_a_fresh_interpreter(module: str) -> None:
+    """No import cycle between the renderer's song-intent module and the planner package."""
+    result = subprocess.run(
+        [sys.executable, "-c", f"import {module}"], capture_output=True, text=True, check=False
+    )
+
+    assert result.returncode == 0, result.stderr

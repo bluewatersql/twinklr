@@ -56,12 +56,14 @@ V2 Migration: Uses structured context from MovingHeadPlanningContext
 ## What This Rig Can Show
 
 Deterministic code turns your `color` and `gobo` into the rig's wheel colours and
-patterns; a head that cannot show a choice keeps its template's own look there.
+patterns; a head that cannot show a choice keeps its template's own look there. A wheel
+shows a colour's hue at the section's own brightness: a dark or pale palette colour
+plays as its wheel colour, not darker or paler (brightness is `intensity`'s).
 {% if not rig_offer.color_wheel %}
 - **Colour**: this rig has no colour wheel; every `color` keeps the template's own colour.
 {% elif not rig_offer.colors_tagged %}
-- **Colour**: the rig's colour wheel says no colour it shows (no state is tagged), so no
-  colour is offered; every `color` keeps the template's own colour.
+- **Colour**: the rig's colour wheel offers no colour (no state is tagged{% if rig_offer.unsettled %}, or a state's settle time is unknown: {{ rig_offer.unsettled | join(', ') }}{% endif %}),
+  so every `color` keeps the template's own colour.
 {% else %}
 {% if rig_offer.colors.faithful %}
 - **Colours shown faithfully**: {% for c in rig_offer.colors.faithful %}{{ c.color }}{% if not loop.last %}, {% endif %}{% endfor +%}
@@ -80,8 +82,11 @@ patterns; a head that cannot show a choice keeps its template's own look there.
 {% endif %}
 - **Palette roles, by section** (the stop each role takes and the wheel colour it lands on):
 {% for section in rig_offer.sections %}
-  - {% for section_id in section.section_ids %}`{{ section_id }}`{% if not loop.last %}, {% endif %}{% endfor %}{% if section.palette_id %} (`{{ section.palette_id }}`){% else %} (no macro palette: the fixed colours){% endif %}: {% for r in section.roles %}{{ r.role }} {{ r.hex }} → {% if r.shown %}{{ r.shown }}{% if r.status != "faithful" %} ({{ r.status }}){% endif %}{% else %}not shown{% endif %}{% if not loop.last %}; {% endif %}{% endfor +%}
+  - {% for section_id in section.section_ids %}`{{ section_id }}`{% if not loop.last %}, {% endif %}{% endfor %}{% if section.palette_id %} (`{{ section.palette_id }}`){% else %} (no macro palette: the fixed colours){% endif %}: {% for r in section.roles %}{% if r.missing %}{{ r.role }} not in this palette{% else %}{{ r.role }} {{ r.hex }} → {% if r.shown %}{{ r.shown }}{% if r.status != "faithful" %} ({{ r.status }}){% endif %}{% if r.same_as %} (same wheel colour as {{ r.same_as }}){% endif %}{% else %}not shown{% endif %}{% endif %}{% if not loop.last %}; {% endif %}{% endfor +%}
 {% endfor %}
+  A role not in a section's palette is not available there (a plan that picks it plays
+  PRIMARY). Where two roles land on the same wheel colour, choose contrast deliberately:
+  a named colour with its reason, or contrast through intensity or gobo.
 {% endif %}
 {% if not rig_offer.gobo_wheel %}
 - **Gobos**: this rig has no gobo wheel; every `gobo` keeps the template's own pattern.
@@ -93,8 +98,15 @@ patterns; a head that cannot show a choice keeps its template's own look there.
 {% endif %}
 - **Strobe speeds**: {% if rig_offer.strobes.all or rig_offer.strobes.some %}{{ (rig_offer.strobes.all + rig_offer.strobes.some) | join(', ') }}{% else %}none tagged{% endif +%}
 - **Hit** (a dimmer accent): {{ {"all": "every head", "some": "some heads", "none": "no head"}[rig_offer.hit] }}
+{% if rig_offer.exclusions %}
+- **Not with these templates** (their overlay masks are too short to turn the wheel there): {% for e in rig_offer.exclusions %}`{{ e.template_id }}`: {{ e.states | join(', ') }}{% if not loop.last %}; {% endif %}{% endfor +%}
+{% endif %}
 {% if rig_offer.wheel_change_ms is not none %}
-- **A wheel change** takes {{ rig_offer.wheel_change_ms }} ms dark (about {{ rig_offer.wheel_change_beats }} beat): the heads go dark to turn a wheel. A colour or gobo change between two sections the heads play straight through costs a dark dip of up to half a beat just before the new section, so hold a colour across sections that flow into each other and change it where the music turns.
+{% if rig_offer.dip_fits %}
+- **A wheel change** takes {{ rig_offer.wheel_change_ms }} ms of darkness (about {{ rig_offer.wheel_change_beats }} beat). Where the heads play straight from one section into the next and its colour or gobo changes, they go dark for that long just before the new section's first beat; where a section starts dark (the heads reposition into it) the wheel turns there. Hold a colour across sections that flow into each other and change it where the music turns.
+{% else %}
+- **A wheel change** takes {{ rig_offer.wheel_change_ms }} ms of darkness (about {{ rig_offer.wheel_change_beats }} beat), more than half a beat ({{ rig_offer.half_beat_ms }} ms) at this tempo. Where a section starts dark (the heads reposition into it) the wheel turns there. Where the heads play straight into a section, its colour or gobo change waits for the section's first dark moment long enough{% if rig_offer.dark_windows %} ({{ rig_offer.dark_windows | join(', ') }}){% endif %} and plays from then; in a section with none it does not play, and the heads keep the previous colour. Change colour where a template with a dark moment starts, or keep it.
+{% endif %}
 {% endif %}
 
 {% endif %}

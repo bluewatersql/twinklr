@@ -26,7 +26,8 @@ updated: 2026-11-17
   them.
 - **Rig offer** — what the pre-planning gate tells the planner a rig can show of its
   song intent: each colour (faithfully, approximately, on some heads, not at all), each
-  section's palette roles on the wheel, gobos, strobe speeds, hit, wheel change time
+  section's palette roles on the wheel, gobos, strobe speeds, hit, wheel change time,
+  and per template its dark phases and the states its overlay masks cannot reach
   (`TemplateAdmission.offer`, `sequencer/moving_heads/song_intent.py`).
 - **Template** — a moving-head choreography unit, a JSON `TemplateDoc` whose steps state
   motion, dimmer or shutter pulse, wheel states and phase spread across the heads. The

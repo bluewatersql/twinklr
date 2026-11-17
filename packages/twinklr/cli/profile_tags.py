@@ -24,7 +24,8 @@ def report_profile_tags(
     models: Sequence[Model],
     artifact_dir: Path,
 ) -> None:
-    """Note in one line which fixtures have wheel or shutter states without a meaning tag,
+    """Note in one line which fixtures have wheel or shutter states without a meaning tag
+    (or wheel states without a settle time),
     with the paste-ready tags in `PROFILE_TAGS_FILENAME` under `artifact_dir`; print
     nothing and remove an earlier file when every state carries its meaning.
 
@@ -45,7 +46,8 @@ def report_profile_tags(
     fixture_ids = ", ".join(fixture_id for entry in guidance for fixture_id in entry.fixture_ids)
     note = (
         f"NOTE: {fixture_ids}: wheel or shutter states without a meaning tag (hex, pattern, "
-        "strobe) cannot carry the planner's colour, gobo or strobe choices; "
+        "strobe), or wheel states without a settle_ms, cannot carry the planner's colour, "
+        "gobo or strobe choices; "
     )
     try:
         path.write_text(text, encoding="utf-8")

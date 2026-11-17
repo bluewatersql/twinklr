@@ -27,11 +27,14 @@ if TYPE_CHECKING:
 BACKEND_ID = "xlights_dmx"
 """The backend the renderer writes: xLights DMX effects in an `.xsq`."""
 
-RENDERER_REVISION = "3"
+RENDERER_REVISION = "4"
 """Bumped by hand in the commit that intentionally changes the renderer's output; the
 render identity also carries the frame encoder's own version. 3: a section's colour and
 gobo are rendered (song-intent rendering W4), so a plan that sets them renders
-differently from revision 2."""
+differently from revision 2. 4 (W3/W4 review fix round): a colour change that cannot dip
+before a lit boundary turns in the section's first dark window instead of not at all, a
+held state an overlay mask cannot reach falls back to the authored one, and a palette
+role the section's palette lacks plays PRIMARY's stop instead of the fixed table's."""
 
 
 def render_fingerprint(

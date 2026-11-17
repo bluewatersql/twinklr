@@ -3,7 +3,7 @@ from __future__ import annotations
 import bisect
 from collections import defaultdict
 from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from fractions import Fraction
 import functools
 import gc
@@ -99,9 +99,13 @@ from twinklr.core.sequencer.moving_heads.identity import (
     render_fingerprint,
 )
 from twinklr.core.sequencer.moving_heads.song_intent import (
+    DarkPhases,
     HeadWheels,
     RigOffer,
     SectionPalette,
+    TemplateOffer,
+    darkness_ms,
+    frames_ms,
     resolve_section_look,
     rig_offer,
     section_palette_for,
@@ -543,16 +547,63 @@ def _wheel_states(
 
 
 @dataclass(frozen=True)
+class _Deferral:
+    """A wheel change turned in a dark window inside the section instead of before it:
+    the cues before `split` hold the old states, the cue `turn_cue` (when the turn falls
+    inside one) changes at `turn_ms`, the rest hold the new states (`_swap_wheels` each
+    way, so it applies to a section compiled with either; a template overlay's own state
+    is left as it is)."""
+
+    changes: dict[ChannelName, tuple[str, str]]
+    turn_ms: int
+    split: int
+    turn_cue: int | None
+
+    def apply(
+        self, own: Sequence[FixtureSegment], profile: FixtureCapabilities
+    ) -> list[FixtureSegment]:
+        """`own` (one head's section cues, in time order) with the change deferred."""
+        back = {channel: (new, old) for channel, (old, new) in self.changes.items()}
+        out = []
+        for index, cue in enumerate(own):
+            if index == self.turn_cue:
+                old = _swap_wheels(cue, self.changes, profile)
+                channels = dict(cue.channels)
+                for channel, (held, new) in self.changes.items():
+                    channels[channel] = ChannelValue(
+                        channel=channel,
+                        physical=DiscreteTrajectory(
+                            events=(
+                                *_wheel_events(old, channel, held, self.turn_ms),
+                                DiscretePoint(t_ms=self.turn_ms, state=new),
+                            )
+                        ),
+                    )
+                out.append(cue.model_copy(update={"channels": channels}))
+            elif index < self.split:
+                out.append(_swap_wheels(cue, self.changes, profile))
+            else:
+                out.append(_swap_wheels(cue, back, profile))
+        return out
+
+
+@dataclass(frozen=True)
 class _BoundaryChange:
-    """What a section's first cue does at a boundary a head plays lit through when song
-    intent changes a wheel there (`_boundary_change`)."""
+    """What a head does at a boundary it plays lit through when song intent changes a
+    wheel there (`_boundary_change`): one of a dip, a deferral, or the states kept."""
 
     record: dict[str, Any]
-    dip: tuple[FixtureSegment, HeadFollow] | None
+    dip: tuple[FixtureSegment, HeadFollow] | None = None
     """The previous cue with its tail dark and the wheel turned there, and the head as it
     leaves it."""
-    kept: dict[ChannelName, str]
-    """Without a dip: the wheel states the head keeps from the previous section."""
+    deferred: _Deferral | None = None
+    kept: dict[ChannelName, str] = field(default_factory=dict)
+    """Without a dip or a deferral: the wheel states the head keeps from the previous
+    section for the whole section."""
+    retry: tuple[dict[ChannelName, tuple[str, str]], int, int] | None = None
+    """With `kept`: the changes, lead and darkness to retry a deferral with once the
+    section is compiled holding the kept states (a template overlay masks a change only
+    from a base state other than its own, so holding the old state can open a mask)."""
 
 
 def _half_beat_before(beat_grid: BeatGrid, time_ms: float) -> float:
@@ -563,6 +614,54 @@ def _half_beat_before(beat_grid: BeatGrid, time_ms: float) -> float:
         return 0.0
     index = min(max(bisect.bisect_left(beats, time_ms), 1), len(beats) - 1)
     return (beats[index] - beats[index - 1]) / 2
+
+
+def _commanded_dark_runs(cue: FixtureSegment, profile: FixtureCapabilities) -> list[list[int]]:
+    """`[start, end)` runs of the cue's frames that command darkness: an authored dimmer
+    at zero the profile declares extinguishing, or an extinguishing shutter state."""
+    visibility = profile.visibility
+    dimmer = cue.channels.get(ChannelName.DIMMER)
+    levels: dict[int, Any] = {}
+    if (
+        visibility.dimmer_zero_extinguishes
+        and dimmer is not None
+        and isinstance(dimmer.physical, ContinuousTrajectory)
+    ):
+        levels = dict(frame_values(dimmer.physical, cue.t0_ms, cue.t1_ms, EFFECT_GRID_MS))
+    shutter = cue.channels.get(ChannelName.SHUTTER)
+    runs: list[list[int]] = []
+    for time_ms in range(cue.t0_ms, cue.t1_ms, EFFECT_GRID_MS):
+        dark = levels.get(time_ms) == 0 or (
+            shutter is not None
+            and isinstance(shutter.physical, DiscreteTrajectory)
+            and state_at(shutter.physical, time_ms) in visibility.extinguishing_shutter_states
+        )
+        if not dark:
+            continue
+        if runs and runs[-1][1] == time_ms:
+            runs[-1][1] = time_ms + EFFECT_GRID_MS
+        else:
+            runs.append([time_ms, time_ms + EFFECT_GRID_MS])
+    return runs
+
+
+def _dark_windows(
+    cues: Sequence[FixtureSegment], profile: FixtureCapabilities
+) -> list[tuple[int, int]]:
+    """One head's dark windows between its first cue's start and its last cue's end, in
+    time order: the gaps between its cues (the transaction pass holds the head dark
+    there) and the frames its cues command dark, merged where they touch."""
+    ordered = sorted(cues, key=lambda cue: cue.t0_ms)
+    runs = [[a.t1_ms, b.t0_ms] for a, b in pairwise(ordered) if a.t1_ms < b.t0_ms]
+    for cue in ordered:
+        runs += _commanded_dark_runs(cue, profile)
+    merged: list[list[int]] = []
+    for start, end in sorted(runs):
+        if merged and start <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    return [(start, end) for start, end in merged]
 
 
 def _boundary_change(
@@ -576,16 +675,25 @@ def _boundary_change(
     intent_channels: Collection[ChannelName],
     half_beat_ms: float,
     shortest_lit_ms: int,
+    section_end_ms: int,
 ) -> _BoundaryChange | None:
     """Where a head enters a section straight from its previous cue, lit, and song intent
-    (this section's colour or gobo, or the previous section's) changes a wheel there: the
-    tail of the previous cue is commanded dark on its own path (`_dark_over_spans`; the
-    head keeps moving as authored, so it needs no repositioning), the wheel turns once it
-    is dark and settles, and the head reveals on the section's first frame as before.
-    The dark lead is what the darkness, turn and settle need (`wheel_change_ms`), at most
-    half the beat before the boundary and inside the previous cue, and the entry must then
-    play as authored (`_plays_as_authored`, which also times the shutter). Otherwise the
-    head keeps the previous wheel state into the section.
+    (this section's colour or gobo, or the previous section's) changes a wheel there, in
+    order:
+
+    1. A dark dip before the boundary: the tail of the previous cue is commanded dark on
+       its own path (`_dark_over_spans`; the head keeps moving as authored), the wheel
+       turns once the head is dark and settles, and the head reveals on the section's
+       first frame as before. The dark lead is what the darkness, turn and settle need
+       (`wheel_change_ms`), at most half the beat before the boundary and inside the
+       previous cue, and the entry must then play as authored (`_plays_as_authored`,
+       which also times the shutter). Darkness the previous cue already commands at its
+       end counts: the dip starts no earlier than it must, and adds nothing where the
+       cue is dark for the whole lead.
+    2. Else the change is deferred to the first dark window inside the section long
+       enough for it (`_dark_windows`: a template's dark phase or overlay mask, a dark
+       span), the head playing the previous states until then.
+    3. Else the head keeps the previous states for the whole section.
 
     None where nothing changes, the change is not the song intent's, the head does not
     enter from its previous cue (a gap, or the section's start), or the entry repositions
@@ -621,58 +729,205 @@ def _boundary_change(
     ]
     known = [settle for settle in settles if settle is not None]
     lead = None if len(known) < len(settles) else wheel_change_ms(profile, max(known))
+    darkness = darkness_ms(profile)
     boundary = first.t0_ms
-    reason = "a term of the wheel change (a settle, or the close latency) is unknown"
-    if lead is not None:
+    record: dict[str, Any] = {"boundary_ms": boundary, "wheels": states}
+    if lead is None or darkness is None:
+        record["kept_previous"] = {
+            "reason": "a term of the wheel change (a settle, or the close latency) is unknown"
+        }
+        return _BoundaryChange(record, kept=kept)
+    settle = frames_ms(max(max(known), EFFECT_GRID_MS))
+    if lead <= half_beat_ms and boundary - lead >= last.segment.t0_ms:
         dark_from = boundary - lead
-        turn = boundary - -(-max(max(known), EFFECT_GRID_MS) // EFFECT_GRID_MS) * EFFECT_GRID_MS
-        reason = (
-            f"the {lead} ms of darkness, turn and settle it needs do not fit half the beat "
-            f"before the boundary ({half_beat_ms:g} ms)"
-        )
-        if lead <= half_beat_ms and dark_from > last.segment.t0_ms:
+        turn = boundary - settle
+        tail = _commanded_dark_runs(last.segment, profile)
+        already = tail[-1][0] if tail and tail[-1][1] == last.segment.t1_ms else boundary
+        darkened = last.segment
+        if already > dark_from:
             (darkened,) = _dark_over_spans(
                 [last.segment],
                 [(dark_from, boundary)],
                 {last.segment.fixture_id: profile},
                 shortest_lit_ms=shortest_lit_ms,
             )
-            channels = dict(darkened.channels)
-            for channel, (old, new) in changes.items():
-                channels[channel] = ChannelValue(
-                    channel=channel,
-                    physical=DiscreteTrajectory(
-                        events=(
-                            *_wheel_events(darkened, channel, old, turn),
-                            DiscretePoint(t_ms=turn, state=new),
-                        )
-                    ),
-                )
-            dipped = darkened.model_copy(update={"channels": channels})
-            follow = follow_cues(
-                [dipped],
-                profile,
-                frame_ms=EFFECT_GRID_MS,
-                after=before[-2] if len(before) > 1 else None,
-            )[-1]
-            if _plays_as_authored(own, profile, follow, initial, locks):
-                return _BoundaryChange(
-                    {
-                        "boundary_ms": boundary,
-                        "wheels": states,
-                        "dark_dip": {"from_ms": dark_from, "lead_ms": lead, "turn_ms": turn},
-                    },
-                    (dipped, follow),
-                    {},
-                )
-            reason = "the section's entry does not play as authored after the dark dip"
-        elif lead <= half_beat_ms:
-            reason = f"the previous cue is shorter than the {lead} ms dark dip"
-    return _BoundaryChange(
-        {"boundary_ms": boundary, "wheels": states, "kept_previous": {"reason": reason}},
-        None,
-        kept,
-    )
+        channels = dict(darkened.channels)
+        for channel, (old, new) in changes.items():
+            channels[channel] = ChannelValue(
+                channel=channel,
+                physical=DiscreteTrajectory(
+                    events=(
+                        *_wheel_events(darkened, channel, old, turn),
+                        DiscretePoint(t_ms=turn, state=new),
+                    )
+                ),
+            )
+        dipped = darkened.model_copy(update={"channels": channels})
+        follow = follow_cues(
+            [dipped],
+            profile,
+            frame_ms=EFFECT_GRID_MS,
+            after=before[-2] if len(before) > 1 else None,
+        )[-1]
+        if _plays_as_authored(own, profile, follow, initial, locks):
+            record["dark_dip"] = {
+                "from_ms": dark_from,
+                "lead_ms": lead,
+                "added_ms": max(0, min(already, boundary) - dark_from),
+                "turn_ms": turn,
+            }
+            return _BoundaryChange(record, dip=(dipped, follow))
+        reason = "the section's entry does not play as authored after a dark dip"
+    elif lead <= half_beat_ms:
+        reason = f"the previous cue is shorter than the {lead} ms dark dip"
+    else:
+        reason = (
+            f"the {lead} ms of darkness, turn and settle it needs do not fit half the beat "
+            f"before the boundary ({half_beat_ms:g} ms)"
+        )
+    deferral = _defer(own, changes, profile, last, initial, locks, lead=lead, darkness=darkness)
+    if deferral is not None:
+        half = boundary + (section_end_ms - boundary) / 2
+        record["deferred"] = {
+            "turn_ms": deferral.turn_ms,
+            "waited_ms": deferral.turn_ms - boundary,
+            "late": deferral.turn_ms > half,
+            "reason": reason,
+        }
+        return _BoundaryChange(record, deferred=deferral)
+    record["kept_previous"] = {
+        "reason": f"{reason}, and the section has no dark window long enough to turn in"
+    }
+    return _BoundaryChange(record, kept=kept, retry=(changes, lead, darkness))
+
+
+def _defer(
+    own: Sequence[FixtureSegment],
+    changes: dict[ChannelName, tuple[str, str]],
+    profile: FixtureCapabilities,
+    last: HeadFollow,
+    initial: InitialFixtureState | None,
+    locks: Sequence[RenderLock],
+    *,
+    lead: int,
+    darkness: int,
+) -> _Deferral | None:
+    """The first dark window of the head's section cues (`_dark_windows`) at least `lead`
+    long in which its wheels can turn from the old to the new states: inside a cue, the
+    turn falls `darkness` (frame-rounded) after the window opens and settles before it
+    closes; in a gap between two cues, the transaction pass turns it, so the cue after
+    the gap must still be entered as authored (`entry_feasible`). None when no window
+    serves."""
+    for start, end in _dark_windows(own, profile):
+        if end - start < lead:
+            continue
+        turn = start + frames_ms(darkness)
+        inside = next((i for i, cue in enumerate(own) if cue.t0_ms <= turn < cue.t1_ms), None)
+        if inside is not None:
+            return _Deferral(changes, turn, inside + 1, inside)
+        after = next((i for i, cue in enumerate(own) if cue.t0_ms > turn), None)
+        if after is None or after == 0:
+            continue
+        deferral = _Deferral(changes, turn, after, None)
+        held = deferral.apply(own, profile)
+        follows = follow_cues(held[:after], profile, frame_ms=EFFECT_GRID_MS, after=last)
+        if entry_feasible(
+            held[after],
+            profile,
+            after=follows[-1],
+            initial=initial,
+            locks=locks,
+            frame_ms=EFFECT_GRID_MS,
+        ):
+            return deferral
+    return None
+
+
+def _unplayable_holds(
+    held_cues: Sequence[FixtureSegment],
+    authored_cues: Sequence[FixtureSegment],
+    held: Mapping[str, Mapping[ChannelName, str]],
+    overlay_wheels: Collection[str],
+    profiles: Mapping[str, FixtureCapabilities],
+    initial_states: Mapping[str, InitialFixtureState],
+    failure_mode: FailureMode,
+) -> dict[str, set[ChannelName]]:
+    """Per head, the overlay wheels whose held state its section cues cannot be planned
+    with (an overlay mask too short to turn to it and back) where the authored cues can:
+    each head's cues are planned on their own (`plan_prepositions`), entered dark at
+    their first pose and wheel states."""
+
+    def plans(fixture_id: str, cues: Sequence[FixtureSegment]) -> bool:
+        own = sorted((c for c in cues if c.fixture_id == fixture_id), key=lambda c: c.t0_ms)
+        initial = initial_states.get(fixture_id)
+        if not own or initial is None:
+            return True
+        profile = profiles[fixture_id]
+        result = plan_prepositions(
+            own,
+            {fixture_id: profile},
+            initial_states={fixture_id: _revealing_state(own[0], profile, initial)},
+            locks=(),
+            frame_ms=EFFECT_GRID_MS,
+            sequence_end_ms=own[-1].t1_ms,
+            failure_mode=failure_mode,
+        )
+        return not result.has_errors
+
+    out: dict[str, set[ChannelName]] = {}
+    for fixture_id, channels in held.items():
+        wheels = {channel for channel in channels if channel.value in overlay_wheels}
+        if wheels and not plans(fixture_id, held_cues) and plans(fixture_id, authored_cues):
+            out[fixture_id] = wheels
+    return out
+
+
+def _played_record(
+    record: dict[str, Any], outcomes: Mapping[str, Mapping[str, Mapping[str, Any]]]
+) -> dict[str, Any]:
+    """A section's look record (`SectionLook.record`) as rendered: each head that does not
+    play the asked state from the section's start moves out of `heads` into `deferred`
+    (the state and when it turns), `kept_previous` or `kept_authored_unplayable`."""
+    for wheel, by_head in outcomes.items():
+        entry = record.get(wheel)
+        if entry is None:
+            continue
+        for fixture_id, outcome in sorted(by_head.items()):
+            entry["heads"].pop(fixture_id, None)
+            for kind, value in outcome.items():
+                entry.setdefault(kind, {})[fixture_id] = value
+    return record
+
+
+def _unplayed_message(
+    section_id: str, outcomes: Mapping[str, Mapping[str, Mapping[str, Any]]]
+) -> str | None:
+    """The warning for a section whose colour or gobo some heads play late or not at all."""
+    said = []
+    for wheel, noun in (("color", "colour"), ("gobo", "gobo")):
+        kinds: dict[str, list[str]] = defaultdict(list)
+        for fixture_id, outcome in sorted(outcomes[wheel].items()):
+            for kind in outcome:
+                kinds[kind].append(fixture_id)
+        if kinds.get("deferred"):
+            said.append(
+                f"its {noun} change turns late on {len(kinds['deferred'])} head(s) "
+                f"({', '.join(kinds['deferred'])}), in a dark window inside the section"
+            )
+        if kinds.get("kept_previous"):
+            said.append(
+                f"{len(kinds['kept_previous'])} head(s) ({', '.join(kinds['kept_previous'])}) "
+                f"keep the previous section's {noun}: no time to turn the wheel in the dark"
+            )
+        if kinds.get("kept_authored_unplayable"):
+            heads = kinds["kept_authored_unplayable"]
+            said.append(
+                f"{len(heads)} head(s) ({', '.join(heads)}) keep the template's {noun}: its "
+                "overlay mask is too short for the asked state"
+            )
+    if not said:
+        return None
+    return f"section {section_id!r}: " + "; ".join(said) + " (the trace's section_looks)"
 
 
 def _wheel_events(
@@ -855,6 +1110,11 @@ def admit_templates(
     failures: dict[tuple[str, str | None], list[str]] = {}
     reach: dict[tuple[str, str | None], dict[str, _Reach]] = {}
     presets_of: dict[str, tuple[str, ...]] = {}
+    # Each rung's bar-1 compile over the whole song: its cues, context, preset and cycle.
+    whole_compiles: dict[
+        tuple[str, str | None],
+        tuple[list[FixtureSegment], TemplateCompileContext, TemplatePreset | None, float],
+    ] = {}
     for template_id in template_ids:
         document = get_template(template_id)
         repeat = document.template.repeat
@@ -946,6 +1206,7 @@ def admit_templates(
                         placements += _repeating_placements(
                             cycle_bars, bars, section_ends=on_unplayable == "error"
                         )
+                    whole_compiles[combination] = (compiled.segments, context, preset, cycle_bars)
                 if not plan:
                     continue
                 refusal = _plan_placement(
@@ -986,10 +1247,34 @@ def admit_templates(
         (later - earlier for earlier, later in pairwise(beat_grid.beat_boundaries)),
         default=None,
     )
-    offer = rig_offer(fixture_group, beat_grid)
+    heads = rig_offer(fixture_group, beat_grid).heads
+    excluded = {
+        template_id: _overlay_exclusions(
+            get_template(template_id),
+            {c: compiles for c, compiles in whole_compiles.items() if c[0] == template_id},
+            heads,
+            profiles=profiles,
+            initial_states=initial_states,
+            phase_map=phase_map,
+            failure_mode=failure_mode,
+            sequence_end_ms=sequence_end_ms,
+            start_limit_ms=start_limit,
+            end_limit_ms=end_limit,
+        )
+        for template_id in template_ids
+        if any(c[0] == template_id and c not in failures for c in whole_compiles)
+    }
     offered = {
-        head.fixture_id: {ChannelName.COLOR: set(head.colors), ChannelName.GOBO: set(head.gobos)}
-        for head in offer.heads
+        template_id: {
+            head.fixture_id: {
+                ChannelName.COLOR: set(head.colors)
+                - set(excluded.get(template_id, {}).get(head.fixture_id, {}).get("color", ())),
+                ChannelName.GOBO: set(head.gobos)
+                - set(excluded.get(template_id, {}).get(head.fixture_id, {}).get("gobo", ())),
+            }
+            for head in heads
+        }
+        for template_id in template_ids
     }
     rungs = {c: per_fixture for c, per_fixture in reach.items() if c not in failures}
     while True:
@@ -1042,6 +1327,22 @@ def admit_templates(
             + ("; ".join(exclusion["reason"] for exclusion in exclusions) or "none is loaded")
         )
     effective_preset = {t: passing[t][0] for t in admitted}
+    offer = rig_offer(
+        fixture_group,
+        beat_grid,
+        {
+            t: TemplateOffer(
+                variants={
+                    "base" if p is None else p: _dark_phases(
+                        whole_compiles[t, p], profiles, phase_map
+                    )
+                    for p in passing[t]
+                },
+                excluded=excluded.get(t, {}),
+            )
+            for t in admitted
+        },
+    )
     admitted_presets = {t: tuple(p for p in passing[t] if p is not None) for t in admitted}
     preset_exclusions = tuple(
         {"template_id": t, "preset_id": p, "reason": "; ".join(failures[t, p])}
@@ -1086,6 +1387,130 @@ def admit_templates(
     )
 
 
+def _overlay_exclusions(
+    document: TemplateDoc,
+    compiles: Mapping[
+        tuple[str, str | None],
+        tuple[list[FixtureSegment], TemplateCompileContext, TemplatePreset | None, float],
+    ],
+    heads: Sequence[HeadWheels],
+    *,
+    profiles: Mapping[str, FixtureCapabilities],
+    initial_states: Mapping[str, InitialFixtureState],
+    phase_map: MusicalPhaseMap,
+    failure_mode: FailureMode,
+    sequence_end_ms: int,
+    start_limit_ms: int,
+    end_limit_ms: int,
+) -> dict[str, dict[str, tuple[str, ...]]]:
+    """Per fixture and wheel, the offered states a template with overlays cannot hold:
+    a section's colour or gobo replaces the base state its overlay masks turn from and
+    back to, so a slower-settling state can need more than a mask gives. Each rung's
+    bar-1 compile over the song is repeated with every fixture holding its slowest
+    offered state on the overlay's wheel, then the next slower settle down, until the
+    dark repositioning between its cues plans (`_plan_placement`); the states slower than
+    that are left out of the template's offer (all of them when none plans). A template
+    without overlays excludes nothing."""
+    from twinklr.core.sequencer.moving_heads.compile.step import CompileError
+    from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
+        UnsupportedRigShapeError,
+    )
+
+    wheels = {overlay.channel for overlay in document.template.overlays}
+    excluded: dict[str, dict[str, set[str]]] = {}
+    for wheel in sorted(wheels):
+        channel = ChannelName(wheel)
+        offered = {
+            head.fixture_id: dict(head.colors if wheel == "color" else head.gobos) for head in heads
+        }
+
+        def settle(fixture_id: str, state: str, wheel: str = wheel) -> int:
+            value = profiles[fixture_id].discrete[wheel].states[state].settle_ms  # type: ignore[index]
+            assert value is not None  # offered states have one
+            return value
+
+        thresholds = sorted(
+            {settle(f, state) for f, states in offered.items() for state in states}, reverse=True
+        )
+        for segments, context, preset, cycle_bars in compiles.values():
+            del segments
+            allowed: int | None = None
+            for threshold in thresholds:
+                held = {}
+                for fixture_id, states in offered.items():
+                    fitting = [s for s in states if settle(fixture_id, s) <= threshold]
+                    if fitting:
+                        slowest = max(fitting, key=lambda s: (settle(fixture_id, s), s))
+                        held[fixture_id] = {channel: slowest}
+                try:
+                    compiled = compile_template(
+                        document.template,
+                        context,
+                        preset,
+                        phase_map=phase_map,
+                        start_limit_ms=start_limit_ms,
+                        end_limit_ms=end_limit_ms,
+                        held_states=held,
+                    )
+                except (CompileError, PhysicalChannelError, UnsupportedRigShapeError, ValueError):
+                    continue
+                if not _plan_placement(
+                    compiled.segments,
+                    profiles,
+                    initial_states,
+                    section_start_ms=context.start_ms,
+                    first_cycle_end_ms=context.bar_offset_to_ms(cycle_bars),
+                    phase_map=phase_map,
+                    failure_mode=failure_mode,
+                    sequence_end_ms=sequence_end_ms,
+                    song_start=True,
+                ):
+                    allowed = threshold
+                    break
+            for fixture_id, states in offered.items():
+                slow = {s for s in states if allowed is None or settle(fixture_id, s) > allowed}
+                if slow:
+                    excluded.setdefault(fixture_id, {}).setdefault(wheel, set()).update(slow)
+    return {
+        fixture_id: {wheel: tuple(sorted(states)) for wheel, states in by_wheel.items()}
+        for fixture_id, by_wheel in excluded.items()
+    }
+
+
+def _dark_phases(
+    compile: tuple[list[FixtureSegment], TemplateCompileContext, TemplatePreset | None, float],
+    profiles: Mapping[str, FixtureCapabilities],
+    phase_map: MusicalPhaseMap,
+) -> DarkPhases:
+    """A rung's dark phases in its first cycle (`DarkPhases`), from its bar-1 compile: per
+    fixture, each dark window (`_dark_windows`) that opens inside the cycle, in beats from
+    the cycle's start."""
+    segments, context, _, cycle_bars = compile
+    start = context.start_ms
+    cycle_end = context.bar_offset_to_ms(cycle_bars)
+
+    def beats(time_ms: float) -> float:
+        return round(
+            float(musical_phase_fraction(phase_map, time_ms, origin_ms=start, period_beats=1.0)),
+            3,
+        )
+
+    by_fixture: dict[str, list[FixtureSegment]] = defaultdict(list)
+    for segment in segments:
+        by_fixture[segment.fixture_id].append(segment)
+    return DarkPhases(
+        cycle_beats=beats(cycle_end),
+        heads={
+            fixture_id: tuple(
+                (beats(a), beats(b))
+                for a, b in _dark_windows(own, profiles[fixture_id])
+                if start <= a < cycle_end
+            )
+            for fixture_id, own in sorted(by_fixture.items())
+        },
+    )
+
+
 def _reach(
     segments: Sequence[FixtureSegment], profiles: Mapping[str, FixtureCapabilities]
 ) -> dict[str, _Reach]:
@@ -1109,7 +1534,7 @@ def _entry_dips(
     profiles: Mapping[str, FixtureCapabilities],
     initial_states: Mapping[str, InitialFixtureState],
     shortest_beat_ms: float | None,
-    offered: Mapping[str, Mapping[ChannelName, Collection[str]]],
+    offered: Mapping[str, Mapping[str, Mapping[ChannelName, Collection[str]]]],
 ) -> tuple[dict[str, dict[str, Any]], dict[tuple[str, str | None], str]]:
     """Each template's worst-case section-entry dip, over its rungs in `reach` (keyed by
     template and preset id, None for the base), and each rung without a bound on some
@@ -1119,9 +1544,11 @@ def _entry_dips(
     The predecessor may be any rung in `reach` or the initial state: per
     fixture, the envelope is the union of their pose ranges and the initial pose, and the
     wheels held are the union of their wheel states and the initial ones. A section's
-    colour or gobo can hold any wheel state the rig offers (`offered`, per fixture), so
-    those join both the states held and each rung's entry states. Offered states all
-    have a known settle, so they never leave a rung without a bound.
+    colour or gobo can hold any wheel state the rig offers for its template (`offered`,
+    per template and fixture), so the states offered for any template join the states
+    held, and those offered for a rung's template its entry states. A wheel is offered
+    only when every one of its states has a known settle, so they never leave a rung
+    without a bound.
     """
     envelope: dict[str, dict[ChannelName, tuple[float, float]]] = {}
     held: dict[str, dict[ChannelName, set[str]]] = defaultdict(lambda: defaultdict(set))
@@ -1146,9 +1573,10 @@ def _entry_dips(
                 merged[ch] = (min(merged[ch][0], low), max(merged[ch][1], high))
             for channel, states in wheels.items():
                 held[fixture_id][channel] |= states
-    for fixture_id, by_channel in offered.items():
-        for channel, offered_states in by_channel.items():
-            held[fixture_id][channel] |= set(offered_states)
+    for by_fixture in offered.values():
+        for fixture_id, by_channel in by_fixture.items():
+            for channel, offered_states in by_channel.items():
+                held[fixture_id][channel] |= set(offered_states)
 
     worst: dict[str, tuple[int, str]] = {}
     unbounded: dict[tuple[str, str | None], str] = {}
@@ -1156,8 +1584,9 @@ def _entry_dips(
         found: tuple[int, str] | None = None
         for fixture_id, (poses, wheels) in sorted(per_fixture.items()):
             profile = profiles[fixture_id]
+            ours = offered.get(template_id, {}).get(fixture_id, {})
             entry = {
-                channel: set(states) | set(offered.get(fixture_id, {}).get(channel, ()))
+                channel: set(states) | set(ours.get(channel, ()))
                 for channel, states in wheels.items()
             }
             bound = worst_case_entry_ms(
@@ -2010,8 +2439,15 @@ class RenderingPipeline:
                         action="unchanged",
                     )
                 )
+            template_heads = (
+                heads
+                if self.admission is None
+                else list(
+                    self.admission.offer.for_templates({template_doc.template.template_id}).heads
+                )
+            )
             look = resolve_section_look(
-                section, heads, section_palette_for(self.palettes, section.section_id)
+                section, template_heads, section_palette_for(self.palettes, section.section_id)
             )
             held = look.states
             refused = 0 if unplayable is None else len(unplayable)
@@ -2072,11 +2508,41 @@ class RenderingPipeline:
                     start_limit_ms=start_limit,
                     end_limit_ms=end_limit,
                 )
+            outcomes: dict[str, dict[str, dict[str, Any]]] = {"color": {}, "gobo": {}}
+            """Per wheel and head, how it departs from playing the section's state from its
+            start: `deferred`, `kept_previous` or `kept_authored_unplayable`."""
+            # A held state an overlay mask cannot turn to and back in time: that head
+            # plays the authored state in this section instead (never a refusal).
+            if template_doc.template.overlays and held:
+                fallback = _unplayable_holds(
+                    section_cues,
+                    compile_section({}),
+                    held,
+                    {overlay.channel for overlay in template_doc.template.overlays},
+                    profiles,
+                    policy.initial_states,
+                    policy.reposition_fallback,
+                )
+                for fixture_id, channels in fallback.items():
+                    for channel in channels:
+                        outcomes[channel.value][fixture_id] = {
+                            "kept_authored_unplayable": "its overlay mask is too short to turn "
+                            f"to {held[fixture_id][channel]} and back"
+                        }
+                if fallback:
+                    held = {
+                        f: {c: st for c, st in by.items() if c not in fallback.get(f, ())}
+                        for f, by in held.items()
+                    }
+                    section_cues = compile_section(held)
             # A wheel change the song intent makes at a boundary the heads play lit
-            # through: a dark dip before the reveal, else the previous state kept.
+            # through: a dark dip before it, else a turn in the section's first dark window
+            # long enough, else the previous state kept (`_boundary_change`).
             boundaries: list[dict[str, Any]] = []
             dips: dict[str, tuple[FixtureSegment, HeadFollow]] = {}
+            deferrals: dict[str, _Deferral] = {}
             keep: dict[str, dict[ChannelName, str]] = {}
+            retries: dict[str, tuple[_BoundaryChange, int]] = {}
             half_beat = _half_beat_before(self.beat_grid, context.start_ms)
             for fixture_id in sorted({cue.fixture_id for cue in section_cues}):
                 change = _boundary_change(
@@ -2095,31 +2561,98 @@ class RenderingPipeline:
                     },
                     half_beat_ms=half_beat,
                     shortest_lit_ms=self._shortest_lit_ms,
+                    section_end_ms=context.end_ms,
                 )
                 if change is None:
                     continue
                 boundaries.append({"fixture_id": fixture_id, **change.record})
                 if change.dip is not None:
                     dips[fixture_id] = change.dip
+                elif change.deferred is not None:
+                    deferrals[fixture_id] = change.deferred
+                    for channel, (_, new) in change.deferred.changes.items():
+                        outcomes[channel.value][fixture_id] = {
+                            "deferred": {"state": new, "from_ms": change.deferred.turn_ms}
+                        }
                 else:
                     keep[fixture_id] = change.kept
+                    retries[fixture_id] = (change, len(boundaries) - 1)
+                    for channel, state in change.kept.items():
+                        outcomes[channel.value][fixture_id] = {"kept_previous": state}
             if keep:
                 held = {
                     fixture_id: {**held.get(fixture_id, {}), **keep.get(fixture_id, {})}
                     for fixture_id in {*held, *keep}
                 }
                 section_cues = compile_section(held)
+                # Held at the old states, an overlay may now mask a turn to the new ones.
+                for fixture_id, (change, at) in retries.items():
+                    if change.retry is None:
+                        continue
+                    changes, lead, darkness = change.retry
+                    deferral = _defer(
+                        sorted(
+                            (c for c in section_cues if c.fixture_id == fixture_id),
+                            key=lambda c: c.t0_ms,
+                        ),
+                        changes,
+                        profiles[fixture_id],
+                        kept[fixture_id][-1],
+                        policy.initial_states.get(fixture_id),
+                        self.locks,
+                        lead=lead,
+                        darkness=darkness,
+                    )
+                    if deferral is None:
+                        continue
+                    deferrals[fixture_id] = deferral
+                    boundary = boundaries[at]
+                    reason = boundary.pop("kept_previous")["reason"].split(", and the")[0]
+                    boundary["deferred"] = {
+                        "turn_ms": deferral.turn_ms,
+                        "waited_ms": deferral.turn_ms - boundary["boundary_ms"],
+                        "late": deferral.turn_ms
+                        > boundary["boundary_ms"] + (context.end_ms - boundary["boundary_ms"]) / 2,
+                        "reason": reason,
+                    }
+                    for channel, (_, new) in changes.items():
+                        outcomes[channel.value][fixture_id] = {
+                            "deferred": {"state": new, "from_ms": deferral.turn_ms}
+                        }
+            if deferrals:
+                deferred_cues = []
+                for fixture_id in sorted({cue.fixture_id for cue in section_cues}):
+                    own = sorted(
+                        (cue for cue in section_cues if cue.fixture_id == fixture_id),
+                        key=lambda cue: cue.t0_ms,
+                    )
+                    deferral = deferrals.get(fixture_id)
+                    deferred_cues += (
+                        own if deferral is None else deferral.apply(own, profiles[fixture_id])
+                    )
+                section_cues = deferred_cues
             for fixture_id, (dipped, follow) in dips.items():
                 replaced = kept[fixture_id][-1].segment
                 cues[next(i for i, cue in enumerate(cues) if cue is replaced)] = dipped
                 kept[fixture_id][-1] = follow
             for fixture_id in {cue.fixture_id for cue in section_cues}:
                 held_by_fixture[fixture_id] = dict(held.get(fixture_id, {}))
-            record = look.record()
+            record = _played_record(look.record(), outcomes)
             if boundaries:
                 record["boundaries"] = boundaries
             if len(record) > 1:
                 section_looks.append(record)
+            message = _unplayed_message(section.section_id, outcomes)
+            if message is not None:
+                diagnostics.append(
+                    MHDiagnostic(
+                        code="unsupported_attribute",
+                        severity="warning",
+                        message=message,
+                        section_id=section.section_id,
+                        action="unchanged",
+                    )
+                )
             dropped.extend(compiled_steps)
             entered, inside, windows = _enter_section(
                 section_cues,

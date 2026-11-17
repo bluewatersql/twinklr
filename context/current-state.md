@@ -72,10 +72,12 @@ See [product/overview.md](product/overview.md).
     strobe speeds, hit, wheel change time), the planner is shown it, and a colour or
     gobo no head can show is repaired. Each head plays the section's colour (a palette
     role through the section's macro palette, under `run` and `show` alike; the fixed
-    role table without one) and gobo as its nearest tagged state, turned only in the
-    dark; a change at a boundary the heads play lit through dips dark for at most half a
-    beat before the section, else the head keeps the previous colour. Renderer revision
-    3. ([user guide](../docs/user-guide.md#how-a-sections-colour-and-gobo-reach-the-lights),
+    role table without one; a role the palette lacks plays PRIMARY) and gobo as its
+    nearest tagged state, turned only in the dark; a change at a boundary the heads play
+    lit through dips dark for at most half a beat before the section, else turns in the
+    section's first dark window, else keeps the previous colour (recorded, and repaired
+    for the planner). The offer also publishes each template's dark phases and the
+    states its overlay masks cannot reach. Renderer revision 4. ([user guide](../docs/user-guide.md#how-a-sections-colour-and-gobo-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w3-w4-offer-colour/README.md))
   - **Known regression: the rest of the song intent is not rendered yet.** The planner's
     intensity, shutter and gobo events, lyric moment cues bound to events, section

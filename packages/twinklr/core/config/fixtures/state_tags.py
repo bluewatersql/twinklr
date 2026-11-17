@@ -52,6 +52,10 @@ exactly (about one just-noticeable difference)."""
 
 CLOSE_DISTANCE = 0.10
 """Graded difference within which a slot shows the request closely..."""
+DIMMED_LUMINANCE = 0.8
+"""A request at least this share of a slot's relative luminance is graded on the slot
+dimmed to it (`ColorMatch.graded_distance`); a darker one on the plain difference."""
+
 CLOSE_HUE = 25.0
 """...when its hue is also within this many degrees."""
 
@@ -90,11 +94,14 @@ class ColorMatch(NamedTuple):
     neutral_fallback: bool
     """A white slot was returned for a request with a hue because no slot matched it."""
     graded_distance: float
-    """What `fit` grades: the Oklab difference between the request and the slot dimmed to
-    the level that brings it nearest (never brighter than the slot). A dimmer scales
-    linear RGB, which scales every Oklab coordinate alike, so a request that is the slot's
-    colour at a lower level grades as that colour; a lighter or more saturated request
-    than the slot still counts its difference. Equal to `distance` or less."""
+    """What `fit` grades. For a request at least `DIMMED_LUMINANCE` of the slot's
+    luminance: the Oklab difference between the request and the slot dimmed to the level
+    that brings it nearest (never brighter than the slot); a dimmer scales linear RGB,
+    which scales every Oklab coordinate alike, so a slightly darker shade of the slot's
+    colour grades as that colour, and a lighter or more saturated request still counts
+    its difference. For a darker request, `distance` itself: the renderer plays the slot
+    at the template's own level, so olive is not yellow, maroon not red, grey not white.
+    Equal to `distance` or less."""
 
 
 def tagged_colors(profile: FixtureCapabilities) -> dict[str, str]:
@@ -133,7 +140,8 @@ def nearest_tagged_color(colors: Mapping[str, str], color: str) -> ColorMatch | 
         ValueError: If `color` is not a colour.
     """
     slots = {name: (shown, _oklab(shown)) for name, shown in sorted(colors.items())}
-    wanted = _oklab(canonical_hex(color))
+    request = canonical_hex(color)
+    wanted = _oklab(request)
     if not slots or wanted[0] < MIN_LIGHTNESS:
         return None
     whites = [name for name, (_, lab) in slots.items() if _chroma(lab) < NEUTRAL_CHROMA]
@@ -157,7 +165,11 @@ def nearest_tagged_color(colors: Mapping[str, str], color: str) -> ColorMatch | 
             if min(_chroma(wanted), _chroma(lab)) >= NEUTRAL_CHROMA
             else None
         )
-        graded = _dimmed_distance(wanted, lab)
+        graded = (
+            _dimmed_distance(wanted, lab)
+            if _luminance(request) >= DIMMED_LUMINANCE * _luminance(shown)
+            else distance(name)
+        )
         if fit is None:
             if graded <= EXACT_DISTANCE:
                 fit = "exact"
@@ -236,15 +248,27 @@ _LMS_TO_OKLAB = (
 )
 
 
-def _oklab(hex_color: str) -> tuple[float, float, float]:
+def _linear(hex_color: str) -> list[float]:
+    """sRGB `#RRGGBB` linearised (IEC 61966-2-1)."""
+
     def linear(channel: int) -> float:
         value = channel / 255
         return value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4
 
+    return [linear(int(hex_color[index : index + 2], 16)) for index in (1, 3, 5)]
+
+
+def _luminance(hex_color: str) -> float:
+    """Relative luminance (Rec. 709 weights of linear RGB)."""
+    red, green, blue = _linear(hex_color)
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+
+
+def _oklab(hex_color: str) -> tuple[float, float, float]:
     def times(matrix: tuple[tuple[float, ...], ...], vector: list[float]) -> list[float]:
         return [sum(w * v for w, v in zip(row, vector, strict=True)) for row in matrix]
 
-    rgb = [linear(int(hex_color[index : index + 2], 16)) for index in (1, 3, 5)]
+    rgb = _linear(hex_color)
     lms = [value ** (1 / 3) for value in times(_SRGB_TO_LMS, rgb)]
     lightness, a, b = times(_LMS_TO_OKLAB, lms)
     return lightness, a, b
@@ -277,6 +301,8 @@ _PLACEHOLDERS = {
     "pattern": f"<one of: {', '.join(GoboPattern)}>",
     "strobe": "<slow, medium or fast; delete this key if the state does not strobe>",
 }
+_SETTLE_PLACEHOLDER = "<milliseconds this state takes to settle once selected>"
+"""What a wheel state without `settle_ms` gets in the snippet; refused if pasted unfilled."""
 _OPT_OUT = (
     "A state that honestly has no such meaning (a pulse, a random strobe, a rainbow scroll, "
     'a gobo shake) takes "offer": false in place of the tag, and is never offered.'
@@ -299,11 +325,15 @@ def tag_guidance(
     layout_hex: Mapping[str, str] | None = None,
     layout_model: str | None = None,
 ) -> str | None:
-    """Paste-ready tags for `profile`'s untagged states, or None when there are none.
+    """Paste-ready tags for `profile`'s untagged states, and settle times for the wheel
+    states that lack one, or None when there are neither.
 
     An untagged state is a color or gobo state without its tag, or a shutter state
     without one that is not the open, closed or an extinguishing state (those already
-    say what they do). The snippet holds each such channel's whole `states`, so it
+    say what they do). A colour or gobo wheel with a state to offer is offered only when
+    every one of its states has a `settle_ms` (a turn to a tagged state and back to the
+    one a template authors must both be timed in the dark), so each state without one
+    gets a placeholder. The snippet holds each such channel's whole `states`, so it
     replaces that object; a missing tag is a placeholder or a suggestion, and every
     suggestion is listed after the snippet for the user to confirm. Nothing is applied.
 
@@ -316,6 +346,7 @@ def tag_guidance(
     snippet: dict[str, dict[str, dict[str, object]]] = {}
     suggested: list[str] = []
     count = 0
+    unsettled_names: list[str] = []
     for channel, wheel in profile.discrete.items():
         tag = STATE_TAGS[channel]
         declared = _declared_shutter_states(profile) if channel == "shutter" else set()
@@ -324,9 +355,16 @@ def tag_guidance(
             for name, state in wheel.states.items()
             if getattr(state, tag) is None and state.offer is None and name not in declared
         ]
-        if not untagged:
+        offerable = any(state.offer is None for state in wheel.states.values())
+        unsettled = (
+            [name for name, state in wheel.states.items() if state.settle_ms is None]
+            if channel != "shutter" and offerable
+            else []
+        )
+        if not untagged and not unsettled:
             continue
         count += len(untagged)
+        unsettled_names += [f"{channel}.{name}" for name in unsettled]
         states: dict[str, dict[str, object]] = {}
         for name, state in wheel.states.items():
             entry: dict[str, object] = state.model_dump(mode="json", exclude_none=True)
@@ -337,17 +375,32 @@ def tag_guidance(
                     suggested.append(
                         f'  {channel}.{name}: {tag} "{value}" (suggested from {source})'
                     )
+            if name in unsettled:
+                entry["settle_ms"] = _SETTLE_PLACEHOLDER
             states[name] = entry
         snippet[channel] = states
     if not snippet:
         return None
     many = count > 1
+    said = []
+    if count:
+        said.append(
+            f"{count} wheel or shutter state{'s do' if many else ' does'} not say what "
+            f"{'they show' if many else 'it shows'}, so the planner's colour, gobo and "
+            f"strobe choices cannot use {'them' if many else 'it'}."
+        )
+    if unsettled_names:
+        said.append(
+            f"These wheel states have no settle_ms: {', '.join(unsettled_names)}. A colour "
+            "or gobo wheel is offered only when every one of its states has one, since a "
+            "turn to a tagged state and back to the one a template holds must both be "
+            "timed in the dark; add each (or the channel's own settle_ms)."
+        )
     text = (
-        f"{count} wheel or shutter state{'s do' if many else ' does'} not say what "
-        f"{'they show' if many else 'it shows'}, so the planner's colour, gobo and strobe "
-        f"choices cannot use {'them' if many else 'it'}. Under the profile's `discrete`, "
-        "replace each channel's `states` with the one below; fill every <...> placeholder "
-        "(pasted unfilled, it is refused when the fixture file loads). "
+        " ".join(said)
+        + " Under the profile's `discrete`, replace each channel's `states` with the one "
+        "below; fill every <...> placeholder (pasted unfilled, it is refused when the "
+        "fixture file loads). "
         + _OPT_OUT
         + (f" {_VARIABLE_STROBE}" if "shutter" in snippet else "")
         + "\n"

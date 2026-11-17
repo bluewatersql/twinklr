@@ -27,6 +27,7 @@ from twinklr.core.agents.sequencer.moving_heads.moment_cues import (
     bind_lyric_moment_cues,
     unanswered_high_cues,
 )
+from twinklr.core.agents.sequencer.moving_heads.rig_repair import repair_rig_intent
 from twinklr.core.agents.sequencer.moving_heads.specs import (
     get_judge_spec,
     get_planner_spec,
@@ -39,7 +40,6 @@ from twinklr.core.agents.shared.judge.controller import (
 )
 from twinklr.core.agents.shared.judge.feedback import FeedbackManager
 from twinklr.core.agents.spec import AgentSpec
-from twinklr.core.sequencer.moving_heads.song_intent import repair_rig_intent
 
 logger = logging.getLogger(__name__)
 
@@ -160,7 +160,7 @@ def normalize_plan(plan: ChoreographyPlan, context: MovingHeadPlanningContext) -
     plan = bind_lyric_moment_cues(plan, context.lyric_context, context.beat_grid, context.sections)
     if context.rig_offer is None:
         return plan
-    return repair_rig_intent(plan, context.rig_offer, context.palettes)
+    return repair_rig_intent(plan, context.rig_offer, context.palettes, context.beat_grid)
 
 
 class MovingHeadPlannerOrchestrator:
@@ -273,6 +273,12 @@ class MovingHeadPlannerOrchestrator:
                 if context.template_descriptions is not None
                 else None
             ),
+            # The stops each section's palette roles resolve to: the macro plan names a
+            # palette by id, and an edit of its stops changes the prompt and the repairs.
+            "palettes": {
+                section_id: palette.model_dump(mode="json")
+                for section_id, palette in sorted(context.palettes.items())
+            },
             # What the planner is told the rig can show, and what repair keeps.
             "rig_offer": (context.rig_offer.model_dump(mode="json") if context.rig_offer else None),
             # Bar numbers in the plan name positions on this authoritative grid.

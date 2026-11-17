@@ -46,7 +46,7 @@ one projection; `SelectorAdmission.from_gate` carries the same object):
 
 | Field | What |
 |---|---|
-| `heads` | Per head: whether it has a colour / gobo wheel, and its **offered** colour states (`hex`) and gobo states (`pattern`): tagged, and with a known `settle_ms` (a wheel turns only in the dark, and its settle times the turn; a tagged state without one is not offered) |
+| `heads` | Per head: whether it has a colour / gobo wheel, and its **offered** colour states (`hex`) and gobo states (`pattern`): tagged, on a wheel whose every state has a known `settle_ms` (corrected in the review fix round: first written per state, which let an authored state without a settle cost admission) |
 | `color(c)` / `preset_colors()` | For any colour (every `ColorPreset`, any palette stop): `faithful` (every colour-wheel head `exact`/`close`), `approximate` (every one shows it, some only `approximate`), `partial` (some cannot: they keep their authored colour, named in `missing`), `unavailable`; each head's state and fit |
 | `gobos` | Each `GoboPattern`: `all` / `some` / `none` of the gobo-wheel heads, with states and the heads missing it |
 | `strobes` | Each strobe speed: `all` / `some` / `none` of the heads with a shutter |
@@ -351,12 +351,8 @@ section colours:
 
 ## Limits and open points
 
-- **Overlay masks are not re-checked against offered settles at the gate.** An overlay
-  returning to a section colour whose state settles slower than the authored base could
-  need more than its mask; the gate checks the authored base only. Catalog impact:
-  `masked_wheel_flick` (1-beat masks; the offered settles are 120–160 ms) — not hit in
-  any test or the matrix; under `on_unplayable: dark` such a cue would be kept dark, under
-  `error` the render refuses.
+- (Superseded by the review fix round, item 4: overlay masks are now checked against
+  the offered settles at the gate, and the render falls back to the authored state.)
 - The dip needs the dark lead inside the previous cue; a shorter last cue keeps the
   previous colour (recorded).
 - Colour and gobo **events** are repaired against the offer but not rendered (W7);
@@ -385,3 +381,96 @@ Scratch (session-local, not committed):
 (`matrix_w34.py`, `compare_w34.py`, `run_matrix.sh`, `tempo_examples.py`,
 `gate_dips.py`, `render_prompt.py`, `two_sections.py`, `rerecord_pins.py`,
 `intent_pin.py`, `golden_fp.py`).
+
+## Review fix round (2026-11-17, on `e611164f`)
+
+The independent review of `e611164f` (frame-by-frame over about 150 renders, no physical
+violation found) returned REQUEST CHANGES, items 1–12. All were done; uncommitted, no
+`make validate`, no provider call. Where this section and the text above differ, this
+section is current.
+
+| # | Item | Done |
+|---|---|---|
+| 1 | Tagging cost admission (an authored state without `settle_ms` lost every bound) | `HeadWheels.from_profile` offers a wheel only when **every** state of it has a settle (`unsettled` names the rest); `tag_guidance` names each missing settle with a paste-ready placeholder (refused if pasted unfilled); the CLI note says "or wheel states without a settle_ms". Tests: a partly settled, tagged rig admits exactly what the same rig admits untagged, with equal dips and nothing offered for that wheel; the guidance test |
+| 2 | Template dark phases were left out of the offer | **I dropped them in W3 without saying so; that was a scope cut I should have reported.** Now `RigOffer.templates[template].variants[base\|preset] = DarkPhases(cycle_beats, heads)`: per admitted variant and fixture, the dark windows of its first cycle in beats from the cycle start (gaps between cues from visibility envelopes and overlay masks, frames the cues command dark; the entry dip stays in `entry_dips`), from the gate's bar-1 compile. `DarkPhases.first_window(head, beats)` is the query the repair uses and W6/W7 can use. Tests: `masked_wheel_flick`'s two masks (beats 2–3 and 5–6 of 8) on every head, `mirror_wings` none |
+| 3 | A colour change that could not dip kept the previous colour for the whole section | Rule now (a) dip before the boundary within half a beat; (b) else turn in the section's first dark window long enough (`_dark_windows`: a dark phase or overlay mask, a gap, a dark span), the head playing the previous colour until then; for an overlay family the section is recompiled at the old colour so its mask opens, and the turn is validated (in a gap with `entry_feasible`; inside a cue by construction: dark from the window's start, turned after the darkness latency, settled before the window ends); (c) else keep the previous colour. (b) and (c) are recorded per head with times (`boundaries[].deferred {turn_ms, waited_ms, late}` / `kept_previous {reason}`), and the plan repair (`rig_repair._boundary_repairs`, run with the beat grid in `normalize_plan`) records for the planner every change into a section whose template has no dark window long enough in its first half (c), or whose first one lies past half the section (late b). The repair cannot know whether the heads play straight into the section (that needs the render), so it says "where the heads play straight into it" and over-reports sections that enter dark (seen on Dance Jams below). Tests at 170 BPM: `masked_wheel_flick` turns in its first mask on all four heads (no darkness added), `mirror_wings` keeps red, recorded; repair prediction test |
+| 4 | A slow offered state under overlay masks: cues forced dark, or a refusal after paid planning | Gate: each overlay template's admitted variants are compiled at bar 1 holding every head's slowest offered state on the overlay wheel, then the next slower settle down, until the placement plans; slower states go to `TemplateOffer.excluded` (per fixture and wheel), which the prompt lists ("Not with these templates"), the repair (`RigOffer.for_templates`) and the render resolution use, and the entry dips respect. Render safety net: a head whose section cues with the held state do not plan where the authored ones do plays the authored state in that section (`kept_authored_unplayable`, recorded, a warning); never a refusal for this cause. Tests: a green settling in 470 ms under `masked_wheel_flick` at 120 BPM is excluded for that template only; without the gate's result, every head falls back to the authored colour and the render does not refuse under `on_unplayable: error` |
+| 5 | Trace, report and prompt claimed colours the frames did not show; the prompt contradicted itself | The render moves each head that does not play the asked state from the section's start out of `heads` into `deferred {state, from_ms}`, `kept_previous` or `kept_authored_unplayable` (`_played_record`); a per-section warning counts them; `describe_look` and the report's `played` lines say so ("MH2 turns to blue at 9020 ms", "MH3 keeps the previous colour red"). The prompt states the rule by tempo: where the change fits half a beat, the dip; where it does not, the wait for the first dark moment (naming the templates that have one) or no change |
+| 6 | Palette roles not in the palette | WARM / COOL resolve only to a stop with a hue within 90° of 55° / 230°, NEUTRAL only to a white (chroma below 0.04); otherwise the role is not in that palette: the prompt says "not in this palette", a plan that picks it is repaired to `PALETTE_PRIMARY` (recorded), and the render plays PRIMARY's stop (never a fixed-table colour under a macro palette). Over the 19 catalog palettes: no WARM in 5 (`core.ice_neon`, `core.mono_cool`, `core.uv_party`, `spec.cosmic_night`, `spec.futuristic_teal`), no COOL in 4 (`core.gold_warm`, `core.magma`, `core.mono_warm`, `spec.gritty_embers`), no NEUTRAL in 2 (`core.magma`, `core.rainbow_bright`). The prompt marks a role landing on the same wheel colour as an earlier one ("(same wheel colour as PALETTE_PRIMARY)") and suggests contrast through a named colour, intensity or gobo. Tested over every catalog palette on the four wheels (w/r/b/g; w/r/b; open/red/amber/pink/blue/green; eight-slot) |
+| 7 | The lightness discount over-promised | A request darker than 0.8 of the slot's relative luminance is graded on the plain ΔE (the slot plays at the template's level): olive → yellow, maroon → red, grey → white are `approximate`, no longer `exact`. W1 expectations re-judged: orange → CTO `approximate` (was `close` in W4), peach → white `approximate`; `warm_white` → white stays `exact` (0.88 of white's luminance), the palette green `#00E676` stays `close` (0.81). The prompt now says once that a wheel shows a colour's hue at the section's brightness (`intensity` is the control) |
+| 8 | Dip vs existing darkness | The dip starts no earlier than it must: where the previous cue already commands darkness for the whole lead (a show's rest, a dark phase), nothing is darkened and `dark_dip.added_ms` is 0; otherwise the dip darkens only what is lit. Test: a dark span over the last beat before the boundary adds no darkness |
+| 9 | Import cycle | `song_intent.py` no longer imports the planner package at run time (it reads plan values as strings, `PlannedLook` protocol); the plan-mutating repair moved to `agents/sequencer/moving_heads/rig_repair.py`. Test: each of `song_intent`, `rig_repair`, `pipeline`, `context` imports first in a fresh interpreter |
+| 10 | Lost coverage, weak render tests | Mixed-rig strobe all/some/missing and `#000000` unavailable restored (`test_song_intent.py`); a shutter-only-darkness rig dip test; the overlay test at 40 ms close latency; the dark-window assertion now counts shutter settle where only the shutter extinguishes |
+| 11 | Cache key hashed the palette id only | It hashes each section's resolved stops (`palettes`); test: an edit of a catalog palette's stops re-keys |
+| 12 | Flick equal to the section colour | Noted in the user guide and here: under `masked_wheel_flick`, a head whose flick colour equals the section's colour shows no flick (its overlay has nothing to turn to) |
+
+### Consequences
+
+- **`RENDERER_REVISION` 3 → 4** (deferral, overlay fallback, a missing role playing PRIMARY
+  change bytes for an unchanged plan and rig). Every fingerprint re-recorded; every frame
+  and `.xsq` hash unchanged, `INTENT_PIN`'s included (its boundaries all dip at 120 BPM).
+  Golden moving-head fingerprint `bf6be5e6…` → `5fd51634…`. **New pin** `FAST_INTENT_PIN`
+  (170 BPM, owner-like timings: a change deferred into `masked_wheel_flick`'s mask, a
+  change kept over `mirror_wings`).
+- The planner cache re-keys again (palette stops, offer with dark phases and exclusions,
+  prompt packs).
+- Byte matrix against `9deb95df` re-run on this tree: the same classification as § Byte
+  proof (as-authored plans on every rig and plan C on every untagged rig identical in
+  frames, segments, normalised record and trace, `.xsq`, `.xtiming`, `.xmap`; only the
+  tagged rig's plan C and gate dips differ; admission identical in all 405). Against the
+  first W4 round, no frame and no gate result of the matrix changed (its fastest grid,
+  340 ms beats, still fits the tagged family rig's 160 ms change in half a beat).
+- Parity: 8 passed, 18 xfailed; `--runxfail` 18 failed, all `AssertionError` on their
+  targets.
+
+### Verification (fix round, after the last code edit)
+
+| Command | Result |
+|---|---|
+| `uv run pytest tests -q --no-cov` | 6860 passed, 30 skipped, 18 xfailed |
+| `uv run pytest tests/regression -q --no-cov` | 58 passed, 18 xfailed (47 pins) |
+| `uv run ruff check .` | All checks passed |
+| `uv run ruff format --check .` | 1301 files already formatted |
+| `uv run mypy .` | No issues in 651 source files |
+| Byte matrix vs `9deb95df` | As above |
+
+### Item 3 on a real fast grid: `Dance Jams Final Audio.mp3`
+
+Owner-authorised for this change (implementation brief, Approvals; recorded by the
+coordinator). Read in place at `/Users/ondeck/work/github/twinklr/data/music/` (the brief
+named `data/songs/`, where no such file exists; the file of that name is under
+`data/music/`). Offline: local DSP analysis only, every enhancement off (metadata,
+lyrics, phonemes, AcoustID, MusicBrainz, online lyrics, WhisperX), the analysis cache
+under the scratchpad; no LLM or provider stage. Script `w34/dance_jams.py`. Rig: the
+tagged four-head family rig with owner-like wheel timings (close latency 20 ms, every
+colour and gobo state settling in 150 ms: a 180 ms change). Plan: hand-built over the
+song's 13 DSP sections (bars from the detected grid), cycling through the admitted
+families, colours alternating red and blue.
+
+| | |
+|---|---|
+| Grid | 129.2 BPM, 4/4, 135 bars, 542 beats; beats 348 / 464 / 569 ms (min / median / max); 258.5 s; the analysis warned "Low downbeat phase confidence: 0.00" |
+| Admitted | `finite_snap_hold`, `fly_in_cascade`, `fly_out_cascade`, `masked_wheel_flick`, `mirror_wings`, `target_orbit`; `zoom_wave` excluded (no zoom axis) |
+| Dark phases published | cascades: several windows of 1–6 beats per cycle; `masked_wheel_flick`: beats 2–3 and 5–6; `finite_snap_hold`, `mirror_wings`, `target_orbit`: none; no exclusions |
+
+At the owner-like 180 ms change (fits half the median beat, 232 ms, and the half beat
+before each boundary that dipped): of 12 boundaries, the changes into the cascades and the flick were played
+in the gaps between cues (their entries plan as authored through a dark gap, so no
+boundary record), those into `finite_snap_hold` rode its entry window, and **6 heads at 4
+boundaries** (into `mirror_wings` and `target_orbit`, entered lit) **dipped 180 ms before
+the section**. Nothing deferred or kept; 0 repairs. **This song's tempo does not need
+item 3's deferral at the owner's timings.**
+
+To exercise it on this real grid, the same run with a slower wheel (every state settling
+in 300 ms: a 320 ms change, more than every half beat): the same 6 heads at the same 4
+boundaries **kept the previous colour** (no dark window in `mirror_wings` /
+`target_orbit`), each recorded in the trace with its reason; the changes into the
+cascades, the flick and `finite_snap_hold` still played (gaps, entry windows). The plan
+repair recorded **6 colour changes** for the planner: the 4 that kept the previous
+colour, plus 2 into `finite_snap_hold` that in fact played through its entry window (the
+repair cannot see which boundaries are entered dark; it over-reports, never
+under-reports). No deferral into a dark window occurred on this plan: the sections with
+dark phases (cascades, flick) were entered through gaps, which turn the wheel anyway.
+Acceptance as stated (colour changes play wherever a dark window exists; every one that
+cannot is recorded and fed back as a repair): met on this song, with the over-report
+noted.

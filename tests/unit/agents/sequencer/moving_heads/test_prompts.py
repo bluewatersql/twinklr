@@ -688,25 +688,29 @@ class TestPlannerUserPromptRendering:
             "yellow, lime\n",
             "  - `intro`, `verse_1`, `chorus_1`, `outro` (`core.christmas_traditional`): "
             "PALETTE_PRIMARY #E53935 → red; PALETTE_ACCENT #43A047 → not shown; "
-            "PALETTE_WARM #E53935 → red; PALETTE_COOL #43A047 → not shown; "
-            "PALETTE_NEUTRAL #FFFFFF → white\n",
+            "PALETTE_WARM #E53935 → red (same wheel colour as PALETTE_PRIMARY); "
+            "PALETTE_COOL #43A047 → not shown; PALETTE_NEUTRAL #FFFFFF → white\n",
             "- **Gobos**: on every head: open, stars, dots; not shown: circles, triangles, "
             "diamonds, clouds, prism, shatter, flame, water, foliage, abstract\n",
             "- **Strobe speeds**: none tagged\n",
             "- **Hit** (a dimmer accent): every head\n",
-            "- **A wheel change** takes 160 ms dark (about 0.4 beat)",
+            "- **A wheel change** takes 160 ms of darkness (about 0.4 beat). Where the heads "
+            "play straight from one section into the next and its colour or gobo changes, "
+            "they go dark for that long just before the new section's first beat",
+            "a dark or pale palette colour\nplays as its wheel colour",
         ):
             assert line in section, line
-        assert "costs a dark dip of up to half a beat just before the new section" in section
+        assert "more than half a beat" not in section
 
     def test_an_untagged_rig_is_told_no_colour_or_gobo_is_offered(self) -> None:
         from tests.support import moving_heads as m
 
         rendered = self._render(rig_offer=m.untagged_offer())
 
-        assert "so no\n  colour is offered; every `color` keeps the template's own colour" in (
-            rendered
-        )
+        assert (
+            "the rig's colour wheel offers no colour (no state is tagged),\n  so every "
+            "`color` keeps the template's own colour"
+        ) in rendered
         assert "so no gobo\n  is offered" in rendered
         assert "## What This Rig Can Show" not in self._render()
 

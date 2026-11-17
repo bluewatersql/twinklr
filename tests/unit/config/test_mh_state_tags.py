@@ -31,6 +31,7 @@ from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup
 from twinklr.core.config.fixtures.state_tags import (
     CLOSE_DISTANCE,
     CLOSE_HUE,
+    DIMMED_LUMINANCE,
     EXACT_DISTANCE,
     HUE_CAP,
     MIN_LIGHTNESS,
@@ -309,7 +310,7 @@ _PRESET_STATES: dict[str, tuple[tuple[str, str], ...]] = {
     "yellow": (("green", _A), ("yellow", _E), ("green", _A), ("white", _M), ("open", _M)),
     "magenta": (("red", _A), ("magenta", _E), ("pink", _A), ("red", _A), ("open", _M)),
     "cyan": (("green", _A), ("cyan", _E), ("green", _A), ("white", _M), ("open", _M)),
-    "orange": (("red", _A), ("orange", _E), ("amber", _C), ("red", _A), ("cto", _C)),
+    "orange": (("red", _A), ("orange", _E), ("amber", _C), ("red", _A), ("cto", _A)),
     "purple": (("blue", _A), ("magenta", _A), ("blue", _A), ("white", _M), ("open", _M)),
     "amber": (("red", _A), ("orange", _C), ("amber", _E), ("red", _A), ("cto", _C)),
     "lime": (("green", _A), ("yellow", _C), ("green", _A), ("white", _M), ("open", _M)),
@@ -363,22 +364,38 @@ def test_fit_grades_follow_the_stated_thresholds() -> None:
     assert far.hue_difference is not None and CLOSE_HUE < far.hue_difference <= HUE_CAP
 
 
-def test_the_fit_grades_the_slot_at_the_dimmer_level_nearest_the_request() -> None:
-    """A dimmer scales a slot's colour, never brightens or saturates it: a request that is
-    the slot's colour, darker, grades as that colour; a lighter or more saturated one
-    keeps its difference. The state chosen does not change."""
-    profile = _wheel(green="green", red="red", white="white")
+def test_the_fit_grades_a_slightly_darker_shade_as_the_slot_and_a_darker_one_plainly() -> None:
+    """A dimmer scales a slot's colour, never brightens or saturates it: a request at
+    least 0.8 of the slot's luminance is graded on the slot dimmed to it, so a slightly
+    darker shade grades as that colour. A darker request is graded on the plain
+    difference, since the slot plays at the template's level: olive is not yellow, maroon
+    not red, grey not white. The state chosen does not change."""
+    assert DIMMED_LUMINANCE == 0.8
+    profile = _wheel(green="green", red="red", white="white", yellow="yellow")
 
-    darker = nearest_color_state(profile, "#00E676")  # a palette green, L 0.81 to 0.87
-    dimmed = nearest_color_state(profile, "#7F0000")  # red at a lower level
+    palette_green = nearest_color_state(profile, "#00E676")  # 0.81 of green's luminance
+    shade = nearest_color_state(profile, "#F00000")  # 0.87 of red's
     paler = nearest_color_state(profile, "#FF8080")  # lighter and less saturated than red
+    darker = {
+        request: nearest_color_state(profile, request)
+        for request in ("#808000", "#800000", "#808080")  # olive, maroon, grey: 0.22
+    }
 
-    assert darker is not None and (darker.state, darker.fit) == ("green", "close")
-    assert darker.distance > CLOSE_DISTANCE >= darker.graded_distance  # raw ΔE: approximate
-    assert dimmed is not None and (dimmed.state, dimmed.fit) == ("red", "exact")
-    assert dimmed.graded_distance < 1e-6 < dimmed.distance
+    assert palette_green is not None and (palette_green.state, palette_green.fit) == (
+        "green",
+        "close",
+    )
+    assert palette_green.distance > CLOSE_DISTANCE >= palette_green.graded_distance
+    assert shade is not None and (shade.state, shade.fit) == ("red", "exact")
+    assert shade.graded_distance < 1e-6 < shade.distance
     assert paler is not None and paler.state == "red" and paler.fit == "approximate"
     assert paler.graded_distance == pytest.approx(paler.distance, abs=1e-2)
+    assert {r: (m.state, m.fit) for r, m in darker.items() if m is not None} == {
+        "#808000": ("yellow", "approximate"),
+        "#800000": ("red", "approximate"),
+        "#808080": ("white", "approximate"),
+    }
+    assert all(m is not None and m.graded_distance == m.distance for m in darker.values())
 
 
 _PALETTE_WHITES = {"#FFFFFF", "#F5F1E8"}
@@ -417,11 +434,11 @@ def test_a_pale_tint_takes_a_white_slot_nearer_it_and_a_saturated_slot_otherwise
     peach = nearest_color_state(_wheel(**_W4), "#FFCCBC")
     ice = nearest_color_state(_wheel(**_W8), "#B3E5FC")
 
-    # Graded with the white slot dimmed to the tint's level: only its tint (chroma 0.062)
-    # is left of the difference.
+    # Peach is 0.68 of white's luminance, darker than a dimmed slot may stand in for, so
+    # it is graded on the plain difference.
     assert peach is not None and (peach.state, peach.fit, peach.neutral_fallback) == (
         "white",
-        "close",
+        "approximate",
         False,
     )
     assert ice is not None and (ice.state, ice.fit) == ("cyan", "approximate")
@@ -658,6 +675,7 @@ def test_a_filled_snippet_pastes_into_the_profile_and_an_unfilled_one_is_refused
         _profile(unfilled)
 
     snippet["gobo"]["states"]["gobo4"]["pattern"] = "flame"
+    snippet["gobo"]["states"]["gobo4"]["settle_ms"] = 150
     snippet["shutter"]["states"]["strobe"]["strobe"] = "medium"
     for channel, block in snippet.items():
         payload["discrete"][channel]["states"] = block["states"]
@@ -709,7 +727,13 @@ def test_an_opted_out_state_is_settled_and_never_offered() -> None:
             "open": {"pattern": "open"},
             "dots": {"pattern": "dots"},
             "star": {"pattern": "stars"},
-            "shake": {"range_min": 24, "range_max": 31, "value": 28, "offer": False},
+            "shake": {
+                "range_min": 24,
+                "range_max": 31,
+                "value": 28,
+                "settle_ms": 150,
+                "offer": False,
+            },
         },
         shutter={"pulse": {"range_min": 100, "range_max": 199, "value": 150, "offer": False}},
     )
@@ -718,6 +742,33 @@ def test_an_opted_out_state_is_settled_and_never_offered() -> None:
     assert tag_guidance(profile) is None
     assert profile.model_dump(mode="json")["discrete"]["gobo"]["states"]["shake"]["offer"] is False
     assert "offer" not in profile.model_dump(mode="json")["discrete"]["gobo"]["states"]["dots"]
+
+
+def test_guidance_names_the_wheel_states_without_a_settle_ready_to_paste() -> None:
+    """A tagged wheel with a state of unknown settle is not offered (the turn back to it
+    could not be timed); the guidance names each such state and gives it a placeholder,
+    refused if pasted unfilled."""
+    payload = _payload(
+        color={"white": {"hex": "white"}, "red": {"hex": "red"}, "blue": {"hex": "blue"}},
+        gobo={
+            "open": {"pattern": "open"},
+            "dots": {"pattern": "dots"},
+            "star": {"pattern": "stars"},
+        },
+    )
+    for name in ("white", "red"):
+        del payload["discrete"]["color"]["states"][name]["settle_ms"]
+    payload["discrete"]["color"].pop("settle_ms", None)
+    profile = _profile(payload)
+
+    guidance = tag_guidance(profile) or ""
+
+    assert "These wheel states have no settle_ms: color.white, color.red." in guidance
+    states = _snippet(guidance)["color"]["states"]
+    assert states["red"]["settle_ms"] == states["white"]["settle_ms"]
+    assert str(states["red"]["settle_ms"]).startswith("<milliseconds")
+    assert "settle_ms" in states["blue"] and states["blue"]["settle_ms"] == 140
+    assert "gobo" not in _snippet(guidance)
 
 
 @pytest.mark.parametrize("tag", [("hex", "red"), ("pattern", "stars"), ("strobe", "fast")])
