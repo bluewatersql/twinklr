@@ -28,11 +28,20 @@ from tests.support.moving_heads import (
 )
 from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup
 from twinklr.core.config.fixtures.state_tags import (
+    CLOSE_DISTANCE,
+    CLOSE_HUE,
+    EXACT_DISTANCE,
+    HUE_CAP,
+    MIN_LIGHTNESS,
     ColorMatch,
+    RigStateOffer,
     color_distance,
     gobo_state,
     layout_color_tags,
     nearest_color_state,
+    rig_color_offer,
+    rig_gobo_offer,
+    rig_strobe_offer,
     rig_tag_guidance,
     strobe_state,
     tag_guidance,
@@ -288,54 +297,80 @@ _WAP = {
     "green": "green",
 }
 """A wheel with amber and pink slots, and an `open` slot that shows white."""
-_WHEELS = {"w4": _W4, "w8": _W8, "wap": _WAP}
+_WR = {"white": "white", "red": "red"}
+_WCT = {"open": "white", "cto": "#FFB46B", "ctb": "#C8DCFF"}
+"""Colour-temperature correction only: open, a full CTO and a CTB (tints, not colours)."""
+_WHEELS = {"w4": _W4, "w8": _W8, "wap": _WAP, "wr": _WR, "wct": _WCT}
+_ORDER = ("w4", "w8", "wap", "wr", "wct")
 
-_PRESET_STATES: dict[str, tuple[str, str, str]] = {
-    # request:      (w4, w8, wap)
-    "red": ("red", "red", "red"),
-    "blue": ("blue", "blue", "blue"),
-    "green": ("green", "green", "green"),
-    "yellow": ("green", "yellow", "amber"),
-    "magenta": ("red", "magenta", "pink"),
-    "cyan": ("green", "cyan", "green"),
-    "orange": ("red", "orange", "red"),
-    "purple": ("red", "magenta", "pink"),
-    "amber": ("red", "yellow", "amber"),
-    "lime": ("green", "yellow", "green"),
-    "white": ("white", "white", "open"),
-    "warm_white": ("white", "white", "open"),
-    "cool_white": ("white", "white", "open"),
-    "uv": ("blue", "blue", "blue"),
+_E, _C, _A, _M = "exact", "close", "approximate", "hue_mismatch"
+_PRESET_STATES: dict[str, tuple[tuple[str, str], ...]] = {
+    # request: w4, w8, wap, wr (white/red), wct (open/CTO/CTB)
+    "red": (("red", _E), ("red", _E), ("red", _E), ("red", _E), ("open", _M)),
+    "blue": (("blue", _E), ("blue", _E), ("blue", _E), ("white", _M), ("open", _M)),
+    "green": (("green", _E), ("green", _E), ("green", _E), ("white", _M), ("open", _M)),
+    "yellow": (("green", _A), ("yellow", _E), ("green", _A), ("white", _M), ("open", _M)),
+    "magenta": (("red", _A), ("magenta", _E), ("pink", _A), ("red", _A), ("open", _M)),
+    "cyan": (("green", _A), ("cyan", _E), ("green", _A), ("white", _M), ("open", _M)),
+    "orange": (("red", _A), ("orange", _E), ("amber", _C), ("red", _A), ("cto", _A)),
+    "purple": (("blue", _A), ("magenta", _A), ("blue", _A), ("white", _M), ("open", _M)),
+    "amber": (("red", _A), ("orange", _C), ("amber", _E), ("red", _A), ("cto", _C)),
+    "lime": (("green", _A), ("yellow", _C), ("green", _A), ("white", _M), ("open", _M)),
+    "white": (("white", _E), ("white", _E), ("open", _E), ("white", _E), ("open", _E)),
+    "warm_white": (("white", _C), ("white", _C), ("open", _C), ("white", _C), ("open", _C)),
+    "cool_white": (("white", _C), ("white", _C), ("open", _C), ("white", _C), ("open", _C)),
+    "uv": (("blue", _A), ("blue", _A), ("blue", _A), ("white", _M), ("open", _M)),
 }
-"""Every colour preset on three wheels, by hue (OKLCh): the nearest hue among the slots
-that have one, whites only for whites. Amber's canonical hue (84°) is nearer yellow
-(110°) than orange (53°), so on a wheel with both it shows yellow; purple and magenta
-(328°) sit almost midway between red (29°) and blue (264°) on a wheel with neither."""
+"""Every colour preset on five wheels: state and fit. Hue first (OKLCh); a colour with a
+hue never takes a white slot while one with a near enough hue exists, and gets a white
+only as a `hue_mismatch` (white/red: blue, green, cyan; CTO/CTB: everything but the
+warm colours a CTO tints toward)."""
 
 
 def test_the_preset_table_covers_every_colour_preset() -> None:
     assert set(_PRESET_STATES) == {preset.value for preset in ColorPreset}
 
 
-@pytest.mark.parametrize("wheel", sorted(_WHEELS))
+@pytest.mark.parametrize("wheel", _ORDER)
 @pytest.mark.parametrize("request_color", sorted(_PRESET_STATES))
 def test_every_colour_preset_resolves_by_hue_on_realistic_wheels(
     wheel: str, request_color: str
 ) -> None:
     profile = _wheel(**_WHEELS[wheel])
-    expected = _PRESET_STATES[request_color][sorted(_WHEELS).index(wheel)]
+    expected = _PRESET_STATES[request_color][_ORDER.index(wheel)]
 
     match = nearest_color_state(profile, request_color)
 
-    assert match is not None and match.state == expected
+    assert match is not None and (match.state, match.fit) == expected
     shown = COLOR_PRESET_HEX[ColorPreset(request_color)]
-    assert match.fit == ("exact" if match.hex == shown else "approximate")
     assert match.distance == color_distance(shown, match.hex)
+    white_slot = match.state in {"white", "open"}
+    assert match.neutral_fallback == (white_slot and match.fit == "hue_mismatch")
+    assert (match.hue_difference is None) == (white_slot or "white" in request_color)
+
+
+def test_fit_grades_follow_the_stated_thresholds() -> None:
+    """exact within ΔE 0.02; close within 0.10 and 25°; approximate within 75°."""
+    assert (EXACT_DISTANCE, CLOSE_DISTANCE, CLOSE_HUE, HUE_CAP) == (0.02, 0.10, 25.0, 75.0)
+    profile = _wheel(red="red", orange="orange", blue="blue")
+
+    near = nearest_color_state(profile, "#FA0505")  # a measured red
+    tint = nearest_color_state(profile, "#FF3D00")
+    far = nearest_color_state(profile, "#FFD600")
+
+    assert near is not None and (near.state, near.fit) == ("red", "exact")
+    assert near.distance <= EXACT_DISTANCE
+    assert tint is not None and (tint.state, tint.fit) == ("red", "close")
+    assert tint.hue_difference is not None and tint.hue_difference <= CLOSE_HUE
+    assert far is not None and (far.state, far.fit) == ("orange", "approximate")
+    assert far.hue_difference is not None and CLOSE_HUE < far.hue_difference <= HUE_CAP
 
 
 _PALETTE_WHITES = {"#FFFFFF", "#F5F1E8"}
-"""The catalog palettes' white and warm white stops (OKLCh chroma 0 and 0.013); every
-other stop has chroma 0.060 or more."""
+"""The catalog palettes' white and warm white stops (OKLCh chroma 0 and 0.013)."""
+_PALETTE_PALE = {"#B3E5FC", "#FFCCBC", "#80DEEA", "#B39DDB"}
+"""Its pale tints, OKLCh chroma 0.060, 0.062, 0.091 and 0.091 (below `PALE_CHROMA`), which
+may take a nearer white slot; every other stop is 0.14 or more."""
 
 
 def _palette_stops() -> list[str]:
@@ -348,17 +383,31 @@ def _palette_stops() -> list[str]:
     )
 
 
-@pytest.mark.parametrize("wheel", sorted(_WHEELS))
-def test_no_palette_colour_with_a_hue_lands_on_a_white_slot(wheel: str) -> None:
-    """Every stop of every catalog palette: one with a hue goes to a slot with a hue, a
-    white (or tinted white) to a white slot."""
+@pytest.mark.parametrize("wheel", ("w4", "w8", "wap"))
+def test_no_saturated_palette_colour_lands_on_a_white_slot(wheel: str) -> None:
+    """Every stop of every catalog palette, on wheels with colour slots: a saturated
+    stop takes a slot with a hue, a white stop a white slot."""
     profile = _wheel(**_WHEELS[wheel])
-    whites = {"white", "open"}
 
     for stop in _palette_stops():
         match = nearest_color_state(profile, stop)
-        assert match is not None
-        assert (match.state in whites) == (stop in _PALETTE_WHITES), (stop, match)
+        assert match is not None and match.fit != "hue_mismatch", (stop, match)
+        if stop in _PALETTE_WHITES:
+            assert match.state in {"white", "open"}, (stop, match)
+        elif stop not in _PALETTE_PALE:
+            assert match.state not in {"white", "open"}, (stop, match)
+
+
+def test_a_pale_tint_takes_a_white_slot_nearer_it_and_a_saturated_slot_otherwise() -> None:
+    peach = nearest_color_state(_wheel(**_W4), "#FFCCBC")
+    ice = nearest_color_state(_wheel(**_W8), "#B3E5FC")
+
+    assert peach is not None and (peach.state, peach.fit, peach.neutral_fallback) == (
+        "white",
+        "approximate",
+        False,
+    )
+    assert ice is not None and (ice.state, ice.fit) == ("cyan", "approximate")
 
 
 @pytest.mark.parametrize(
@@ -381,49 +430,89 @@ def test_the_parity_palettes_resolve_as_the_parity_targets_expect(
     assert match is not None and match.state == expected
 
 
-def test_amber_resolves_to_orange_on_a_wheel_with_orange_and_no_yellow() -> None:
-    match = nearest_color_state(
-        _wheel(white="white", red="red", orange="orange", blue="blue"), "amber"
-    )
+def test_amber_and_purple_take_their_neighbours_by_hue() -> None:
+    """Amber (68°) is nearer orange (53°) than yellow (110°). Purple, a violet (306°), is
+    nearer blue (264°) than red (29°), and nearer magenta (328°) still where it exists."""
+    assert {
+        name: (match.state if (match := nearest_color_state(_wheel(**wheel), color)) else None)
+        for name, wheel, color in (
+            ("amber-w8", _W8, "amber"),
+            ("amber-no-yellow", {"white": "white", "red": "red", "orange": "orange"}, "amber"),
+            ("purple-w4", _W4, "purple"),
+            ("purple-w8", _W8, "purple"),
+        )
+    } == {
+        "amber-w8": "orange",
+        "amber-no-yellow": "orange",
+        "purple-w4": "blue",
+        "purple-w8": "magenta",
+    }
 
-    assert match is not None and (match.state, match.fit) == ("orange", "approximate")
 
-
-def test_a_colour_with_a_hue_uses_a_white_slot_only_when_no_slot_has_a_hue() -> None:
-    match = nearest_color_state(_wheel(open="white", cool="cool_white"), "cyan")
+def test_a_colour_with_no_slot_near_its_hue_is_a_mismatch_on_the_nearest_white() -> None:
+    match = nearest_color_state(_wheel(**_WR), "cyan")
 
     assert match is not None
-    assert (match.state, match.fit) == ("cool", "no_chromatic_match_used_neutral")
-    assert match.distance == color_distance("cyan", "cool_white")
+    assert (match.state, match.fit, match.neutral_fallback) == ("white", "hue_mismatch", True)
+    assert match.hue_difference is None
 
 
-def test_a_white_request_on_a_wheel_without_white_takes_the_nearest_slot() -> None:
+def test_a_mismatch_without_a_white_slot_returns_the_nearest_hue() -> None:
+    match = nearest_color_state(_wheel(red="red", orange="orange"), "blue")
+
+    assert match is not None
+    assert (match.state, match.fit, match.neutral_fallback) == ("red", "hue_mismatch", False)
+    assert match.hue_difference is not None and match.hue_difference > HUE_CAP
+
+
+def test_a_tint_never_stands_in_for_a_saturated_colour() -> None:
+    """A CTB slot is blue-ish but a twentieth of blue's chroma; a red request is not
+    shown by a CTO (under `MIN_CHROMA_RATIO` of its chroma)."""
+    profile = _wheel(**_WCT)
+
+    blue, red = nearest_color_state(profile, "blue"), nearest_color_state(profile, "red")
+
+    assert blue is not None and (blue.state, blue.fit) == ("open", "hue_mismatch")
+    assert red is not None and (red.state, red.fit) == ("open", "hue_mismatch")
+
+
+def test_a_white_request_on_a_wheel_without_white_is_a_mismatch() -> None:
     match = nearest_color_state(_wheel(red="red", yellow="yellow", blue="blue"), "warm_white")
 
-    assert match is not None and (match.state, match.fit) == ("yellow", "approximate")
+    assert match is not None and (match.state, match.fit) == ("yellow", "hue_mismatch")
+
+
+def test_a_request_too_dark_for_any_slot_gets_no_match() -> None:
+    profile = _wheel(**_W4)
+
+    assert MIN_LIGHTNESS == 0.15
+    assert nearest_color_state(profile, "#000000") is None
+    assert nearest_color_state(profile, "#0A0A0A") is None
+    assert nearest_color_state(profile, "#400000") is not None  # dark red, L 0.23
 
 
 def test_an_exact_slot_is_at_distance_zero() -> None:
     profile = _wheel(red="red", orange="orange", blue="blue")
 
-    assert nearest_color_state(profile, "#ff0000") == ColorMatch("red", "#FF0000", 0.0, "exact")
-    assert nearest_color_state(profile, "orange") == ColorMatch("orange", "#FF8000", 0.0, "exact")
+    assert nearest_color_state(profile, "#ff0000") == ColorMatch(
+        "red", "#FF0000", 0.0, 0.0, "exact", False
+    )
 
 
 def test_a_tie_goes_to_the_first_state_name() -> None:
     profile = _wheel(zeta="#FF0000", alpha="#FF0000", beta="#0000FF")
 
-    assert nearest_color_state(profile, "#FE0000") == ColorMatch(
-        "alpha", "#FF0000", color_distance("#FE0000", "#FF0000"), "approximate"
-    )
+    match = nearest_color_state(profile, "#FE0000")
+
+    assert match is not None and (match.state, match.fit) == ("alpha", "exact")
 
 
 def test_nearest_color_state_ignores_untagged_states_and_none_when_nothing_is_tagged() -> None:
     profile = _profile(_payload(color={"blue": {"hex": "blue"}}))
 
-    assert nearest_color_state(profile, "red") == ColorMatch(
-        "blue", "#0000FF", color_distance("#FF0000", "#0000FF"), "approximate"
-    )
+    match = nearest_color_state(profile, "red")
+
+    assert match is not None and (match.state, match.fit) == ("blue", "hue_mismatch")
     assert nearest_color_state(_profile(discrete_profile_payload()), "red") is None
 
 
@@ -439,19 +528,87 @@ def test_color_distance_is_the_oklab_difference() -> None:
     assert color_distance("#000000", "#FFFFFF") == pytest.approx(1.0, abs=1e-4)
 
 
-def test_gobo_state_finds_the_tagged_pattern_first_state_name_on_a_tie() -> None:
+# --- Rig-level offers -------------------------------------------------------------------
+
+
+def _mixed_rig() -> dict[str, FixtureCapabilities]:
+    """MH1 and MH2 on the eight-slot wheel with a gobo `star` and three strobe speeds;
+    MH3 on white/red/blue/green with only a fast strobe; MH4 on white/red, no gobo."""
+    strobes = {
+        "strobe_slow": {"range_min": 100, "range_max": 139, "value": 120, "strobe": "slow"},
+        "strobe_medium": {"range_min": 140, "range_max": 179, "value": 160, "strobe": "medium"},
+        "strobe_fast": {"range_min": 180, "range_max": 219, "value": 200, "strobe": "fast"},
+    }
+
+    def head(colors: dict[str, str], speeds: tuple[str, ...], gobo: bool) -> FixtureCapabilities:
+        payload = _wheel(**colors).model_dump(mode="json")
+        payload["discrete"]["shutter"]["states"] |= {
+            name: state for name, state in strobes.items() if state["strobe"] in speeds
+        }
+        if gobo:
+            payload["discrete"]["gobo"]["states"]["star"]["pattern"] = "stars"
+        return _profile(payload)
+
+    eight = head(_W8, ("slow", "medium", "fast"), gobo=True)
+    return {
+        "MH1": eight,
+        "MH2": eight,
+        "MH3": head(_W4, ("fast",), gobo=True),
+        "MH4": head(_WR, (), gobo=False),
+    }
+
+
+def test_rig_color_offer_grades_a_colour_across_a_mixed_rig() -> None:
+    rig = _mixed_rig()
+
+    red = rig_color_offer(rig, "red")
+    cyan = rig_color_offer(rig, "cyan")
+    amber = rig_color_offer({"MH1": rig["MH1"]}, "amber")
+    lone = rig_color_offer({"MH4": rig["MH4"]}, "blue")
+
+    assert (red.status, red.worse) == ("all_exact_or_close", ())
+    assert (cyan.status, cyan.worse) == ("partial", ("MH3", "MH4"))
+    assert [m.fit for m in cyan.matches.values() if m] == [
+        "exact",
+        "exact",
+        "approximate",
+        "hue_mismatch",
+    ]
+    assert (amber.status, amber.worse) == ("all_exact_or_close", ())
+    assert (lone.status, lone.worse) == ("unavailable", ("MH4",))
+    assert rig_color_offer(rig, "#000000").status == "unavailable"
+
+
+def test_rig_gobo_and_strobe_offers_say_all_some_or_none() -> None:
+    rig = _mixed_rig()
+
+    assert rig_gobo_offer(rig, "stars") == RigStateOffer(
+        {"MH1": "star", "MH2": "star", "MH3": "star", "MH4": None}, "some", ("MH4",)
+    )
+    assert rig_gobo_offer(rig, "flame").available == "none"
+    assert rig_strobe_offer(rig, "fast").available == "some"
+    assert rig_strobe_offer(rig, "fast").missing == ("MH4",)
+    assert rig_strobe_offer({"MH1": rig["MH1"]}, "medium") == RigStateOffer(
+        {"MH1": "strobe_medium"}, "all", ()
+    )
+
+
+def test_gobo_state_prefers_the_shortest_name_among_states_of_one_pattern() -> None:
     payload = _payload(
         gobo={
             "star": {"pattern": "stars"},
             "open": {"pattern": "open"},
-            "star_shake": {"range_min": 24, "range_max": 31, "value": 28, "pattern": "stars"},
+            "a_star_shake": {"range_min": 24, "range_max": 31, "value": 28, "pattern": "stars"},
+            "dots": {"pattern": "dots"},
+            "dotz": {"range_min": 32, "range_max": 39, "value": 34, "pattern": "dots"},
         }
     )
     profile = _profile(payload)
 
-    assert gobo_state(profile, GoboPattern.STARS) == "star"
+    assert gobo_state(profile, GoboPattern.STARS) == "star"  # not the shake, first by name
+    assert gobo_state(profile, GoboPattern.DOTS) == "dots"  # equal length: by name
     assert gobo_state(profile, "open") == "open"
-    assert gobo_state(profile, GoboPattern.DOTS) is None
+    assert gobo_state(profile, GoboPattern.FLAME) is None
     assert gobo_state(_profile(profile_payload()), "open") is None
 
 
@@ -556,26 +713,102 @@ def test_a_filled_snippet_pastes_into_the_profile_and_an_unfilled_one_is_refused
 
     assert gobo_state(profile, "flame") == "gobo4"
     assert strobe_state(profile, "medium") == "strobe"
-    assert nearest_color_state(profile, "red") == ColorMatch("red", "#FF0000", 0.0, "exact")
+    assert nearest_color_state(profile, "red") == ColorMatch(
+        "red", "#FF0000", 0.0, 0.0, "exact", False
+    )
     assert tag_guidance(profile) is None
 
 
-def test_name_suggestions_read_words_inside_a_state_name() -> None:
+@pytest.mark.parametrize(
+    ("channel", "name", "suggested"),
+    [
+        pytest.param("color", "Warm White", "warm_white", id="two-word-preset"),
+        pytest.param("color", "red2", "red", id="name-with-digits"),
+        pytest.param("color", "open", "white", id="open-colour-slot"),
+        pytest.param("color", "dark-blue", None, id="modifier"),
+        pytest.param("color", "light_green", None, id="modifier-light"),
+        pytest.param("color", "red_blue", None, id="two-colours"),
+        pytest.param("color", "cto", None, id="no-colour-word"),
+        pytest.param("gobo", "stars_shake", "stars", id="pattern-in-name"),
+        pytest.param("gobo", "dots_stars", None, id="two-patterns"),
+        pytest.param("shutter", "fast_strobe", "fast", id="speed"),
+        pytest.param("shutter", "strobe_slow_fast", None, id="variable-range"),
+    ],
+)
+def test_name_suggestions_need_one_unqualified_word(
+    channel: str, name: str, suggested: str | None
+) -> None:
+    payload = _payload(**{channel: {name: {"range_min": 230, "range_max": 239, "value": 234}}})
+    tag = {"color": "hex", "gobo": "pattern", "shutter": "strobe"}[channel]
+
+    guidance = tag_guidance(_profile(payload)) or ""
+    value = _snippet(guidance)[channel]["states"][name][tag]
+
+    if suggested is None:
+        assert value.startswith("<")
+    else:
+        assert value == suggested
+
+
+def test_an_opted_out_state_is_settled_and_never_offered() -> None:
     payload = _payload(
-        color={
-            "dark-blue": {"range_min": 30, "range_max": 39, "value": 34},
-            "Warm White": {"range_min": 40, "range_max": 49, "value": 44},
-            "open": {"range_min": 50, "range_max": 59, "value": 54},
-            "cto": {"range_min": 60, "range_max": 69, "value": 64},
+        color={"white": {"hex": "white"}, "red": {"hex": "red"}, "blue": {"hex": "blue"}},
+        gobo={
+            "open": {"pattern": "open"},
+            "dots": {"pattern": "dots"},
+            "star": {"pattern": "stars"},
+            "shake": {"range_min": 24, "range_max": 31, "value": 28, "offer": False},
+        },
+        shutter={"pulse": {"range_min": 100, "range_max": 199, "value": 150, "offer": False}},
+    )
+    profile = _profile(payload)
+
+    assert tag_guidance(profile) is None
+    assert profile.model_dump(mode="json")["discrete"]["gobo"]["states"]["shake"]["offer"] is False
+    assert "offer" not in profile.model_dump(mode="json")["discrete"]["gobo"]["states"]["dots"]
+
+
+@pytest.mark.parametrize("tag", [("hex", "red"), ("pattern", "stars"), ("strobe", "fast")])
+def test_an_opt_out_cannot_carry_a_tag(tag: tuple[str, str]) -> None:
+    channel = {"hex": "color", "pattern": "gobo", "strobe": "shutter"}[tag[0]]
+    payload = _payload(
+        **{
+            channel: {
+                "x": {
+                    "range_min": 230,
+                    "range_max": 239,
+                    "value": 234,
+                    tag[0]: tag[1],
+                    "offer": False,
+                }
+            }
         }
     )
 
-    color = _snippet(tag_guidance(_profile(payload)) or "")["color"]["states"]
+    with pytest.raises(ValidationError) as caught:
+        _profile(payload)
 
-    assert color["dark-blue"]["hex"] == "blue"
-    assert color["Warm White"]["hex"] == "warm_white"
-    assert color["open"]["hex"] == "white"
-    assert color["cto"]["hex"].startswith("<#RRGGBB or a colour name")
+    (error,) = caught.value.errors()
+    assert error["loc"] == ("discrete", channel, "states", "x")
+    assert "`offer: false`" in error["msg"] and f"`{tag[0]}`" in error["msg"]
+
+
+def test_offer_accepts_only_false() -> None:
+    with pytest.raises(ValidationError) as caught:
+        _profile(_payload(gobo={"dots": {"offer": True}}))
+
+    (error,) = caught.value.errors()
+    assert error["loc"] == ("discrete", "gobo", "states", "dots", "offer")
+
+
+def test_guidance_explains_opting_out_and_splitting_a_variable_strobe() -> None:
+    guidance = tag_guidance(_profile(_strobing_payload())) or ""
+
+    assert '"offer": false' in guidance
+    assert "one variable slow-to-fast range offers one speed" in guidance
+    assert "split the range into three states" in guidance
+    colour_only = tag_guidance(_profile(discrete_profile_payload())) or ""
+    assert "variable slow-to-fast" not in colour_only  # no untagged shutter state
 
 
 def _layout_model(tmp_path: Path, **slots: tuple[int, str]) -> Any:
@@ -669,13 +902,14 @@ _BASE_PREFIX = "fixture.base_config.physical_profile"
 _HEADS = ("MH1", "MH2", "MH3", "MH4")
 _STROBE_STATE = {"range_min": 100, "range_max": 149, "value": 120, "settle_ms": 0}
 
-_TAG_MUTATIONS: dict[str, tuple[str, str, str]] = {
+_TAG_MUTATIONS: dict[str, tuple[str, str, str | bool]] = {
     "discrete.states.hex": ("color", "red", "red"),
     "discrete.states.pattern": ("gobo", "star", "stars"),
     "discrete.states.strobe": ("shutter", "strobe", "fast"),
+    "discrete.states.offer": ("gobo", "dots", False),
 }
-"""Per tag path: the channel and state the tag goes on, and its value. The shutter's
-`strobe` state is in both renders, so only the tag differs."""
+"""Per path: the channel and state the tag (or the `offer: false` opt-out) goes on, and
+its value. The shutter's `strobe` state is in both renders, so only the tag differs."""
 
 TAG_PATHS = tuple(
     path
@@ -757,9 +991,8 @@ def test_the_user_guide_tag_example_loads_into_its_minimal_profile() -> None:
     profile = fixture.config.physical_profile
 
     assert profile is not None
-    assert tagged_colors(profile) == {"amber": "#FFBF00", "red": "#E01010", "white": "#FFFFFF"}
+    assert tagged_colors(profile) == {"amber": "#FFA000", "red": "#E01010", "white": "#FFFFFF"}
     assert gobo_state(profile, "stars") == "star"
     assert strobe_state(profile, "fast") == "strobe_fast"
-    assert nearest_color_state(profile, "yellow") == ColorMatch(
-        "amber", "#FFBF00", color_distance("yellow", "amber"), "approximate"
-    )
+    match = nearest_color_state(profile, "yellow")
+    assert match is not None and (match.state, match.fit) == ("amber", "approximate")

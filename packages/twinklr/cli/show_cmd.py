@@ -12,6 +12,7 @@ import time
 from rich.console import Console
 
 from twinklr.cli.display_cmd import load_display_fe_bundle
+from twinklr.cli.profile_tags import report_profile_tags
 from twinklr.core.agents.providers.factory import validate_llm_provider_config
 from twinklr.core.agents.sequencer.moving_heads.rendering_stage import record_render
 from twinklr.core.caching import derive_session_id
@@ -120,6 +121,9 @@ async def run_show_pipeline_async(
 
     artifact_dir = output_dir / song_name
     artifact_dir.mkdir(parents=True, exist_ok=True)
+    report_profile_tags(
+        console, fixture_group.expand_fixtures(), wiring.layout_models, artifact_dir
+    )
     resolved_session_id = session_id or derive_session_id(
         audio_path=audio_path,
         configs=(app_config, job_config, fixture_group),

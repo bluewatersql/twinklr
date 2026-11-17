@@ -2104,15 +2104,15 @@ for _profile_root in (
             f"test_physical_profile_field_changes_contract[{_physical_path}]",
             _note,
         )
-# Song-intent W1 meaning tags on discrete states (`hex`, `pattern`, `strobe`): validated
-# and part of render identity, but no renderer or planner reads them yet. Each exact path
-# must change the render fingerprint and no frame; W3 (the rig offer) and W4 (section
-# colour and gobo) repoint them to the effect they add.
+# Song-intent W1 meaning tags on discrete states (`hex`, `pattern`, `strobe`) and the
+# `offer: false` opt-out: validated and part of render identity, but no renderer or
+# planner reads them yet. Each exact path must change the render fingerprint and no
+# frame; W3 (the rig offer) and W4 (section colour and gobo) repoint them to their effect.
 for _profile_root in (
     "fixture.fixtures[FixtureInstance].config.physical_profile",
     "fixture.base_config.physical_profile",
 ):
-    for _tag in ("hex", "pattern", "strobe"):
+    for _tag in ("hex", "pattern", "strobe", "offer"):
         _tag_path = f"{_profile_root}.discrete.states.{_tag}"
         CONFIG_EFFECTS[_tag_path] = ConfigDisposition(
             ConfigDispositionKind.EFFECT_TEST,

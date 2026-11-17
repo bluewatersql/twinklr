@@ -32,6 +32,7 @@ from twinklr.cli.curation_cmd import (
 )
 from twinklr.cli.display_cmd import add_display_subparser, run_display_command
 from twinklr.cli.fseqcmp_cmd import run_fseqcmp_command
+from twinklr.cli.profile_tags import report_profile_tags
 from twinklr.cli.recipe_builder_cmd import (
     add_curate_catalog_subparser,
     run_curate_catalog_command,
@@ -56,7 +57,6 @@ from twinklr.core.api.xlights import (
 from twinklr.core.caching import derive_session_id
 from twinklr.core.caching.identity import hash_file_content
 from twinklr.core.config.fixtures import FixtureGroup
-from twinklr.core.config.fixtures.state_tags import rig_tag_guidance
 from twinklr.core.config.loader import load_app_config, load_fixture_group, load_job_config
 from twinklr.core.config.models import JobConfig
 from twinklr.core.config.render_policy import (
@@ -154,10 +154,6 @@ LIVE_PLAN_IDENTITY = {
 
 LIVE_DRY_RUN_FILENAME = "live-dry-run.jsonl"
 """Where a dry run writes its planned xLights writes, one JSON object a line."""
-
-PROFILE_TAGS_FILENAME = "profile_tags.txt"
-"""Paste-ready meaning tags for the rig's untagged wheel and shutter states, written
-beside a run's output when there are any."""
 
 
 def _sha256(text: str) -> str:
@@ -618,24 +614,7 @@ async def _run_pipeline_async(
             console.print(f"[red]ERROR: xLights layout {layout_path.name}: {error}[/red]")
             return 1
         console.print(f"[green]✅ xLights models checked against[/green] {layout_path.name}")
-    # Untagged wheel states are never guessed at: one line says so, and the paste-ready
-    # tags go to a file beside the run's output (removed once the rig is fully tagged).
-    tag_guidance = rig_tag_guidance(fixture_group.expand_fixtures(), layout_models or ())
-    tag_guidance_path = artifact_dir / PROFILE_TAGS_FILENAME
-    if tag_guidance:
-        tag_guidance_path.write_text("\n".join(g.text for g in tag_guidance), encoding="utf-8")
-        untagged = ", ".join(fixture_id for g in tag_guidance for fixture_id in g.fixture_ids)
-        console.print(
-            f"NOTE: {untagged}: wheel or shutter states without a meaning tag (hex, pattern, "
-            "strobe) cannot carry the planner's colour, gobo or strobe choices; paste-ready "
-            f"tags to confirm: {tag_guidance_path}",
-            style="yellow",
-            markup=False,
-            highlight=False,
-            soft_wrap=True,
-        )
-    else:
-        tag_guidance_path.unlink(missing_ok=True)
+    report_profile_tags(console, fixture_group.expand_fixtures(), layout_models or (), artifact_dir)
 
     # Define pipeline via pipeline definitions module
     console.print("\n[bold]Defining pipeline...[/bold]")

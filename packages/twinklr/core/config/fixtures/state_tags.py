@@ -14,7 +14,6 @@ name or the fixture's xLights model, marked as a suggestion for the user to conf
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from itertools import pairwise
 import json
 import math
 import re
@@ -39,10 +38,40 @@ NEUTRAL_CHROMA = 0.04
 0.029 (`cool_white`) and the palette catalog's tinted whites 0.013, while its palest
 tints start at 0.060; saturated wheel colours are 0.15 and above."""
 
-ColorFit = Literal["exact", "approximate", "no_chromatic_match_used_neutral"]
-"""How faithfully a matched state shows a requested colour: the same colour; another
-colour (the nearest by the rules of `nearest_color_state`); or a white, because the
-request has a hue and the wheel has no tagged slot that does."""
+PALE_CHROMA = 0.10
+"""Below this chroma a requested tint (a pastel such as `#FFCCBC`) may also take a white
+slot, when white is nearer it (Oklab) than the best slot with a hue."""
+
+MIN_LIGHTNESS = 0.15
+"""Below this Oklab lightness a request is too dark for any wheel slot: darkness is the
+dimmer's, so it gets no match."""
+
+EXACT_DISTANCE = 0.02
+"""Oklab difference within which a slot shows the request exactly (about one
+just-noticeable difference)."""
+
+CLOSE_DISTANCE = 0.10
+"""Oklab difference within which a slot shows the request closely..."""
+CLOSE_HUE = 25.0
+"""...when its hue is also within this many degrees."""
+
+HUE_CAP = 75.0
+"""Beyond this hue difference no slot with a hue stands in for the request."""
+
+MIN_CHROMA_RATIO = 0.6
+"""A slot with a hue stands in for a request only with at least this share of its
+chroma, so a tint (a CTO or CTB slot) never stands in for a saturated colour."""
+
+ColorFit = Literal["exact", "close", "approximate", "hue_mismatch"]
+"""How faithfully a matched state shows a requested colour.
+
+- `exact`: within `EXACT_DISTANCE`.
+- `close`: within `CLOSE_DISTANCE` and, for colours with a hue, `CLOSE_HUE`.
+- `approximate`: the best slot, with a hue within `HUE_CAP` (or a white for a white or
+  pale request, further than `CLOSE_DISTANCE`).
+- `hue_mismatch`: no slot shows anything like it; the state is the nearest white slot
+  (`neutral_fallback`) or, without one, the nearest by hue. Not to be offered.
+"""
 
 
 class ColorMatch(NamedTuple):
@@ -53,7 +82,12 @@ class ColorMatch(NamedTuple):
     distance: float
     """Oklab colour difference (ΔE_OK) between the request and `hex`: 0 is the same
     colour, about 0.02 a just-noticeable difference, black to white 1."""
+    hue_difference: float | None
+    """Degrees between the request's hue and `hex`'s (0 to 180); None when either is a
+    white (chroma below `NEUTRAL_CHROMA`) and has no hue."""
     fit: ColorFit
+    neutral_fallback: bool
+    """A white slot was returned for a request with a hue because no slot matched it."""
 
 
 def tagged_colors(profile: FixtureCapabilities) -> dict[str, str]:
@@ -66,43 +100,76 @@ def tagged_colors(profile: FixtureCapabilities) -> dict[str, str]:
 
 def nearest_color_state(profile: FixtureCapabilities, color: str) -> ColorMatch | None:
     """The tagged colour state to show `color` (`#RRGGBB` or a colour preset name); None
-    when no colour state is tagged.
+    when no colour state is tagged or the request is darker than `MIN_LIGHTNESS`.
 
-    Hue first, in OKLCh. A request with a hue (chroma at least `NEUTRAL_CHROMA`) goes to
-    the tagged slot with a hue whose hue angle is nearest, then whose chroma, then whose
-    lightness is nearest; a white slot is chosen only when no tagged slot has a hue
-    (`fit` says so). A white request goes to the white slot nearest in lightness and
-    tint (`color_distance`), or, on a wheel without one, to the nearest slot. Ties go to
-    the first state name.
+    Hue first, in OKLCh:
+
+    - A white request (chroma below `NEUTRAL_CHROMA`) takes the nearest white slot
+      (Oklab); without one, the nearest slot, as a `hue_mismatch`.
+    - A request with a hue takes, among the slots with a hue and at least
+      `MIN_CHROMA_RATIO` of its chroma, the one whose hue is nearest, then whose chroma,
+      then whose lightness. A pale request (chroma below `PALE_CHROMA`) takes the nearest
+      white slot instead when that is nearer it (Oklab) or no slot with a hue qualifies.
+      When no slot qualifies or the best is more than `HUE_CAP` away, the result is a `hue_mismatch`: the nearest white slot
+      (`neutral_fallback`), else the slot with a hue nearest by hue.
+
+    Ties go to the first state name. `fit` grades the result (`ColorFit`).
 
     Raises:
         ValueError: If `color` is not a colour.
     """
-    target = canonical_hex(color)
     slots = {name: (shown, _oklab(shown)) for name, shown in tagged_colors(profile).items()}
-    if not slots:
+    wanted = _oklab(canonical_hex(color))
+    if not slots or wanted[0] < MIN_LIGHTNESS:
         return None
-    wanted = _oklab(target)
-    hued = {name for name, (_, lab) in slots.items() if _chroma(lab) >= NEUTRAL_CHROMA}
-    pool = (hued if _chroma(wanted) >= NEUTRAL_CHROMA else slots.keys() - hued) or slots.keys()
+    whites = [name for name, (_, lab) in slots.items() if _chroma(lab) < NEUTRAL_CHROMA]
+    hued = [name for name in slots if name not in whites]
 
-    def rank(name: str) -> tuple[float, ...]:
+    def distance(name: str) -> float:
+        return math.dist(wanted, slots[name][1])
+
+    def by_hue(name: str) -> tuple[float, ...]:
         lab = slots[name][1]
-        if _chroma(wanted) >= NEUTRAL_CHROMA and name in hued:
-            return (
-                _hue_difference(wanted, lab),
-                abs(_chroma(wanted) - _chroma(lab)),
-                abs(wanted[0] - lab[0]),
-            )
-        return (math.dist(wanted, lab),)
+        return (
+            _hue_difference(wanted, lab),
+            abs(_chroma(wanted) - _chroma(lab)),
+            abs(wanted[0] - lab[0]),
+        )
 
-    state = min(sorted(pool), key=rank)
-    shown, lab = slots[state]
-    distance = math.dist(wanted, lab)
-    fit: ColorFit = "exact" if distance == 0 else "approximate"
-    if _chroma(wanted) >= NEUTRAL_CHROMA and state not in hued:
-        fit = "no_chromatic_match_used_neutral"
-    return ColorMatch(state, shown, distance, fit)
+    def result(name: str, fit: ColorFit | None = None, fallback: bool = False) -> ColorMatch:
+        shown, lab = slots[name]
+        hue = (
+            _hue_difference(wanted, lab)
+            if min(_chroma(wanted), _chroma(lab)) >= NEUTRAL_CHROMA
+            else None
+        )
+        if fit is None:
+            gap = distance(name)
+            if gap <= EXACT_DISTANCE:
+                fit = "exact"
+            elif gap <= CLOSE_DISTANCE and (hue is None or hue <= CLOSE_HUE):
+                fit = "close"
+            else:
+                fit = "approximate"
+        return ColorMatch(name, shown, distance(name), hue, fit, fallback)
+
+    def nearest(names: list[str]) -> str:
+        return min(names, key=lambda name: (distance(name), name))
+
+    if _chroma(wanted) < NEUTRAL_CHROMA:
+        return result(nearest(whites)) if whites else result(nearest(hued), "hue_mismatch")
+    able = [n for n in hued if _chroma(slots[n][1]) >= MIN_CHROMA_RATIO * _chroma(wanted)]
+    best = min(able, key=lambda name: (*by_hue(name), name)) if able else None
+    within = best is not None and by_hue(best)[0] <= HUE_CAP
+    if _chroma(wanted) < PALE_CHROMA and whites:
+        white = nearest(whites)
+        if best is None or not within or distance(white) < distance(best):
+            return result(white)
+    if best is not None and within:
+        return result(best)
+    if whites:
+        return result(nearest(whites), "hue_mismatch", fallback=True)
+    return result(min(hued, key=lambda name: (*by_hue(name), name)), "hue_mismatch")
 
 
 def color_distance(first: str, second: str) -> float:
@@ -112,11 +179,14 @@ def color_distance(first: str, second: str) -> float:
 
 
 def gobo_state(profile: FixtureCapabilities, pattern: GoboPattern | str) -> str | None:
-    """The first gobo state, by name, tagged with `pattern`; None when none is."""
+    """The gobo state tagged with `pattern`; None when none is. Among states sharing a
+    pattern, the shortest name, then the first by name: a static `star` before its
+    shaking copy `star_shake`."""
     wanted = GoboPattern(pattern)
     wheel = profile.discrete.get("gobo")
-    states = sorted(wheel.states.items()) if wheel is not None else []
-    return next((name for name, state in states if state.pattern == wanted), None)
+    states = wheel.states.items() if wheel is not None else ()
+    names = [name for name, state in states if state.pattern == wanted]
+    return min(names, key=lambda name: (len(name), name), default=None)
 
 
 def strobe_state(profile: FixtureCapabilities, speed: StrobeSpeed) -> str | None:
@@ -124,6 +194,78 @@ def strobe_state(profile: FixtureCapabilities, speed: StrobeSpeed) -> str | None
     shutter = profile.discrete.get("shutter")
     states = shutter.states.items() if shutter is not None else ()
     return next((name for name, state in states if state.strobe == speed), None)
+
+
+RigColorStatus = Literal["all_exact_or_close", "partial", "unavailable"]
+
+
+class RigColorOffer(NamedTuple):
+    """What a rig makes of one requested colour."""
+
+    matches: dict[str, ColorMatch | None]
+    """Each fixture's match (`nearest_color_state`), by fixture id."""
+    status: RigColorStatus
+    """`all_exact_or_close` when every fixture shows it exactly or closely; `unavailable`
+    when none shows it at all (every match is None or a `hue_mismatch`); else
+    `partial`."""
+    worse: tuple[str, ...]
+    """The fixtures that show it less than closely, in rig order (empty when
+    `all_exact_or_close`)."""
+
+
+def rig_color_offer(profiles: Mapping[str, FixtureCapabilities], color: str) -> RigColorOffer:
+    """`nearest_color_state` for each fixture of a rig (`profiles`, by fixture id) and how
+    the rig as a whole shows `color`.
+
+    Raises:
+        ValueError: If `color` is not a colour.
+    """
+    matches = {fixture_id: nearest_color_state(p, color) for fixture_id, p in profiles.items()}
+    worse = tuple(
+        fixture_id
+        for fixture_id, match in matches.items()
+        if match is None or match.fit not in ("exact", "close")
+    )
+    shown = any(match is not None and match.fit != "hue_mismatch" for match in matches.values())
+    status: RigColorStatus = (
+        "all_exact_or_close" if not worse else "partial" if shown else "unavailable"
+    )
+    return RigColorOffer(matches, status, worse)
+
+
+RigAvailability = Literal["all", "some", "none"]
+
+
+class RigStateOffer(NamedTuple):
+    """Which fixtures of a rig have a state for one gobo pattern or strobe speed."""
+
+    states: dict[str, str | None]
+    """Each fixture's state (`gobo_state` or `strobe_state`), by fixture id."""
+    available: RigAvailability
+    missing: tuple[str, ...]
+    """The fixtures without one, in rig order."""
+
+
+def rig_gobo_offer(
+    profiles: Mapping[str, FixtureCapabilities], pattern: GoboPattern | str
+) -> RigStateOffer:
+    """`gobo_state` for each fixture of a rig (`profiles`, by fixture id)."""
+    return _state_offer({fixture_id: gobo_state(p, pattern) for fixture_id, p in profiles.items()})
+
+
+def rig_strobe_offer(
+    profiles: Mapping[str, FixtureCapabilities], speed: StrobeSpeed
+) -> RigStateOffer:
+    """`strobe_state` for each fixture of a rig (`profiles`, by fixture id)."""
+    return _state_offer({fixture_id: strobe_state(p, speed) for fixture_id, p in profiles.items()})
+
+
+def _state_offer(states: dict[str, str | None]) -> RigStateOffer:
+    missing = tuple(fixture_id for fixture_id, state in states.items() if state is None)
+    available: RigAvailability = (
+        "none" if len(missing) == len(states) else "some" if missing else "all"
+    )
+    return RigStateOffer(states, available, missing)
 
 
 # Oklab (Ottosson 2020): sRGB linearised (IEC 61966-2-1), to LMS, cube root, to Lab.
@@ -170,9 +312,20 @@ _PLACEHOLDERS = {
     "pattern": f"<one of: {', '.join(GoboPattern)}>",
     "strobe": "<slow, medium or fast; delete this key if the state does not strobe>",
 }
+_OPT_OUT = (
+    "A state that honestly has no such meaning (a pulse, a random strobe, a rainbow scroll, "
+    'a gobo shake) takes "offer": false in place of the tag, and is never offered.'
+)
+_VARIABLE_STROBE = (
+    "A shutter whose strobe is one variable slow-to-fast range offers one speed as one "
+    "state; to offer slow, medium and fast, split the range into three states, one per "
+    "speed."
+)
 """What an untagged state gets in the snippet; each is refused if pasted unfilled."""
 
 _STROBE_SPEEDS: tuple[str, ...] = get_args(StrobeSpeed)
+_MODIFIERS = frozenset({"light", "dark", "deep", "pale"})
+"""Words that make a colour name something other than the preset it contains."""
 
 
 def tag_guidance(
@@ -204,7 +357,7 @@ def tag_guidance(
         untagged = [
             name
             for name, state in wheel.states.items()
-            if getattr(state, tag) is None and name not in declared
+            if getattr(state, tag) is None and state.offer is None and name not in declared
         ]
         if not untagged:
             continue
@@ -229,7 +382,11 @@ def tag_guidance(
         f"{'they show' if many else 'it shows'}, so the planner's colour, gobo and strobe "
         f"choices cannot use {'them' if many else 'it'}. Under the profile's `discrete`, "
         "replace each channel's `states` with the one below; fill every <...> placeholder "
-        "(pasted unfilled, it is refused when the fixture file loads):\n" + _snippet_json(snippet)
+        "(pasted unfilled, it is refused when the fixture file loads). "
+        + _OPT_OUT
+        + (f" {_VARIABLE_STROBE}" if "shutter" in snippet else "")
+        + "\n"
+        + _snippet_json(snippet)
     )
     if suggested:
         text += (
@@ -263,20 +420,29 @@ def _suggestion(
     if channel == "color" and name in layout_hex:
         return layout_hex[name], f"xLights model {layout_model!r}"
     words = [word for word in re.split(r"[^a-z]+", name.lower()) if word]
-    value: str | None = None
+    found: list[str] = []
     if channel == "color":
-        candidates = ["_".join(pair) for pair in pairwise(words)] + words
-        value = next((word for word in candidates if word in COLOR_PRESET_HEX), None)
-        if value is None and words == ["open"]:
-            value = ColorPreset.WHITE.value  # a colour wheel's open slot shows white
+        if not _MODIFIERS & set(words):
+            rest = list(words)
+            while rest:
+                pair = "_".join(rest[:2])
+                if len(rest) > 1 and pair in COLOR_PRESET_HEX:
+                    found.append(pair)
+                    rest = rest[2:]
+                    continue
+                if rest[0] in COLOR_PRESET_HEX:
+                    found.append(rest[0])
+                rest = rest[1:]
+        if not found and words == ["open"]:
+            found = [ColorPreset.WHITE.value]  # a colour wheel's open slot shows white
     elif channel == "gobo":
         patterns = {pattern.value for pattern in GoboPattern}
-        value = next(
-            (form for word in words for form in (word, f"{word}s") if form in patterns),
-            None,
-        )
+        found = [form for word in words for form in (word, f"{word}s") if form in patterns]
     elif "strobe" in words:
-        value = next((speed for speed in _STROBE_SPEEDS if speed in words), None)
+        found = [speed for speed in _STROBE_SPEEDS if speed in words]
+    # A modifier (`dark_blue`), two colours (`red_blue`), two patterns or two speeds (a
+    # variable range) do not name one value: the user fills the placeholder.
+    value = found[0] if len(set(found)) == 1 else None
     return value, "the state name" if value is not None else ""
 
 

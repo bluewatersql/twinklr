@@ -6,7 +6,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from tests.support.moving_heads import p1_job, p1_rig
 from twinklr.cli.main import build_arg_parser
+from twinklr.cli.profile_tags import PROFILE_TAGS_FILENAME
 from twinklr.cli.show_cmd import run_show_command, run_show_pipeline_async
 from twinklr.core.config.fixtures import FixtureGroup, FixtureInstance
 from twinklr.core.config.fixtures.dmx import DmxMapping
@@ -208,3 +210,39 @@ async def test_show_refuses_a_rig_without_profiles_before_any_analysis(
     assert "the moving-head renderer cannot render this rig" in output
     assert "MH1: physical_profile is missing" in output
     prepare.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_show_notes_untagged_wheel_states_like_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`twinklr show` prints the one-line note and writes the paste-ready tags, using the
+    layout models its wiring read, before any analysis."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-only")
+    (tmp_path / "song.wav").write_bytes(b"synthetic audio")
+    wiring = MagicMock(layout_models=())
+    wiring.pipeline.validate_pipeline.return_value = []
+    with (
+        patch("twinklr.cli.show_cmd.load_app_config", return_value=AppConfig()),
+        patch("twinklr.cli.show_cmd.load_job_config", return_value=p1_job()),
+        patch("twinklr.cli.show_cmd.load_fixture_group", return_value=p1_rig()),
+        patch("twinklr.cli.show_cmd.load_display_fe_bundle"),
+        patch("twinklr.cli.show_cmd.load_template_catalog"),
+        patch("twinklr.cli.show_cmd.list_templates", return_value=[]),
+        patch("twinklr.cli.show_cmd.prepare_combined_show_pipeline", return_value=wiring),
+        patch("twinklr.cli.show_cmd.TwinklrSession", side_effect=RuntimeError("stop")),
+        pytest.raises(RuntimeError, match="stop"),
+    ):
+        await run_show_pipeline_async(
+            audio_path=tmp_path / "song.wav",
+            layout_path=tmp_path / "layout.xml",
+            fixture_config_path=tmp_path / "fixtures.json",
+            output_dir=tmp_path / "out",
+            app_config_path=None,
+            job_config_path=tmp_path / "job.json",
+        )
+
+    (note,) = [line for line in capsys.readouterr().out.splitlines() if "NOTE:" in line]
+    (tags,) = (tmp_path / "out").rglob(PROFILE_TAGS_FILENAME)
+    assert note.startswith("NOTE: MH1, MH2: wheel or shutter states without a meaning tag")
+    assert note.endswith(str(tags))

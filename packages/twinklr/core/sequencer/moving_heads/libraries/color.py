@@ -33,18 +33,21 @@ COLOR_PRESET_HEX: dict[ColorPreset, str] = {
     ColorPreset.MAGENTA: "#FF00FF",
     ColorPreset.CYAN: "#00FFFF",
     ColorPreset.ORANGE: "#FF8000",
-    ColorPreset.PURPLE: "#800080",
-    ColorPreset.AMBER: "#FFBF00",
+    ColorPreset.PURPLE: "#A020F0",
+    ColorPreset.AMBER: "#FFA000",
     ColorPreset.LIME: "#BFFF00",
     ColorPreset.WHITE: "#FFFFFF",
     ColorPreset.WARM_WHITE: "#F5F1E8",
     ColorPreset.COOL_WHITE: "#DCF0FF",
     ColorPreset.UV: "#6E00FF",
 }
-"""Each preset's canonical colour: the RGB representatives the deleted renderer's palette
-projection used (`sequencer/show_coordination.py` `_PRESET_RGB` at tag
-`mh-last-with-legacy-renderer`). Chosen, not measured; what a fixture's wheel really
-shows is its profile's `hex` tags."""
+"""Each preset's canonical colour. Chosen, not measured; what a fixture's wheel really
+shows is its profile's `hex` tags. Taken from the RGB representatives the deleted
+renderer's palette projection used (`sequencer/show_coordination.py` `_PRESET_RGB` at tag
+`mh-last-with-legacy-renderer`), except two moved off a neighbour's hue (OKLCh, W1
+review, 2026-11-17): purple is a violet (306°; the old `#800080` had magenta's 328°)
+and amber sits between orange and yellow nearer orange (68°; the old `#FFBF00` was 84°,
+nearer yellow's 110° than orange's 53°)."""
 
 _HEX = re.compile(r"#[0-9A-Fa-f]{6}")
 

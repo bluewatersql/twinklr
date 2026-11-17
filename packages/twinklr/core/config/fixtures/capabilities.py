@@ -258,9 +258,9 @@ class DiscreteState(BaseModel):
 
     A state may also say what it means, for the planner's colour, gobo and strobe
     choices: one tag per channel kind (`hex` on color, `pattern` on gobo, `strobe` on
-    shutter; the profile checks the kind). Tags are never defaulted: an untagged state
-    is simply not offered. Absent tags are left out of dumps, so an untagged profile
-    dumps, and so fingerprints, as before.
+    shutter; the profile checks the kind), or `offer: false` when it honestly has none.
+    Tags are never defaulted: an untagged state is simply not offered. Absent tags are
+    left out of dumps, so an untagged profile dumps, and so fingerprints, as before.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -287,6 +287,14 @@ class DiscreteState(BaseModel):
         exclude_if=lambda value: value is None,
         description="How fast a shutter state strobes",
     )
+    offer: Literal[False] | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description=(
+            "false: the state honestly has no tag (a pulse, a random strobe, a rainbow "
+            "scroll, a gobo shake) and is never offered; tag guidance stops asking for one"
+        ),
+    )
 
     @field_validator("hex", mode="before")
     @classmethod
@@ -298,6 +306,11 @@ class DiscreteState(BaseModel):
         if not self.range_min <= self.value <= self.range_max:
             raise ValueError(
                 f"value {self.value} is outside its range [{self.range_min}, {self.range_max}]"
+            )
+        if self.offer is False and (tags := [t for t in STATE_TAGS.values() if getattr(self, t)]):
+            raise ValueError(
+                f"`offer: false` says the state has no meaning tag, but it carries "
+                f"`{tags[0]}`; remove one of them"
             )
         return self
 

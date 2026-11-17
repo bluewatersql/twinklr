@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+from rich.console import Console
 
 from tests.support.live_xlights import FakeLiveXLights
 from tests.support.moving_heads import (
@@ -27,6 +28,7 @@ from tests.support.moving_heads import (
     unprofiled_rig,
 )
 from twinklr.cli import main as cli_main
+from twinklr.cli.profile_tags import PROFILE_TAGS_FILENAME, report_profile_tags
 from twinklr.core.agents.audio.profile.models import (
     AudioProfileModel,
     Contrast,
@@ -1061,7 +1063,7 @@ async def test_run_notes_untagged_wheel_states_once_and_writes_the_paste_ready_t
 
     output = capsys.readouterr().out
     (note,) = [line for line in output.splitlines() if "NOTE:" in line]
-    (tags,) = (tmp_path / "out").rglob(cli_main.PROFILE_TAGS_FILENAME)
+    (tags,) = (tmp_path / "out").rglob(PROFILE_TAGS_FILENAME)
     assert note.startswith("NOTE: MH1, MH2: wheel or shutter states without a meaning tag")
     assert note.endswith(f"paste-ready tags to confirm: {tags}")
     assert '"pattern": "stars"' not in output  # the snippet is in the file, not inline
@@ -1082,7 +1084,7 @@ async def test_run_on_a_fully_tagged_rig_prints_no_note_and_removes_stale_tags(
     _captured_run(monkeypatch, p1_job(), p1_rig())
     with p1_templates():
         await _run_with(tmp_path, None)
-    (stale,) = (tmp_path / "out").rglob(cli_main.PROFILE_TAGS_FILENAME)
+    (stale,) = (tmp_path / "out").rglob(PROFILE_TAGS_FILENAME)
     capsys.readouterr()
 
     _captured_run(monkeypatch, p1_job(), tagged_p1_rig())
@@ -1091,3 +1093,16 @@ async def test_run_on_a_fully_tagged_rig_prints_no_note_and_removes_stale_tags(
 
     assert "NOTE:" not in capsys.readouterr().out
     assert not stale.exists()
+
+
+def test_profile_tags_fall_back_to_printing_in_full_when_the_file_cannot_be_written(
+    tmp_path, capsys
+) -> None:
+    """A run never fails for the note: an unwritable directory prints the tags inline."""
+    missing = tmp_path / "no-such-dir"
+
+    report_profile_tags(Console(), p1_rig().expand_fixtures(), (), missing)
+
+    output = capsys.readouterr().out
+    assert "could not be written" in output
+    assert "MH1, MH2 (profile 'synthetic_spot'): 6 wheel or shutter states" in output

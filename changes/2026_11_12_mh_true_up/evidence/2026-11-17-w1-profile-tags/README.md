@@ -30,7 +30,7 @@ were run individually (§ Verification).
 | `packages/twinklr/core/formats/xlights/layout/models/rgb_effects.py` | `Model.dmx_color_wheel()` and `DMX_COLOR_WHEEL_SLOTS`: the one reader of a DMX model's colour-wheel slot attributes |
 | `packages/twinklr/core/profiling/layout/profiler.py` | Reads the slots through `Model.dmx_color_wheel()` instead of its own loop (same attributes, same 20 slots, same order) |
 | `packages/twinklr/cli/main.py` | `twinklr run`/`inject`/`regenerate` print `rig_tag_guidance` before analysis, after the layout check |
-| `tests/unit/config/test_mh_state_tags.py` (new) | 102 tests: model, validation, lookups, guidance, layout derivation, the guide's example, ledger evidence |
+| `tests/unit/config/test_mh_state_tags.py` (new) | 155 tests after the review follow-up: model, validation, lookups, guidance, layout derivation, the guide's example, ledger evidence |
 | `tests/config_effects_registry.py` | Six ledger paths (three tags × two profile roots) |
 | `tests/regression/test_mh_intent_parity.py` | `parity_rig` carries real `hex` tags; its test-side `STATE_HEX` stand-in and RGB nearest-state helper are replaced by `nearest_color_state` (xfail markers untouched) |
 | `tests/unit/cli/test_live_injection_command.py` | `twinklr run` prints the paste-ready tags, with a layout proposal |
@@ -96,7 +96,7 @@ All pure functions of one `FixtureCapabilities`, in
 | `gobo_state(profile, pattern)` | The first gobo state by name tagged with `pattern`, else `None` |
 | `strobe_state(profile, speed)` | The shutter state tagged with `speed`, else `None` |
 
-**Colour matching (revised on the coordinator's follow-up, same day).** The first pass
+**Colour matching (revised on the coordinator's follow-up, same day; the fit grades, hue cap, canonical purple and amber and the CLI note were revised again after review: § Review follow-up, which supersedes this section where they differ).** The first pass
 ranked slots by CIE76 ΔE, which sent a light saturated colour to white (cyan `#00E5FF` →
 white on a white/red/blue/green wheel). For a light show that is wrong: a planner asking
 for cyan should get blue or green. The rule now, all in OKLCh (`NEUTRAL_CHROMA = 0.04`):
@@ -322,3 +322,106 @@ after moving the reader and passes on the old reader too (it guards the move).
   measured.
 - The `run` note prints on every run whose rig has untagged states, including the
   owner's until it is tagged.
+
+## Review follow-up (2026-11-17, on `1f953f96`)
+
+The independent review of `10f3ac49` asked for narrow changes (REQUEST CHANGES); the
+integrator decided items 1–4, 6, 12 and the rig-level helpers. Every item was done. Not
+committed; no `make validate`.
+
+| # | Item | Done |
+|---|---|---|
+| 1 | `fit` was exact only at distance 0 | Graded: `exact` (ΔE_OK ≤ 0.02), `close` (ΔE ≤ 0.10 and hue ≤ 25°), `approximate` (hue ≤ 75°), `hue_mismatch`. `ColorMatch` is now `(state, hex, distance, hue_difference, fit, neutral_fallback)`; `hue_difference` is None when either colour is a white |
+| 2 | No hue cap (blue → red on a white/red wheel) | Beyond 75°, or with no qualifying slot, the result is `hue_mismatch`: the nearest white slot (`neutral_fallback=True`), else the nearest hue. Pinned on white/red and open/CTO/CTB wheels |
+| 3 | Purple `#800080` had magenta's hue | `#A020F0` (violet, 306°): purple → blue on white/red/blue/green, magenta on the eight-slot wheel |
+| 4 | Amber `#FFBF00` (84°) → yellow | `#FFA000` (68°): amber → orange (close) where orange and yellow both exist |
+| 5 | Guidance never clears for honestly untagged states | `"offer": false` (only `false`; refused beside a tag; left out of dumps when absent); `tag_guidance` treats it as settled. Ledger: two more paths, evidenced like the tags |
+| 6 | `twinklr show` not wired | `show` calls the same helper (`cli/profile_tags.py`, `report_profile_tags`) with `wiring.layout_models` once its output directory exists, before any analysis |
+| 7 | File write/delete could fail the run | Wrapped: a write failure prints the tags in full; a delete failure warns |
+| 8 | Black → white | A request darker than Oklab L 0.15 gets no match (`None`): darkness is the dimmer's |
+| 9 | Hard cut at chroma 0.04 | A pale tint (chroma < 0.10) takes the nearest white slot when it is nearer (Oklab) than the best slot with a hue, or when none qualifies. The catalog's pale stops (0.060–0.091) are `#B3E5FC`, `#FFCCBC`, `#80DEEA`, `#B39DDB`; every other non-white stop is 0.14 or more |
+| 10 | Name suggestions too eager | A placeholder when the name has a modifier (`light`, `dark`, `deep`, `pale`), two colours, two patterns or two speeds (`strobe_slow_fast`) |
+| 11 | Layout attribute names unverified | Said so in the user guide |
+| 12 | `gobo_state` could pick the shaking copy | Shortest name, then first by name (`star` before `star_shake`); documented |
+| 13 | Parity helper `nearest_state` calls the function under test | Noted here: the parity targets are mitigated by literal pins: `test_the_parity_palettes_resolve_as_the_parity_targets_expect` asserts red, green and blue for the three parity stops independently of the parity file |
+
+**One addition beyond the decisions: `MIN_CHROMA_RATIO = 0.6`.** With the hue cap alone,
+an open/CTO/CTB wheel answered red with CTO (`approximate`, 35° away), a white standing
+in for a saturated colour by another name. A slot with a hue now qualifies only with at
+least 0.6 of the request's chroma: red (0.258) needs 0.155 and a full CTO (`#FFB46B`) is
+0.125, so red becomes a `hue_mismatch` on open; orange and amber (0.186, 0.172) still
+take the CTO. 0.5 was tried first and let yellow and lime onto the CTO.
+
+**Thresholds as tuned** (`state_tags.py`): `NEUTRAL_CHROMA` 0.04, `PALE_CHROMA` 0.10,
+`MIN_LIGHTNESS` 0.15, `EXACT_DISTANCE` 0.02, `CLOSE_DISTANCE` 0.10, `CLOSE_HUE` 25°,
+`HUE_CAP` 75°, `MIN_CHROMA_RATIO` 0.6. The cap at 75° keeps magenta → red (61°) on a
+white/red/blue/green wheel and cyan → green (52°); 60° would send magenta to a white
+fallback. Lightness counts in ΔE, so a darker or duller request than its slot grades
+lower (e.g. `#00E676` → green is `approximate`, ΔE 0.11, 9°) although the dimmer could
+supply the lightness; W4 may revisit that grading.
+
+Every preset on five wheels (state, fit), pinned in
+`test_every_colour_preset_resolves_by_hue_on_realistic_wheels`:
+
+| Request | w/r/b/g | 8-slot | open/r/amber/pink/b/g | white/red | open/CTO/CTB |
+|---|---|---|---|---|---|
+| red | red exact | red exact | red exact | red exact | open mismatch |
+| blue | blue exact | blue exact | blue exact | white mismatch | open mismatch |
+| green | green exact | green exact | green exact | white mismatch | open mismatch |
+| yellow | green approx | yellow exact | green approx | white mismatch | open mismatch |
+| magenta | red approx | magenta exact | pink approx | red approx | open mismatch |
+| cyan | green approx | cyan exact | green approx | white mismatch | open mismatch |
+| orange | red approx | orange exact | amber close | red approx | cto approx |
+| purple | blue approx | magenta approx | blue approx | white mismatch | open mismatch |
+| amber | red approx | orange close | amber exact | red approx | cto close |
+| lime | green approx | yellow close | green approx | white mismatch | open mismatch |
+| white | white exact | white exact | open exact | white exact | open exact |
+| warm_white, cool_white | white close | white close | open close | white close | open close |
+| uv | blue approx | blue approx | blue approx | white mismatch | open mismatch |
+
+Every catalog palette stop on the three colour wheels: no `hue_mismatch`, no saturated
+stop on a white slot, whites on white (`test_no_saturated_palette_colour_lands_on_a_white_slot`).
+
+**Parity.** `tests/regression/test_mh_intent_parity.py` was not edited in this round;
+its targets go through `nearest_color_state(...).state` for `core.rgb_primary` (red,
+green) and `spec.cosmic_night` (blue), which purple and amber do not touch: unchanged
+(2 passed, 24 xfailed). `tests/regression/baselines/mh_intent_parity.json` was not
+touched: its facts are the old renderer's. The old renderer's show projection
+(`_closest_preset`) used the old preset table; that is a recorded fact, not something
+this table follows. `COLOR_PRESET_HEX`/`canonical_hex` have no other consumer than the
+profile's `hex` normalisation and these lookups; no committed rig tags `purple` or
+`amber`, so no dump or fingerprint moved.
+
+**Rig-level helpers for W3** (pure, tested on a mixed four-head rig):
+
+- `rig_color_offer(profiles, color)` → `RigColorOffer(matches, status, worse)`: each
+  fixture's `ColorMatch`; `all_exact_or_close`, `partial` (with `worse`, the fixtures
+  less than close) or `unavailable` (every match None or `hue_mismatch`).
+- `rig_gobo_offer(profiles, pattern)` and `rig_strobe_offer(profiles, speed)` →
+  `RigStateOffer(states, available, missing)`, `available` being `all`, `some` or `none`.
+
+Whether the heads of one section must share a resolved colour is left to W3/W4, as the
+review listed it for W3.
+
+**Guidance text** now also says how to opt a state out (`"offer": false`) and, when a
+shutter has untagged states, that one variable slow-to-fast strobe range offers one
+speed unless split into three states.
+
+**CLI note.** One shared helper, `twinklr/cli/profile_tags.py`
+(`PROFILE_TAGS_FILENAME`, `report_profile_tags`), used by `run`/`inject`/`regenerate`
+and `show`. Tests: run (note once, file content), run on a tagged rig (no note, stale file
+removed), show (note and file), and the write-failure fallback.
+
+**Dumps and fingerprints.** Unchanged for untagged profiles: `offer` is excluded when
+absent, like the tags. Pins: 45 passed.
+
+### Verification (this round, after the last edit)
+
+| Command | Result |
+|---|---|
+| `uv run pytest tests -q --no-cov` | 6718 passed, 30 skipped, 24 xfailed |
+| `uv run pytest tests/regression/test_mh_pins.py -q --no-cov` | 45 passed |
+| `uv run pytest tests/regression/test_mh_intent_parity.py -q --no-cov` | 2 passed, 24 xfailed |
+| `uv run ruff check packages tests scripts` | All checks passed |
+| `uv run ruff format --check packages tests scripts` | All files formatted |
+| `uv run mypy packages/twinklr` | No issues in 645 source files |
