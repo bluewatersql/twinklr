@@ -244,8 +244,8 @@ class AnalysisSnapshot(BaseModel):
     """One shared analysis payload reused across all five runs for a song.
 
     `admission` is what the pre-planning gate admitted on the experiment's rig for this
-    song: arm A selects only among it, every arm's plan may name only its templates,
-    and its hash is held constant across the arms. None means an old-renderer run,
+    song: arm A selects only among it, every arm's plan may name only its templates and
+    their admitted presets (or none), and its hash is held constant across the arms. None means an old-renderer run,
     whose candidates are the registered builtins (until the cutover removes them).
     """
 
@@ -1020,23 +1020,37 @@ class ComparisonExperimentRunner:
             raise ExperimentBlockedError("analysis cache identity changed across arms")
         if result.held_constant != expected_identity:
             raise ExperimentBlockedError("held-constant hashes changed across arms")
+        if result.arm is Arm.A and result.plan != request.plan:
+            raise ExperimentBlockedError(
+                "arm A result plan is not the deterministic plan the run requested"
+            )
         admission = request.analysis.admission
         if admission is not None:
             planned = {
-                template_id
+                (template_id, preset_id)
                 for section in result.plan.sections
-                for template_id in (
-                    section.template_id,
-                    *(segment.template_id for segment in section.segments or ()),
+                for template_id, preset_id in (
+                    (section.template_id, section.preset_id),
+                    *(
+                        (segment.template_id, segment.preset_id)
+                        for segment in section.segments or ()
+                    ),
                 )
                 if template_id is not None
             }
-            unadmitted = sorted(planned - set(admission.template_ids))
+            presets = {entry.template_id: entry.admitted_presets for entry in admission.templates}
+            unadmitted = sorted({template_id for template_id, _ in planned} - set(presets))
             if unadmitted:
                 raise ExperimentBlockedError(
                     f"arm {result.arm.value} planned {unadmitted}, not admitted on the "
                     "experiment's rig for this song"
                 )
+            for template_id, preset_id in sorted(planned, key=str):
+                if preset_id is not None and preset_id not in presets[template_id]:
+                    raise ExperimentBlockedError(
+                        f"arm {result.arm.value} planned {template_id!r} with preset "
+                        f"{preset_id!r}, not admitted on the experiment's rig for this song"
+                    )
         if result.regeneration_nonce != (
             None if request.arm is Arm.A else request.regeneration_nonce
         ):

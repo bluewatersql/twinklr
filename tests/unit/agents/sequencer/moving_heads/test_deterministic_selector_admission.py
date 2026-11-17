@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 import hashlib
+from itertools import pairwise
 import random
 
 import pytest
@@ -120,9 +121,9 @@ def test_a_section_no_rung_can_fill_raises_the_typed_error() -> None:
 
     with pytest.raises(NoEligibleTemplateError, match="intro_2") as raised:
         selector.select(sections)
-    assert raised.value.section_id == "intro_2"
-    assert raised.value.role == "intro" and raised.value.energy == 10
-    assert raised.value.candidate_ids == tuple(sorted(admitted))
+    message = str(raised.value)
+    assert "role 'intro', energy 10" in message
+    assert str(sorted(admitted)) in message
     assert isinstance(raised.value, ValueError)
 
     with pytest.raises(NoEligibleTemplateError, match="intro_2"):
@@ -149,6 +150,39 @@ def test_same_inputs_same_plan_and_trace_with_a_sha256_tie_break() -> None:
         key=lambda t: hashlib.sha256(f"90210:chorus_1:{t}".encode()).hexdigest(),
     )
     assert trace.selected_template_id == expected
+
+
+def test_trace_candidates_are_sorted_whatever_the_admission_order() -> None:
+    """The gate lists families in its own order; rungs and traces list them sorted, so
+    the trace does not depend on admission order."""
+    admission = _admission(("mirror_wings", "fly_out_cascade", "finite_snap_hold"))
+    section = _section("chorus", 85, 1)
+    sorted_ids = ("finite_snap_hold", "fly_out_cascade", "mirror_wings")
+
+    selector = DeterministicSelector(seed=7, admission=admission)
+
+    assert selector.candidates_for(section).template_ids == sorted_ids
+    assert selector.select([section]).traces[0].eligible_template_ids == sorted_ids
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_variety_holds_under_an_admission_without_relaxing(seed: int) -> None:
+    """With enough admitted families for each role, no rule relaxes: no consecutive
+    repeat, at most two uses per family, and distinct roles use distinct families."""
+    admission = _admission(tuple(t for t in CATALOG_IDS if t != "zoom_wave"))
+    roles = ["verse", "verse", "chorus", "chorus", "verse", "chorus", "verse", "chorus"]
+    sections = _sections(*((role, 45 if role == "verse" else 85) for role in roles))
+
+    result = DeterministicSelector(seed=seed, admission=admission).select(sections)
+
+    choices = [section.template_id for section in result.plan.sections]
+    assert all(trace.relaxed_constraints == () for trace in result.traces)
+    assert all(left != right for left, right in pairwise(choices))
+    assert max(choices.count(choice) for choice in choices) <= 2
+    by_role = {
+        role: {c for r, c in zip(roles, choices, strict=True) if r == role} for role in roles
+    }
+    assert not by_role["verse"] & by_role["chorus"]
 
 
 def test_a_reprise_reuses_the_admitted_family_the_ladder_gives_its_role() -> None:
@@ -191,7 +225,6 @@ def test_admission_from_the_gate_keeps_order_variants_and_exclusions() -> None:
     assert [(e.template_id, e.reason) for e in admission.exclusions] == [
         ("zoom_wave", "no zoom axis")
     ]
-    hash(admission)  # held-constant identities are compared in sets
 
 
 @pytest.mark.parametrize("template_id", CATALOG_IDS)

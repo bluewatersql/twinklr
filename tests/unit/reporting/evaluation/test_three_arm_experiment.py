@@ -1690,18 +1690,39 @@ PHYSICAL_SECTIONS = [
 ]
 
 
-def _physical_llm_plan(template_id: str) -> ChoreographyPlan:
+def _physical_llm_plan(
+    template_id: str | None,
+    *,
+    preset_id: str | None = None,
+    segments: list[tuple[str, str | None]] | None = None,
+) -> ChoreographyPlan:
+    """A one-section, eight-bar plan naming `template_id` and `preset_id`, or, with
+    `segments`, consecutive four-bar segments of `(template_id, preset_id)`."""
     return ChoreographyPlan.model_validate(
         {
             "sections": [
                 {
                     "section_name": "verse_1",
                     "start_bar": 1,
-                    "end_bar": 8,
+                    "end_bar": 4 * len(segments) if segments else 8,
                     "section_role": "verse",
                     "energy_level": 45,
                     "template_id": template_id,
-                    "preset_id": None,
+                    "preset_id": preset_id,
+                    "segments": (
+                        None
+                        if segments is None
+                        else [
+                            {
+                                "segment_id": chr(ord("A") + index),
+                                "start_bar": 4 * index + 1,
+                                "end_bar": 4 * index + 4,
+                                "template_id": segment_template,
+                                "preset_id": segment_preset,
+                            }
+                            for index, (segment_template, segment_preset) in enumerate(segments)
+                        ]
+                    ),
                     "intensity": "SMOOTH",
                     "color_intent": {
                         "selection": {
@@ -1721,21 +1742,24 @@ def _physical_llm_plan(template_id: str) -> ChoreographyPlan:
 
 
 class _PhysicalBackend(_Backend):
-    """`_Backend` whose analysis records a physical admission and whose LLM arms plan
-    `llm_template_id`."""
+    """`_Backend` whose analysis records a physical admission, whose LLM arms plan
+    `llm_plan`, and whose arm A returns `arm_a_plan` instead of its request's plan
+    when one is given."""
 
     def __init__(
         self,
         admission: SelectorAdmission,
         sections: list[SelectorSection],
-        llm_template_id: str = "mirror_wings",
+        llm_plan: ChoreographyPlan | None = None,
         song_sections: dict[str, list[SelectorSection]] | None = None,
+        arm_a_plan: ChoreographyPlan | None = None,
     ) -> None:
         super().__init__()
         self.admission = admission
         self.sections = sections
-        self.llm_template_id = llm_template_id
+        self.llm_plan = llm_plan or _physical_llm_plan("mirror_wings")
         self.song_sections = song_sections or {}
+        self.arm_a_plan = arm_a_plan
 
     async def analyze(self, song: SongManifestEntry) -> AnalysisSnapshot:
         snapshot = await super().analyze(song)
@@ -1749,19 +1773,38 @@ class _PhysicalBackend(_Backend):
 
     async def execute(self, request: ArmExecutionRequest) -> ArmRunResult:
         if request.arm is not Arm.A:
-            request = request.model_copy(update={"plan": _physical_llm_plan(self.llm_template_id)})
+            request = request.model_copy(update={"plan": self.llm_plan})
+        elif self.arm_a_plan is not None:
+            request = request.model_copy(update={"plan": self.arm_a_plan})
         return await super().execute(request)
 
 
-def _hand_admission(template_ids: tuple[str, ...]) -> SelectorAdmission:
+def _hand_admission(
+    template_ids: tuple[str, ...], presets: dict[str, tuple[str, ...]] | None = None
+) -> SelectorAdmission:
+    """Every template admitted on its base, with both presets unless `presets` says."""
+    presets = presets or {}
     return SelectorAdmission(
         templates=tuple(
             AdmittedTemplate(
-                template_id=template_id, effective_preset=None, admitted_presets=("narrow", "slow")
+                template_id=template_id,
+                effective_preset=None,
+                admitted_presets=presets.get(template_id, ("narrow", "slow")),
             )
             for template_id in template_ids
         )
     )
+
+
+async def _run_physical(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, backend: _PhysicalBackend
+) -> list[ArmRunResult]:
+    with physical_catalog():
+        runner = ComparisonExperimentRunner(
+            manifest=_calibrated_manifest(tmp_path), backend=backend
+        )
+        monkeypatch.setattr(runner, "_assert_calibrated", lambda: None)
+        return await runner.run(owner_opt_in=True)
 
 
 @pytest.mark.asyncio
@@ -1810,19 +1853,85 @@ async def test_physical_run_plans_arm_a_over_the_gate_admission_and_records_it(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "llm_plan",
+    [
+        pytest.param(_physical_llm_plan("zoom_wave"), id="section"),
+        pytest.param(
+            _physical_llm_plan(None, segments=[("mirror_wings", None), ("zoom_wave", None)]),
+            id="segment",
+        ),
+    ],
+)
 async def test_physical_run_rejects_an_arm_planning_an_unadmitted_template(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, llm_plan: ChoreographyPlan
+) -> None:
+    backend = _PhysicalBackend(_hand_admission(FAMILY_IDS), PHYSICAL_SECTIONS, llm_plan=llm_plan)
+    with pytest.raises(ExperimentBlockedError, match=r"zoom_wave.*not admitted"):
+        await _run_physical(tmp_path, monkeypatch, backend)
+
+
+_WINGS_SLOW_ONLY = {"mirror_wings": ("slow",)}
+"""`mirror_wings` admitted with `slow` but not `narrow`."""
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "llm_plan",
+    [
+        pytest.param(_physical_llm_plan("mirror_wings", preset_id="narrow"), id="section"),
+        pytest.param(
+            _physical_llm_plan(
+                None, segments=[("mirror_wings", "slow"), ("mirror_wings", "narrow")]
+            ),
+            id="segment",
+        ),
+    ],
+)
+async def test_physical_run_rejects_an_arm_planning_an_unadmitted_preset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, llm_plan: ChoreographyPlan
+) -> None:
+    backend = _PhysicalBackend(
+        _hand_admission(FAMILY_IDS, _WINGS_SLOW_ONLY), PHYSICAL_SECTIONS, llm_plan=llm_plan
+    )
+    with pytest.raises(ExperimentBlockedError, match=r"mirror_wings.*'narrow'.*not admitted"):
+        await _run_physical(tmp_path, monkeypatch, backend)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "llm_plan",
+    [
+        pytest.param(_physical_llm_plan("mirror_wings", preset_id="slow"), id="section"),
+        pytest.param(
+            _physical_llm_plan(None, segments=[("mirror_wings", "slow"), ("mirror_wings", None)]),
+            id="segment",
+        ),
+    ],
+)
+async def test_physical_run_accepts_admitted_presets_and_the_base(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, llm_plan: ChoreographyPlan
+) -> None:
+    backend = _PhysicalBackend(
+        _hand_admission(FAMILY_IDS, _WINGS_SLOW_ONLY), PHYSICAL_SECTIONS, llm_plan=llm_plan
+    )
+    results = await _run_physical(tmp_path, monkeypatch, backend)
+    assert len(results) == 40
+
+
+@pytest.mark.asyncio
+async def test_arm_a_result_must_carry_the_plan_it_was_given(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    with physical_catalog():
-        backend = _PhysicalBackend(
-            _hand_admission(FAMILY_IDS), PHYSICAL_SECTIONS, llm_template_id="zoom_wave"
-        )
-        runner = ComparisonExperimentRunner(
-            manifest=_calibrated_manifest(tmp_path), backend=backend
-        )
-        monkeypatch.setattr(runner, "_assert_calibrated", lambda: None)
-        with pytest.raises(ExperimentBlockedError, match=r"zoom_wave.*not admitted"):
-            await runner.run(owner_opt_in=True)
+    """An admitted, valid plan is still rejected for arm A when it is not the
+    deterministic selector's plan the run requested."""
+    backend = _PhysicalBackend(
+        _hand_admission(FAMILY_IDS),
+        PHYSICAL_SECTIONS,
+        arm_a_plan=_physical_llm_plan("mirror_wings"),
+    )
+    with pytest.raises(ExperimentBlockedError, match="arm A"):
+        await _run_physical(tmp_path, monkeypatch, backend)
 
 
 @pytest.mark.asyncio

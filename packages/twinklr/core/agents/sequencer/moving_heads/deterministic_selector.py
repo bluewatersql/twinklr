@@ -42,27 +42,13 @@ if TYPE_CHECKING:
 
 class NoEligibleTemplateError(ValueError):
     """No candidate template fills a section at any rung of the fallback ladder, or
-    there is no candidate at all (`section_id` None).
+    there is no candidate at all; the message names the section, its role and energy,
+    and the candidates.
 
     Raised before any plan is returned, so before any provider call or render that
     plan would feed.  Variety rules relax to make selection total; the candidate set
     (the gate's admission) never does.
     """
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        section_id: str | None = None,
-        role: str | None = None,
-        energy: int | None = None,
-        candidate_ids: Sequence[str] = (),
-    ) -> None:
-        super().__init__(message)
-        self.section_id = section_id
-        self.role = role
-        self.energy = energy
-        self.candidate_ids = tuple(candidate_ids)
 
 
 class AdmittedTemplate(BaseModel):
@@ -98,7 +84,12 @@ class ExcludedTemplate(BaseModel):
 
 class SelectorAdmission(BaseModel):
     """The selector's candidate set for one rig and song: the gate's admission
-    (`check_physical_templates`) in its order, and its whole-template exclusions."""
+    (`check_physical_templates`) in its order, and its whole-template exclusions.
+
+    The selector reads only `templates`. `exclusions` is provenance: it records why a
+    family is absent, travels in the three-arm `AnalysisSnapshot` and is covered by the
+    held-constant `admission_sha256`, so a result can be read against what was left out.
+    """
 
     templates: tuple[AdmittedTemplate, ...]
     exclusions: tuple[ExcludedTemplate, ...] = ()
@@ -390,11 +381,7 @@ class DeterministicSelector:
         return NoEligibleTemplateError(
             f"no candidate template fits section {section.section_id!r} (role "
             f"{section.role!r}, energy {section.energy}) at any rung ({rungs}) among "
-            f"{candidates}; the candidate set is not relaxed",
-            section_id=section.section_id,
-            role=section.role,
-            energy=section.energy,
-            candidate_ids=candidates,
+            f"{candidates}; the candidate set is not relaxed"
         )
 
     def _candidates_at_rule(self, section: SelectorSection, rule: FallbackRule) -> list[str]:
