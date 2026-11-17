@@ -835,9 +835,14 @@ follows a span. The show's export applies the output budgets and publishes the
 sequence and its trace, which carries the physical render record, together. `inject` sends the
 physical render's effects to the open sequence and `regenerate` re-renders the whole
 song's moving heads from the recorded plan
-([user guide](user-guide.md#live-injection-and-section-regeneration-local-only)). `eval-report`
-re-renders a physical checkpoint from the render its run recorded in it and reports
-physical metrics ([user guide](user-guide.md#evaluation-report-twinklr-eval-report)).
+([user guide](user-guide.md#live-injection-and-section-regeneration-local-only)); both
+render the moving heads on their own, never a show's render. `run`, `show`, `inject` and
+`regenerate` record their physical render in the plan checkpoint, once their `.xsq` is
+written, through one writer (`record_render`, from `RenderingPipeline.checkpoint_record`),
+a show's dark spans included, and all write the same checkpoint path for a song, so the last one wins.
+`eval-report` re-renders a physical checkpoint from that record, over its dark spans,
+and reports physical metrics
+([user guide](user-guide.md#evaluation-report-twinklr-eval-report)).
 With `twinklr run --layout`, a physical job's fixture models are checked against
 the xLights layout before analysis; without it that check is skipped with a warning.
 `twinklr display` renders no moving heads and ignores the mode. Do not reuse the

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -257,6 +258,11 @@ async def test_the_stage_keeps_the_warning_about_cues_kept_dark(tmp_path: Path) 
     assert trace["render"]["unplayable_totals"]["infeasible_transition"]["cues"] > 0
 
 
+def _canonical_sha256(value: Any) -> str:
+    canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
 def _checkpoint(output_dir: Path, plan: Any, **fields: Any) -> Path:
     """A plan checkpoint as the planning stage writes it."""
     path = output_dir / "checkpoints" / "plans" / "final.json"
@@ -304,17 +310,29 @@ async def test_physical_render_records_itself_in_the_plan_checkpoint(tmp_path: P
     assert recorded.policy == context.job_config.moving_heads
     assert recorded.beat_grid == physical_grid()
     assert recorded.admission == admission
-    # The hashes the trace carries, to name the input that differs on a mismatch.
+    # The hashes the trace carries, to name the input that differs on a mismatch, and the
+    # rig as the fingerprint hashes it: whole, and field by field.
+    rig = physical_rig().model_dump(mode="json")
     assert recorded.inputs == {
-        key: trace["render"][key]
-        for key in (
-            "fixtures",
-            "template_sha256",
-            "beat_grid_sha256",
-            "renderer_revision",
-            "encoder_version",
-        )
+        **{
+            key: trace["render"][key]
+            for key in (
+                "fixtures",
+                "template_sha256",
+                "beat_grid_sha256",
+                "renderer_revision",
+                "encoder_version",
+            )
+        },
+        "rig": {
+            "sha256": _canonical_sha256(rig),
+            "fields": {name: _canonical_sha256(value) for name, value in rig.items()},
+            "live_layout": False,
+        },
     }
+    # No dark spans: the record keeps its keys.
+    assert "dark_spans" not in data["render"] and "dark_spans" not in data["render"]["inputs"]
+    assert recorded.dark_spans == ()
     assert [p.name for p in checkpoint.parent.iterdir()] == ["final.json"]  # no temp left
     assert checkpoint.stat().st_mode & 0o777 == 0o640  # the replaced file keeps its mode
 

@@ -163,3 +163,17 @@ its pan steps from 24.95° to 35.0° in one frame (16000 → 16020 ms). That is 
 - Grids: 4/4 at 375, 430, 500 and 600 ms beats, plus jittered and 3/4 grids in the verification sweep. No 6/8 grid.
 - No xLights.
 - Rendering time on a full song, for a report decoding every frame of every head.
+
+## Addendum, later on 2026-11-16
+
+After the four ports were combined, a verifier found that `twinklr show` wrote no
+render record, so `eval-report` refused its checkpoint with advice that was untrue.
+The record is now built by `RenderingPipeline.checkpoint_record` and written by one
+writer for `run`, `inject`, `regenerate` and `show`. It also carries the coordination
+`dark_spans` (when there are any) and `inputs.rig`: a hash of the rendered fixture
+group, a hash per top-level field, and whether the rig was reconciled with a live
+layout. A record without `rig`, the form this port first wrote, is refused as
+malformed. `eval-report` reproduces a show's moving-head fingerprint, reports its dark
+spans, and names "dark spans" or the rig field when they differ. A live run on a
+layout lacking the configured group is named as such; it cannot be reproduced from a
+fixture file.

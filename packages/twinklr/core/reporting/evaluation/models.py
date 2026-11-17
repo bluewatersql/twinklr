@@ -347,10 +347,19 @@ class PhysicalRenderSummary(BaseModel):
     mismatched_inputs: list[str] = Field(
         default_factory=list,
         description=(
-            "On a mismatch, each recorded input hash that differs from the re-render's "
-            "(fixture profile or model name, template, beat grid, revisions)"
+            "On a mismatch, each recorded input that differs from the re-render's "
+            "(fixture profile or model name, the rig's fields, template, beat grid, dark "
+            "spans, revisions)"
         ),
     )
+    dark_spans: list[list[int]] = Field(
+        default_factory=list,
+        description=(
+            "`[start_ms, end_ms)` spans every head is commanded dark over by a show's "
+            "coordination (it rests while another target plays), as rendered"
+        ),
+    )
+    dark_span_ms: int = Field(default=0, description="Total time in the dark spans, in ms")
     admission_exclusions: list[dict[str, Any]] = Field(
         default_factory=list, description="Templates the gate left out of the offer, and why"
     )

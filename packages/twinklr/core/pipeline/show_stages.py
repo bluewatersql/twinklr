@@ -67,7 +67,9 @@ class CombinedShowRenderStage:
         Under `physical_v2` the moving heads render physically: the coordination
         schedule's rests become the renderer's dark spans, planned before section entry
         and repositioning (`moving_head_dark_spans`), and the output carries the render
-        record and frame runs the export traces and budgets. The macro palette and
+        record and frame runs the export traces and budgets, and the record `twinklr
+        show` adds to the plan checkpoint once the export is written
+        (`checkpoint_record`), for `eval-report` to re-render. The macro palette and
         focal role are not projected onto the plan, since the physical renderer applies
         no planner intensity or colour; the render record says so per section.
         """
@@ -152,7 +154,7 @@ class CombinedShowRenderStage:
         Returns:
             The sequence holding the moving-head frame runs, and the stage output's
             moving-head entries: the plan as rendered, its planned segments, the render
-            record and the frame runs.
+            record, the frame runs and the render's checkpoint record.
         """
         from twinklr.core.sequencer.moving_heads.delivery import build_physical_sequence
         from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
@@ -216,6 +218,7 @@ class CombinedShowRenderStage:
             "moving_head_segments": tuple(segments),
             "render_record": record,
             "moving_head_runs": pipeline.runs,
+            "checkpoint_record": pipeline.checkpoint_record(),
         }
 
     def _render_legacy(

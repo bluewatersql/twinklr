@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from twinklr.core.formats.xlights.sequence.models.xsq import TimingTrack
     from twinklr.core.pipeline.context import PipelineContext
     from twinklr.core.pipeline.result import StageResult
-    from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
     from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 logger = logging.getLogger(__name__)
@@ -102,11 +101,12 @@ class MovingHeadRenderingStage:
             - Adds "mh_render_segments" to context.metrics
             - Adds "mh_render_transitions" to context.metrics
             - Adds a physical render's record to the run's plan checkpoint, when the
-              planning stage wrote one (`_record_render`)
+              planning stage wrote one (`record_render`)
         """
         from twinklr.core.agents.sequencer.moving_heads.models import (
             ChoreographyPlan as _ChoreographyPlan,
         )
+        from twinklr.core.config.fixtures import FixtureGroup as _FixtureGroup
         from twinklr.core.pipeline.result import failure_result, success_result
         from twinklr.core.pipeline.stage import resolve_typed_input
         from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
@@ -169,7 +169,9 @@ class MovingHeadRenderingStage:
             # Render to segments and write the delivery
             segments = pipeline.render()
             if pipeline.render_record is not None:
-                _record_render(pipeline, context)
+                # The rig is the live layout's reconciliation for `inject`/`regenerate`.
+                live_layout = isinstance(context.get_state("live_fixture_group"), _FixtureGroup)
+                record_render(pipeline.checkpoint_record(live_layout=live_layout), context)
 
             logger.debug(f"✅ Rendered {len(segments)} segments to {self.xsq_output_path}")
 
@@ -266,20 +268,21 @@ class MovingHeadRenderingStage:
         return load_render_fixture_group(context, self.fixture_config_path)
 
 
-def _record_render(pipeline: RenderingPipeline, context: PipelineContext) -> None:
-    """Add a physical render's identity and inputs to the run's plan checkpoint.
+def record_render(record: dict[str, Any], context: PipelineContext) -> None:
+    """Add a physical render's record (`RenderingPipeline.checkpoint_record`) to the plan
+    checkpoint the planning stage wrote, under its `render` key, once the render is
+    delivered.
 
-    `twinklr eval-report` re-renders the plan from them exactly as this render ran: its
-    `render_fingerprint` (the run's, checked against the re-render's), the render
-    `policy`, the `beat_grid` it rendered against and the pre-planning gate's
-    `admission` (null when none ran), under the checkpoint's `render` key, with the
-    trace's input hashes (`inputs`) that name what differs on a mismatch. Only a
-    checkpoint the planning stage wrote is extended; a legacy render records nothing.
+    The one writer for every command that renders physically and writes a checkpoint:
+    `twinklr run`, `inject` and `regenerate` (this module's stage, after `render()` has
+    written the `.xsq`) and `twinklr show` (after its export has written the combined
+    `.xsq`). `twinklr eval-report` re-renders the plan from the record exactly as that
+    render ran, and names what differs when it cannot. Only a checkpoint the planning
+    stage wrote is extended.
 
     The checkpoint is replaced atomically. The delivery is already written, so a
     checkpoint that cannot be read or written is logged and left as it was.
     """
-    import dataclasses
     import json
     import os
     import stat
@@ -290,28 +293,9 @@ def _record_render(pipeline: RenderingPipeline, context: PipelineContext) -> Non
     checkpoint_path = context.output_dir / "checkpoints" / "plans" / "final.json"
     if not checkpoint_path.exists():
         return
-    record = pipeline.render_record
-    assert record is not None  # set by a physical render
     try:
         data = json.loads(checkpoint_path.read_text(encoding="utf-8"))
-        data["render"] = {
-            "render_fingerprint": record["render_fingerprint"],
-            "policy": pipeline.job_config.moving_heads.model_dump(mode="json"),
-            "beat_grid": pipeline.beat_grid.model_dump(mode="json"),
-            "admission": (
-                None if pipeline.admission is None else dataclasses.asdict(pipeline.admission)
-            ),
-            "inputs": {
-                key: record[key]
-                for key in (
-                    "fixtures",
-                    "template_sha256",
-                    "beat_grid_sha256",
-                    "renderer_revision",
-                    "encoder_version",
-                )
-            },
-        }
+        data["render"] = record
         handle, name = tempfile.mkstemp(
             dir=checkpoint_path.parent, prefix=".final.", suffix=".json.tmp"
         )
@@ -328,7 +312,7 @@ def _record_render(pipeline: RenderingPipeline, context: PipelineContext) -> Non
     except (OSError, ValueError, TypeError) as error:
         logger.warning(
             "physical_v2: could not record the render in the checkpoint %s, so "
-            "`twinklr eval-report` cannot re-render this run: %s",
+            "`twinklr eval-report` cannot re-render it: %s",
             checkpoint_path,
             error,
         )

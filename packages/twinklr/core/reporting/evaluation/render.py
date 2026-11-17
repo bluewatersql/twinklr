@@ -165,6 +165,13 @@ def _render_physical_markdown(physical: PhysicalRenderSummary) -> list[str]:
         )
         for input_name in physical.mismatched_inputs:
             lines.append(f"  - differs: {input_name}")
+    if physical.dark_spans:
+        lines.append(
+            f"- **Dark spans**: {len(physical.dark_spans)}, {physical.dark_span_ms} ms in all: "
+            "the show's coordination rests the heads there while another target plays; "
+            "they keep moving on their authored paths, commanded dark, so `lit` figures "
+            "leave those frames out and the others count them"
+        )
     for exclusion in physical.admission_exclusions:
         lines.append(f"- **Not offered**: `{exclusion['template_id']}`: {exclusion['reason']}")
     for exclusion in physical.admission_preset_exclusions:

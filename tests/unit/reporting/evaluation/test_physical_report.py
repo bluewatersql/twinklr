@@ -182,6 +182,9 @@ async def test_physical_checkpoint_reports_the_render_the_run_made(tmp_path: Pat
     assert physical.admission_effective_presets == run.get("admission_effective_presets", {})
     assert physical.unplayable_totals == run["unplayable_totals"]
     assert physical.not_reported  # every legacy metric left out says why
+    # A run renders no dark spans; its record and report say none.
+    assert "dark_spans" not in json.loads(checkpoint.read_text())["render"]
+    assert (physical.dark_spans, physical.dark_span_ms) == ([], 0)
 
     assert report.summary.sections == 2
     # Removed metrics are absent, never zero.
@@ -239,6 +242,7 @@ async def test_physical_checkpoint_reports_the_render_the_run_made(tmp_path: Pat
     for line in physical.not_reported:
         assert line in markdown
     assert "clamp=" not in markdown and "loop=" not in markdown
+    assert "Dark spans" not in markdown
     # Nothing is written beside the report but the report and its plots.
     assert not list((tmp_path / "report").rglob("*.xsq"))
 
@@ -262,6 +266,13 @@ def _rename_model(fixture_path: Path, checkpoint: Path) -> None:
 def _rename_profile(fixture_path: Path, checkpoint: Path) -> None:
     rig = json.loads(fixture_path.read_text(encoding="utf-8"))
     rig["fixtures"][1]["config"]["physical_profile"]["profile_id"] = "another_spot"
+    fixture_path.write_text(json.dumps(rig), encoding="utf-8")
+
+
+def _rename_group(fixture_path: Path, checkpoint: Path) -> None:
+    """A group-level field the fixtures do not carry: the xLights group's name."""
+    rig = json.loads(fixture_path.read_text(encoding="utf-8"))
+    rig["xlights_group"] = "Renamed group"
     fixture_path.write_text(json.dumps(rig), encoding="utf-8")
 
 
@@ -290,8 +301,17 @@ def _change_template(fixture_path: Path, checkpoint: Path) -> None:
     ("change", "named"),
     [
         pytest.param(_forge_identity, [], id="recorded-identity"),
-        pytest.param(_rename_model, ["fixture 'MH1': xLights model name"], id="model-name"),
-        pytest.param(_rename_profile, ["fixture 'MH2': physical profile"], id="profile"),
+        pytest.param(
+            _rename_model,
+            ["fixture 'MH1': xLights model name", "rig (fixture group): fixtures"],
+            id="model-name",
+        ),
+        pytest.param(
+            _rename_profile,
+            ["fixture 'MH2': physical profile", "rig (fixture group): fixtures"],
+            id="profile",
+        ),
+        pytest.param(_rename_group, ["rig (fixture group): xlights_group"], id="rig-group"),
         pytest.param(_change_template, ["template 'mirror_wings'"], id="template"),
     ],
 )
@@ -456,6 +476,12 @@ def _bad_fixture_hashes(render: dict[str, Any]) -> Any:
     return render
 
 
+def _drop_rig(render: dict[str, Any]) -> Any:
+    """A record written before the rig's identity was: refused, not read."""
+    del render["inputs"]["rig"]
+    return render
+
+
 def _bad_template_hashes(render: dict[str, Any]) -> Any:
     render["inputs"]["template_sha256"] = ["mirror_wings"]
     render["render_fingerprint"] = "0" * 64  # a mismatch would compare them
@@ -464,8 +490,8 @@ def _bad_template_hashes(render: dict[str, Any]) -> Any:
 
 @pytest.mark.parametrize(
     "damage",
-    [_drop_beat_grid, _bad_fixture_hashes, _bad_template_hashes, lambda render: []],
-    ids=["no-beat-grid", "fixture-hashes", "template-hashes", "not-a-mapping"],
+    [_drop_beat_grid, _bad_fixture_hashes, _drop_rig, _bad_template_hashes, lambda render: []],
+    ids=["no-beat-grid", "fixture-hashes", "no-rig", "template-hashes", "not-a-mapping"],
 )
 @pytest.mark.asyncio
 async def test_a_malformed_render_record_is_refused_with_a_message(
@@ -488,6 +514,37 @@ async def test_a_malformed_render_record_is_refused_with_a_message(
                 output_dir=tmp_path / "report",
             )
     analyzer.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_physical_checkpoint_without_a_record_is_refused_with_what_is_true(
+    tmp_path: Path,
+) -> None:
+    """`run`, `show`, `inject` and `regenerate` all plan, then record their render: a
+    checkpoint without the record stopped before its render was delivered or could not
+    record it, and re-running the command writes it. Refused before any analysis."""
+    with physical_catalog():
+        checkpoint, fixture_path, _ = await _run(tmp_path)
+        data = json.loads(checkpoint.read_text(encoding="utf-8"))
+        del data["render"]
+        checkpoint.write_text(json.dumps(data), encoding="utf-8")
+        with (
+            patch("twinklr.core.audio.analyzer.AudioAnalyzer") as analyzer,
+            pytest.raises(UnsupportedRenderModeError) as refused,
+        ):
+            await generate_evaluation_report(
+                checkpoint_path=checkpoint,
+                audio_path=tmp_path / "song.wav",
+                fixture_config_path=fixture_path,
+                output_dir=tmp_path / "report",
+            )
+    analyzer.assert_not_called()
+    message = " ".join(str(refused.value).split())
+    assert "records none" in message
+    assert "stopped before it delivered its moving-head render" in message
+    assert "could not write the record" in message
+    assert "re-running that command records it" in message
+    assert "re-run the job through its render" not in message
 
 
 @pytest.mark.asyncio
@@ -577,6 +634,11 @@ def test_a_boundary_step_starts_at_the_last_lit_frame_before_the_section() -> No
     )
 
 
+def _rig(live_layout: bool = False, **fields: str) -> dict[str, Any]:
+    hashes = {"fixtures": "f", "group_id": "i", "xlights_group": "g", **fields}
+    return {"sha256": "".join(hashes.values()), "fields": hashes, "live_layout": live_layout}
+
+
 def test_mismatched_inputs_name_each_recorded_input_that_differs() -> None:
     run = {
         "fixtures": [
@@ -587,6 +649,8 @@ def test_mismatched_inputs_name_each_recorded_input_that_differs() -> None:
         "beat_grid_sha256": "g",
         "renderer_revision": "2",
         "encoder_version": "1",
+        "rig": _rig(),
+        "dark_spans": [[0, 520]],
     }
     rerender = {
         "fixtures": [
@@ -597,17 +661,39 @@ def test_mismatched_inputs_name_each_recorded_input_that_differs() -> None:
         "beat_grid_sha256": "h",
         "renderer_revision": "3",
         "encoder_version": "2",
+        "rig": _rig(fixtures="F", xlights_group="G"),
     }
 
     assert _mismatched_inputs(run, run) == []
     assert _mismatched_inputs(run, rerender) == [
         "fixture 'MH2': missing from the re-render's rig",
         "fixture 'MH3': missing from the run's rig",
+        "rig (fixture group): fixtures, xlights_group",
         "template 't2'",
         "beat grid",
+        "dark spans",
         "renderer revision",
         "encoder version",
     ]
+
+
+def test_a_rig_reconciled_with_the_live_layout_is_named_so() -> None:
+    """`inject` and `regenerate` render on the rig as the open layout leaves it, which no
+    fixture config reproduces: the field that differs is named, with why."""
+    inputs = {
+        "fixtures": [],
+        "template_sha256": {},
+        "beat_grid_sha256": "g",
+        "renderer_revision": "2",
+        "encoder_version": "1",
+    }
+    run = {**inputs, "rig": _rig(live_layout=True, xlights_group="none")}
+
+    assert _mismatched_inputs(run, {**inputs, "rig": _rig()}) == [
+        "rig (fixture group): the run rendered on its rig as reconciled with the live "
+        "xLights layout, which differs from this fixture config in xlights_group"
+    ]
+    assert _mismatched_inputs(run, {**inputs, "rig": _rig(xlights_group="none")}) == []
 
 
 @pytest.mark.parametrize(

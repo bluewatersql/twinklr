@@ -13,6 +13,7 @@ from rich.console import Console
 
 from twinklr.cli.display_cmd import load_display_fe_bundle
 from twinklr.core.agents.providers.factory import validate_llm_provider_config
+from twinklr.core.agents.sequencer.moving_heads.rendering_stage import record_render
 from twinklr.core.caching import derive_session_id
 from twinklr.core.caching.identity import hash_file_content
 from twinklr.core.config.loader import load_app_config, load_fixture_group, load_job_config
@@ -160,6 +161,10 @@ async def run_show_pipeline_async(
         )
         if not isinstance(render_output, dict):
             raise TypeError("show_render output must be an object")
+        checkpoint_record = render_output.get("checkpoint_record")
+        if checkpoint_record is not None:
+            # The show is delivered: record its moving-head render as `twinklr run` does.
+            record_render(checkpoint_record, context)
         evaluation_contract = render_output.get("evaluation_contract")
         if not isinstance(evaluation_contract, dict):
             raise TypeError("show_render evaluation_contract must be an object")

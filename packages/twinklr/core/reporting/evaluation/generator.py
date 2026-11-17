@@ -786,11 +786,16 @@ def _physical_summary(physical: PhysicalRerender) -> PhysicalRenderSummary:
     """The re-render's identity against the run's, and the gate's facts it traced."""
     record = physical.render_record
     matches = physical.fingerprint == physical.run_fingerprint
+    dark_spans = record.get("dark_spans", [])
     return PhysicalRenderSummary(
         run_fingerprint=physical.run_fingerprint,
         rerender_fingerprint=physical.fingerprint,
         fingerprint_matches=matches,
-        mismatched_inputs=[] if matches else _mismatched_inputs(physical.run_inputs, record),
+        mismatched_inputs=(
+            [] if matches else _mismatched_inputs(physical.run_inputs, physical.rerender_inputs)
+        ),
+        dark_spans=dark_spans,
+        dark_span_ms=sum(end - start for start, end in dark_spans),
         admission_exclusions=record.get("admission_exclusions", []),
         admission_preset_exclusions=record.get("admission_preset_exclusions", []),
         admission_effective_presets=record.get("admission_effective_presets", {}),
@@ -804,10 +809,9 @@ def mismatch_message(physical: PhysicalRenderSummary) -> str:
     differs = (
         "it differs in " + "; ".join(physical.mismatched_inputs)
         if physical.mismatched_inputs
-        else "no recorded input differs (fixture profiles and model names, templates, "
-        "beat grid, revisions), so the fixture group's other settings (positions, "
-        "topology, presets), the checkpoint's plan or recorded policy, or the recorded "
-        "identity itself differ"
+        else "no recorded input differs (fixture profiles and model names, the rig, "
+        "templates, beat grid, dark spans, revisions), so the checkpoint's plan or "
+        "recorded policy, or the recorded identity itself differ"
     )
     return (
         f"the re-render's fingerprint {physical.rerender_fingerprint} does not match the "
@@ -817,7 +821,8 @@ def mismatch_message(physical: PhysicalRenderSummary) -> str:
 
 
 def _mismatched_inputs(run: Mapping[str, Any], rerender: Mapping[str, Any]) -> list[str]:
-    """Each input hash the run recorded that the re-render's trace record does not match."""
+    """Each input the run recorded that the re-render's does not match, both as
+    `RenderingPipeline.checkpoint_record` gives them (`inputs`)."""
     differs = []
     run_fixtures = {f["fixture_id"]: f for f in run.get("fixtures", [])}
     rerender_fixtures = {f["fixture_id"]: f for f in rerender["fixtures"]}
@@ -831,13 +836,31 @@ def _mismatched_inputs(run: Mapping[str, Any], rerender: Mapping[str, Any]) -> l
             differs.append(f"fixture {fixture_id!r}: physical profile")
         if before.get("xlights_model_name") != after["xlights_model_name"]:
             differs.append(f"fixture {fixture_id!r}: xLights model name")
+    run_rig, rerender_rig = run["rig"], rerender["rig"]
+    fields = ", ".join(
+        sorted(
+            name
+            for name in run_rig["fields"].keys() | rerender_rig["fields"].keys()
+            if run_rig["fields"].get(name) != rerender_rig["fields"].get(name)
+        )
+    )
+    if fields:
+        differs.append(
+            "rig (fixture group): the run rendered on its rig as reconciled with the live "
+            f"xLights layout, which differs from this fixture config in {fields}"
+            if run_rig["live_layout"]
+            else f"rig (fixture group): {fields}"
+        )
     run_templates = run.get("template_sha256", {})
     rerender_templates = rerender["template_sha256"]
     for template_id in sorted(run_templates.keys() | rerender_templates.keys()):
         if run_templates.get(template_id) != rerender_templates.get(template_id):
             differs.append(f"template {template_id!r}")
+    if run.get("beat_grid_sha256") != rerender["beat_grid_sha256"]:
+        differs.append("beat grid")
+    if run.get("dark_spans", []) != rerender.get("dark_spans", []):
+        differs.append("dark spans")
     for key, name in (
-        ("beat_grid_sha256", "beat grid"),
         ("renderer_revision", "renderer revision"),
         ("encoder_version", "encoder version"),
     ):

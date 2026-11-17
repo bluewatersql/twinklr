@@ -7,7 +7,7 @@ from dataclasses import replace
 import json
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -63,6 +63,7 @@ from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.formats.xlights.sequence.parser import XSQParser
 from twinklr.core.pipeline import PipelineDefinition, StageDefinition
 from twinklr.core.pipeline.result import PipelineResult, success_result
+from twinklr.core.reporting.evaluation.generator import generate_evaluation_report
 
 
 @pytest.fixture(autouse=True)
@@ -498,6 +499,72 @@ async def test_regenerate_on_a_physical_job_rerenders_the_whole_song_and_replace
     assert after["template_sha256"].keys() == {TEMPLATE_ID, SUBSET_TEMPLATE_ID}
     assert "re-rendered the moving heads for the whole song" in output
     assert after["render_fingerprint"] in output
+
+
+class _SongMetadataOnly:
+    """The audio analysis `eval-report` runs, read only for the song's metadata."""
+
+    def __init__(self, **kwargs: object) -> None:
+        pass
+
+    async def __aenter__(self) -> _SongMetadataOnly:
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        return None
+
+    async def analyze(self, path: str) -> SimpleNamespace:
+        return SimpleNamespace(features={"tempo": {"bpm": 120.0}})
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("groups", "named"),
+    [
+        pytest.param(("GROUP - MOVING HEADS",), [], id="layout-holds-the-rig"),
+        pytest.param(
+            (),
+            [
+                "rig (fixture group): the run rendered on its rig as reconciled with the live "
+                "xLights layout, which differs from this fixture config in xlights_group"
+            ],
+            id="layout-lacks-the-group",
+        ),
+    ],
+)
+async def test_eval_report_on_an_inject_names_the_rig_the_live_layout_reconciled(
+    tmp_path, monkeypatch, groups, named
+) -> None:
+    """`inject` renders on the rig as the open layout leaves it and records that render.
+    Where the layout holds the configured rig, `eval-report` reproduces it from the
+    fixture config; where the layout lacks the group the config names, no fixture config
+    reproduces it, and the report says why and names the field."""
+    fake = FakeLiveXLights(models=("Dmx MH1", "Dmx MH2"), groups=groups)
+    _live_physical_cli(monkeypatch, fake)
+    # The plan as a planner states it, every intent field present, as the checkpoint
+    # carries it.
+    monkeypatch.setitem(
+        globals(), "BASE_PLAN", ChoreographyPlan.model_validate(BASE_PLAN.model_dump(mode="json"))
+    )
+    fixture_path = tmp_path / "fixture_config.json"
+    fixture_path.write_text(physical_rig().model_dump_json(), encoding="utf-8")
+
+    with physical_test_templates():
+        assert await _live(tmp_path) == 0
+        (checkpoint,) = (tmp_path / "out").glob("*/checkpoints/plans/final.json")
+        with patch("twinklr.core.audio.analyzer.AudioAnalyzer", _SongMetadataOnly):
+            report = await generate_evaluation_report(
+                checkpoint_path=checkpoint,
+                audio_path=tmp_path / "song.wav",
+                fixture_config_path=fixture_path,
+                output_dir=tmp_path / "report",
+            )
+
+    assert json.loads(checkpoint.read_text())["render"]["inputs"]["rig"]["live_layout"] is True
+    assert report.physical is not None
+    assert report.physical.run_fingerprint == _render_trace(tmp_path)["render_fingerprint"]
+    assert report.physical.fingerprint_matches is not named
+    assert report.physical.mismatched_inputs == named
 
 
 @pytest.mark.anyio

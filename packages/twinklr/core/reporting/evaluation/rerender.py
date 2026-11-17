@@ -38,6 +38,8 @@ class PhysicalRerender:
         render_record: The render's trace record (`RenderingPipeline.render_record`).
         run_fingerprint: The render fingerprint the run recorded.
         run_inputs: The input hashes the run recorded (`RecordedRender.inputs`).
+        rerender_inputs: The re-render's own, in the same shape (`inputs` of
+            `RenderingPipeline.checkpoint_record`).
     """
 
     frames: tuple[EncodedFixtureFrame, ...]
@@ -45,6 +47,7 @@ class PhysicalRerender:
     render_record: dict[str, Any]
     run_fingerprint: str
     run_inputs: Mapping[str, Any]
+    rerender_inputs: Mapping[str, Any]
 
     @property
     def fingerprint(self) -> str:
@@ -134,8 +137,9 @@ async def rerender_plan(
     user's document, and the easiest of the three to miss.
 
     A `physical_v2` plan is re-rendered from the render its run recorded: under the
-    recorded policy, against the recorded beat grid and with the recorded gate result,
-    which decides the variant a section naming no preset renders, with the physical
+    recorded policy, against the recorded beat grid, over the recorded dark spans (a
+    show's coordination rests) and with the recorded gate result, which decides the
+    variant a section naming no preset renders, with the physical
     family catalog admitted as `twinklr run` admits it (`admit_plan_templates`). The
     audio is analyzed only for the song's metadata. The re-render's fingerprint is
     returned beside the run's, for the caller to compare.
@@ -225,6 +229,7 @@ async def rerender_plan(
         job_config=job_config,
         output_path=None,  # Evaluation reads segments; it writes no sequence file.
         admission=None if recorded is None else recorded.admission,
+        dark_spans=() if recorded is None else recorded.dark_spans,
     )
 
     # Render segments
@@ -249,6 +254,7 @@ async def rerender_plan(
             render_record=pipeline.render_record,
             run_fingerprint=recorded.fingerprint,
             run_inputs=recorded.inputs,
+            rerender_inputs=pipeline.checkpoint_record()["inputs"],
         )
 
     # Return wrapped result (pass features dict for backward compatibility)

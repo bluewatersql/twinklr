@@ -14,6 +14,7 @@ from dataclasses import replace
 from itertools import pairwise
 import json
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -30,9 +31,15 @@ from tests.support.mh_physical import (
     sine_step,
     topology_rig,
 )
+from tests.unit.cli.test_live_injection_command import _audio_profile
 from twinklr.cli.show_cmd import export_show_artifacts, run_show_pipeline_async
 from twinklr.core.agents.audio.profile.models import SongSectionRef
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
+from twinklr.core.agents.sequencer.moving_heads.orchestrator import MovingHeadPlannerOrchestrator
+from twinklr.core.agents.sequencer.moving_heads.rendering_stage import MovingHeadRenderingStage
+from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
+from twinklr.core.agents.shared.judge.controller import IterationContext, IterationResult
+from twinklr.core.agents.shared.judge.models import IterationState
 from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup
 from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
@@ -42,6 +49,11 @@ from twinklr.core.pipeline import PipelineContext, PipelineExecutor
 from twinklr.core.pipeline.definition import PipelineDefinition
 from twinklr.core.pipeline.result import PipelineResult, success_result
 from twinklr.core.pipeline.show_wiring import CombinedShowWiring, prepare_combined_show_pipeline
+from twinklr.core.reporting.evaluation.collect import extract_plan, recorded_render
+from twinklr.core.reporting.evaluation.extract import physical_channel_values
+from twinklr.core.reporting.evaluation.generator import generate_evaluation_report
+from twinklr.core.reporting.evaluation.models import EvaluationReport
+from twinklr.core.reporting.evaluation.rerender import rerender_plan
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     TRANSACTION_METADATA_KEY,
     plan_prepositions,
@@ -83,6 +95,7 @@ from twinklr.core.sequencer.vocabulary import (
     StepUnit,
 )
 from twinklr.core.sequencer.vocabulary.choreography import TargetType
+from twinklr.core.session import TwinklrSession
 from twinklr.core.utils.formatting import clean_audio_filename
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -314,18 +327,23 @@ def _recorded(
     macro: MacroSpec,
     moving_heads: MovingHeadSpec = SWING,
     calls: list[str],
+    planning_stage: bool = False,
 ) -> CombinedShowWiring:
-    """The wiring with every provider-backed stage replaced by a recorded one."""
+    """The wiring with every provider-backed stage replaced by a recorded one; with
+    `planning_stage`, the real moving-head planning stage is kept (its provider call is
+    the caller's to answer), which reads a real audio profile and writes the plan
+    checkpoint."""
     mh_id = next(iter(wiring.moving_head_target_ids))
     outputs: dict[str, object] = {
-        "profile": object(),
-        "lyrics": object(),
+        "profile": _audio_profile() if planning_stage else object(),
+        "lyrics": None if planning_stage else object(),
         "macro": _macro(mh_id, macro),
         "groups": None,
         "holistic": None,
         "holistic_corrector": None,
-        "moving_heads": _mh_plan(moving_heads),
     }
+    if not planning_stage:
+        outputs["moving_heads"] = _mh_plan(moving_heads)
     pipeline = PipelineDefinition(
         name=wiring.pipeline.name,
         stages=[
@@ -788,3 +806,223 @@ async def test_twinklr_show_writes_one_physical_show_offline(
         ARCH_GROUP,
     }
     assert "moving_heads" in calls
+
+
+class _SongMetadataOnly:
+    """The audio analysis `eval-report` runs, which a physical report reads only for the
+    song's metadata."""
+
+    def __init__(self, **kwargs: object) -> None:
+        pass
+
+    async def __aenter__(self) -> _SongMetadataOnly:
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        return None
+
+    async def analyze(self, path: str) -> SimpleNamespace:
+        return SimpleNamespace(features={"tempo": {"bpm": 120.0}})
+
+
+def _plan_through_json(moving_heads: MovingHeadSpec = SWING) -> ChoreographyPlan:
+    """The plan as a planner states it, every intent field present, as the checkpoint
+    carries it."""
+    return ChoreographyPlan.model_validate(_mh_plan(moving_heads).model_dump(mode="json"))
+
+
+async def _show_command(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    macro: MacroSpec = CALL_RESPONSE,
+    job: JobConfig | None = None,
+    exit_code: int = 0,
+) -> tuple[Path, Path, Path]:
+    """`twinklr show` end to end, offline, with the real moving-head planning stage (its
+    provider answered by a recorded plan), which writes the plan checkpoint; it must exit
+    with `exit_code`. Returns the artifact directory, the fixture config and the audio."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    layout_path, fixture_path = _write_inputs(tmp_path, _rig())
+    job_path = tmp_path / "job_config.json"
+    job_path.write_text((job or _job()).model_dump_json(), encoding="utf-8")
+    audio_path = tmp_path / "physical-show.wav"
+    audio_path.write_bytes(b"synthetic audio")
+    local = AppConfig(
+        llm_provider="ollama", llm_base_url="http://127.0.0.1:11434/v1", llm_api_key=""
+    )
+
+    def recorded(**kwargs: Any) -> CombinedShowWiring:
+        return _recorded(
+            prepare_combined_show_pipeline(**kwargs), macro=macro, calls=[], planning_stage=True
+        )
+
+    async def planner(self: object, planning_context: object) -> IterationResult:
+        return IterationResult(
+            success=True,
+            plan=_plan_through_json(),
+            context=IterationContext(current_iteration=1, state=IterationState.COMPLETE),
+        )
+
+    async def cache_key(self: object, planning_context: object) -> str:
+        return "show-evaluation"
+
+    monkeypatch.setattr(MovingHeadPlannerOrchestrator, "run", planner)
+    monkeypatch.setattr(MovingHeadPlannerOrchestrator, "get_cache_key", cache_key)
+    with (
+        patch("twinklr.cli.show_cmd.load_app_config", return_value=local),
+        patch("twinklr.cli.show_cmd.prepare_combined_show_pipeline", side_effect=recorded),
+        patch("twinklr.core.audio.analyzer.AudioAnalyzer", return_value=_analyzer()),
+    ):
+        exited = await run_show_pipeline_async(
+            audio_path=audio_path,
+            layout_path=layout_path,
+            fixture_config_path=fixture_path,
+            output_dir=tmp_path / "out",
+            app_config_path=None,
+            job_config_path=job_path,
+        )
+    assert exited == exit_code
+    return tmp_path / "out" / clean_audio_filename(audio_path.stem), fixture_path, audio_path
+
+
+async def _evaluate(
+    checkpoint: Path, fixture_path: Path, audio_path: Path, out: Path
+) -> EvaluationReport:
+    with patch("twinklr.core.audio.analyzer.AudioAnalyzer", _SongMetadataOnly):
+        return await generate_evaluation_report(
+            checkpoint_path=checkpoint,
+            audio_path=audio_path,
+            fixture_config_path=fixture_path,
+            output_dir=out,
+        )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_eval_report_reproduces_a_show_render_with_its_dark_spans(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`twinklr show` records its render in the plan checkpoint as `twinklr run` does,
+    the coordination's dark spans included, and `eval-report` re-renders exactly it."""
+    artifact_dir, fixture_path, audio_path = await _show_command(tmp_path, monkeypatch)
+    trace = json.loads(
+        (artifact_dir / f"{artifact_dir.name}_twinklr_show.xsq.trace.json").read_text()
+    )["render"]
+    checkpoint = artifact_dir / "checkpoints" / "plans" / "final.json"
+    data = json.loads(checkpoint.read_text(encoding="utf-8"))
+    spans = trace["dark_spans"]
+    assert len(spans) == len(CALLS)  # the heads rest on each of the tree's calls
+    assert data["render"]["render_fingerprint"] == trace["render_fingerprint"]
+    assert data["render"]["dark_spans"] == spans
+    assert data["render"]["inputs"]["dark_spans"] == spans
+
+    report = await _evaluate(checkpoint, fixture_path, audio_path, tmp_path / "report")
+
+    physical = report.physical
+    assert physical is not None
+    assert physical.fingerprint_matches is True, physical.mismatched_inputs
+    assert physical.rerender_fingerprint == physical.run_fingerprint == trace["render_fingerprint"]
+    assert physical.dark_spans == spans
+    assert physical.dark_span_ms == sum(end - start for start, end in spans)
+    markdown = (tmp_path / "report" / "report.md").read_text(encoding="utf-8")
+    assert f"**Dark spans**: {len(spans)}, {physical.dark_span_ms} ms in all" in markdown
+    written = json.loads((tmp_path / "report" / "report.json").read_text(encoding="utf-8"))
+    assert written["physical"]["dark_spans"] == spans
+
+    # Lit-only figures leave the spans out by construction: in every frame of every span
+    # each head emits nothing, and lit means emitted intensity above 0.
+    with patch("twinklr.core.audio.analyzer.AudioAnalyzer", _SongMetadataOnly):
+        rerendered = await rerender_plan(
+            plan=extract_plan(data),
+            audio_path=audio_path,
+            fixture_config_path=fixture_path,
+            render_policy=recorded_render(data),
+        )
+    assert rerendered.physical is not None
+    values = physical_channel_values(
+        rerendered.physical.frames, rerendered.physical.profiles, (0, sys.maxsize)
+    )
+    for fixture_id in FIXTURE_IDS:
+        intensity = values[fixture_id]["dimmer"]
+        for start, end in spans:
+            assert not any(intensity[start // EFFECT_GRID_MS : end // EFFECT_GRID_MS])
+        assert any(intensity)  # lit outside the spans
+    for curve in (c for section in report.sections for c in section.curves):
+        if curve.channel != "dimmer":
+            assert curve.lit_range is not None and curve.lit_range <= curve.stats.range
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_dark_spans_that_are_not_the_shows_are_named_as_what_differs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A record whose spans were changed or lost re-renders another render, and the
+    report names the dark spans instead of nothing."""
+    artifact_dir, fixture_path, audio_path = await _show_command(tmp_path, monkeypatch)
+    checkpoint = artifact_dir / "checkpoints" / "plans" / "final.json"
+    data = json.loads(checkpoint.read_text(encoding="utf-8"))
+
+    for change in ("tampered", "missing"):
+        changed = json.loads(json.dumps(data))
+        if change == "tampered":
+            changed["render"]["dark_spans"] = changed["render"]["dark_spans"][1:]
+        else:
+            del changed["render"]["dark_spans"]
+        path = tmp_path / f"{change}.json"
+        path.write_text(json.dumps(changed), encoding="utf-8")
+
+        report = await _evaluate(path, fixture_path, audio_path, tmp_path / change)
+
+        assert report.physical is not None
+        assert report.physical.fingerprint_matches is False, change
+        assert report.physical.mismatched_inputs == ["dark spans"], change
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_show_and_run_record_their_render_in_one_shape(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One writer: the show's record has the run's keys, and the dark spans besides."""
+    artifact_dir, fixture_path, _ = await _show_command(tmp_path, monkeypatch)
+    show = json.loads((artifact_dir / "checkpoints" / "plans" / "final.json").read_text())
+
+    run_dir = tmp_path / "run"
+    job = _job()
+    session = TwinklrSession(job_config=job, session_id="run", project_root=run_dir)
+    context = PipelineContext(session=session, output_dir=run_dir)
+    context.set_state("beat_grid", BeatGrid.model_validate(show["render"]["beat_grid"]))
+    plan = _plan_through_json()
+    MovingHeadStage(fixture_count=2, available_templates=["show_swing"])._handle_state(
+        {"plan": plan.model_dump(mode="json")}, context
+    )
+    rendered = await MovingHeadRenderingStage(
+        xsq_output_path=run_dir / "run.xsq", fixture_config_path=fixture_path
+    ).execute({"moving_heads": plan}, context)
+    assert rendered.success, rendered.error
+    run = json.loads((run_dir / "checkpoints" / "plans" / "final.json").read_text())
+
+    assert show.keys() == run.keys()
+    assert run["render"].keys() == show["render"].keys() - {"dark_spans"}
+    assert run["render"]["inputs"].keys() == show["render"]["inputs"].keys() - {"dark_spans"}
+    # The same rig, the same identity.
+    assert run["render"]["inputs"]["rig"] == show["render"]["inputs"]["rig"]
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_a_show_whose_export_is_refused_records_no_render(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The record follows the delivery, as `twinklr run`'s does: a show the output budget
+    refuses writes no sequence, and its plan checkpoint records no render."""
+    artifact_dir, _, _ = await _show_command(
+        tmp_path, monkeypatch, job=_job(max_effects=10), exit_code=1
+    )
+
+    data = json.loads((artifact_dir / "checkpoints" / "plans" / "final.json").read_text())
+    assert data["render_mode"] == "physical_v2"
+    assert "render" not in data
+    assert not list(artifact_dir.glob("*.xsq"))

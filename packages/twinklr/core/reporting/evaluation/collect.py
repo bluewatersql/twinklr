@@ -9,7 +9,7 @@ from datetime import datetime
 import json
 from pathlib import Path
 import subprocess
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
 
 from pydantic import ConfigDict, TypeAdapter, with_config
 
@@ -69,6 +69,14 @@ class _RecordedFixture(TypedDict):
     profile_sha256: str
 
 
+class _RecordedRig(TypedDict):
+    """The rendered rig's identity in a render record's `inputs`."""
+
+    sha256: str
+    fields: dict[str, str]
+    live_layout: bool
+
+
 class _RecordedInputs(TypedDict):
     """The input hashes a run's render record carries (`RecordedRender.inputs`)."""
 
@@ -77,26 +85,33 @@ class _RecordedInputs(TypedDict):
     beat_grid_sha256: str
     renderer_revision: str
     encoder_version: str
+    rig: _RecordedRig
+    dark_spans: NotRequired[list[list[int]]]
 
 
 @dataclass(frozen=True)
 class RecordedRender:
-    """The physical render a run recorded in its checkpoint (`render`, written by the
-    render stage): its fingerprint and the inputs a re-render needs to be that render.
+    """The physical render a run recorded in its checkpoint (`render`, written by
+    `record_render` from `RenderingPipeline.checkpoint_record`): its fingerprint and the
+    inputs a re-render needs to be that render.
 
     Attributes:
         fingerprint: The run's render fingerprint.
         policy: The job's full moving-head render policy.
         beat_grid: The beat grid the run rendered against.
         admission: The pre-planning gate's result, or None when no gate ran.
+        dark_spans: The spans the render held every head dark over, as snapped and
+            merged (`twinklr show`'s coordination rests); empty when there were none.
         inputs: The run trace's input hashes (`fixtures`, `template_sha256`,
-            `beat_grid_sha256`, `renderer_revision`, `encoder_version`).
+            `beat_grid_sha256`, `renderer_revision`, `encoder_version`, and
+            `dark_spans` when there were any) and the rendered rig's identity (`rig`).
     """
 
     fingerprint: str
     policy: MHRenderPolicy
     beat_grid: BeatGrid
     admission: TemplateAdmission | None
+    dark_spans: tuple[tuple[int, int], ...]
     inputs: Mapping[str, Any]
 
 
@@ -105,8 +120,8 @@ def recorded_render(checkpoint_data: dict) -> RecordedRender | None:
 
     Raises:
         UnsupportedRenderModeError: If the checkpoint names a physical render mode but
-            records no render (its run failed before rendering, or predates the record),
-            or a record that does not read back.
+            records no render, or a record that does not read back (one written before
+            the record carried the rig's identity among them).
     """
     mode = checkpoint_render_policy(checkpoint_data).mode
     if mode == "legacy_v1":
@@ -115,8 +130,10 @@ def recorded_render(checkpoint_data: dict) -> RecordedRender | None:
     if render is None:
         raise UnsupportedRenderModeError(
             f"`twinklr eval-report` re-renders a moving_heads.mode {mode!r} plan only from "
-            "the render its run recorded in the checkpoint (`render`), and this checkpoint "
-            "records none; re-run the job through its render to write it"
+            "the render recorded beside it in the checkpoint (`render`), and this "
+            "checkpoint records none: the command that planned it stopped before it "
+            "delivered its moving-head render, or could not write the record (it logs a "
+            "warning when it cannot); re-running that command records it"
         )
     try:
         if not isinstance(render, dict):
@@ -140,6 +157,9 @@ def _recorded_render(render: dict[str, Any]) -> RecordedRender:
         inputs=TypeAdapter(_RecordedInputs).validate_python(render["inputs"]),
         policy=MHRenderPolicy.model_validate(render["policy"]),
         beat_grid=BeatGrid.model_validate(render["beat_grid"]),
+        dark_spans=TypeAdapter(tuple[tuple[int, int], ...]).validate_python(
+            render.get("dark_spans", ())
+        ),
         admission=None
         if admission is None
         else TemplateAdmission(

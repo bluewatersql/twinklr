@@ -640,4 +640,19 @@ them by hand. What each changed beyond its brief, and what the owner should know
 - **Selector and three-arm experiment.** See the section above on what the port
   changes in the experiment.
 
-Not yet done at this point: `make validate` on the merged tree, and C1.2 onward.
+`make validate` on the merged tree at `6fe8b0ba`: 7223 passed, 39 skipped.
+
+A verifier separate from every port's author then checked the combination. The merged
+code equals a clean three-way merge of the four reviewed tips; old-renderer output is
+byte-identical across `run`, `show`, `eval-report`, `inject` (apart from the intended
+ownership-manifest pruning) and the selector; standalone physical output is unchanged
+(13,770 comparisons); gate time is unchanged. It found one cross-port gap, fixed
+before C1.2: `show` wrote no render record, so `eval-report` dead-ended on a show with
+an untrue message (see the addendum in the C1.1b record). The same verifier confirmed
+the fix and that no production path renders a plan carrying the private
+`legacy_intent_omitted` flag, which does not survive a checkpoint.
+
+Known and accepted: `run`, `show` and `inject` write one checkpoint path per song, so
+the last one wins, and a failed re-run leaves an earlier delivery without a record.
+For C1.2: `require_legacy_render` (`config/render_policy.py`) has no caller left, and
+`show_cmd.py`'s `if checkpoint_record is not None` becomes unconditional.

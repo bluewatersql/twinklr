@@ -3,7 +3,7 @@ from __future__ import annotations
 import bisect
 from collections import defaultdict
 from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from fractions import Fraction
 import functools
 import gc
@@ -1522,9 +1522,11 @@ class PhysicalRenderError(ValueError):
 
 
 def _sha256(model: BaseModel) -> str:
-    canonical = json.dumps(
-        model.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), allow_nan=False
-    )
+    return _json_sha256(model.model_dump(mode="json"))
+
+
+def _json_sha256(value: Any) -> str:
+    canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
@@ -1907,6 +1909,61 @@ class RenderingPipeline:
             preset_substitutions=substitutions,
             dark_spans=self.dark_spans,
         )
+
+    def checkpoint_record(self, *, live_layout: bool = False) -> dict[str, Any]:
+        """What `twinklr eval-report` re-renders this physical render from, and what names
+        the input that differs when its re-render is another render; written under the
+        plan checkpoint's `render` key (`record_render`), for every command's render.
+
+        Its keys: `render_fingerprint`; the moving-head `policy`; the `beat_grid` it
+        rendered against; the gate's `admission` (null when none ran); `dark_spans`, as
+        snapped and merged, only when there are any; and `inputs`, the trace's input
+        hashes (each fixture's profile and model name, each template, the beat grid, the
+        renderer and encoder revisions, the dark spans when there are any) with the
+        rendered rig's identity (`rig`): the hash of the fixture group as the fingerprint
+        hashes it, the hash of each of its top-level fields, and whether it is the rig
+        as reconciled with the live xLights layout (`live_layout`).
+
+        Args:
+            live_layout: The render's rig is the fixture config reconciled with the live
+                xLights layout (`inject`, `regenerate`).
+
+        Raises:
+            ValueError: If this pipeline has not rendered a `physical_v2` render.
+        """
+        record = self.render_record
+        if record is None:
+            raise ValueError("only a rendered physical_v2 render has a checkpoint record")
+        rig = self.fixture_group.model_dump(mode="json")
+        inputs: dict[str, Any] = {
+            key: record[key]
+            for key in (
+                "fixtures",
+                "template_sha256",
+                "beat_grid_sha256",
+                "renderer_revision",
+                "encoder_version",
+            )
+        }
+        inputs["rig"] = {
+            "sha256": _json_sha256(rig),
+            "fields": {name: _json_sha256(value) for name, value in rig.items()},
+            "live_layout": live_layout,
+        }
+        checkpoint: dict[str, Any] = {
+            "render_fingerprint": record["render_fingerprint"],
+            "policy": self.job_config.moving_heads.model_dump(mode="json"),
+            "beat_grid": self.beat_grid.model_dump(mode="json"),
+            "admission": None if self.admission is None else asdict(self.admission),
+            "inputs": inputs,
+        }
+        if "dark_spans" in record:
+            # Left out when there are none, as in the trace. The re-render takes the
+            # spans from `dark_spans`; `inputs` keeps the run's, to name them on a
+            # mismatch.
+            checkpoint["dark_spans"] = record["dark_spans"]
+            inputs["dark_spans"] = record["dark_spans"]
+        return checkpoint
 
     def _render_physical(self) -> list[FixtureSegment]:
         """Render through the opt-in physical path and, with an output path, deliver it.
