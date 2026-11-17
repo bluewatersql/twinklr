@@ -21,7 +21,7 @@ from typing import Any
 
 import pytest
 
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
     assert_honest_transactions,
     discrete_profile_payload,
     preposition_profile_payload,
@@ -38,7 +38,6 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
     TransitionDiagnostic,
 )
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile.physical import _check_travel_rate
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     FailureMode,
     follow_cues,
@@ -46,6 +45,7 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
     plan_prepositions,
     worst_case_entry_ms,
 )
+from twinklr.core.sequencer.moving_heads.compile.step import _check_travel_rate
 
 _FRAME = 20
 _REVIEW_SEEDS = (3911, 16042, 37040)
@@ -1382,7 +1382,7 @@ def _check_admitted(seed: int) -> str:
 
 
 def test_entry_bound_dominates_after_any_cue_the_compile_admits() -> None:
-    """The envelope bound (no followed predecessor) holds after any one cue the physical
+    """The envelope bound (no followed predecessor) holds after any one cue the
     compile admits: within the configured speed (`_check_travel_rate`) and followable
     by the head (`follow_lag`). Word-boundary wobble on a coarse axis, which once left
     the head 20 s behind, is refused by the compile instead. Known catching seeds first,

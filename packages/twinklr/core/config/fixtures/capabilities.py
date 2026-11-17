@@ -1,4 +1,4 @@
-"""Explicit fixture capabilities and run initial state for the physical renderer.
+"""Explicit fixture capabilities and run initial state for the moving-head renderer.
 
 A `FixtureCapabilities` profile says which model-relative DMX channels a fixture has,
 how calibrated physical values map to DMX words, which bytes select its discrete
@@ -345,7 +345,7 @@ class VisibilityCapability(BaseModel):
 
 
 class FixtureCapabilities(BaseModel):
-    """A fixture's explicit physical profile for the physical renderer.
+    """A fixture's explicit physical profile for the moving-head renderer.
 
     Values left out are filled when the profile loads (`_fill_defaults`), so the model
     always holds the explicit profile; `defaulted` names what was filled.

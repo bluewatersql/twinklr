@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from twinklr.core.config.fixtures.capabilities import FixtureCapabilities
 from twinklr.core.config.fixtures.dmx import DmxMapping
-from twinklr.core.config.fixtures.physical import (
+from twinklr.core.config.fixtures.removed_fields import (
     REMOVED_FIXTURE_FIELDS,
     drop_retired_fields,
     reject_removed_fields,

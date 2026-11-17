@@ -1,12 +1,12 @@
-# Physical moving-head families
+# Moving-head families
 
 Strict JSON `TemplateDoc` documents for the moving-head renderer. They load for every
-run (`admit_physical_catalog`), before any `--template-dir`. The deterministic selector
+run (`load_template_catalog`), before any `--template-dir`. The deterministic selector
 sees only the families the run's gate admitted, each with its effective variant
 (`SelectorAdmission`).
 
 Before planning, the render preflight dry-compiles each family with no preset and with
-each preset on the run's rig and song (`check_physical_templates`). A family is offered
+each preset on the run's rig and song (`admit_templates`). A family is offered
 when any of its variants passes there, tried as a ladder: the base (no preset) first,
 then its presets in the order it declares them (`narrow`, then `slow`). The first that
 passes is the family's **effective variant** on this rig and song: a section naming no
@@ -22,7 +22,7 @@ passes, the family plays exactly as it did before the ladder. The gate also logs
 admitted family's worst-case section-entry dip, over its admitted variants.
 
 Every family sets explicit start angles and names no rig position preset, authors its
-dimmer, and declares `physical_reposition_fallback: drop_accent` on every step, so a
+dimmer, and declares `reposition_fallback: drop_accent` on every step, so a
 job that sets `moving_heads.reposition_fallback: drop_accent` plays a cue it cannot
 reposition into dark. Each declares two variants as presets: `narrow` (less reach) and
 `slow` (half the rate). Both ask for less speed than the base, so on a head too slow for
@@ -36,7 +36,7 @@ synthetic designs, not accepted looks.
 The families are authored in 4/4: periods are in beats and cycles in bars, and a 2-bar
 4/4 cycle holds whole movement periods (4 beats, `slow` 8) and the flick's overlay
 (beats 2 to 6). Each cycle restarts its motion, so in another meter such a cycle would
-end mid-path and the head would jump at every cycle boundary. The physical compile
+end mid-path and the head would jump at every cycle boundary. The template compile
 therefore grows a repeating cycle that would end mid-period, or before its overlay ends,
 with its step, to the smallest whole number of bars that holds them
 (`whole_period_cycle`), for the render and the gate alike. Every family then plays in
@@ -67,7 +67,7 @@ its speed limit cannot play. A step's cycles that follow one another without a g
 therefore continue one musical phase from the first, and meet at the same pose. On a
 grid whose bars all sit at one distance from the frame grid nothing changes.
 
-This is physical renderer revision 2. Revision 1 cut a non-4/4 cycle mid-period, which
+This is renderer revision 2. Revision 1 cut a non-4/4 cycle mid-period, which
 left the orbit, the wings and the zoom wave out in 3/4 and the `slow` variants out in
 6/8 and played a cascade's 1.5 periods per 3/4 cycle, and it restarted each cycle at
 its own frame, which on a drifting grid left heads near their limit out (on the owner's
@@ -129,14 +129,14 @@ heads' phases; declare a topology to keep them.
 
 `zoom_wave` is the bounded optical pilot (P2.5): one continuous optical axis, the zoom's
 beam angle, through the same physical encoding and dark repositioning as pan and tilt.
-Its zoom waves on the sway's own phase (`physical_zoom`, `sine`), so it lags with each
+Its zoom waves on the sway's own phase (`zoom`, `sine`), so it lags with each
 head's place in the wave. `narrow` narrows only the sway (a preset cannot patch the zoom),
 and `slow` halves the rate of both. On a rig with a zoom axis every other family holds
 the zoom at the profile's default byte, and between sections the zoom moves only in the
 dark and settles before the reveal, like pan and tilt.
 
 It was designed and checked only against a synthetic profile:
-`zoom_pilot_profile_payload` in `tests/support/mh_physical.py`, laid out for a
+`zoom_pilot_profile_payload` in `tests/support/moving_heads.py`, laid out for a
 16-channel DMX model with every offset in 1-16 (16-bit pan 1/2 and tilt 3/4, dimmer 5,
 shutter 6, color 7, gobo 8, an 8-bit zoom on 9 whose 10°-40° beam angle maps over bytes
 20-220 at 90°/s with 40 ms settle). That layout is prepared for validation against an

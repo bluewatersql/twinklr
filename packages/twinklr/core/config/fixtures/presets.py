@@ -1,7 +1,7 @@
-"""Named rig components for the physical renderer: position and attribute presets.
+"""Named rig components for the moving-head renderer: position and attribute presets.
 
 A fixture group may declare named presets: per-fixture aims (`PositionPreset`) and
-per-fixture shutter/color/gobo states and dimmer level (`AttributePreset`). A physical
+per-fixture shutter/color/gobo states and dimmer level (`AttributePreset`). A
 template step refers to them by id, so the template carries no rig-specific angle or
 profile state name. A preset that does not declare a fixture may name a fallback preset
 of the same kind; nothing is ever filled in with a center or default value.

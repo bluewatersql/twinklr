@@ -162,7 +162,7 @@ def trace(*entries: ShowTraceEntry) -> ShowTraceV2:
         entry_count=len(entries),
         fallback_substitutions=0,
         entries=list(entries),
-        render={"renderer": "physical_v2"},
+        render={"renderer_revision": "2"},
     )
 
 

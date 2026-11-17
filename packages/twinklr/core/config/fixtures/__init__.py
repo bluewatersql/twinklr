@@ -5,10 +5,10 @@ Provides clear separation of concerns, sensible defaults, and type safety.
 
 This package is organized into focused modules:
 - dmx: DMX channel assignments
-- physical: Retired and removed fixture-config fields
+- removed_fields: Retired and removed fixture-config fields
 - instances: Fixture instances and their configurations
 - groups: Fixture grouping and batch configuration
-- capabilities: Explicit physical-renderer profiles and run initial state
+- capabilities: Explicit physical profiles and run initial state
 """
 
 from __future__ import annotations

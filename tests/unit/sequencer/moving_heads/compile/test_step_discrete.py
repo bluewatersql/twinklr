@@ -1,4 +1,4 @@
-"""Physical discrete channels: named shutter, color and gobo states resolve to declared bytes."""
+"""Discrete channels: named shutter, color and gobo states resolve to declared bytes."""
 
 from __future__ import annotations
 
@@ -10,10 +10,10 @@ from pydantic import ValidationError
 import pytest
 
 from tests.config_effects_registry import CONFIG_EFFECTS, ConfigDispositionKind
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
     discrete_profile_payload,
     discrete_step_payload,
-    physical_step_payload,
+    linear_step_payload,
 )
 from twinklr.core.config.fixtures import DiscreteCapability, FixtureCapabilities
 from twinklr.core.sequencer.models.context import StepCompileContext
@@ -24,13 +24,13 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
 )
 from twinklr.core.sequencer.models.template import TemplateStep
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile.physical import (
+from twinklr.core.sequencer.moving_heads.compile.step import (
+    CompileError,
     DiscreteChange,
-    PhysicalCompileError,
-    compile_physical_step,
+    compile_step,
     resolve_discrete_state,
     shutter_changes,
-    slice_physical_segment,
+    slice_segment,
     wheel_changes,
 )
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
@@ -45,7 +45,7 @@ def _context(
     return StepCompileContext(
         section_id="verse",
         segment_id="A",
-        template_id="physical_probe",
+        template_id="step_probe",
         fixture_id="MH1",
         role="OUTER_LEFT",
         start_ms=start_ms,
@@ -62,7 +62,7 @@ def _compile(
     payload = {**discrete_step_payload(), **fields}
     for name in [name for name, value in payload.items() if value is None]:
         payload.pop(name)
-    return compile_physical_step(
+    return compile_step(
         TemplateStep.model_validate(payload),
         _context(start_ms=start_ms, profile=profile),
         sample_times_ms=tuple(range(start_ms, start_ms + 1000, 20)),
@@ -93,15 +93,15 @@ def test_shutter_17_uses_profile_closed_value() -> None:
     shutter = profile.discrete["shutter"]
     assert shutter.offset == 17
 
-    closed = _compile(physical_shutter_state="closed")
+    closed = _compile(shutter_state="closed")
     assert _events(closed, ChannelName.SHUTTER) == [(0, "closed")]
     assert resolve_discrete_state(shutter, "closed") == 64
     assert resolve_discrete_state(shutter, "open") == 8
 
     # The pulse form on channel 17 selects exactly the two declared bytes, never 0.
     pulse = _compile(
-        physical_shutter_state=None,
-        physical_shutter={
+        shutter_state=None,
+        shutter={
             "period_beats": 1.0,
             "duty_cycle": 0.5,
             "low_state": "closed",
@@ -116,8 +116,8 @@ def test_shutter_17_uses_profile_closed_value() -> None:
 
 def test_wheel_change_never_sweeps_intermediate_modes() -> None:
     profile = _profile()
-    first = _compile(physical_color="white", physical_gobo="open")
-    second = _compile(1000, physical_color="blue", physical_gobo="star")
+    first = _compile(color="white", gobo="open")
+    second = _compile(1000, color="blue", gobo="star")
 
     # One event per step: a step function, not a ramp through red or dots.
     assert _events(first, ChannelName.COLOR) == [(0, "white")]
@@ -131,9 +131,7 @@ def test_wheel_change_never_sweeps_intermediate_modes() -> None:
     assert color_bytes == {0, 26}
 
     # A slice carries the selected state; it never interpolates one.
-    assert _events(slice_physical_segment(second, 1500, 2000), ChannelName.COLOR) == [
-        (1500, "blue")
-    ]
+    assert _events(slice_segment(second, 1500, 2000), ChannelName.COLOR) == [(1500, "blue")]
 
     # What the transaction pass needs to mask and settle each selection, including
     # the return to the declared default after the last authored state.
@@ -158,8 +156,8 @@ def test_wheel_change_never_sweeps_intermediate_modes() -> None:
 
 
 def test_unauthored_spans_and_gaps_hold_the_default_state() -> None:
-    red = [_compile(start, physical_color="red", physical_gobo=None) for start in (0, 1000, 3000)]
-    unauthored = _compile(2000, physical_color=None, physical_gobo=None)
+    red = [_compile(start, color="red", gobo=None) for start in (0, 1000, 3000)]
+    unauthored = _compile(2000, color=None, gobo=None)
     expected = [
         (0, None, "red"),
         (2000, "red", "white"),
@@ -180,7 +178,7 @@ def test_unauthored_spans_and_gaps_hold_the_default_state() -> None:
     blue_default = discrete_profile_payload()
     blue_default["discrete"]["color"]["default_state"] = "blue"
     blue_default["defaults"][7] = 26
-    late = _compile(1000, profile=blue_default, physical_color="red", physical_gobo=None)
+    late = _compile(1000, profile=blue_default, color="red", gobo=None)
     assert _changes(wheel_changes([late], {"MH1": _profile(blue_default)}), ChannelName.COLOR) == [
         (0, None, "blue"),
         (1000, "blue", "red"),
@@ -191,11 +189,9 @@ def test_unauthored_spans_and_gaps_hold_the_default_state() -> None:
 def test_changes_use_each_fixtures_own_profile_in_any_order() -> None:
     slow = discrete_profile_payload()
     slow["discrete"]["color"]["states"]["red"]["settle_ms"] = 400
-    mh1 = _compile(physical_color="red", physical_gobo=None)
+    mh1 = _compile(color="red", gobo=None)
     mh2 = mh1.model_copy(update={"fixture_id": "MH2"})
-    mh2_later = _compile(1000, physical_color="blue", physical_gobo=None).model_copy(
-        update={"fixture_id": "MH2"}
-    )
+    mh2_later = _compile(1000, color="blue", gobo=None).model_copy(update={"fixture_id": "MH2"})
 
     changes = wheel_changes([mh2_later, mh1, mh2], {"MH1": _profile(), "MH2": _profile(slow)})
 
@@ -216,14 +212,14 @@ def test_changes_use_each_fixtures_own_profile_in_any_order() -> None:
 
 
 def test_overlapping_segments_authoring_one_channel_are_rejected() -> None:
-    first = _compile(physical_color="red", physical_gobo=None)
-    overlap = _compile(500, physical_color="blue", physical_gobo=None)
+    first = _compile(color="red", gobo=None)
+    overlap = _compile(500, color="blue", gobo=None)
 
     with pytest.raises(ValueError, match="overlap"):
         wheel_changes([first, overlap], {"MH1": _profile()})
 
     # Overlap on a channel only one segment authors is not ambiguous.
-    no_color = _compile(500, physical_color=None, physical_gobo=None)
+    no_color = _compile(500, color=None, gobo=None)
     assert _changes(wheel_changes([first, no_color], {"MH1": _profile()}), ChannelName.COLOR) == [
         (0, None, "red"),
         (1000, "red", "white"),
@@ -231,8 +227,8 @@ def test_overlapping_segments_authoring_one_channel_are_rejected() -> None:
 
 
 def test_shutter_changes_cross_step_boundaries() -> None:
-    closed = _compile(physical_shutter_state="closed", physical_gobo=None)
-    opened = _compile(1000, physical_shutter_state="open", physical_gobo=None)
+    closed = _compile(shutter_state="closed", gobo=None)
+    opened = _compile(1000, shutter_state="open", gobo=None)
     profiles = {"MH1": _profile()}
 
     changes = shutter_changes([closed, opened], profiles)
@@ -249,8 +245,8 @@ def test_shutter_changes_cross_step_boundaries() -> None:
     }
 
     pulse = _compile(
-        physical_shutter_state=None,
-        physical_shutter={
+        shutter_state=None,
+        shutter={
             "period_beats": 1.0,
             "duty_cycle": 0.5,
             "low_state": "closed",
@@ -269,9 +265,9 @@ def test_unknown_state_has_no_open_fallback() -> None:
     profile = _profile()
 
     for channel, field in (
-        (ChannelName.SHUTTER, "physical_shutter_state"),
-        (ChannelName.COLOR, "physical_color"),
-        (ChannelName.GOBO, "physical_gobo"),
+        (ChannelName.SHUTTER, "shutter_state"),
+        (ChannelName.COLOR, "color"),
+        (ChannelName.GOBO, "gobo"),
     ):
         with pytest.raises(PhysicalChannelError, match="'magenta'") as error:
             _compile(**{field: "magenta"})
@@ -302,12 +298,12 @@ def test_absent_required_capability_is_an_error() -> None:
     assert error.value.channel is ChannelName.GOBO
 
     # Without a wheel request the same profile compiles.
-    segment = _compile(profile=no_gobo, physical_gobo=None)
+    segment = _compile(profile=no_gobo, gobo=None)
     assert ChannelName.GOBO not in segment.channels
 
 
 def test_unrequested_discrete_channels_are_not_authored() -> None:
-    segment = _compile(physical_shutter_state=None, physical_color=None, physical_gobo=None)
+    segment = _compile(shutter_state=None, color=None, gobo=None)
 
     assert set(segment.channels) == {ChannelName.PAN, ChannelName.TILT}
 
@@ -317,9 +313,9 @@ def test_unrequested_discrete_channels_are_not_authored() -> None:
 
 def test_static_and_pulsed_shutter_are_exclusive() -> None:
     payload = discrete_step_payload()
-    payload["physical_shutter"] = physical_step_payload()["physical_shutter"]
+    payload["shutter"] = linear_step_payload()["shutter"]
 
-    with pytest.raises(ValidationError, match="physical_shutter_state or physical_shutter"):
+    with pytest.raises(ValidationError, match="shutter_state or shutter"):
         TemplateStep.model_validate(payload)
 
 
@@ -327,19 +323,19 @@ def test_static_and_pulsed_shutter_are_exclusive() -> None:
 @pytest.mark.parametrize(
     "field",
     [
-        "physical_shutter_state",
-        "physical_color",
-        "physical_gobo",
-        "physical_shutter.low_state",
-        "physical_shutter.high_state",
+        "shutter_state",
+        "color",
+        "gobo",
+        "shutter.low_state",
+        "shutter.high_state",
     ],
 )
 def test_blank_state_names_are_rejected_by_the_model(field: str, name: str) -> None:
     payload = discrete_step_payload()
-    if field.startswith("physical_shutter."):
-        payload.pop("physical_shutter_state")
-        payload["physical_shutter"] = {**physical_step_payload()["physical_shutter"]}
-        payload["physical_shutter"][field.removeprefix("physical_shutter.")] = name
+    if field.startswith("shutter."):
+        payload.pop("shutter_state")
+        payload["shutter"] = {**linear_step_payload()["shutter"]}
+        payload["shutter"][field.removeprefix("shutter.")] = name
     else:
         payload[field] = name
 
@@ -347,15 +343,14 @@ def test_blank_state_names_are_rejected_by_the_model(field: str, name: str) -> N
         TemplateStep.model_validate(payload)
 
 
-@pytest.mark.parametrize("field", ["physical_shutter_state", "physical_color", "physical_gobo"])
-def test_discrete_physical_data_alone_is_not_a_physical_step(field: str) -> None:
-    with pytest.raises(ValidationError, match=r"movement\.physical\n  Field required"):
+@pytest.mark.parametrize("field", ["shutter_state", "color", "gobo"])
+def test_discrete_states_alone_are_not_a_step(field: str) -> None:
+    with pytest.raises(ValidationError, match=r"movement\.shape\n  Field required"):
         TemplateStep.model_validate(
             {
                 "step_id": "states_only",
                 "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
                 "movement": {},
-                "dimmer": {},
                 field: "open",
             }
         )
@@ -367,71 +362,68 @@ def test_absent_discrete_fields_stay_out_of_template_dumps() -> None:
             "step_id": "aimed",
             "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
             "movement": {
-                "physical": {
-                    "shape": "hold",
-                    "mode": "periodic",
-                    "start_pan_deg": 0.0,
-                    "start_tilt_deg": 0.0,
-                }
+                "shape": "hold",
+                "mode": "periodic",
+                "start_pan_deg": 0.0,
+                "start_tilt_deg": 0.0,
             },
-            "dimmer": {},
         }
     )
 
     dumped = step.model_dump(mode="json")
-    assert not {"physical_shutter_state", "physical_color", "physical_gobo"} & dumped.keys()
+    assert not {"shutter_state", "color", "gobo"} & dumped.keys()
 
 
-# --- Registry evidence for physical discrete template fields -------------------------
+# --- Registry evidence for discrete template step fields ----------------------------
 
 Component = Literal["compiled"]
 
 _COMPONENT_NOTES: dict[Component, str] = {
-    "compiled": "exact path changes the physical compile result",
+    "compiled": "exact path changes the compile result",
 }
 
 _STEP_PREFIX = "template.template.steps."
 
 _DISCRETE_MUTATIONS: dict[str, tuple[Component, Callable[[dict[str, Any]], Any]]] = {
-    "physical_shutter_state": (
+    "shutter_state": (
         "compiled",
-        lambda s: s.update(physical_shutter_state="closed"),
+        lambda s: s.update(shutter_state="closed"),
     ),
-    "physical_color": ("compiled", lambda s: s.update(physical_color="blue")),
-    "physical_gobo": ("compiled", lambda s: s.update(physical_gobo="star")),
+    "color": ("compiled", lambda s: s.update(color="blue")),
+    "gobo": ("compiled", lambda s: s.update(gobo="star")),
 }
 """Per template path below the step: the one component its alternative must change."""
 
-PHYSICAL_DISCRETE_PATHS = tuple(
+DISCRETE_FIELD_PATHS = tuple(
     path
     for path, disposition in CONFIG_EFFECTS.items()
     if disposition.kind is ConfigDispositionKind.EFFECT_TEST
     and disposition.test_nodeid is not None
-    and "::test_physical_discrete_field_changes_compile[" in disposition.test_nodeid
+    and "::test_discrete_field_changes_compile[" in disposition.test_nodeid
 )
 
 
 def _compile_snapshot(step_payload: dict[str, Any]) -> dict[str, Any]:
     try:
         step = TemplateStep.model_validate(step_payload)
-        segment = compile_physical_step(step, _context(), sample_times_ms=tuple(range(0, 1000, 20)))
-    except (ValidationError, PhysicalCompileError, PhysicalChannelError) as error:
+        segment = compile_step(step, _context(), sample_times_ms=tuple(range(0, 1000, 20)))
+    except (ValidationError, CompileError, PhysicalChannelError) as error:
         return {"rejected": f"{type(error).__name__}: {error}"}
     return {"compiled": segment.model_dump(mode="json")}
 
 
-def test_physical_discrete_evidence_paths_cover_every_mutation() -> None:
+def test_discrete_field_evidence_paths_cover_every_mutation() -> None:
     """The registry, its notes and the mutation table describe the same evidence."""
     expected = {f"{_STEP_PREFIX}{suffix}": c for suffix, (c, _) in _DISCRETE_MUTATIONS.items()}
 
-    assert set(PHYSICAL_DISCRETE_PATHS) == set(expected)
+    assert set(DISCRETE_FIELD_PATHS) == set(expected)
     for path, component in expected.items():
         assert CONFIG_EFFECTS[path].note == _COMPONENT_NOTES[component], path
 
 
-@pytest.mark.parametrize("config_path", PHYSICAL_DISCRETE_PATHS, ids=PHYSICAL_DISCRETE_PATHS)
-def test_physical_discrete_field_changes_compile(config_path: str) -> None:
-    """Each physical discrete template path changes the compiled segment."""
+@pytest.mark.parametrize("config_path", DISCRETE_FIELD_PATHS, ids=DISCRETE_FIELD_PATHS)
+def test_discrete_field_changes_compile(config_path: str) -> None:
+    """Each discrete template step path changes the compiled segment."""
     _, mutate = _DISCRETE_MUTATIONS[config_path.removeprefix(_STEP_PREFIX)]
     payload = copy.deepcopy(discrete_step_payload())
     mutate(payload)

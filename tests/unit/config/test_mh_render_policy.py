@@ -9,12 +9,12 @@ from pydantic import ValidationError
 import pytest
 import yaml
 
-from tests.support.mh_physical import (
-    PHYSICAL_INITIAL_STATE,
-    physical_grid,
-    physical_job,
-    physical_plan,
-    physical_rig,
+from tests.support.moving_heads import (
+    INITIAL_STATE,
+    p1_grid,
+    p1_job,
+    p1_plan,
+    p1_rig,
 )
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.loader import load_full_config, load_job_config
@@ -27,8 +27,8 @@ from twinklr.core.sequencer.moving_heads.pipeline import (
 
 
 def _unprofiled_rig() -> FixtureGroup:
-    """`physical_rig` without its physical profiles."""
-    payload = physical_rig().model_dump(mode="json")
+    """`p1_rig` without its physical profiles."""
+    payload = p1_rig().model_dump(mode="json")
     for fixture in payload["fixtures"]:
         del fixture["config"]["physical_profile"]
     return FixtureGroup.model_validate(payload)
@@ -95,10 +95,10 @@ def test_a_rig_without_profiles_is_rejected(tmp_path: Path) -> None:
     missing item, before any output."""
     with pytest.raises(UnsupportedRenderModeError, match="cannot render this rig") as raised:
         RenderingPipeline(
-            choreography_plan=physical_plan(),
-            beat_grid=physical_grid(),
+            choreography_plan=p1_plan(),
+            beat_grid=p1_grid(),
             fixture_group=_unprofiled_rig(),
-            job_config=physical_job(),
+            job_config=p1_job(),
             output_path=tmp_path / "out.xsq",
         )
 
@@ -128,11 +128,11 @@ def test_loading_a_job_on_a_rig_without_profiles_is_rejected_before_execution(
     ):
         load_full_config(path)
 
-    (tmp_path / "fixtures.json").write_text(physical_rig().model_dump_json(), encoding="utf-8")
+    (tmp_path / "fixtures.json").write_text(p1_rig().model_dump_json(), encoding="utf-8")
     with pytest.raises(UnsupportedRenderModeError, match=r"MH1: .*initial state is unknown"):
         load_full_config(path)
 
-    initial = {"MH1": PHYSICAL_INITIAL_STATE, "MH2": PHYSICAL_INITIAL_STATE}
+    initial = {"MH1": INITIAL_STATE, "MH2": INITIAL_STATE}
     path = _write_job(
         tmp_path,
         {"fixture_config_path": "fixtures.json", "moving_heads": {"initial_states": initial}},
@@ -145,31 +145,29 @@ def test_loading_a_job_on_a_rig_without_profiles_is_rejected_before_execution(
 def test_preflight_names_each_unusable_initial_state() -> None:
     """An unsettled, contradictory or stray initial state is refused at preflight; the
     transaction pass would fail it whenever the first cue is."""
-    unsettled = {**PHYSICAL_INITIAL_STATE, "settled": False}
+    unsettled = {**INITIAL_STATE, "settled": False}
     contradictory = {
-        **PHYSICAL_INITIAL_STATE,
+        **INITIAL_STATE,
         "dimmer": 1.0,
-        "discrete_states": {**PHYSICAL_INITIAL_STATE["discrete_states"], "shutter": "open"},
+        "discrete_states": {**INITIAL_STATE["discrete_states"], "shutter": "open"},
     }
-    job = physical_job(
-        initial_states={"MH1": unsettled, "MH2": contradictory, "MH9": PHYSICAL_INITIAL_STATE}
-    )
+    job = p1_job(initial_states={"MH1": unsettled, "MH2": contradictory, "MH9": INITIAL_STATE})
 
     with pytest.raises(UnsupportedRenderModeError) as raised:
-        preflight_render_policy(job, physical_rig())
+        preflight_render_policy(job, p1_rig())
 
     message = str(raised.value)
     assert "MH1: moving_heads.initial_states['MH1']: initial state is not settled" in message
     assert "MH2: moving_heads.initial_states['MH2']: initial state claims dark=True" in message
     assert "moving_heads.initial_states['MH9'] names no fixture of the rig" in message
-    preflight_render_policy(physical_job(), physical_rig())
+    preflight_render_policy(p1_job(), p1_rig())
 
 
 def test_refusal_names_each_fixture_what_to_add_and_where_the_example_is() -> None:
     """A rig without profiles is refused naming every fixture, where its profile goes and
     the user guide's minimal example."""
     with pytest.raises(UnsupportedRenderModeError) as raised:
-        preflight_render_policy(physical_job(), _unprofiled_rig())
+        preflight_render_policy(p1_job(), _unprofiled_rig())
 
     message = str(raised.value)
     for fixture_id in ("MH1", "MH2"):
@@ -190,8 +188,8 @@ def test_job_model_validates_without_fixtures() -> None:
 
 
 def _renamed(*names: str) -> FixtureGroup:
-    """`physical_rig` with its two heads' xLights model names replaced."""
-    payload = physical_rig().model_dump(mode="json")
+    """`p1_rig` with its two heads' xLights model names replaced."""
+    payload = p1_rig().model_dump(mode="json")
     for fixture, name in zip(payload["fixtures"], names, strict=True):
         fixture["xlights_model_name"] = name
     return FixtureGroup.model_validate(payload)
@@ -212,4 +210,4 @@ def test_preflight_refuses_unusable_model_names(names: tuple[str, str], message:
     """Frames go to each fixture's own model, so a shared or blank model name is refused
     before planning."""
     with pytest.raises(UnsupportedRenderModeError, match=re.escape(message)):
-        preflight_render_policy(physical_job(), _renamed(*names))
+        preflight_render_policy(p1_job(), _renamed(*names))

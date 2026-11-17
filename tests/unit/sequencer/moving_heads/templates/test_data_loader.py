@@ -13,9 +13,7 @@ from twinklr.core.sequencer.models.enum import (
 )
 from twinklr.core.sequencer.models.template import (
     BaseTiming,
-    Dimmer,
     Movement,
-    PhysicalMovementSpec,
     RemainderPolicy,
     RepeatContract,
     RepeatMode,
@@ -26,8 +24,8 @@ from twinklr.core.sequencer.models.template import (
     TemplateStep,
 )
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
-    PHYSICAL_TEMPLATE_DIR,
-    admit_physical_catalog,
+    TEMPLATE_CATALOG_DIR,
+    load_template_catalog,
     load_template_document,
     load_templates_from_directory,
 )
@@ -55,12 +53,7 @@ def _doc(
                 duration_bars=duration_bars,
             )
         ),
-        movement=Movement(
-            physical=PhysicalMovementSpec(
-                shape="hold", mode="finite", start_pan_deg=0.0, start_tilt_deg=0.0
-            )
-        ),
-        dimmer=Dimmer(),
+        movement=Movement(shape="hold", mode="finite", start_pan_deg=0.0, start_tilt_deg=0.0),
     )
     return TemplateDoc(
         enabled=enabled,
@@ -126,16 +119,16 @@ def test_family_catalog_is_admitted_once_into_the_given_registry() -> None:
     """The family catalog loads into the registry it is given, once however many runs
     admit it; its documents' source names the catalog directory."""
     registry = TemplateRegistry()
-    loaded = admit_physical_catalog(registry=registry)
+    loaded = load_template_catalog(registry=registry)
 
-    assert loaded == [path.stem for path in sorted(PHYSICAL_TEMPLATE_DIR.glob("*.json"))]
+    assert loaded == [path.stem for path in sorted(TEMPLATE_CATALOG_DIR.glob("*.json"))]
     assert len(loaded) == 7  # six P2.4c families and the P2.5 zoom pilot
     for template_id in loaded:
         source = Path(registry.source(template_id).removeprefix("data:"))
-        assert source.parent == PHYSICAL_TEMPLATE_DIR
+        assert source.parent == TEMPLATE_CATALOG_DIR
 
     # A later run in the same process keeps them.
-    assert admit_physical_catalog(registry=registry) == loaded
+    assert load_template_catalog(registry=registry) == loaded
     assert len(registry.list_all()) == 7
 
 

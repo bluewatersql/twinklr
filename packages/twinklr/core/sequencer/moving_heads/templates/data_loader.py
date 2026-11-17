@@ -1,7 +1,7 @@
 """Load moving-head templates from strict JSON documents.
 
-The family catalog (``catalog/templates/moving_heads_physical``) loads first
-(``admit_physical_catalog``) and configured data directories (``--template-dir``)
+The family catalog (``catalog/templates/moving_heads``) loads first
+(``load_template_catalog``) and configured data directories (``--template-dir``)
 second. Collisions across normalized template IDs, display names, or explicit aliases
 are a loud error with both sources named. Callers must pass ``allow_overrides=True``
 to shadow the exact same template ID with a data document; even then, aliases owned by
@@ -26,8 +26,8 @@ from twinklr.core.sequencer.moving_heads.templates.library import (
     TemplateRegistry,
 )
 
-PHYSICAL_TEMPLATE_DIR = (
-    Path(__file__).resolve().parents[6] / "catalog" / "templates" / "moving_heads_physical"
+TEMPLATE_CATALOG_DIR = (
+    Path(__file__).resolve().parents[6] / "catalog" / "templates" / "moving_heads"
 )
 """The family catalog."""
 
@@ -107,7 +107,7 @@ def load_templates_from_directory(
     return registered
 
 
-def admit_physical_catalog(*, registry: TemplateRegistry = REGISTRY) -> list[str]:
+def load_template_catalog(*, registry: TemplateRegistry = REGISTRY) -> list[str]:
     """Hold the family catalog in `registry`: register each catalog document, keeping one
     an earlier run in the same process already admitted from the catalog.
 
@@ -115,7 +115,7 @@ def admit_physical_catalog(*, registry: TemplateRegistry = REGISTRY) -> list[str
         The catalog's template IDs now registered, in path order.
     """
     admitted: list[str] = []
-    for path in discover_template_documents(PHYSICAL_TEMPLATE_DIR):
+    for path in discover_template_documents(TEMPLATE_CATALOG_DIR):
         document = load_template_document(path)
         template_id = document.template.template_id
         source = f"data:{path}"
@@ -128,10 +128,10 @@ def admit_physical_catalog(*, registry: TemplateRegistry = REGISTRY) -> list[str
     return admitted
 
 
-def in_physical_catalog(template_id: str, *, registry: TemplateRegistry = REGISTRY) -> bool:
-    """Whether the registered template was loaded from `PHYSICAL_TEMPLATE_DIR`: the
+def in_template_catalog(template_id: str, *, registry: TemplateRegistry = REGISTRY) -> bool:
+    """Whether the registered template was loaded from `TEMPLATE_CATALOG_DIR`: the
     templates the pre-planning gate may leave out of the offer instead of refusing."""
     source = registry.source(template_id)
     return source.startswith("data:") and Path(source.removeprefix("data:")).is_relative_to(
-        PHYSICAL_TEMPLATE_DIR
+        TEMPLATE_CATALOG_DIR
     )

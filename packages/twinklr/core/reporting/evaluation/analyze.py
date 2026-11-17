@@ -15,11 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 def physical_channel_stats(values: list[float], *, frame_ms: int) -> CurveStats:
-    """Statistics of one channel of a physical render, in the channel's own unit.
+    """Statistics of one channel of a render, in the channel's own unit.
 
     `values` holds one value per frame (`physical_channel_values`). `energy` is the
     mean absolute rate of change per second. No clamp percentage is reported: the
-    physical renderer refuses a value outside the axis' operable range instead of
+    renderer refuses a value outside the axis' operable range instead of
     clamping it. No flag is raised. `values` is never empty: a fixture has a value in every frame.
     """
     arr = np.array(values)

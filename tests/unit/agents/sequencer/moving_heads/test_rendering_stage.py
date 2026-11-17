@@ -10,19 +10,19 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tests.support.mh_physical import (
-    PHYSICAL_INITIAL_STATE,
+from tests.support.moving_heads import (
+    INITIAL_STATE,
     TEMPLATE_ID,
+    bars_grid,
     hold_step,
-    physical_bars_grid,
-    physical_grid,
-    physical_job,
-    physical_plan,
-    physical_rig,
-    physical_sections,
-    physical_template_doc,
-    physical_test_templates,
+    loop_template_doc,
+    p1_grid,
+    p1_job,
+    p1_plan,
+    p1_rig,
+    p1_templates,
     registered_templates,
+    sections_plan,
     unprofiled_rig,
 )
 from twinklr.core.agents.sequencer.moving_heads.rendering_stage import MovingHeadRenderingStage
@@ -31,6 +31,7 @@ from twinklr.core.formats.xlights.layout.models.rgb_effects import Model
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.reporting.evaluation.collect import load_checkpoint, recorded_render
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import UnsupportedRigShapeError
+from twinklr.core.sequencer.moving_heads.identity import RENDERER_REVISION
 from twinklr.core.sequencer.moving_heads.pipeline import TemplateAdmission
 
 
@@ -122,21 +123,21 @@ async def test_unsupported_rig_shape_is_reported_as_an_actionable_message(tmp_pa
 
 
 @pytest.mark.asyncio
-async def test_physical_mode_without_profiles_fails_the_stage(tmp_path: Path) -> None:
-    """A physical job on a rig without physical profiles fails, naming each head and
+async def test_rig_without_profiles_fails_the_stage(tmp_path: Path) -> None:
+    """A job on a rig without physical profiles fails, naming each head and
     the missing item, and delivers nothing."""
     stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
     context = _context_with_fixture_path("fixture_config.json")
-    context.session.job_config = physical_job()
-    context.set_state("beat_grid", physical_grid())
+    context.session.job_config = p1_job()
+    context.set_state("beat_grid", p1_grid())
 
     with (
-        physical_test_templates(),
+        p1_templates(),
         patch.object(
             MovingHeadRenderingStage, "_load_fixture_config", return_value=unprofiled_rig()
         ),
     ):
-        result = await stage.execute({"moving_heads": physical_plan()}, context)
+        result = await stage.execute({"moving_heads": p1_plan()}, context)
 
     assert not result.success
     assert result.error is not None
@@ -147,25 +148,25 @@ async def test_physical_mode_without_profiles_fails_the_stage(tmp_path: Path) ->
     assert context.get_state("delivery_artifacts") is None
 
 
-def _physical_context() -> PipelineContext:
+def _render_context() -> PipelineContext:
     context = _context_with_fixture_path("fixture_config.json")
-    context.session.job_config = physical_job()
-    context.set_state("beat_grid", physical_grid())
+    context.session.job_config = p1_job()
+    context.set_state("beat_grid", p1_grid())
     return context
 
 
 @pytest.mark.asyncio
-async def test_physical_job_renders_and_delivers_through_the_stage(tmp_path: Path) -> None:
-    """The stage dispatches a physical job to the physical renderer and delivers it,
-    with the render identity in the trace beside the `.xsq`."""
+async def test_job_renders_and_delivers_through_the_stage(tmp_path: Path) -> None:
+    """The stage renders the job and delivers it, with the render identity in the trace
+    beside the `.xsq`."""
     stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
-    context = _physical_context()
+    context = _render_context()
 
     with (
-        physical_test_templates(),
-        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=physical_rig()),
+        p1_templates(),
+        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=p1_rig()),
     ):
-        result = await stage.execute({"moving_heads": physical_plan()}, context)
+        result = await stage.execute({"moving_heads": p1_plan()}, context)
 
     assert result.success, result.error
     artifacts = context.get_state("delivery_artifacts")
@@ -173,16 +174,16 @@ async def test_physical_job_renders_and_delivers_through_the_stage(tmp_path: Pat
     assert artifacts.xsq_path == tmp_path / "out.xsq"
     assert artifacts.model_names == ("Dmx MH1", "Dmx MH2")
     trace = json.loads(artifacts.trace_path.read_text(encoding="utf-8"))
-    assert trace["render"]["renderer"] == "physical_v2"
+    assert trace["render"]["renderer_revision"] == RENDERER_REVISION
     assert len(trace["render"]["render_fingerprint"]) == 64
     assert context.get_state("rendered_segment_count") > 0
 
 
 @pytest.mark.asyncio
-async def test_stage_hands_the_run_layout_to_the_physical_render(tmp_path: Path) -> None:
+async def test_stage_hands_the_run_layout_to_the_render(tmp_path: Path) -> None:
     """The layout `twinklr run` loads reaches the model check, and the trace says so."""
     stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
-    context = _physical_context()
+    context = _render_context()
     models = tuple(
         Model.model_validate(
             {"name": f"Dmx MH{index}", "DisplayAs": "DmxMovingHeadAdv", "DmxChannelCount": "18"}
@@ -193,10 +194,10 @@ async def test_stage_hands_the_run_layout_to_the_physical_render(tmp_path: Path)
     context.set_state("layout_sha256", "ef" * 32)
 
     with (
-        physical_test_templates(),
-        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=physical_rig()),
+        p1_templates(),
+        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=p1_rig()),
     ):
-        result = await stage.execute({"moving_heads": physical_plan()}, context)
+        result = await stage.execute({"moving_heads": p1_plan()}, context)
 
     assert result.success, result.error
     trace = json.loads(context.get_state("delivery_artifacts").trace_path.read_text())
@@ -207,20 +208,20 @@ async def test_stage_hands_the_run_layout_to_the_physical_render(tmp_path: Path)
 
 
 @pytest.mark.asyncio
-async def test_physical_refusal_fails_the_stage_and_delivers_nothing(tmp_path: Path) -> None:
-    """A physical job whose heads are not known to be settled is refused, naming the
+async def test_render_refusal_fails_the_stage_and_delivers_nothing(tmp_path: Path) -> None:
+    """A job whose heads are not known to be settled is refused, naming the
     head and the item, and writes no file."""
     stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
-    context = _physical_context()
-    initial = {**PHYSICAL_INITIAL_STATE, "settled": False}
-    context.session.job_config = physical_job(initial_states={"MH1": initial, "MH2": initial})
-    rig = physical_rig()
+    context = _render_context()
+    initial = {**INITIAL_STATE, "settled": False}
+    context.session.job_config = p1_job(initial_states={"MH1": initial, "MH2": initial})
+    rig = p1_rig()
 
     with (
-        physical_test_templates(),
+        p1_templates(),
         patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=rig),
     ):
-        result = await stage.execute({"moving_heads": physical_plan()}, context)
+        result = await stage.execute({"moving_heads": p1_plan()}, context)
 
     assert not result.success
     assert result.error is not None
@@ -233,21 +234,19 @@ async def test_physical_refusal_fails_the_stage_and_delivers_nothing(tmp_path: P
 async def test_the_stage_keeps_the_warning_about_cues_kept_dark(tmp_path: Path) -> None:
     """A plan placing a cue where it cannot play renders dark under the default
     `on_unplayable`; the stage keeps the render's one warning for the run's summary."""
-    jump = physical_template_doc(
+    jump = loop_template_doc(
         "stage_jump",
         [hold_step("l", -90.0, duration=0.5), hold_step("r", 90.0, start=0.5, duration=0.5)],
     )
     stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
-    context = _physical_context()
-    context.set_state("beat_grid", physical_bars_grid(*[500.0] * 4))
+    context = _render_context()
+    context.set_state("beat_grid", bars_grid(*[500.0] * 4))
 
     with (
         registered_templates(jump),
-        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=physical_rig()),
+        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=p1_rig()),
     ):
-        result = await stage.execute(
-            {"moving_heads": physical_sections(("stage_jump", 1, 4))}, context
-        )
+        result = await stage.execute({"moving_heads": sections_plan(("stage_jump", 1, 4))}, context)
 
     assert result.success, result.error
     warning = context.get_state("unplayable_warning")
@@ -273,8 +272,8 @@ def _checkpoint(output_dir: Path, plan: Any, **fields: Any) -> Path:
 
 
 @pytest.mark.asyncio
-async def test_physical_render_records_itself_in_the_plan_checkpoint(tmp_path: Path) -> None:
-    """`eval-report` re-renders a physical plan from what the run rendered: the stage adds
+async def test_render_records_itself_in_the_plan_checkpoint(tmp_path: Path) -> None:
+    """`eval-report` re-renders a plan from what the run rendered: the stage adds
     the render's fingerprint, policy, beat grid and gate result to the run's checkpoint,
     and they read back as the objects the render used."""
     admission = TemplateAdmission(
@@ -286,17 +285,17 @@ async def test_physical_render_records_itself_in_the_plan_checkpoint(tmp_path: P
         entry_dips={TEMPLATE_ID: {"fixture_id": "MH1", "bound_ms": 120, "beats": 1}},
     )
     stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
-    context = _physical_context()
+    context = _render_context()
     context.output_dir = tmp_path
     context.set_state("template_admission", admission)
-    checkpoint = _checkpoint(tmp_path, physical_plan())
+    checkpoint = _checkpoint(tmp_path, p1_plan())
     checkpoint.chmod(0o640)
 
     with (
-        physical_test_templates(),
-        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=physical_rig()),
+        p1_templates(),
+        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=p1_rig()),
     ):
-        result = await stage.execute({"moving_heads": physical_plan()}, context)
+        result = await stage.execute({"moving_heads": p1_plan()}, context)
 
     assert result.success, result.error
     trace = json.loads((tmp_path / "out.xsq.trace.json").read_text(encoding="utf-8"))
@@ -306,11 +305,11 @@ async def test_physical_render_records_itself_in_the_plan_checkpoint(tmp_path: P
     assert recorded is not None
     assert recorded.fingerprint == trace["render"]["render_fingerprint"]
     assert recorded.policy == context.job_config.moving_heads
-    assert recorded.beat_grid == physical_grid()
+    assert recorded.beat_grid == p1_grid()
     assert recorded.admission == admission
     # The hashes the trace carries, to name the input that differs on a mismatch, and the
     # rig as the fingerprint hashes it: whole, and field by field.
-    rig = physical_rig().model_dump(mode="json")
+    rig = p1_rig().model_dump(mode="json")
     assert recorded.inputs == {
         **{
             key: trace["render"][key]
@@ -342,18 +341,18 @@ async def test_a_checkpoint_that_cannot_be_extended_does_not_fail_the_render(
     """The delivery is written before the record; a checkpoint the stage cannot read
     is left as it is, with a warning, and the render still succeeds."""
     stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
-    context = _physical_context()
+    context = _render_context()
     context.output_dir = tmp_path
     checkpoint = tmp_path / "checkpoints" / "plans" / "final.json"
     checkpoint.parent.mkdir(parents=True)
     checkpoint.write_text("{not json", encoding="utf-8")
 
     with (
-        physical_test_templates(),
-        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=physical_rig()),
+        p1_templates(),
+        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=p1_rig()),
         caplog.at_level("WARNING"),
     ):
-        result = await stage.execute({"moving_heads": physical_plan()}, context)
+        result = await stage.execute({"moving_heads": p1_plan()}, context)
 
     assert result.success, result.error
     assert (tmp_path / "out.xsq").exists()
@@ -363,18 +362,18 @@ async def test_a_checkpoint_that_cannot_be_extended_does_not_fail_the_render(
 
 
 @pytest.mark.asyncio
-async def test_physical_render_writes_no_checkpoint_the_run_did_not(tmp_path: Path) -> None:
+async def test_render_writes_no_checkpoint_the_run_did_not(tmp_path: Path) -> None:
     """With no plan checkpoint (the planning stage writes one when `write_checkpoint`
     holds), the render records nothing."""
     stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
-    context = _physical_context()
+    context = _render_context()
     context.output_dir = tmp_path
 
     with (
-        physical_test_templates(),
-        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=physical_rig()),
+        p1_templates(),
+        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=p1_rig()),
     ):
-        result = await stage.execute({"moving_heads": physical_plan()}, context)
+        result = await stage.execute({"moving_heads": p1_plan()}, context)
 
     assert result.success, result.error
     assert not (tmp_path / "checkpoints").exists()

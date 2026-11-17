@@ -100,7 +100,7 @@ class CurveAnalysis(BaseModel):
         default=None,
         exclude_if=lambda value: value is None,
         description=(
-            "Physical pan, tilt or zoom only: range over the lit frames (emitted intensity "
+            "Pan, tilt or zoom only: range over the lit frames (emitted intensity "
             "above 0), leaving out dark repositioning; `stats.range` counts every frame"
         ),
     )
@@ -108,7 +108,7 @@ class CurveAnalysis(BaseModel):
         default=None,
         exclude_if=lambda value: value is None,
         description=(
-            "Physical pan, tilt or zoom only: mean rate of change per second between "
+            "Pan, tilt or zoom only: mean rate of change per second between "
             "consecutive lit frames; `stats.energy` counts every frame"
         ),
     )
@@ -194,9 +194,7 @@ class EvaluationReport(BaseModel):
     song: SongMetadata = Field(description="Song timing and structure")
     summary: ReportSummary = Field(description="High-level statistics")
     sections: list[SectionReport] = Field(description="Per-section analysis")
-    physical: PhysicalRenderSummary = Field(
-        description="The render's identity and the gate's facts"
-    )
+    render: RenderSummary = Field(description="The render's identity and the gate's facts")
 
     model_config = ConfigDict(frozen=True)
 
@@ -230,7 +228,7 @@ class LitStep(BaseModel):
 
 
 class SectionRenderFacts(BaseModel):
-    """What a physical render's trace records about one section, and the motion its
+    """What a render's trace records about one section, and the motion its
     encoded frames show there."""
 
     entry_windows: list[dict[str, Any]] = Field(
@@ -267,7 +265,7 @@ class SectionRenderFacts(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
-class PhysicalRenderSummary(BaseModel):
+class RenderSummary(BaseModel):
     """A report's render identity and the gate's facts."""
 
     run_fingerprint: str = Field(description="Render fingerprint the run recorded")

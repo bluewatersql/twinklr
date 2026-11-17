@@ -12,16 +12,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from tests.support.live_xlights import FakeLiveXLights
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
     CATALOG_IDS,
     SUBSET_TEMPLATE_ID,
     TEMPLATE_ID,
-    physical_bars_grid,
-    physical_catalog,
-    physical_job,
-    physical_layout_xml,
-    physical_rig,
-    physical_test_templates,
+    bars_grid,
+    family_catalog,
+    p1_job,
+    p1_layout_xml,
+    p1_rig,
+    p1_templates,
     unprofiled_rig,
 )
 from twinklr.cli import main as cli_main
@@ -69,9 +69,9 @@ from twinklr.core.reporting.evaluation.generator import generate_evaluation_repo
 
 @pytest.fixture(autouse=True)
 def _restore_template_registry() -> Iterator[None]:
-    """`twinklr run` admits the physical catalog into the shared registry for a
-    physical_v2 job; each test removes what its run registered."""
-    with physical_catalog(admit=False):
+    """`twinklr run` admits the family catalog into the shared registry; each test
+    removes what its run registered."""
+    with family_catalog(admit=False):
         yield
 
 
@@ -164,7 +164,7 @@ async def test_run_pipeline_reports_structured_partial_injection_failure(
     monkeypatch.setattr(cli_main, "load_app_config", lambda _: app_config)
     monkeypatch.setattr(cli_main, "load_job_config", lambda _: job_config)
     monkeypatch.setattr(cli_main, "load_fixture_group", lambda _: fixture_group)
-    monkeypatch.setattr(cli_main, "admit_physical_catalog", list)
+    monkeypatch.setattr(cli_main, "load_template_catalog", list)
     monkeypatch.setattr(cli_main, "list_templates", list)
     monkeypatch.setattr(cli_main, "preflight_render_policy", lambda *args: None)
     monkeypatch.setattr(
@@ -214,7 +214,7 @@ def _stop_if_planning_starts(**kwargs):
     raise AssertionError("the pipeline must not be built for a refused job")
 
 
-LIVE_GRID = physical_bars_grid(500.0, 500.0, 500.0, 500.0)
+LIVE_GRID = bars_grid(500.0, 500.0, 500.0, 500.0)
 """Four 4/4 bars of 2 s: an intro on bars 1-2 and a chorus on bars 3-4."""
 BASE_PLAN = ChoreographyPlan(
     sections=[
@@ -321,8 +321,8 @@ class _RecordedProfile:
         return success_result(_audio_profile(), stage_name=self.name)
 
 
-def _live_physical_cli(monkeypatch, fake: FakeLiveXLights) -> dict:
-    """Patch a physical `inject`/`regenerate` up to the real planner stage, render stage
+def _live_cli(monkeypatch, fake: FakeLiveXLights) -> dict:
+    """Patch an `inject`/`regenerate` up to the real planner stage, render stage
     and injection workflow: audio, profile and the planner's provider are recorded
     stand-ins (the planner answers `BASE_PLAN` for the whole song, `CHORUS_REPLAN` for
     the chorus alone and `INTRO_REPLAN` for the intro alone), and xLights is `fake`.
@@ -376,8 +376,8 @@ def _live_physical_cli(monkeypatch, fake: FakeLiveXLights) -> dict:
     monkeypatch.setenv("OPENAI_API_KEY", "offline-test-key")
     monkeypatch.setattr(cli_main, "XLightsAutomationClient", lambda: fake)
     monkeypatch.setattr(cli_main, "load_app_config", lambda _: AppConfig(llm_api_key="k"))
-    monkeypatch.setattr(cli_main, "load_job_config", lambda _: physical_job())
-    monkeypatch.setattr(cli_main, "load_fixture_group", lambda _: physical_rig())
+    monkeypatch.setattr(cli_main, "load_job_config", lambda _: p1_job())
+    monkeypatch.setattr(cli_main, "load_fixture_group", lambda _: p1_rig())
     monkeypatch.setattr(cli_main, "build_run_pipeline", build)
     monkeypatch.setattr(
         cli_main,
@@ -445,16 +445,14 @@ def _section_cues(render: dict, section_id: str) -> list[dict]:
 
 
 @pytest.mark.anyio
-async def test_inject_on_a_physical_job_injects_exactly_the_written_xsq(
-    tmp_path, monkeypatch, capsys
-) -> None:
-    """`twinklr inject` on a physical job renders as `twinklr run` does and injects the
+async def test_inject_injects_exactly_the_written_xsq(tmp_path, monkeypatch, capsys) -> None:
+    """`twinklr inject` renders as `twinklr run` does and injects the
     `.xsq`'s effects one for one: the same per-fixture models, layer, DMX settings and
     frame-aligned times. A second identical inject changes nothing."""
     fake = FakeLiveXLights(models=("Dmx MH1", "Dmx MH2"))
-    _live_physical_cli(monkeypatch, fake)
+    _live_cli(monkeypatch, fake)
 
-    with physical_test_templates():
+    with p1_templates():
         first = await _live(tmp_path)
         output = capsys.readouterr().out
         injected = fake.placed()
@@ -473,17 +471,17 @@ async def test_inject_on_a_physical_job_injects_exactly_the_written_xsq(
 
 
 @pytest.mark.anyio
-async def test_regenerate_on_a_physical_job_rerenders_the_whole_song_and_replaces_its_effects(
+async def test_regenerate_rerenders_the_whole_song_and_replaces_its_effects(
     tmp_path, monkeypatch, capsys
 ) -> None:
-    """`twinklr regenerate chorus` on a physical job re-plans only the chorus, renders the
+    """`twinklr regenerate chorus` re-plans only the chorus, renders the
     moving heads for the whole song from the previous plan with that section replaced,
     and makes the sequence hold exactly the new `.xsq`'s effects; the intro's plan and
     cues are unchanged, the chorus's are new, and the render identity changes."""
     fake = FakeLiveXLights(models=("Dmx MH1", "Dmx MH2"))
-    captured = _live_physical_cli(monkeypatch, fake)
+    captured = _live_cli(monkeypatch, fake)
 
-    with physical_test_templates():
+    with p1_templates():
         assert await _live(tmp_path) == 0
         before = _render_trace(tmp_path)
         injected = fake.placed()
@@ -545,16 +543,16 @@ async def test_eval_report_on_an_inject_names_the_rig_the_live_layout_reconciled
     fixture config; where the layout lacks the group the config names, no fixture config
     reproduces it, and the report says why and names the field."""
     fake = FakeLiveXLights(models=("Dmx MH1", "Dmx MH2"), groups=groups)
-    _live_physical_cli(monkeypatch, fake)
+    _live_cli(monkeypatch, fake)
     # The plan as a planner states it, every intent field present, as the checkpoint
     # carries it.
     monkeypatch.setitem(
         globals(), "BASE_PLAN", ChoreographyPlan.model_validate(BASE_PLAN.model_dump(mode="json"))
     )
     fixture_path = tmp_path / "fixture_config.json"
-    fixture_path.write_text(physical_rig().model_dump_json(), encoding="utf-8")
+    fixture_path.write_text(p1_rig().model_dump_json(), encoding="utf-8")
 
-    with physical_test_templates():
+    with p1_templates():
         assert await _live(tmp_path) == 0
         (checkpoint,) = (tmp_path / "out").glob("*/checkpoints/plans/final.json")
         with patch("twinklr.core.audio.analyzer.AudioAnalyzer", _SongMetadataOnly):
@@ -566,22 +564,22 @@ async def test_eval_report_on_an_inject_names_the_rig_the_live_layout_reconciled
             )
 
     assert json.loads(checkpoint.read_text())["render"]["inputs"]["rig"]["live_layout"] is True
-    assert report.physical is not None
-    assert report.physical.run_fingerprint == _render_trace(tmp_path)["render_fingerprint"]
-    assert report.physical.fingerprint_matches is not named
-    assert report.physical.mismatched_inputs == named
+    assert report.render is not None
+    assert report.render.run_fingerprint == _render_trace(tmp_path)["render_fingerprint"]
+    assert report.render.fingerprint_matches is not named
+    assert report.render.mismatched_inputs == named
 
 
 @pytest.mark.anyio
-async def test_regenerate_on_a_physical_job_without_an_injected_plan_is_refused_before_planning(
+async def test_regenerate_without_an_injected_plan_is_refused_before_planning(
     tmp_path, monkeypatch, capsys
 ) -> None:
     """A whole-song re-render needs the plan of the effects already in the sequence; with
     none recorded for it (no earlier `inject`, or only a dry run), nothing is planned."""
     fake = FakeLiveXLights(models=("Dmx MH1", "Dmx MH2"))
-    captured = _live_physical_cli(monkeypatch, fake)
+    captured = _live_cli(monkeypatch, fake)
 
-    with physical_test_templates():
+    with p1_templates():
         assert await _live(tmp_path, dry_run=True) == 0
         captured["build_calls"] = 0
         capsys.readouterr()
@@ -595,16 +593,14 @@ async def test_regenerate_on_a_physical_job_without_an_injected_plan_is_refused_
 
 
 @pytest.mark.anyio
-async def test_regenerate_on_a_physical_job_twice_builds_on_each_recorded_plan(
-    tmp_path, monkeypatch, capsys
-) -> None:
+async def test_regenerate_twice_builds_on_each_recorded_plan(tmp_path, monkeypatch, capsys) -> None:
     """inject, regenerate the chorus, regenerate the intro: neither regenerate is refused,
     each starts from the plan the one before recorded, and the record follows."""
     fake = FakeLiveXLights(models=("Dmx MH1", "Dmx MH2"))
-    _live_physical_cli(monkeypatch, fake)
+    _live_cli(monkeypatch, fake)
     recorded: list[list[str | None]] = []
 
-    with physical_test_templates():
+    with p1_templates():
         for section_id in (None, "chorus", "intro"):
             assert await _live(tmp_path, section_id=section_id) == 0, capsys.readouterr().out
             (record,) = json.loads(_live_plans(tmp_path).read_text(encoding="utf-8")).values()
@@ -626,9 +622,9 @@ async def test_regenerate_refuses_a_recorded_plan_the_gate_no_longer_admits_befo
     """A kept section naming a template this run's pre-planning check did not admit is
     refused by that check, before the profile or any other planner runs."""
     fake = FakeLiveXLights(models=("Dmx MH1", "Dmx MH2"))
-    captured = _live_physical_cli(monkeypatch, fake)
+    captured = _live_cli(monkeypatch, fake)
 
-    with physical_test_templates():
+    with p1_templates():
         assert await _live(tmp_path) == 0
         payload = json.loads(_live_plans(tmp_path).read_text(encoding="utf-8"))
         for record in payload.values():
@@ -665,11 +661,11 @@ def _change_audio(tmp_path: Path, monkeypatch) -> None:
 
 
 def _change_job(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(cli_main, "load_job_config", lambda _: physical_job(max_effects=99_999))
+    monkeypatch.setattr(cli_main, "load_job_config", lambda _: p1_job(max_effects=99_999))
 
 
 def _change_rig(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(cli_main, "load_fixture_group", lambda _: physical_rig(mh1_pan_max=260.0))
+    monkeypatch.setattr(cli_main, "load_fixture_group", lambda _: p1_rig(mh1_pan_max=260.0))
 
 
 @pytest.mark.anyio
@@ -682,15 +678,15 @@ def _change_rig(tmp_path: Path, monkeypatch) -> None:
         (_change_rig, "the rig differs"),
     ],
 )
-async def test_regenerate_on_a_physical_job_refuses_a_stale_recorded_plan_before_planning(
+async def test_regenerate_refuses_a_stale_recorded_plan_before_planning(
     tmp_path, monkeypatch, capsys, change, reason
 ) -> None:
     """The recorded plan is used only while it still describes the sequence: the same
     owned effects, audio, job and rig as when it was injected."""
     fake = FakeLiveXLights(models=("Dmx MH1", "Dmx MH2"))
-    captured = _live_physical_cli(monkeypatch, fake)
+    captured = _live_cli(monkeypatch, fake)
 
-    with physical_test_templates():
+    with p1_templates():
         assert await _live(tmp_path) == 0
         injected = fake.placed()
         change(tmp_path, monkeypatch)
@@ -718,13 +714,13 @@ class _SwitchingSequence(FakeLiveXLights):
 
 
 @pytest.mark.anyio
-async def test_regenerate_on_a_physical_job_refuses_a_sequence_switched_during_the_run(
+async def test_regenerate_refuses_a_sequence_switched_during_the_run(
     tmp_path, monkeypatch, capsys
 ) -> None:
     fake = _SwitchingSequence(models=("Dmx MH1", "Dmx MH2"))
-    _live_physical_cli(monkeypatch, fake)
+    _live_cli(monkeypatch, fake)
 
-    with physical_test_templates():
+    with p1_templates():
         assert await _live(tmp_path) == 0
         injected = fake.placed()
         fake.requests.clear()
@@ -751,9 +747,9 @@ async def test_a_corrupt_live_plans_file_is_named_on_regenerate_and_on_inject(
     """Regenerate refuses naming the file and what to do; inject completes and says the
     plan was not recorded, without a traceback."""
     fake = FakeLiveXLights(models=("Dmx MH1", "Dmx MH2"))
-    _live_physical_cli(monkeypatch, fake)
+    _live_cli(monkeypatch, fake)
 
-    with physical_test_templates():
+    with p1_templates():
         assert await _live(tmp_path) == 0
         _live_plans(tmp_path).write_text(content, encoding="utf-8")
         capsys.readouterr()
@@ -773,15 +769,15 @@ async def test_a_corrupt_live_plans_file_is_named_on_regenerate_and_on_inject(
 
 
 @pytest.mark.anyio
-async def test_live_physical_injection_names_a_fixture_the_live_layout_lacks(
+async def test_live_injection_names_a_fixture_the_live_layout_lacks(
     tmp_path, monkeypatch, capsys
 ) -> None:
     """A fixture whose model the open layout does not have is named with what to do;
-    the physical path never suggests the old renderer."""
+    the renderer never suggests the old renderer."""
     fake = FakeLiveXLights(models=("Dmx MH1",))
-    captured = _live_physical_cli(monkeypatch, fake)
+    captured = _live_cli(monkeypatch, fake)
 
-    with physical_test_templates():
+    with p1_templates():
         exit_code = await _live(tmp_path)
     output = " ".join(capsys.readouterr().out.split())
 
@@ -792,12 +788,12 @@ async def test_live_physical_injection_names_a_fixture_the_live_layout_lacks(
 
 
 @pytest.mark.anyio
-async def test_live_physical_injection_refuses_a_rig_without_profiles_without_suggesting_legacy(
+async def test_live_injection_refuses_a_rig_without_profiles_without_suggesting_legacy(
     tmp_path, monkeypatch, capsys
 ) -> None:
     rig = unprofiled_rig()
     fake = FakeLiveXLights(models=tuple(f.xlights_model_name for f in rig.expand_fixtures()))
-    captured = _live_physical_cli(monkeypatch, fake)
+    captured = _live_cli(monkeypatch, fake)
     monkeypatch.setattr(cli_main, "load_fixture_group", lambda _: rig)
 
     exit_code = await _live(tmp_path)
@@ -810,13 +806,13 @@ async def test_live_physical_injection_refuses_a_rig_without_profiles_without_su
 
 
 @pytest.mark.anyio
-async def test_a_physical_dry_run_prints_a_summary_and_writes_every_command_to_a_file(
+async def test_a_dry_run_prints_a_summary_and_writes_every_command_to_a_file(
     tmp_path, monkeypatch, capsys
 ) -> None:
     fake = FakeLiveXLights(models=("Dmx MH1", "Dmx MH2"))
-    _live_physical_cli(monkeypatch, fake)
+    _live_cli(monkeypatch, fake)
 
-    with physical_test_templates():
+    with p1_templates():
         assert await _live(tmp_path, dry_run=True) == 0
     output = capsys.readouterr().out
 
@@ -832,10 +828,10 @@ async def test_a_physical_dry_run_prints_a_summary_and_writes_every_command_to_a
 
 
 @pytest.mark.anyio
-async def test_run_refuses_a_physical_job_on_a_rig_without_profiles_before_planning(
+async def test_run_refuses_a_rig_without_profiles_before_planning(
     tmp_path, monkeypatch, capsys
 ) -> None:
-    """`twinklr run` checks a physical job against the loaded rig before any analysis
+    """`twinklr run` checks a job against the loaded rig before any analysis
     or provider request, naming each fixture and the missing item."""
     monkeypatch.setenv("OPENAI_API_KEY", "offline-test-key")
     monkeypatch.setattr(cli_main, "load_app_config", lambda _: AppConfig(llm_api_key="k"))
@@ -856,7 +852,7 @@ async def test_run_refuses_a_physical_job_on_a_rig_without_profiles_before_plann
     assert "MH4: physical_profile is missing" in output
 
 
-def _prepared_physical_run(monkeypatch, physical_job, physical_rig) -> list[dict]:
+def _prepared_run(monkeypatch, job, rig) -> list[dict]:
     """Patch `twinklr run` up to the pipeline build; return the captured build calls."""
     calls: list[dict] = []
 
@@ -866,17 +862,17 @@ def _prepared_physical_run(monkeypatch, physical_job, physical_rig) -> list[dict
 
     monkeypatch.setenv("OPENAI_API_KEY", "offline-test-key")
     monkeypatch.setattr(cli_main, "load_app_config", lambda _: AppConfig(llm_api_key="k"))
-    monkeypatch.setattr(cli_main, "load_job_config", lambda _: physical_job)
-    monkeypatch.setattr(cli_main, "load_fixture_group", lambda _: physical_rig)
+    monkeypatch.setattr(cli_main, "load_job_config", lambda _: job)
+    monkeypatch.setattr(cli_main, "load_fixture_group", lambda _: rig)
     monkeypatch.setattr(cli_main, "build_run_pipeline", capture)
     return calls
 
 
 @pytest.mark.anyio
-async def test_run_offers_the_planner_only_physical_templates(tmp_path, monkeypatch) -> None:
-    calls = _prepared_physical_run(monkeypatch, physical_job(), physical_rig())
+async def test_run_offers_the_planner_the_loaded_templates(tmp_path, monkeypatch) -> None:
+    calls = _prepared_run(monkeypatch, p1_job(), p1_rig())
 
-    with physical_test_templates(), pytest.raises(AssertionError, match="stop at"):
+    with p1_templates(), pytest.raises(AssertionError, match="stop at"):
         await cli_main.run_pipeline_async(
             audio_path=tmp_path / "song.wav",
             output_dir=tmp_path,
@@ -943,14 +939,14 @@ async def _run_with(tmp_path, layout: Path | None) -> int:
 
 
 @pytest.mark.anyio
-async def test_run_refuses_a_physical_model_the_layout_says_cannot_take_the_mapping(
+async def test_run_refuses_a_model_the_layout_says_cannot_take_the_mapping(
     tmp_path, monkeypatch, capsys
 ) -> None:
     layout = tmp_path / "xlights_rgbeffects.xml"
-    layout.write_text(physical_layout_xml({"Dmx MH2": {"DmxChannelCount": "16"}}), encoding="utf-8")
-    captured = _captured_run(monkeypatch, physical_job(), physical_rig())
+    layout.write_text(p1_layout_xml({"Dmx MH2": {"DmxChannelCount": "16"}}), encoding="utf-8")
+    captured = _captured_run(monkeypatch, p1_job(), p1_rig())
 
-    with physical_test_templates():
+    with p1_templates():
         exit_code = await _run_with(tmp_path, layout)
 
     output = " ".join(capsys.readouterr().out.split())
@@ -960,14 +956,14 @@ async def test_run_refuses_a_physical_model_the_layout_says_cannot_take_the_mapp
 
 
 @pytest.mark.anyio
-async def test_run_checks_a_physical_rig_against_its_layout_and_hands_it_on(
+async def test_run_checks_the_rig_against_its_layout_and_hands_it_on(
     tmp_path, monkeypatch, capsys
 ) -> None:
     layout = tmp_path / "xlights_rgbeffects.xml"
-    layout.write_text(physical_layout_xml(), encoding="utf-8")
-    captured = _captured_run(monkeypatch, physical_job(), physical_rig())
+    layout.write_text(p1_layout_xml(), encoding="utf-8")
+    captured = _captured_run(monkeypatch, p1_job(), p1_rig())
 
-    with physical_test_templates():
+    with p1_templates():
         await _run_with(tmp_path, layout)
 
     output = " ".join(capsys.readouterr().out.split())
@@ -1016,13 +1012,13 @@ async def test_run_refuses_unusable_model_names_before_planning(
     tmp_path, monkeypatch, capsys, names, message
 ) -> None:
     """A job on a rig with a shared or blank model name stops before analysis."""
-    payload = physical_rig().model_dump(mode="json")
+    payload = p1_rig().model_dump(mode="json")
     for fixture, name in zip(payload["fixtures"], names, strict=True):
         fixture["xlights_model_name"] = name
     rig = FixtureGroup.model_validate(payload)
 
-    captured = _captured_run(monkeypatch, physical_job(), rig)
-    with physical_test_templates():
+    captured = _captured_run(monkeypatch, p1_job(), rig)
+    with p1_templates():
         assert await _run_with(tmp_path, None) == 1
     assert captured["build_calls"] == 0
     assert message in " ".join(capsys.readouterr().out.split())

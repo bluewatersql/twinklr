@@ -67,7 +67,7 @@ def build_xsq_trace_payload(
 ) -> dict[str, Any]:
     """Build the stable trace-v2 document shared by MH, display, and combined shows.
 
-    `render` is the physical moving-head render record (identity, inputs, cue timing,
+    `render` is the moving-head render record (identity, inputs, cue timing,
     transaction diagnostics, output measure); the document carries it only when given.
     """
     rows = [dict(entry) for entry in entries]

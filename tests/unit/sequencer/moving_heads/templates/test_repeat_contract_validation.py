@@ -11,16 +11,14 @@ from __future__ import annotations
 from pydantic import ValidationError
 import pytest
 
-from tests.support.mh_physical import CATALOG_IDS, physical_catalog
+from tests.support.moving_heads import CATALOG_IDS, family_catalog
 from twinklr.core.sequencer.models.enum import (
     TemplateCategory,
     TimingMode,
 )
 from twinklr.core.sequencer.models.template import (
     BaseTiming,
-    Dimmer,
     Movement,
-    PhysicalMovementSpec,
     RemainderPolicy,
     RepeatContract,
     RepeatMode,
@@ -48,12 +46,7 @@ def _step(step_id: str, *, offset_bars: float, duration_bars: float) -> Template
                 duration_bars=duration_bars,
             )
         ),
-        movement=Movement(
-            physical=PhysicalMovementSpec(
-                shape="hold", mode="finite", start_pan_deg=0.0, start_tilt_deg=0.0
-            )
-        ),
-        dimmer=Dimmer(),
+        movement=Movement(shape="hold", mode="finite", start_pan_deg=0.0, start_tilt_deg=0.0),
     )
 
 
@@ -147,7 +140,7 @@ def test_parallel_steps_are_accepted() -> None:
 
 
 def test_every_shipped_template_passes_the_validator() -> None:
-    with physical_catalog() as template_ids:
+    with family_catalog() as template_ids:
         assert sorted(template_ids) == list(CATALOG_IDS)
         for template_id in template_ids:
             validate_repeat_contract(get_template(template_id).template)
@@ -155,7 +148,7 @@ def test_every_shipped_template_passes_the_validator() -> None:
 
 def test_every_shipped_template_schedules_all_of_its_steps() -> None:
     """The consequence the validator exists to guarantee, stated directly."""
-    with physical_catalog() as template_ids:
+    with family_catalog() as template_ids:
         for template_id in template_ids:
             template = get_template(template_id).template
             declared = {step.step_id for step in template.steps}

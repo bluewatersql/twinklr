@@ -741,3 +741,39 @@ Carried into C1.5: `README.md:175`, `docs/overview.md:147`,
 `scripts/validation/_core/mh_xsq_validation.py` (still reads `xlights_semantic_groups`),
 a user-guide note on re-injecting before `regenerate`. Carried into T1: `dmx_mapping`
 primary channels are shown to the planner and stay until the contract changes.
+
+## 2026-11-17: C1.4 done — names of the second path removed
+
+Record: [evidence/2026-11-17-c1-4-renames](../evidence/2026-11-17-c1-4-renames/README.md).
+
+- **Renamed or removed:** every `physical_v2` string (logs, diagnostics, the revision
+  string is now `renderer.2+encoder.N`, family tags); the `renderer` entry of the render
+  record (removed: it could hold one value only); `PHYSICAL_RENDERER_REVISION` →
+  `RENDERER_REVISION` and the function and exception names in the inventory's table
+  (`PhysicalRenderError` → `RenderRefusedError`, because `RenderError` exists);
+  `compile/physical.py` → `compile/step.py`; `config/fixtures/physical.py` →
+  `removed_fields.py`; the catalog moved to `catalog/templates/moving_heads/`; the
+  evaluation report key `physical` → `render` (schema stays `2.0.0`, which exists only
+  on this branch).
+- **Template format:** `movement.physical` and `dimmer.physical` are flattened and the
+  `physical_*` step keys lost the prefix. An old key is refused by name with the new key
+  in the message, on every load path.
+- **Proof of unchanged output:** byte matrix against `079831df`, author and reviewer
+  independently: frames, segments, `.xsq`, `.xtiming`, `.xmap` identical in all 720
+  renders. Pin frame and `.xsq` hashes untouched. Revision number still 2.
+- **Deliberate byte changes:** fingerprints; trace bytes (diagnostic wording, the
+  removed `renderer` key); gate exclusion reason wording; planner-visible template
+  descriptions lose the `physical_v2` tag and nothing else.
+- **Consequences the owner was told on 2026-11-17:** the planner cache key hashes the
+  template descriptions, so the first `run` or `show` of each song plans again and pays.
+  Session ids and `regenerate` are unaffected by this step. A three-arm snapshot
+  recorded before this step would not match its admission hash (none exists).
+- **Phase 1 request fingerprints** are now
+  `8f1635e9aae6002e15897c1070092824ad020ea48832fc43b2d1147ae3451c2c` (`p1_linear_reveal`)
+  and `55bb8ba6b2b99a8d9255b47b13144692296333bfc93336d0f928951a2d8ea84a`
+  (`p1_linear_reveal_48ch`).
+- **Review:** approved on the first pass with one medium record gap and seven low
+  findings, all fixed; the integrator re-ran pins, goldens and config tests.
+
+Carried into C1.5: `context/current-state.md:47,49`, `scripts/validation/README.md:287`,
+`docs/pipeline_guide.md:845` (says `display` "ignores the mode"), plus the C1.3 list.

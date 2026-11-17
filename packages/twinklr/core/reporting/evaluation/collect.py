@@ -110,9 +110,8 @@ def recorded_render(checkpoint_data: dict) -> RecordedRender:
 
     Raises:
         UnsupportedRenderModeError: If the checkpoint records no render (the removed
-            second renderer never wrote one), a record whose policy names `mode` (the
-            physical renderer wrote those while two renderers existed), or a record
-            that does not read back (one written before the record carried the rig's
+            second renderer never wrote one), a record written before the cutover to one
+            renderer (its policy names `mode`), or a record that does not read back (one written before the record carried the rig's
             identity).
     """
     render = checkpoint_data.get("render")
@@ -128,10 +127,8 @@ def recorded_render(checkpoint_data: dict) -> RecordedRender:
     if isinstance(policy, dict) and "mode" in policy:
         raise UnsupportedRenderModeError(
             "`twinklr eval-report` cannot re-render this checkpoint: its render record was "
-            "written while the job could choose between two moving-head renderers (its "
-            "policy names `mode`), and the render it records is no longer the one this "
-            "version computes; re-running the command that planned it plans and records "
-            "it again"
+            "written before the cutover to one moving-head renderer (its policy names "
+            "`mode`); re-run the command that planned it to plan and record it again"
         )
     try:
         if not isinstance(render, dict):

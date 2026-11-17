@@ -1,4 +1,4 @@
-"""The physical moving-head renderer end to end: plan to delivered `.xsq` (P1.6).
+"""The moving-head renderer end to end: plan to delivered `.xsq` (P1.6).
 
 A synthetic two-head rig (16-bit pan/tilt, shutter on channel 17, the second head
 inverted) plays the test-only `p1_linear_reveal` template over P0's variable-tempo grid,
@@ -17,17 +17,17 @@ from typing import Any
 
 import pytest
 
-from tests.support.mh_physical import (
-    PHYSICAL_INITIAL_STATE,
+from tests.support.moving_heads import (
+    INITIAL_STATE,
     SUBSET_TEMPLATE_ID,
     TEMPLATE_ID,
     assert_honest_transactions,
-    physical_edge_grid,
-    physical_grid,
-    physical_job,
-    physical_plan,
-    physical_rig,
-    physical_test_templates,
+    edge_grid,
+    p1_grid,
+    p1_job,
+    p1_plan,
+    p1_rig,
+    p1_templates,
 )
 from twinklr.cli.main import build_run_pipeline
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
@@ -46,18 +46,18 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
 )
 from twinklr.core.sequencer.moving_heads.delivery import DeliveryRollbackError
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
-    PhysicalOutputError,
+    OutputError,
     encode_fixture_frames,
     frame_times,
 )
-from twinklr.core.sequencer.moving_heads.pipeline import PhysicalRenderError, RenderingPipeline
+from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline, RenderRefusedError
 from twinklr.core.sequencer.moving_heads.templates.library import REGISTRY
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 
 @pytest.fixture
-def physical_templates() -> Iterator[None]:
-    with physical_test_templates():
+def p1_templates_registered() -> Iterator[None]:
+    with p1_templates():
         yield
 
 
@@ -70,10 +70,10 @@ def _pipeline(
     **kwargs: Any,
 ) -> RenderingPipeline:
     return RenderingPipeline(
-        choreography_plan=physical_plan(template_id),
-        beat_grid=physical_grid(),
-        fixture_group=rig or physical_rig(),
-        job_config=job or physical_job(),
+        choreography_plan=p1_plan(template_id),
+        beat_grid=p1_grid(),
+        fixture_group=rig or p1_rig(),
+        job_config=job or p1_job(),
         output_path=output_path,
         media_file="song.wav",
         **kwargs,
@@ -110,8 +110,8 @@ def _cues(segments: list[Any]) -> list[Any]:
     return [s for s in segments if TRANSACTION_METADATA_KEY not in s.metadata]
 
 
-def test_physical_sequence_round_trips_through_the_written_xsq(
-    tmp_path: Path, physical_templates: None
+def test_sequence_round_trips_through_the_written_xsq(
+    tmp_path: Path, p1_templates_registered: None
 ) -> None:
     """Decoded `.xsq` frames equal the encoded frames: complete, carried, channel 17."""
     output = tmp_path / "show.xsq"
@@ -125,7 +125,7 @@ def test_physical_sequence_round_trips_through_the_written_xsq(
         "show.xsq",
         "show.xsq.trace.json",
     ]
-    rig = physical_rig()
+    rig = p1_rig()
     models = {f.fixture_id: f.xlights_model_name for f in rig.expand_fixtures()}
     encoded: dict[str, dict[int, dict[int, int]]] = {}
     for frame in pipeline.frames:
@@ -137,7 +137,7 @@ def test_physical_sequence_round_trips_through_the_written_xsq(
     assert list(decoded) == ["Dmx MH1", "Dmx MH2"]
     assert pipeline.artifacts.model_names == ("Dmx MH1", "Dmx MH2")
 
-    times = frame_times(int(physical_grid().duration_ms))
+    times = frame_times(int(p1_grid().duration_ms))
     footprint = list(range(1, 19))
     for frames in decoded.values():
         assert sorted(frames) == list(times)
@@ -166,7 +166,7 @@ def test_physical_sequence_round_trips_through_the_written_xsq(
     assert all(later > earlier for earlier, later in pairwise(mh1))
 
     # The transaction pass is honest about every head's darkness, motion and reveal.
-    job = physical_job()
+    job = p1_job()
     cues = _cues(segments)
     profiles = {f.fixture_id: f.config.physical_profile for f in rig.expand_fixtures()}
     result = plan_prepositions(
@@ -184,13 +184,13 @@ def test_physical_sequence_round_trips_through_the_written_xsq(
             result,
             cues,
             profile,
-            InitialFixtureState.model_validate(PHYSICAL_INITIAL_STATE),
+            InitialFixtureState.model_validate(INITIAL_STATE),
             fixture_id=fixture_id,
         )
 
 
 def test_trace_records_identity_cue_timing_and_transactions(
-    tmp_path: Path, physical_templates: None
+    tmp_path: Path, p1_templates_registered: None
 ) -> None:
     """The trace persists the render identity and the evidence behind it."""
     output = tmp_path / "show.xsq"
@@ -245,7 +245,7 @@ def test_trace_records_identity_cue_timing_and_transactions(
 
 
 def test_subset_output_keeps_every_head_in_rig_order(
-    tmp_path: Path, physical_templates: None
+    tmp_path: Path, p1_templates_registered: None
 ) -> None:
     """A template targeting only MH2 still emits MH1, parked dark, first."""
     output = tmp_path / "show.xsq"
@@ -259,7 +259,7 @@ def test_subset_output_keeps_every_head_in_rig_order(
 
 
 def test_locks_are_honored_in_the_delivered_output(
-    tmp_path: Path, physical_templates: None
+    tmp_path: Path, p1_templates_registered: None
 ) -> None:
     """A pan lock inside a cue delivers the cue's own bytes in the locked frames; the same
     lock over a dark reposition the head needs is a conflict that delivers nothing."""
@@ -269,7 +269,7 @@ def test_locks_are_honored_in_the_delivered_output(
     output = tmp_path / "show.xsq"
     segments = _pipeline(output, locks=(inside,)).render()
 
-    profile = physical_rig().expand_fixtures()[0].config.physical_profile
+    profile = p1_rig().expand_fixtures()[0].config.physical_profile
     assert isinstance(profile, FixtureCapabilities)
     cues = [cue for cue in _cues(segments) if cue.fixture_id == "MH1"]
     alone = {
@@ -284,8 +284,8 @@ def test_locks_are_honored_in_the_delivered_output(
         )
     result = plan_prepositions(
         _cues(segments),
-        {f.fixture_id: f.config.physical_profile for f in physical_rig().expand_fixtures()},  # type: ignore[misc]
-        initial_states=physical_job().moving_heads.initial_states,
+        {f.fixture_id: f.config.physical_profile for f in p1_rig().expand_fixtures()},  # type: ignore[misc]
+        initial_states=p1_job().moving_heads.initial_states,
         locks=(inside,),
         frame_ms=EFFECT_GRID_MS,
         sequence_end_ms=3620,
@@ -295,19 +295,19 @@ def test_locks_are_honored_in_the_delivered_output(
         result,
         _cues(segments),
         profile,
-        InitialFixtureState.model_validate(PHYSICAL_INITIAL_STATE),
+        InitialFixtureState.model_validate(INITIAL_STATE),
         locks=(inside,),
     )
 
     in_gap = RenderLock(
         start_ms=2040, end_ms=2100, fixture_ids=("MH1",), channels=(ChannelName.PAN,)
     )
-    with pytest.raises(PhysicalRenderError, match="MH1 cue at 2820 ms: lock_conflict"):
+    with pytest.raises(RenderRefusedError, match="MH1 cue at 2820 ms: lock_conflict"):
         _pipeline(tmp_path / "gap" / "show.xsq", locks=(in_gap,)).render()
     assert not (tmp_path / "gap").exists()
 
 
-def test_physical_identity_ignores_lock_order(physical_templates: None) -> None:
+def test_render_identity_ignores_lock_order(p1_templates_registered: None) -> None:
     """Lock order changes no frame, so it does not change render identity."""
     first = RenderLock(
         start_ms=1100, end_ms=1200, fixture_ids=("MH1",), channels=(ChannelName.PAN,)
@@ -328,24 +328,24 @@ def test_physical_identity_ignores_lock_order(physical_templates: None) -> None:
 
 
 def test_render_only_policy_edit_changes_render_identity_not_plan_identity(
-    tmp_path: Path, physical_templates: None
+    tmp_path: Path, p1_templates_registered: None
 ) -> None:
     """Moving a head's start pose re-renders; it neither re-keys the planner's session
     nor changes what the planner is offered."""
-    moved = {**PHYSICAL_INITIAL_STATE, "pan_deg": 10.0}
-    edited = physical_job(initial_states={"MH1": moved, "MH2": PHYSICAL_INITIAL_STATE})
+    moved = {**INITIAL_STATE, "pan_deg": 10.0}
+    edited = p1_job(initial_states={"MH1": moved, "MH2": INITIAL_STATE})
     audio = tmp_path / "song.wav"
     audio.write_bytes(b"synthetic")
     app = AppConfig(llm_api_key="offline")
 
     assert _pipeline(None, job=edited).fingerprint() != _pipeline(None).fingerprint()
     assert derive_session_id(audio_path=audio, configs=(app, edited)) == derive_session_id(
-        audio_path=audio, configs=(app, physical_job())
+        audio_path=audio, configs=(app, p1_job())
     )
 
 
 def test_failed_publish_restores_the_prior_deliverable(
-    tmp_path: Path, physical_templates: None, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, p1_templates_registered: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A move that fails part way through publishing (here the `.xsq`, moved last, after
     the trace that differs) puts every file already moved back as it was."""
@@ -370,7 +370,7 @@ def test_failed_publish_restores_the_prior_deliverable(
 
     monkeypatch.setattr(Path, "replace", replace_failing_once)
     with pytest.raises(OSError, match="injected publish failure"):
-        _pipeline(output, job=physical_job(max_effects=999_999)).render()
+        _pipeline(output, job=p1_job(max_effects=999_999)).render()
     monkeypatch.undo()
 
     assert failures
@@ -378,7 +378,7 @@ def test_failed_publish_restores_the_prior_deliverable(
 
 
 def test_failed_restore_keeps_the_set_aside_deliverable_and_names_it(
-    tmp_path: Path, physical_templates: None, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, p1_templates_registered: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """If putting an earlier file back also fails, the staging directory holding it is
     kept, never deleted, and the error names where it is."""
@@ -398,7 +398,7 @@ def test_failed_restore_keeps_the_set_aside_deliverable_and_names_it(
 
     monkeypatch.setattr(Path, "replace", replace_failing)
     with pytest.raises(DeliveryRollbackError) as raised:
-        _pipeline(output, job=physical_job(max_effects=999_999)).render()
+        _pipeline(output, job=p1_job(max_effects=999_999)).render()
     monkeypatch.undo()
 
     kept = raised.value.kept_dir
@@ -408,11 +408,11 @@ def test_failed_restore_keeps_the_set_aside_deliverable_and_names_it(
 
 
 def test_step_starting_in_the_last_partial_frame_is_dropped_with_a_record(
-    physical_templates: None,
+    p1_templates_registered: None,
 ) -> None:
     """A step that starts inside the song's final partial frame has no frame to play; it
     is dropped, recorded in the trace, and the render goes on."""
-    grid = physical_grid()
+    grid = p1_grid()
     beats = [beat for beat in grid.beat_boundaries if beat <= 2815.0]
     short = grid.model_copy(
         update={
@@ -423,10 +423,10 @@ def test_step_starting_in_the_last_partial_frame_is_dropped_with_a_record(
         }
     )
     pipeline = RenderingPipeline(
-        choreography_plan=physical_plan(),
+        choreography_plan=p1_plan(),
         beat_grid=short,
-        fixture_group=physical_rig(),
-        job_config=physical_job(),
+        fixture_group=p1_rig(),
+        job_config=p1_job(),
         output_path=None,
     )
     pipeline.render()
@@ -443,7 +443,7 @@ def test_step_starting_in_the_last_partial_frame_is_dropped_with_a_record(
 
 def test_silent_song_edges_are_held_dark_outside_the_covered_span(
     tmp_path: Path,
-    physical_templates: None,
+    p1_templates_registered: None,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -452,11 +452,11 @@ def test_silent_song_edges_are_held_dark_outside_the_covered_span(
     head dark outside it, and infers no tempo."""
 
     def no_tempo_inference(self: BeatGrid) -> BeatGrid:
-        raise AssertionError("the physical path extended the beat grid")
+        raise AssertionError("the renderer extended the beat grid")
 
     monkeypatch.setattr(BeatGrid, "extended_to_duration", no_tempo_inference)
     caplog.set_level("WARNING")
-    grid = physical_edge_grid(lead_in_ms=3000, tail_ms=4000)
+    grid = edge_grid(lead_in_ms=3000, tail_ms=4000)
     # Bars 1-3: bar 3 starts on the last observed beat, so its reveal lies past the span.
     plan = ChoreographyPlan(
         sections=[
@@ -475,8 +475,8 @@ def test_silent_song_edges_are_held_dark_outside_the_covered_span(
     pipeline = RenderingPipeline(
         choreography_plan=plan,
         beat_grid=grid,
-        fixture_group=physical_rig(),
-        job_config=physical_job(),
+        fixture_group=p1_rig(),
+        job_config=p1_job(),
         output_path=output,
         media_file="song.wav",
     )
@@ -498,19 +498,19 @@ def test_silent_song_edges_are_held_dark_outside_the_covered_span(
     )
     warnings = [r.getMessage() for r in caplog.records if "dropped" in r.getMessage()]
     assert warnings == [
-        "physical_v2: 2 cue(s) start outside the frames 2520-7000 ms that the covered phase "
+        "moving heads: 2 cue(s) start outside the frames 2520-7000 ms that the covered phase "
         "span and the song allow and are dropped (held dark); the trace's dropped_cues "
         "lists them"
     ]
     assert render["frame_grid"]["frame_count"] == 531
 
-    rig = physical_rig()
+    rig = p1_rig()
     cues = _cues(segments)
     assert sorted({(c.t0_ms, c.t1_ms) for c in cues}) == [(4020, 5020), (5820, 6620)]
     decoded = _decoded_frames(output)
     times = frame_times(int(grid.duration_ms))
-    job = physical_job()
-    initial = InitialFixtureState.model_validate(PHYSICAL_INITIAL_STATE)
+    job = p1_job()
+    initial = InitialFixtureState.model_validate(INITIAL_STATE)
     profiles = {f.fixture_id: f.config.physical_profile for f in rig.expand_fixtures()}
     for fixture in rig.expand_fixtures():
         profile = profiles[fixture.fixture_id]
@@ -557,7 +557,7 @@ def test_silent_song_edges_are_held_dark_outside_the_covered_span(
 
 
 def test_unchecked_models_are_reported(
-    physical_templates: None, caplog: pytest.LogCaptureFixture
+    p1_templates_registered: None, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Without a layout the model check cannot run; the render says so, not just the trace."""
     with caplog.at_level("WARNING"):
@@ -580,19 +580,19 @@ def test_unchecked_models_are_reported(
                     ),
                 )
             },
-            PhysicalRenderError,
+            RenderRefusedError,
             "MH2 cue at 1020 ms: lock_conflict",
             id="transaction-lock-conflict",
         ),
         pytest.param(
-            {"job": physical_job(max_effects=1)},
-            PhysicalOutputError,
+            {"job": p1_job(max_effects=1)},
+            OutputError,
             "max_effects 1",
             id="effect-budget",
         ),
         pytest.param(
-            {"job": physical_job(max_xsq_bytes=1000)},
-            PhysicalOutputError,
+            {"job": p1_job(max_xsq_bytes=1000)},
+            OutputError,
             "max_xsq_bytes 1000",
             id="byte-budget",
         ),
@@ -602,7 +602,7 @@ def test_unchecked_models_are_reported(
                     Model(name="Dmx MH1", DisplayAs="DmxMovingHeadAdv", DmxChannelCount="18")
                 ]
             },
-            PhysicalOutputError,
+            OutputError,
             "MH2: model 'Dmx MH2' is not in the xLights layout",
             id="model-missing-from-layout",
         ),
@@ -610,7 +610,7 @@ def test_unchecked_models_are_reported(
 )
 def test_failure_delivers_nothing(
     tmp_path: Path,
-    physical_templates: None,
+    p1_templates_registered: None,
     kwargs: dict[str, Any],
     error: type[Exception],
     message: str,
@@ -672,12 +672,12 @@ def _dmx(name: str, **attributes: str) -> Model:
     ],
 )
 def test_layout_check_refuses_a_model_the_mapping_cannot_drive(
-    tmp_path: Path, physical_templates: None, mh2: dict[str, str], message: str
+    tmp_path: Path, p1_templates_registered: None, mh2: dict[str, str], message: str
 ) -> None:
     """A model that is not a single-color DMX model wide enough for its profile's whole
-    footprint never receives the physical channel mapping."""
+    footprint never receives the channel mapping."""
     layout = [_dmx("Dmx MH1", StringType="Single Color White"), _dmx("Dmx MH2", **mh2)]
-    with pytest.raises(PhysicalOutputError) as raised:
+    with pytest.raises(OutputError) as raised:
         _pipeline(tmp_path / "show.xsq", layout_models=layout).render()
 
     assert message in str(raised.value)
@@ -687,7 +687,7 @@ def test_layout_check_refuses_a_model_the_mapping_cannot_drive(
 
 
 def test_layout_check_passes_and_records_the_layout(
-    tmp_path: Path, physical_templates: None
+    tmp_path: Path, p1_templates_registered: None
 ) -> None:
     """A layout whose models fit is checked and its content hash recorded, as evidence;
     it is not render identity, because it cannot change a byte. MH1 declares only the
@@ -709,7 +709,7 @@ def test_layout_check_passes_and_records_the_layout(
 
 
 def test_failed_removal_during_rollback_keeps_the_staging_directory(
-    tmp_path: Path, physical_templates: None, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, p1_templates_registered: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """If a newly placed file cannot be removed while rolling back, the earlier files
     are still put back, the staging directory is kept and the error names it."""
@@ -732,7 +732,7 @@ def test_failed_removal_during_rollback_keeps_the_staging_directory(
     monkeypatch.setattr(Path, "replace", replace_failing)
     monkeypatch.setattr(Path, "unlink", unlink_failing)
     with pytest.raises(DeliveryRollbackError) as raised:
-        _pipeline(output, job=physical_job(max_effects=999_999)).render()
+        _pipeline(output, job=p1_job(max_effects=999_999)).render()
     monkeypatch.undo()
 
     assert raised.value.kept_dir.is_dir()
@@ -744,10 +744,10 @@ def test_failed_removal_during_rollback_keeps_the_staging_directory(
 
 
 def test_calibration_change_changes_render_identity_not_plan_identity(
-    tmp_path: Path, physical_templates: None
+    tmp_path: Path, p1_templates_registered: None
 ) -> None:
     """Recalibrating one head's pan re-renders it; the planner sees the same rig."""
-    base, recalibrated = physical_rig(), physical_rig(mh1_pan_max=250.0)
+    base, recalibrated = p1_rig(), p1_rig(mh1_pan_max=250.0)
 
     assert (
         _pipeline(None, rig=recalibrated).fingerprint() != _pipeline(None, rig=base).fingerprint()
@@ -756,7 +756,7 @@ def test_calibration_change_changes_render_identity_not_plan_identity(
     def planner_inputs(rig: FixtureGroup) -> tuple[Any, ...]:
         pipeline, graph, _ = build_run_pipeline(
             fixture_group=rig,
-            job_config=physical_job(),
+            job_config=p1_job(),
             available_templates=[TEMPLATE_ID],
             xsq_output_path=tmp_path / "show.xsq",
             fixture_config_path=tmp_path / "fixture_config.json",
@@ -772,7 +772,7 @@ def test_calibration_change_changes_render_identity_not_plan_identity(
 def test_test_template_leaves_the_shared_registry_as_it_was() -> None:
     """Loading the test template for a test never leaks it into the catalog."""
     before = {info.template_id for info in REGISTRY.list_all()}
-    with physical_test_templates():
+    with p1_templates():
         assert {info.template_id for info in REGISTRY.list_all()} == before | {
             TEMPLATE_ID,
             SUBSET_TEMPLATE_ID,
@@ -794,7 +794,7 @@ def test_test_template_setup_failure_leaves_the_registry_as_it_was(
         return register(document, **kwargs)
 
     monkeypatch.setattr(REGISTRY, "register_document", fail_on_the_variant)
-    with pytest.raises(ValueError, match="injected"), physical_test_templates():
+    with pytest.raises(ValueError, match="injected"), p1_templates():
         pass
     monkeypatch.undo()
     assert {info.template_id for info in REGISTRY.list_all()} == before

@@ -22,7 +22,7 @@ from twinklr.core.sequencer.moving_heads.export.dmx_settings_builder import (
     DmxSettingsBuilder,
 )
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
-    PhysicalOutputError,
+    OutputError,
     segment_frame_span,
 )
 
@@ -41,15 +41,15 @@ the same prefix as DMX (`formats/xlights/layout/choreography.py::_dmx_model_name
 xLights 2026.19 writes `DmxMovingHeadAdv` and `DmxGeneral` (observed 2026-11-14)."""
 
 SINGLE_COLOR_STRING_TYPE_PREFIX = "single color"
-"""Lower-cased `StringType` prefix accepted for the physical mapping: one channel per
+"""Lower-cased `StringType` prefix accepted for the channel mapping: one channel per
 node, as the layout profiler reads it
 (`profiling/layout/profiler.py::_infer_channels_per_node`). xLights 2026.19 writes
 `Single Color White` on DMX models (observed 2026-11-14); other single-color spellings
 are accepted but unobserved, and a model without a `StringType` is accepted."""
 
 
-def check_physical_models(fixtures: Sequence[FixtureInstance], models: Sequence[Model]) -> None:
-    """Refuse a fixture whose xLights model the physical channel mapping cannot drive.
+def check_models(fixtures: Sequence[FixtureInstance], models: Sequence[Model]) -> None:
+    """Refuse a fixture whose xLights model the channel mapping cannot drive.
 
     The mapping writes model-relative DMX channels 1..footprint on every frame, so the
     fixture's model must be in the layout, a DMX model (`DisplayAs` prefix
@@ -64,7 +64,7 @@ def check_physical_models(fixtures: Sequence[FixtureInstance], models: Sequence[
         models: The xLights layout's models.
 
     Raises:
-        PhysicalOutputError: With code `unsupported_backend_channel`, naming each
+        OutputError: With code `unsupported_backend_channel`, naming each
             refused fixture, model and item.
     """
     by_name = {model.name: model for model in models}
@@ -98,11 +98,11 @@ def check_physical_models(fixtures: Sequence[FixtureInstance], models: Sequence[
             continue
         refused[fixture.fixture_id] = reason
     if refused:
-        raise PhysicalOutputError(
+        raise OutputError(
             MHDiagnostic(
                 code="unsupported_backend_channel",
                 severity="error",
-                message="Physical output needs single-color DMX models wide enough for their "
+                message="Moving-head output needs single-color DMX models wide enough for their "
                 "profiles: "
                 + "; ".join(f"{fixture_id}: {reason}" for fixture_id, reason in refused.items()),
                 fixture_id=next(iter(refused)) if len(refused) == 1 else None,
@@ -111,24 +111,24 @@ def check_physical_models(fixtures: Sequence[FixtureInstance], models: Sequence[
         )
 
 
-def physical_run_requests(
+def run_requests(
     runs: Sequence[FrameRun],
     segments: Sequence[FixtureSegment],
     targets: Mapping[str, str],
     *,
     logical_layer: int = 0,
 ) -> tuple[EmissionRequest, ...]:
-    """Convert physical frame runs into one constant DMX effect request each.
+    """Convert frame runs into one constant DMX effect request each.
 
     Every run targets its own fixture's
-    model; physical output is never grouped. Runs are already frame-aligned, so the
+    model; moving-head output is never grouped. Runs are already frame-aligned, so the
     emission session's quantization leaves them unchanged; a misaligned run is refused
     rather than shifted a second time. A run's trace sources are the segments whose
     frame span overlaps it, earliest first; the earliest represents the run.
 
     Args:
         runs: Coalesced frame runs.
-        segments: The physical segments the runs were encoded from.
+        segments: The segments the runs were encoded from.
         targets: Fixture id to xLights model name.
         logical_layer: Logical layer for every request.
 

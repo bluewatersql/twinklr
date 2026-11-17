@@ -248,12 +248,12 @@ Factory: `TwinklrSession.from_directory(config_dir)` discovers `config.json` and
 ### Sequencer & Rendering
 
 **Moving heads** (`packages/twinklr/core/sequencer/moving_heads/`):
-- The physical template compiler turns `ChoreographyPlan` sections into cues with
+- The template compiler turns `ChoreographyPlan` sections into cues with
   typed physical trajectories; the transaction pass plans dark repositioning between
   them, and the frame encoder writes complete 20 ms frames as constant DMX effects
 - Output is a fresh xLights `.xsq` plus `.xtiming`/`.xmap` sidecars, written by `moving_heads/delivery.py`; no user sequence is read
 - The template registry accepts strict JSON `TemplateDoc` files. The family catalog
-  (`catalog/templates/moving_heads_physical/`) loads first; normalized ID/name/alias
+  (`catalog/templates/moving_heads/`) loads first; normalized ID/name/alias
   collisions fail unless an explicit override targets the exact incumbent ID.
 
 Validate any data directory with:
@@ -414,8 +414,8 @@ The complete, category-based inventory and data requirements live in
 
 Prefer a strict JSON `TemplateDoc` in a configured template directory. Validate it with
 `twinklr template-validate`, then pass the directory to `twinklr run --template-dir`.
-The family catalog's README (`catalog/templates/moving_heads_physical/README.md`)
-describes the physical step data a template must carry.
+The family catalog's README (`catalog/templates/moving_heads/README.md`)
+describes the step data a template must carry.
 
 ### Adding a New LLM Provider
 

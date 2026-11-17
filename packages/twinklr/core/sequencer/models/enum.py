@@ -85,7 +85,7 @@ class ChannelName(StrEnum):
         PAN: Horizontal rotation/position channel.
         TILT: Vertical rotation/position channel.
         DIMMER: Brightness/intensity channel.
-        ZOOM: Beam angle; physical renderer only, for a profile that declares a zoom axis.
+        ZOOM: Beam angle, for a profile that declares a zoom axis.
 
     Example:
         >>> channel = ChannelName.PAN

@@ -9,7 +9,7 @@ from unittest.mock import patch
 from pydantic import SecretStr, ValidationError
 import pytest
 
-from tests.support.mh_physical import unprofiled_rig
+from tests.support.moving_heads import unprofiled_rig
 from twinklr.core.agents.providers.factory import create_llm_provider
 from twinklr.core.config.loader import load_full_config, load_job_config
 from twinklr.core.config.models import AppConfig, JobConfig

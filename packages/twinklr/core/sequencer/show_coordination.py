@@ -439,12 +439,12 @@ def moving_head_dark_spans(
     *,
     moving_head_target_ids: set[str],
 ) -> tuple[tuple[int, int], ...]:
-    """Where the coordination schedule rests the moving heads, for the physical renderer.
+    """Where the coordination schedule rests the moving heads, for the moving-head renderer.
 
     Each macro section's time that no window of the schedule activates a moving-head
     target in (a call/response phase answered by others, a sequenced or ripple step on
     another target), merged and in time order; empty when every section keeps them
-    active throughout. The physical renderer plans the heads dark there before it plans
+    active throughout. The renderer plans the heads dark there before it plans
     section entry and repositioning (`RenderingPipeline(dark_spans=...)`).
     """
     schedule = coordination_schedule(macro_plan, beat_grid, graph)

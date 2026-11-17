@@ -1,6 +1,6 @@
-"""Frame-accurate DMX byte encoding for the physical moving-head renderer.
+"""Frame-accurate DMX byte encoding for the moving-head renderer.
 
-Physical segments are sampled at every effect-grid frame start and composed into the
+Segments are sampled at every effect-grid frame start and composed into the
 fixture's complete declared channel footprint: declared default bytes plus the states
 the segments resolve to. A pan or tilt word is encoded once per frame, from the exact
 sampled value, and split into its coarse and fine bytes, so a coarse carry is never
@@ -35,7 +35,7 @@ from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
 from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
 
 ENCODER_VERSION = "1"
-"""Bumped by hand in the commit that intentionally changes encoded physical bytes."""
+"""Bumped by hand in the commit that intentionally changes encoded bytes."""
 
 
 @dataclass(frozen=True)
@@ -87,14 +87,14 @@ class CueTiming:
 
 @dataclass(frozen=True)
 class OutputMeasure:
-    """Actual size of a physical render's output."""
+    """Actual size of a render's output."""
 
     effect_count: int
     xsq_bytes: int
 
 
-class PhysicalOutputError(Exception):
-    """Physical output the backend cannot carry or the job's budgets do not allow."""
+class OutputError(Exception):
+    """Output the backend cannot carry or the job's budgets do not allow."""
 
     def __init__(self, diagnostic: MHDiagnostic, measure: OutputMeasure | None = None) -> None:
         self.diagnostic = diagnostic
@@ -135,7 +135,7 @@ def frame_times(duration_ms: int) -> tuple[int, ...]:
 
 
 def segment_frame_span(segment: FixtureSegment) -> tuple[int, int]:
-    """The half-open frame span `[start, end)` a physical segment samples.
+    """The half-open frame span `[start, end)` a segment samples.
 
     Raises:
         ValueError: If quantizing its bounds leaves no frame.
@@ -153,7 +153,7 @@ def segment_frame_span(segment: FixtureSegment) -> tuple[int, int]:
 def quantized_cues(segments: Sequence[FixtureSegment]) -> tuple[CueTiming, ...]:
     """Every cue the encoder quantizes, with requested and actual times, for trace.
 
-    Per segment in order: its start and end, then each physical channel's step cues
+    Per segment in order: its start and end, then each channel's step cues
     (hold points and discrete events). Linear points are sampled exactly at frame
     starts, so they are not cues.
     """
@@ -201,7 +201,7 @@ def encode_fixture_frames(
     *,
     frame_times_ms: tuple[int, ...],
 ) -> tuple[EncodedFixtureFrame, ...]:
-    """Encode one fixture's physical segments as complete frames at `frame_times_ms`.
+    """Encode one fixture's segments as complete frames at `frame_times_ms`.
 
     Each segment samples the frames in its quantized half-open span. Linear values are
     sampled exactly at the frame start; hold values and discrete states change on their
@@ -215,7 +215,7 @@ def encode_fixture_frames(
         PhysicalChannelError: If a channel holds a value the profile cannot honor, a
             sample before its first point, cues that land on one frame or at or after
             the segment's end, or two segments write the same channel in one frame.
-        PhysicalOutputError: If the footprint exceeds the DMX effect's 48 channels.
+        OutputError: If the footprint exceeds the DMX effect's 48 channels.
     """
     fixture_ids = {segment.fixture_id for segment in segments}
     if len(fixture_ids) != 1:
@@ -223,7 +223,7 @@ def encode_fixture_frames(
     (fixture_id,) = fixture_ids
     footprint = range(1, capabilities.footprint + 1)
     if capabilities.footprint > MAX_DMX_EFFECT_CHANNELS:
-        raise PhysicalOutputError(
+        raise OutputError(
             MHDiagnostic(
                 code="unsupported_backend_channel",
                 severity="error",
@@ -422,10 +422,10 @@ def measure_output(runs: Sequence[FrameRun], serialized_xsq: bytes) -> OutputMea
 
 
 def check_output_budget(measure: OutputMeasure, policy: MHRenderPolicy) -> None:
-    """Fail when physical output exceeds the job's budgets; never decimate to fit.
+    """Fail when the output exceeds the job's budgets; never decimate to fit.
 
     Raises:
-        PhysicalOutputError: With code `output_budget_exceeded` and the measure.
+        OutputError: With code `output_budget_exceeded` and the measure.
     """
     over = []
     if measure.effect_count > policy.max_effects:
@@ -433,11 +433,11 @@ def check_output_budget(measure: OutputMeasure, policy: MHRenderPolicy) -> None:
     if measure.xsq_bytes > policy.max_xsq_bytes:
         over.append(f"{measure.xsq_bytes} bytes exceed max_xsq_bytes {policy.max_xsq_bytes}")
     if over:
-        raise PhysicalOutputError(
+        raise OutputError(
             MHDiagnostic(
                 code="output_budget_exceeded",
                 severity="error",
-                message=f"Physical output rejected: {'; '.join(over)}. No frames were dropped.",
+                message=f"Moving-head output rejected: {'; '.join(over)}. No frames were dropped.",
                 action="rejected",
             ),
             measure,

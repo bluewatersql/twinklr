@@ -1,7 +1,7 @@
-"""The physical family catalog (P2.4c): admission, section succession and the families' frames.
+"""The family catalog (P2.4c): admission, section succession and the families' frames.
 
-The six documents in `catalog/templates/moving_heads_physical` load only under
-`physical_v2`, after the builtins and before `--template-dir`. Every ordered pair of
+The documents in `catalog/templates/moving_heads` load for every run, before
+`--template-dir`. Every ordered pair of
 families renders back to back at a fast tempo without a fallback, and each family's
 frames show what its name claims: fly-out lights outward travel and fly-in inward
 travel with every return dark, orbit and wings stay lit across cycles, and the snap
@@ -23,24 +23,24 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
     CATALOG_IDS,
     FAMILY_IDS,
     TEMPLATE_DIR,
     TEMPLATE_ID,
     assert_honest_transactions,
+    bars_grid,
+    family_catalog,
     family_job,
     family_rig,
     hold_step,
+    loop_template_doc,
     minimal_family_rig,
     overlay,
-    physical_bars_grid,
-    physical_catalog,
-    physical_job,
-    physical_rig,
-    physical_sections,
-    physical_template_doc,
+    p1_job,
+    p1_rig,
     registered_templates,
+    sections_plan,
     sweep_step,
     zoom_job,
     zoom_rig,
@@ -63,10 +63,10 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import frame_times
 from twinklr.core.sequencer.moving_heads.pipeline import (
     RenderingPipeline,
     TemplateAdmission,
-    check_physical_templates,
+    admit_templates,
 )
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
-    PHYSICAL_TEMPLATE_DIR,
+    TEMPLATE_CATALOG_DIR,
     load_template_document,
 )
 from twinklr.core.sequencer.moving_heads.templates.library import (
@@ -81,11 +81,11 @@ _STRICT = {"reposition_fallback": "error", "on_unplayable": "error"}
 # --- The documents ---------------------------------------------------------------------
 
 
-def test_catalog_holds_the_families_each_physical_explicit_and_degradable() -> None:
-    """Each family (the six of P2.4c and the P2.5 zoom pilot) lints, is physical on
-    every step, sets both start angles (no rig position preset is required), authors its
+def test_catalog_holds_the_families_each_explicit_and_degradable() -> None:
+    """Each family (the six of P2.4c and the P2.5 zoom pilot) lints, sets on every step
+    both start angles (no rig position preset is required), authors its
     dimmer, declares `drop_accent` and declares reach and rate variants as presets."""
-    paths = sorted(PHYSICAL_TEMPLATE_DIR.glob("*.json"))
+    paths = sorted(TEMPLATE_CATALOG_DIR.glob("*.json"))
     assert tuple(path.stem for path in paths) == CATALOG_IDS
     for path in paths:
         document = load_template_document(path)
@@ -93,22 +93,22 @@ def test_catalog_holds_the_families_each_physical_explicit_and_degradable() -> N
         template = document.template
         assert template.template_id == path.stem
         for step in template.steps:
-            movement = step.movement.physical
+            movement = step.movement
             assert movement.start_pan_deg is not None and movement.start_tilt_deg is not None
             assert step.component_refs is None, path.name
-            assert step.dimmer.physical is not None or step.physical_visibility is not None
-            assert step.physical_reposition_fallback == "drop_accent", path.name
+            assert step.dimmer is not None or step.visibility is not None
+            assert step.reposition_fallback == "drop_accent", path.name
         assert {preset.preset_id for preset in document.presets} == {"narrow", "slow"}
 
 
 def test_a_family_preset_keeps_the_flick_overlay() -> None:
     """Applying a preset rebuilds the template; without its overlay a preset would play
     the flick family with no flick."""
-    document = load_template_document(PHYSICAL_TEMPLATE_DIR / "masked_wheel_flick.json")
-    overlays = document.template.physical_overlays
+    document = load_template_document(TEMPLATE_CATALOG_DIR / "masked_wheel_flick.json")
+    overlays = document.template.overlays
     assert overlays
     for preset in document.presets:
-        assert apply_preset(document.template, preset).physical_overlays == overlays
+        assert apply_preset(document.template, preset).overlays == overlays
 
 
 # --- Admission through the CLI ---------------------------------------------------------
@@ -144,10 +144,10 @@ async def _cli_offer(
 
 
 @pytest.mark.asyncio
-async def test_physical_run_offers_the_families_and_template_dir_documents(
+async def test_run_offers_the_families_and_template_dir_documents(
     tmp_path: Path,
 ) -> None:
-    with physical_catalog(admit=False):
+    with family_catalog(admit=False):
         offered = await _cli_offer(tmp_path, family_job(HEADS), family_rig(HEADS), TEMPLATE_DIR)
 
     assert sorted(offered) == sorted([*CATALOG_IDS, TEMPLATE_ID])
@@ -156,16 +156,16 @@ async def test_physical_run_offers_the_families_and_template_dir_documents(
 @pytest.mark.parametrize(
     "spelling",
     [
-        pytest.param(PHYSICAL_TEMPLATE_DIR, id="resolved"),
-        pytest.param(PHYSICAL_TEMPLATE_DIR / ".." / PHYSICAL_TEMPLATE_DIR.name, id="unresolved"),
+        pytest.param(TEMPLATE_CATALOG_DIR, id="resolved"),
+        pytest.param(TEMPLATE_CATALOG_DIR / ".." / TEMPLATE_CATALOG_DIR.name, id="unresolved"),
     ],
 )
 @pytest.mark.asyncio
-async def test_template_dir_naming_the_physical_catalog_loads_nothing_twice(
+async def test_template_dir_naming_the_catalog_loads_nothing_twice(
     tmp_path: Path, spelling: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     with (
-        physical_catalog(admit=False),
+        family_catalog(admit=False),
         patch(
             "twinklr.cli.main.load_templates_from_directory",
             side_effect=AssertionError("--template-dir loaded"),
@@ -181,7 +181,7 @@ async def test_template_dir_naming_the_physical_catalog_loads_nothing_twice(
 @pytest.mark.asyncio
 async def test_runs_in_one_process_admit_the_catalog_once(tmp_path: Path) -> None:
     """A second run reuses the catalog the first admitted instead of failing on it."""
-    with physical_catalog(admit=False):
+    with family_catalog(admit=False):
         for _ in range(2):
             offered = await _cli_offer(tmp_path, family_job(HEADS), family_rig(HEADS))
             assert tuple(sorted(offered)) == CATALOG_IDS
@@ -194,18 +194,18 @@ def test_template_with_an_unknown_bound_term_is_excluded_naming_fixture_and_term
     """A template that plays at every gate placement on a head whose tilt latency is
     unknown still has no worst-case entry bound there, so it is left out of the offer;
     one with no cue on that head is admitted."""
-    payload = physical_rig().model_dump(mode="json")
+    payload = p1_rig().model_dump(mode="json")
     payload["fixtures"][0]["config"]["physical_profile"]["axes"]["tilt"]["latency_ms"] = None
     rig = FixtureGroup.model_validate(payload)
-    still = physical_template_doc("p24c_still", [hold_step("still", 0.0)])
-    right = physical_template_doc(
+    still = loop_template_doc("p24c_still", [hold_step("still", 0.0)])
+    right = loop_template_doc(
         "p24c_still_right", [hold_step("still", 0.0, target=SemanticGroupType.RIGHT)]
     )
-    job = physical_job()
+    job = p1_job()
     with registered_templates(still, right):
-        admission = check_physical_templates(
+        admission = admit_templates(
             ["p24c_still", "p24c_still_right"],
-            beat_grid=physical_bars_grid(500.0, 500.0, 500.0),
+            beat_grid=bars_grid(500.0, 500.0, 500.0),
             fixture_group=rig,
             initial_states=job.moving_heads.initial_states,
             failure_mode="error",
@@ -221,7 +221,7 @@ def test_template_with_an_unknown_bound_term_is_excluded_naming_fixture_and_term
 def _gate(
     template_ids: Sequence[str], grid: BeatGrid, rig: FixtureGroup, job: JobConfig
 ) -> TemplateAdmission:
-    return check_physical_templates(
+    return admit_templates(
         list(template_ids),
         beat_grid=grid,
         fixture_group=rig,
@@ -247,9 +247,9 @@ def test_gate_reports_each_familys_worst_case_entry_dip() -> None:
     500 ms of the other bars), from the union of every offered family's poses and wheel
     states and the initial state: beside the wide cascades the orbit dips longer than
     offered alone."""
-    grid = physical_bars_grid(500.0, 300.0, 500.0, 500.0)
+    grid = bars_grid(500.0, 300.0, 500.0, 500.0)
     rig, job = _late_mh3_rig(), family_job(HEADS)
-    with physical_catalog():
+    with family_catalog():
         everything = _gate(FAMILY_IDS, grid, rig, job)
         orbit = _gate(["target_orbit"], grid, rig, job)
         beside_cascade = _gate(["target_orbit", "fly_out_cascade"], grid, rig, job)
@@ -299,7 +299,7 @@ def test_in_other_meters_every_family_is_offered_with_both_variants(
         (zoom_rig(HEADS), zoom_job(HEADS)) if zoom else (family_rig(HEADS), family_job(HEADS))
     )
     template_ids = CATALOG_IDS if zoom else FAMILY_IDS
-    with physical_catalog():
+    with family_catalog():
         admission = _gate(template_ids, _meter_grid(beats_per_bar, 500.0, 10), rig, job)
 
     assert admission.admitted == template_ids
@@ -319,12 +319,12 @@ def test_a_failing_presets_poses_stay_out_of_every_entry_dip() -> None:
     """A preset that compiles at bar 1 but whose own cues cannot be repositioned between
     (a 120-degree sweep jumping back at every cycle) is left out, and its poses widen no
     entry envelope: every admitted template's dip is as if it were not declared."""
-    rig, job = physical_rig(), physical_job()
-    grid = physical_bars_grid(500.0, 500.0, 500.0)
-    still = physical_template_doc("p3_still", [hold_step("still", 0.0)])
-    aim = physical_template_doc("p3_aim", [hold_step("aim", 0.0)])
+    rig, job = p1_rig(), p1_job()
+    grid = bars_grid(500.0, 500.0, 500.0)
+    still = loop_template_doc("p3_still", [hold_step("still", 0.0)])
+    aim = loop_template_doc("p3_aim", [hold_step("aim", 0.0)])
     sweep = {"shape": "linear", "mode": "finite", "pan_extent_deg": 120.0, "period_beats": 4.0}
-    swept = _with_preset(aim, "sweep", {"aim": {"movement": {"physical": sweep}}})
+    swept = _with_preset(aim, "sweep", {"aim": {"movement": sweep}})
     with registered_templates(still, swept):
         admission = _gate(["p3_aim", "p3_still"], grid, rig, job)
     with registered_templates(still, aim):
@@ -345,35 +345,33 @@ def test_a_base_without_an_entry_bound_is_passed_over_for_a_preset_with_one() ->
     after the flick, plays only white and has a bound, so the template is admitted
     through it: `late` is its effective variant, the base's failure is recorded as a
     preset exclusion naming no preset, and the dip is `late`'s."""
-    payload = physical_rig().model_dump(mode="json")
+    payload = p1_rig().model_dump(mode="json")
     for fixture in payload["fixtures"]:
         red = fixture["config"]["physical_profile"]["discrete"]["color"]["states"]["red"]
         red["settle_ms"] = None
     rig = FixtureGroup.model_validate(payload)
-    policy = physical_job().model_dump(mode="json")
+    policy = p1_job().model_dump(mode="json")
     for state in policy["moving_heads"]["initial_states"].values():
         state["discrete_states"]["color"] = "red"
     job = JobConfig.model_validate(policy)
-    still = physical_template_doc("p3_still", [hold_step("still", 0.0)])
+    still = loop_template_doc("p3_still", [hold_step("still", 0.0)])
     flick = _with_preset(
-        physical_template_doc(
+        loop_template_doc(
             "p3_flick",
-            [sweep_step("look", 0.0, 0.0, physical_color="white")],
+            [sweep_step("look", 0.0, 0.0, color="white")],
             mode="ONCE",
             overlays=[overlay("color", 0.0, 2.0, 0.5, "red")],
         ),
         "late",
         {
             "look": {
-                "movement": {"physical": {"period_beats": 2.0}},
+                "movement": {"period_beats": 2.0},
                 "timing": {"base_timing": {"start_offset_bars": 0.5, "duration_bars": 0.5}},
             }
         },
     )
     with registered_templates(still, flick):
-        admission = _gate(
-            ["p3_flick", "p3_still"], physical_bars_grid(500.0, 500.0, 500.0), rig, job
-        )
+        admission = _gate(["p3_flick", "p3_still"], bars_grid(500.0, 500.0, 500.0), rig, job)
 
     assert admission.admitted == ("p3_flick", "p3_still")
     assert admission.exclusions == ()
@@ -387,8 +385,8 @@ def test_a_base_without_an_entry_bound_is_passed_over_for_a_preset_with_one() ->
 
 
 def _unknown_settle_rig(**states: str) -> FixtureGroup:
-    """`physical_rig` whose `wheel` states named by keyword have no known settle time."""
-    payload = physical_rig().model_dump(mode="json")
+    """`p1_rig` whose `wheel` states named by keyword have no known settle time."""
+    payload = p1_rig().model_dump(mode="json")
     for fixture in payload["fixtures"]:
         discrete = fixture["config"]["physical_profile"]["discrete"]
         for state, wheel in states.items():
@@ -397,8 +395,8 @@ def _unknown_settle_rig(**states: str) -> FixtureGroup:
 
 
 def _job_holding(**discrete_states: str) -> JobConfig:
-    """`physical_job` whose initial states hold these wheel states."""
-    policy = physical_job().model_dump(mode="json")
+    """`p1_job` whose initial states hold these wheel states."""
+    policy = p1_job().model_dump(mode="json")
     for state in policy["moving_heads"]["initial_states"].values():
         state["discrete_states"] |= discrete_states
     return JobConfig.model_validate(policy)
@@ -410,32 +408,28 @@ def test_a_rung_without_an_entry_bound_leaves_the_envelope_of_every_dip() -> Non
     one measured without its 170-degree pose, as if `late` were the template's only
     variant."""
     rig, job = _unknown_settle_rig(red="color"), _job_holding(color="red")
-    still = physical_template_doc("p3_still", [hold_step("still", 0.0, physical_color="white")])
+    still = loop_template_doc("p3_still", [hold_step("still", 0.0, color="white")])
     far = _with_preset(
-        physical_template_doc(
+        loop_template_doc(
             "p3_flick",
-            [sweep_step("look", 170.0, 0.0, physical_color="white")],
+            [sweep_step("look", 170.0, 0.0, color="white")],
             mode="ONCE",
             overlays=[overlay("color", 0.0, 2.0, 0.5, "red")],
         ),
         "late",
         {
             "look": {
-                "movement": {"physical": {"period_beats": 2.0, "start_pan_deg": 0.0}},
+                "movement": {"period_beats": 2.0, "start_pan_deg": 0.0},
                 "timing": {"base_timing": {"start_offset_bars": 0.5, "duration_bars": 0.5}},
             }
         },
     )
-    alone = physical_template_doc(
+    alone = loop_template_doc(
         "p3_flick",
-        [
-            sweep_step(
-                "look", 0.0, 0.0, period_beats=2.0, physical_color="white", start=0.5, duration=0.5
-            )
-        ],
+        [sweep_step("look", 0.0, 0.0, period_beats=2.0, color="white", start=0.5, duration=0.5)],
         mode="ONCE",
     )
-    grid = physical_bars_grid(500.0, 500.0, 500.0)
+    grid = bars_grid(500.0, 500.0, 500.0)
     with registered_templates(still, far):
         admission = _gate(["p3_flick", "p3_still"], grid, rig, job)
     with registered_templates(still, alone):
@@ -454,19 +448,15 @@ def test_a_rung_losing_its_bound_only_through_a_failing_rung_keeps_it() -> None:
     is admitted."""
     rig = _unknown_settle_rig(red="color", dots="gobo")
     job = _job_holding(color="red", gobo="dots")
-    still = physical_template_doc(
-        "p3_still", [hold_step("still", 0.0, physical_color="white", physical_gobo="dots")]
-    )
-    flick = physical_template_doc(
+    still = loop_template_doc("p3_still", [hold_step("still", 0.0, color="white", gobo="dots")])
+    flick = loop_template_doc(
         "p3_flick",
-        [sweep_step("look", 0.0, 0.0, physical_color="white", physical_gobo="star")],
+        [sweep_step("look", 0.0, 0.0, color="white", gobo="star")],
         mode="ONCE",
         overlays=[overlay("color", 0.0, 2.0, 0.5, "red")],
     )
     with registered_templates(still, flick):
-        admission = _gate(
-            ["p3_flick", "p3_still"], physical_bars_grid(500.0, 500.0, 500.0), rig, job
-        )
+        admission = _gate(["p3_flick", "p3_still"], bars_grid(500.0, 500.0, 500.0), rig, job)
 
     assert admission.admitted == ("p3_still",)
     [exclusion] = admission.exclusions
@@ -476,8 +466,8 @@ def test_a_rung_losing_its_bound_only_through_a_failing_rung_keeps_it() -> None:
 
 
 def _preset_plan(*sections: tuple[str, str | None, int, int]) -> ChoreographyPlan:
-    """`physical_sections` of `(template_id, preset_id, start_bar, end_bar)`."""
-    plan = physical_sections(*((t, start, end) for t, _, start, end in sections))
+    """`sections_plan` of `(template_id, preset_id, start_bar, end_bar)`."""
+    plan = sections_plan(*((t, start, end) for t, _, start, end in sections))
     return plan.model_copy(
         update={
             "sections": [
@@ -510,12 +500,12 @@ def _jumping_aim(*presets: tuple[str, float]) -> TemplateDoc:
     """`p3_aim`: a one-bar cycle sweeping pan 120 degrees and jumping back at every
     cycle, which no head can do lit, with a preset per `(preset_id, pan extent)`."""
     return TemplateDoc(
-        template=physical_template_doc("p3_aim", [sweep_step("aim", 0.0, 120.0)]).template,
+        template=loop_template_doc("p3_aim", [sweep_step("aim", 0.0, 120.0)]).template,
         presets=[
             TemplatePreset.model_validate(
                 {
                     "preset_id": preset_id,
-                    "step_patches": {"aim": {"movement": {"physical": {"pan_extent_deg": extent}}}},
+                    "step_patches": {"aim": {"movement": {"pan_extent_deg": extent}}},
                 }
             )
             for preset_id, extent in presets
@@ -530,8 +520,8 @@ def test_a_section_renders_the_effective_variant_unless_it_names_an_admitted_pre
     two with a warning naming why and what plays instead; naming `calm` renders it with
     no warning. Without the gate's result the base plays. The trace records the effective
     variant and each rung's exclusion."""
-    rig, job = physical_rig(), physical_job()
-    grid = physical_bars_grid(500.0, 500.0, 500.0)
+    rig, job = p1_rig(), p1_job()
+    grid = bars_grid(500.0, 500.0, 500.0)
     with registered_templates(_jumping_aim(("wild", 150.0), ("calm", 0.0))):
         admission = _gate(["p3_aim"], grid, rig, job)
         runs = {
@@ -570,7 +560,7 @@ def test_a_section_renders_the_effective_variant_unless_it_names_an_admitted_pre
     [warning] = [d for d in record["diagnostics"] if "preset 'wild'" in d["message"]]
     assert "is not admitted for template 'p3_aim'" in warning["message"]
     assert "jumps across the cue" in warning["message"]
-    assert warning["message"].endswith("physical_v2 applies its effective variant 'calm'")
+    assert warning["message"].endswith("the renderer applies its effective variant 'calm'")
     assert (warning["code"], warning["severity"], warning["action"]) == (
         "unsupported_attribute",
         "warning",
@@ -582,7 +572,7 @@ def test_a_section_renders_the_effective_variant_unless_it_names_an_admitted_pre
         if "undeclared" in d["message"]
     ]
     assert "is not declared by template 'p3_aim'" in undeclared["message"]
-    assert undeclared["message"].endswith("physical_v2 applies its effective variant 'calm'")
+    assert undeclared["message"].endswith("the renderer applies its effective variant 'calm'")
     assert record["admission_preset_exclusions"] == [dict(e) for e in admission.preset_exclusions]
     assert record["admission_effective_presets"] == {"p3_aim": "calm"}
     assert "admission_exclusions" not in record
@@ -595,14 +585,14 @@ def test_a_template_dir_template_is_not_laddered_and_refuses_on_any_failing_vari
     """A template outside the shipped catalog (not `excludable`) is not admitted through
     a later variant: one whose base fails refuses the run even though its `calm` preset
     passes, naming every failing variant."""
-    rig, job = physical_rig(), physical_job()
+    rig, job = p1_rig(), p1_job()
     with (
         registered_templates(_jumping_aim(("wild", 150.0), ("calm", 0.0))),
         pytest.raises(UnsupportedRenderModeError, match="cannot render") as refused,
     ):
-        check_physical_templates(
+        admit_templates(
             ["p3_aim"],
-            beat_grid=physical_bars_grid(500.0, 500.0, 500.0),
+            beat_grid=bars_grid(500.0, 500.0, 500.0),
             fixture_group=rig,
             initial_states=job.moving_heads.initial_states,
             failure_mode=job.moving_heads.reposition_fallback,
@@ -618,13 +608,13 @@ def test_a_preset_the_gate_did_not_admit_renders_the_base_when_the_base_is_admit
     section naming `wild` renders the base, exactly as one naming an undeclared preset,
     with the warning that no preset applies; the trace records no effective variant,
     since every admitted template plays its base."""
-    rig, job = physical_rig(), physical_job()
-    grid = physical_bars_grid(500.0, 500.0, 500.0)
+    rig, job = p1_rig(), p1_job()
+    grid = bars_grid(500.0, 500.0, 500.0)
     wild = {"shape": "linear", "mode": "finite", "pan_extent_deg": 120.0, "period_beats": 4.0}
     still = _with_preset(
-        physical_template_doc("p3_aim", [hold_step("aim", 0.0)]),
+        loop_template_doc("p3_aim", [hold_step("aim", 0.0)]),
         "wild",
-        {"aim": {"movement": {"physical": wild}}},
+        {"aim": {"movement": wild}},
     )
     with registered_templates(still):
         admission = _gate(["p3_aim"], grid, rig, job)
@@ -641,7 +631,7 @@ def test_a_preset_the_gate_did_not_admit_renders_the_base_when_the_base_is_admit
     assert record is not None
     [warning] = [d for d in record["diagnostics"] if "preset 'wild'" in d["message"]]
     assert "is not admitted for template 'p3_aim'" in warning["message"]
-    assert warning["message"].endswith("physical_v2 applies no preset")
+    assert warning["message"].endswith("the renderer applies no preset")
     assert "admission_effective_presets" not in record
 
 
@@ -653,10 +643,10 @@ _FAST_BEAT_MS = 340.0
 def fast_admission() -> TemplateAdmission:
     """The gate over every family on the family rig, its shortest beats fast."""
     job = family_job(HEADS, **_STRICT)
-    with physical_catalog():
-        return check_physical_templates(
+    with family_catalog():
+        return admit_templates(
             list(FAMILY_IDS),
-            beat_grid=physical_bars_grid(500.0, _FAST_BEAT_MS, _FAST_BEAT_MS, 500.0),
+            beat_grid=bars_grid(500.0, _FAST_BEAT_MS, _FAST_BEAT_MS, 500.0),
             fixture_group=family_rig(HEADS),
             initial_states=job.moving_heads.initial_states,
             failure_mode=job.moving_heads.reposition_fallback,
@@ -687,9 +677,9 @@ def test_every_ordered_pair_of_families_renders_back_to_back_at_the_fastest_bars
     sequence = _every_ordered_pair(FAMILY_IDS)
     assert len(set(pairwise(sequence))) == len(FAMILY_IDS) ** 2
     sections = [(template_id, 2 * i + 1, 2 * i + 2) for i, template_id in enumerate(sequence)]
-    grid = physical_bars_grid(*([_FAST_BEAT_MS] * (2 * len(sections) + 1)))
+    grid = bars_grid(*([_FAST_BEAT_MS] * (2 * len(sections) + 1)))
     rig, job = family_rig(HEADS), family_job(HEADS, **_STRICT)
-    with physical_catalog():
+    with family_catalog():
         pipeline, segments = _render(sections, grid, rig, job)
         _verify(pipeline, segments, rig, job)
     assert pipeline.render_record is not None
@@ -703,7 +693,7 @@ def _render(
     sections: list[tuple[str, int, int]], grid: BeatGrid, rig: FixtureGroup, job: JobConfig
 ) -> tuple[RenderingPipeline, list[FixtureSegment]]:
     pipeline = RenderingPipeline(
-        choreography_plan=physical_sections(*sections),
+        choreography_plan=sections_plan(*sections),
         beat_grid=grid,
         fixture_group=rig,
         job_config=job,
@@ -769,9 +759,9 @@ def _dark(frame: dict[int, int], profile: FixtureCapabilities) -> bool:
 def _solo(template_id: str, bars: int) -> RenderingPipeline:
     """`bars` bars of `template_id` alone from bar 1 at 120 BPM on the family rig, checked
     honest from its bytes; rendered once per test session."""
-    grid = physical_bars_grid(*([500.0] * (bars + 1)))
+    grid = bars_grid(*([500.0] * (bars + 1)))
     rig, job = family_rig(HEADS), family_job(HEADS, **_STRICT)
-    with physical_catalog():
+    with family_catalog():
         pipeline, segments = _render([(template_id, 1, bars)], grid, rig, job)
         _verify(pipeline, segments, rig, job)
     return pipeline
@@ -868,7 +858,7 @@ def test_flick_shows_the_preset_state_lit_mid_cycle_and_the_base_color_resumes()
     profile = _profiles(family_rig(HEADS))["MH1"]
     color = profile.discrete["color"]
     state_of = {s.value: name for name, s in color.states.items()}
-    beats = physical_bars_grid(*([500.0] * 5)).beat_boundaries
+    beats = bars_grid(*([500.0] * 5)).beat_boundaries
     for index, fixture_id in enumerate(HEADS):
         flick = "red" if index % 2 == 0 else "blue"
         lit = [
@@ -893,9 +883,9 @@ def test_flick_shows_the_preset_state_lit_mid_cycle_and_the_base_color_resumes()
 def test_continuous_families_never_go_dark_between_cycles(template_id: str) -> None:
     """Three cycles in one section: once a head is lit after entering, it stays lit to
     the section end."""
-    grid = physical_bars_grid(*([500.0] * 7))
+    grid = bars_grid(*([500.0] * 7))
     rig, job = family_rig(HEADS), family_job(HEADS, **_STRICT)
-    with physical_catalog():
+    with family_catalog():
         pipeline, segments = _render([(template_id, 1, 6)], grid, rig, job)
         _verify(pipeline, segments, rig, job)
     profile = _profiles(rig)["MH1"]
@@ -913,9 +903,9 @@ def test_continuous_families_never_go_dark_between_cycles(template_id: str) -> N
 def test_snap_holds_its_terminal_pose_lit_to_the_section_end() -> None:
     """One cue per head: after its one-beat move the head holds still, lit, until the
     section ends."""
-    grid = physical_bars_grid(*([500.0] * 4))
+    grid = bars_grid(*([500.0] * 4))
     rig, job = family_rig(HEADS), family_job(HEADS, **_STRICT)
-    with physical_catalog():
+    with family_catalog():
         pipeline, segments = _render([("finite_snap_hold", 1, 3)], grid, rig, job)
         _verify(pipeline, segments, rig, job)
     profile = _profiles(rig)["MH1"]
@@ -941,12 +931,12 @@ def test_snap_holds_its_terminal_pose_lit_to_the_section_end() -> None:
 def test_family_renders_honestly_repeatably_and_without_a_head(template_id: str) -> None:
     """Two sections of the family, then another family: honest from the bytes, nothing
     kept dark, identical on a repeat, and removing a head leaves the others' frames."""
-    grid = physical_bars_grid(500.0, 500.0, 430.0, 430.0, 500.0, 500.0, 500.0)
+    grid = bars_grid(500.0, 500.0, 430.0, 430.0, 500.0, 500.0, 500.0)
     other = "target_orbit" if template_id != "target_orbit" else "finite_snap_hold"
     sections = [(template_id, 1, 2), (template_id, 3, 4), (other, 5, 6)]
     rig, job = family_rig(HEADS), family_job(HEADS)
     present = tuple(h for h in HEADS if h != "MH2")
-    with physical_catalog():
+    with family_catalog():
         pipeline, segments = _render(sections, grid, rig, job)
         _verify(pipeline, segments, rig, job)
         again, _ = _render(sections, grid, rig, job)
@@ -977,17 +967,17 @@ def test_a_minimal_rig_is_admitted_and_delivered_byte_identical_to_the_explicit_
     the gate admits what it admits on the explicit rig (a profile per head, a declared
     topology), and the render delivers the same frames and the same `.xsq`. Only the
     trace differs: it lists, per head, what the profile left to its defaults."""
-    grid = physical_bars_grid(*([500.0] * 7))
+    grid = bars_grid(*([500.0] * 7))
     sections = [("mirror_wings", 1, 2), ("masked_wheel_flick", 3, 4), ("fly_out_cascade", 5, 6)]
     job = family_job(HEADS, **_STRICT)
     rigs = {"explicit": (family_rig(HEADS), job), "minimal": (minimal_family_rig(HEADS), job)}
     pipelines: dict[str, RenderingPipeline] = {}
     admissions: dict[str, TemplateAdmission] = {}
-    with physical_catalog():
+    with family_catalog():
         for name, (rig, job) in rigs.items():
             admissions[name] = _gate(CATALOG_IDS, grid, rig, job)
             pipelines[name] = RenderingPipeline(
-                choreography_plan=physical_sections(*sections),
+                choreography_plan=sections_plan(*sections),
                 beat_grid=grid,
                 fixture_group=rig,
                 job_config=job,

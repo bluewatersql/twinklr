@@ -1,6 +1,6 @@
-"""Show metrics on a physical moving-head trace: onsets, not 20 ms frame runs.
+"""Show metrics on a moving-head trace: onsets, not 20 ms frame runs.
 
-A physical render writes each moving head as constant DMX frame runs, so its trace has
+A render writes each moving head as constant DMX frame runs, so its trace has
 one entry per run: the dark transactions and parks between cues, every run of a cue,
 and the runs of a cue held dark through a dark span. The metrics count where a cue is
 seen to begin.
@@ -43,7 +43,7 @@ _HOLD = ("B", "hold")
 _PARK = ("MH1/park/preposition", "preposition")
 
 
-def _physical_trace() -> ShowTraceV2:
+def _moving_head_trace() -> ShowTraceV2:
     """The manifest's section (0-2000 ms): the display calls on beats 1 and 3, the heads
     answer on beats 2 and 4, so the render holds them dark over 0-500 and 1000-1500.
 
@@ -67,12 +67,12 @@ def _physical_trace() -> ShowTraceV2:
         _run(2_000, 2_020, _PARK, section=""),
     )
     return rows.model_copy(
-        update={"render": {"renderer": "physical_v2", "dark_spans": [[0, 500], [1_000, 1_500]]}}
+        update={"render": {"renderer_revision": "2", "dark_spans": [[0, 500], [1_000, 1_500]]}}
     )
 
 
-def test_physical_frame_runs_become_one_onset_per_seen_cue() -> None:
-    emissions = show_emissions(_physical_trace())
+def test_moving_head_frame_runs_become_one_onset_per_seen_cue() -> None:
+    emissions = show_emissions(_moving_head_trace())
 
     assert [(item.backend, item.start_ms, item.end_ms) for item in emissions] == [
         ("display", 0, 500),
@@ -83,8 +83,8 @@ def test_physical_frame_runs_become_one_onset_per_seen_cue() -> None:
     ]
 
 
-def test_cross_part_metrics_read_the_onsets_of_a_physical_trace() -> None:
-    rows = _physical_trace()
+def test_cross_part_metrics_read_the_onsets_of_a_moving_head_trace() -> None:
+    rows = _moving_head_trace()
 
     result = score_cross_part_alignment(manifest=manifest(), trace=rows, beat_grid=grid())
 

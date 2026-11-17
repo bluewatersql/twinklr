@@ -186,7 +186,7 @@ release.
 
 | Baseline | Kind | Pinned in |
 |---|---|---|
-| Moving-head output | Render fingerprint and encoded-frame hashes of every catalog family, and one delivered `.xsq` | `tests/regression/test_mh_physical_pins.py` |
+| Moving-head output | Render fingerprint and encoded-frame hashes of every catalog family, and one delivered `.xsq` | `tests/regression/test_mh_pins.py` |
 | `02_rudolph` | Display `.xsq` metrics + hermetic replay parity | `tests/regression/baselines/02_rudolph*` |
 
 Re-pin a baseline only with an explicit decision to move the go-forward reference.

@@ -14,14 +14,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
     SUBSET_TEMPLATE_ID,
+    bars_grid,
+    family_catalog,
     family_job,
     family_rig,
-    physical_bars_grid,
-    physical_catalog,
-    physical_sections,
-    physical_test_templates,
+    p1_templates,
+    sections_plan,
 )
 from twinklr.core.agents.sequencer.moving_heads.models import PlanSection
 from twinklr.core.config.models import JobConfig
@@ -37,7 +37,7 @@ HEADS = ("MH1", "MH2", "MH3", "MH4")
 
 
 def _make_beat_grid(bars: int = 8) -> BeatGrid:
-    return physical_bars_grid(*([500.0] * bars))
+    return bars_grid(*([500.0] * bars))
 
 
 def _job(heads: tuple[str, ...] = HEADS, **fields: Any) -> JobConfig:
@@ -58,7 +58,7 @@ def _pipeline(
     **kwargs: Any,
 ) -> RenderingPipeline:
     return RenderingPipeline(
-        choreography_plan=physical_sections(*sections),
+        choreography_plan=sections_plan(*sections),
         beat_grid=beat_grid or _make_beat_grid(),
         fixture_group=family_rig(heads),
         job_config=job_config or _job(heads),
@@ -68,7 +68,7 @@ def _pipeline(
 
 @pytest.fixture(autouse=True)
 def _catalog() -> Iterator[None]:
-    with physical_catalog():
+    with family_catalog():
         yield
 
 
@@ -124,7 +124,7 @@ def test_8head_rig_fixture_roles_are_spatial() -> None:
 def test_a_group_the_rig_cannot_fill_raises_rather_than_going_dark() -> None:
     """A template addressing RIGHT on a one-head rig (CENTER only) is a rig/plan mismatch
     the operator has to see, not a section to skip in silence."""
-    with physical_test_templates():
+    with p1_templates():
         pipeline = _pipeline(("MH1",), ((SUBSET_TEMPLATE_ID, 1, 2),))
         with pytest.raises(UnsupportedRigShapeError, match=SUBSET_TEMPLATE_ID):
             pipeline.render()

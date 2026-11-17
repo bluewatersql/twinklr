@@ -38,11 +38,6 @@ from twinklr.core.sequencer.models.template import (
     TemplateStep,
 )
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile.physical import (
-    PhysicalCompileError,
-    compile_physical_step,
-    slice_physical_segment,
-)
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     FALLBACK_METADATA_KEY,
     dark_throughout,
@@ -54,6 +49,11 @@ from twinklr.core.sequencer.moving_heads.compile.presets import (
     resolve_component_refs,
 )
 from twinklr.core.sequencer.moving_heads.compile.scheduler import schedule_repeats
+from twinklr.core.sequencer.moving_heads.compile.step import (
+    CompileError,
+    compile_step,
+    slice_segment,
+)
 from twinklr.core.sequencer.moving_heads.compile.visibility import (
     apply_overlay,
     apply_visibility,
@@ -104,7 +104,7 @@ class TemplateCompileResult(BaseModel):
     provenance: list[str] = Field(default_factory=list)
     dropped_steps: list[dict[str, str | int]] = Field(
         default_factory=list,
-        description="Physical compile only: step instances starting outside the covered "
+        description="Step instances starting outside the covered "
         "phase span or at or after the song's last whole frame, which have no frame to play",
     )
 
@@ -113,7 +113,7 @@ class TemplateCompileResult(BaseModel):
         return [seg for seg in self.segments if seg.fixture_id == fixture_id]
 
 
-def compile_physical_template(
+def compile_template(
     template: Template,
     context: TemplateCompileContext,
     preset: TemplatePreset | None = None,
@@ -124,13 +124,13 @@ def compile_physical_template(
     step_cache: dict[tuple[Any, ...], FixtureSegment] | None = None,
     unplayable: list[dict[str, str | int]] | None = None,
 ) -> TemplateCompileResult:
-    """Compile a template's scheduled steps for the physical renderer.
+    """Compile a template's scheduled steps for the renderer.
 
     Applies the preset, the repeat schedule and target resolution, the repeating cycle
     first grown to whole bars holding whole
     movement periods at the grid's meter (`whole_period_cycle`), then every step
     instance is compiled by
-    `compile_physical_step` on the frame grid. Its musical bounds are cut at the
+    `compile_step` on the frame grid. Its musical bounds are cut at the
     section end, quantized with the encoder's `quantize_cue`, and its end is cut at
     `end_limit_ms`, the last frame boundary inside the song and the covered phase span,
     so a step running past it is truncated there without error. A step starting before
@@ -139,14 +139,14 @@ def compile_physical_template(
     phase origin would lie outside the map. A cue whose pose
     commands the head cannot follow within one encoded word (`follow_lag`) is refused.
     Each segment records its requested musical bounds in metadata `requested_t0_ms`
-    and `requested_t1_ms`, and a step's `physical_reposition_fallback` under
+    and `requested_t1_ms`, and a step's `reposition_fallback` under
     `FALLBACK_METADATA_KEY`. A step's `component_refs` are resolved per target
     fixture against `context.presets`, after the preset patch, and each such segment
-    records `component_provenance`. A step's `physical_distribution` is resolved over
+    records `component_provenance`. A step's `distribution` is resolved over
     `context.topology`, the canonical full rig, so each target fixture's phase offsets
     and pan sign depend on its rank there alone; each such segment records them, with
-    the rank, as `phase_distribution`. A step's `physical_visibility` keeps only each
-    cue's lit slices (`apply_visibility`), and the template's `physical_overlays` then
+    the rank, as `phase_distribution`. A step's `visibility` keeps only each
+    cue's lit slices (`apply_visibility`), and the template's `overlays` then
     split each fixture's cues around every cycle's overlay (`apply_overlay`); both leave
     their dark spans as gaps for the transaction pass, so the pre-planning gate, which
     compiles through here, sees exactly the cues the render does.
@@ -163,7 +163,7 @@ def compile_physical_template(
             components and phase), for a caller compiling one template at many
             placements against one phase map and rig (the pre-planning gate).
         unplayable: When given (a render under `on_unplayable="dark"`), a step instance
-            a fixture cannot play here (a `PhysicalCompileError` or `PhysicalChannelError`
+            a fixture cannot play here (a `CompileError` or `PhysicalChannelError`
             it raises for that fixture, or an `EmptyStepError`) and every fixture's cues of a
             ONCE cycle the section is too short for are left out and recorded here
             instead of raised: fixture, section, template, step, frames, `reason`
@@ -171,14 +171,14 @@ def compile_physical_template(
             `detail`. Errors of the template as a whole still raise.
 
     Returns:
-        TemplateCompileResult with the physical segments.
+        TemplateCompileResult with the segments.
 
     Raises:
-        PhysicalCompileError: For a FADE_OUT remainder policy, which has no physical
+        CompileError: For a FADE_OUT remainder policy, which has no
             fade, a cycle `whole_period_cycle` would grow too far, a ONCE template
             whose single cycle the section is too short for (a cut at `end_limit_ms`
             is not refused) or with a step whose finite move
-            outlasts the step, a step the physical compile
+            outlasts the step, a step the step compile
             rejects, a component reference that
             does not resolve on this rig (naming template, step, preset and fixture),
             a distribution on a rig without a topology (naming the fixture group)
@@ -197,13 +197,13 @@ def compile_physical_template(
         working_template = apply_preset(template, preset)
         provenance.append(f"preset:{preset.preset_id}")
     if working_template.repeat.remainder_policy == RemainderPolicy.FADE_OUT:
-        raise PhysicalCompileError(
+        raise CompileError(
             MHDiagnostic(
                 code="unsupported_attribute",
                 severity="error",
                 message=(
                     f"template {template.template_id!r} uses remainder_policy FADE_OUT, "
-                    "which the physical renderer does not implement"
+                    "which the renderer does not implement"
                 ),
                 section_id=context.section_id,
                 action="rejected",
@@ -228,7 +228,7 @@ def compile_physical_template(
         },
     )
     if working_template.repeat.mode == RepeatMode.ONCE and schedule_result.num_complete_cycles == 0:
-        error = PhysicalCompileError(
+        error = CompileError(
             MHDiagnostic(
                 code="unsupported_attribute",
                 severity="error",
@@ -348,7 +348,7 @@ def compile_physical_template(
                         step, tuple(fixture.fixture_id for fixture in targets), context.presets
                     )
                 except ComponentRefError as error:
-                    raise PhysicalCompileError(
+                    raise CompileError(
                         MHDiagnostic(
                             code="unsupported_attribute",
                             severity="error",
@@ -360,12 +360,12 @@ def compile_physical_template(
                     ) from error
             components = resolved[step.step_id]
         distribution = None
-        if step.physical_distribution:
+        if step.distribution:
             if step.step_id not in phases:
                 phases[step.step_id] = _resolve_phases(step, template, context, targets)
             distribution = phases[step.step_id]
         # This instance's sampled channels, by profile and resolved components, for heads
-        # that share a channel's phase (`compile_physical_step`).
+        # that share a channel's phase (`compile_step`).
         shared: dict[tuple[str | None, str | None], dict[tuple[Any, ...], Any]] = {}
         for fixture in targets:
             fixture_components = None if components is None else components[fixture.fixture_id]
@@ -388,7 +388,7 @@ def compile_physical_template(
                 ),
                 pan_sign=1 if phase is None else phase.pan_sign,
             )
-            # Everything `compile_physical_step` and `follow_lag` read besides identity, so a
+            # Everything `compile_step` and `follow_lag` read besides identity, so a
             # head on the same profile, resolved components and phase reuses another's cue.
             fixture_key = (
                 profile_keys.setdefault(
@@ -421,7 +421,7 @@ def compile_physical_template(
                         }
                     )
                 else:
-                    segment = compile_physical_step(
+                    segment = compile_step(
                         step,
                         step_context,
                         sample_times_ms=tuple(range(t0, t1, EFFECT_GRID_MS)),
@@ -445,14 +445,14 @@ def compile_physical_template(
                                 "metadata": dict(segment.metadata),
                             }
                         )
-            except (PhysicalCompileError, PhysicalChannelError, ValueError) as error:
+            except (CompileError, PhysicalChannelError, ValueError) as error:
                 error.add_note(
                     f"template {template.template_id!r}, step {step.step_id!r}, "
                     f"fixture {fixture.fixture_id!r}"
                 )
                 # Only a deliberate refusal is left dark; any other error is a defect.
                 if unplayable is None or not isinstance(
-                    error, (PhysicalCompileError, PhysicalChannelError)
+                    error, (CompileError, PhysicalChannelError)
                 ):
                     raise
                 unplayable.append(
@@ -471,7 +471,7 @@ def compile_physical_template(
             assert fixture.physical_profile is not None  # the step compiled on it
             segment.add_metadata("requested_t0_ms", requested_t0)
             segment.add_metadata("requested_t1_ms", requested_t1)
-            segment.add_metadata(FALLBACK_METADATA_KEY, step.physical_reposition_fallback)
+            segment.add_metadata(FALLBACK_METADATA_KEY, step.reposition_fallback)
             if fixture_components is not None:
                 segment.add_metadata("component_provenance", fixture_components.provenance)
             if phase is not None:
@@ -486,7 +486,7 @@ def compile_physical_template(
                         },
                     },
                 )
-            if step.physical_visibility is None:
+            if step.visibility is None:
                 segments.append(segment)
                 continue
             # After the metadata, so every lit slice carries it.
@@ -494,8 +494,8 @@ def compile_physical_template(
                 segments.extend(
                     apply_visibility(
                         segment,
-                        step.physical_visibility,
-                        movement=step.movement.physical,
+                        step.visibility,
+                        movement=step.movement,
                         offset=step_context.phase_offset_by_channel.get(
                             ChannelName.PAN, Fraction(0)
                         ),
@@ -523,7 +523,7 @@ def compile_physical_template(
                     )
                 )
 
-    if working_template.physical_overlays:
+    if working_template.overlays:
         # A HOLD_LAST_POSE remainder replays the cycle's closing step from a new phase
         # origin; no authored cycle plays it there, so it takes no overlay. A TRUNCATE
         # remainder is the head of a cycle and keeps them; ONCE has no remainder instance.
@@ -552,13 +552,13 @@ def compile_physical_template(
 def _step_periods(step: TemplateStep) -> set[Fraction]:
     """The periods, in beats, at which a step's motion and pulses repeat: a periodic
     movement's, and each dimmer or shutter pulse's that is not lit throughout."""
-    movement = step.movement.physical
+    movement = step.movement
     periods = {
         exact_decimal(pulse.period_beats)
-        for pulse in (step.dimmer.physical, step.physical_shutter)
+        for pulse in (step.dimmer, step.shutter)
         if pulse is not None and pulse.duty_cycle < 1
     }
-    if movement is not None and movement.mode == "periodic" and movement.period_beats is not None:
+    if movement.mode == "periodic" and movement.period_beats is not None:
         periods.add(exact_decimal(movement.period_beats))
     return periods
 
@@ -590,16 +590,16 @@ def _phase_shift(
     does).
     """
     anchor_bars, anchor_t0 = anchor
-    movement = step.movement.physical
+    movement = step.movement
     periods = {
         channel: exact_decimal(pulse.period_beats)
         for channel, pulse in (
-            (ChannelName.DIMMER, step.dimmer.physical),
-            (ChannelName.SHUTTER, step.physical_shutter),
+            (ChannelName.DIMMER, step.dimmer),
+            (ChannelName.SHUTTER, step.shutter),
         )
         if pulse is not None and pulse.duty_cycle < 1
     }
-    if movement is not None and movement.mode == "periodic" and movement.period_beats is not None:
+    if movement.mode == "periodic" and movement.period_beats is not None:
         periods[ChannelName.PAN] = periods[ChannelName.TILT] = exact_decimal(movement.period_beats)
     beats = (exact_decimal(start_bars) - exact_decimal(anchor_bars)) * beats_per_bar
     periods = {c: p for c, p in periods.items() if (beats / p).denominator == 1}
@@ -642,11 +642,11 @@ def whole_period_cycle(template: Template, beats_per_bar: int) -> Template:
     of each and every overlay; an overlay still plays once per (grown) cycle. Any other
     template is returned as it is: a ONCE template, a cycle that already holds them (the
     shipped families' 2-bar cycles in 4/4), and a cycle whose loop steps do not each
-    span it, whose motion restarts at each step by design. The physical compile, and so
+    span it, whose motion restarts at each step by design. The template compile, and so
     the pre-planning gate, plays every template through here.
 
     Raises:
-        PhysicalCompileError: If the grown cycle would be longer than
+        CompileError: If the grown cycle would be longer than
             `MAX_GROWN_CYCLE_BARS`.
     """
     repeat = template.repeat
@@ -661,7 +661,7 @@ def whole_period_cycle(template: Template, beats_per_bar: int) -> Template:
     ):
         return template
     periods = {period for step in steps for period in _step_periods(step)}
-    ends = [exact_decimal(overlay.end_beats) for overlay in template.physical_overlays]
+    ends = [exact_decimal(overlay.end_beats) for overlay in template.overlays]
     beats = cycle * beats_per_bar
     if all((beats / period).denominator == 1 for period in periods) and all(
         beats >= end for end in ends
@@ -679,7 +679,7 @@ def whole_period_cycle(template: Template, beats_per_bar: int) -> Template:
     least = max([math.ceil(cycle), *(math.ceil(end / beats_per_bar) for end in ends)])
     bars = -(-least // multiple) * multiple
     if bars > MAX_GROWN_CYCLE_BARS:
-        raise PhysicalCompileError(
+        raise CompileError(
             MHDiagnostic(
                 code="unsupported_attribute",
                 severity="error",
@@ -751,15 +751,15 @@ def _require_move_within_step(
     """A ONCE step's finite move must end within the step, so a head without a phase
     offset reaches its terminal pose there: from a path's `transform.phase_cycles` c,
     the move takes `period_beats * (1 - c)`. Bars become beats at the grid's meter."""
-    movement = step.movement.physical
-    if movement is None or movement.period_beats is None:
+    movement = step.movement
+    if movement.period_beats is None:
         return
     step_beats = exact_decimal(step.timing.base_timing.duration_bars) * (
         context.beat_grid.beats_per_bar
     )
     phase = movement.transform.phase_cycles if movement.transform else 0.0
     if exact_decimal(movement.period_beats) * (1 - exact_decimal(phase)) > step_beats:
-        raise PhysicalCompileError(
+        raise CompileError(
             MHDiagnostic(
                 code="unsupported_attribute",
                 severity="error",
@@ -797,7 +797,7 @@ def _apply_overlays(
         if fixture.physical_profile is not None
     }
     fixture_ids = sorted({segment.fixture_id for segment in segments})
-    for overlay in template.physical_overlays:
+    for overlay in template.overlays:
         where = (
             f"template {template.template_id!r}, overlay on {overlay.channel} over beats "
             f"[{overlay.start_beats:g}, {overlay.end_beats:g})"
@@ -866,8 +866,8 @@ def _overlay_states(
 
 def _overlay_error(
     message: str, context: TemplateCompileContext, fixture_id: str | None = None
-) -> PhysicalCompileError:
-    return PhysicalCompileError(
+) -> CompileError:
+    return CompileError(
         MHDiagnostic(
             code="unsupported_attribute",
             severity="error",
@@ -887,8 +887,8 @@ def _resolve_phases(
 ) -> dict[str, ResolvedFixturePhase]:
     """Each target fixture's phase offsets and pan sign under the step's distribution."""
 
-    def reject(message: str) -> PhysicalCompileError:
-        return PhysicalCompileError(
+    def reject(message: str) -> CompileError:
+        return CompileError(
             MHDiagnostic(
                 code="unsupported_attribute",
                 severity="error",
@@ -900,14 +900,14 @@ def _resolve_phases(
 
     if context.topology is None:
         raise reject(
-            f"physical_distribution needs the rig's topology, but fixture group "
+            f"distribution needs the rig's topology, but fixture group "
             f"{context.fixture_group_id!r} declares no topology and not every fixture "
             "declares position.position_index to derive one row from"
         )
     try:
         return resolve_distribution(
             context.topology,
-            step.physical_distribution,
+            step.distribution,
             tuple(fixture.fixture_id for fixture in targets),
         )
     except ValueError as error:
@@ -924,7 +924,7 @@ def apply_entry_window(
 
     For a fixture in `window_ends`, its first cue to be revealed after the window is
     entered from the transaction pass's darkness: a cue running across the window end is
-    cut to begin there with `slice_physical_segment`, so its phase origin is kept, and
+    cut to begin there with `slice_segment`, so its phase origin is kept, and
     that cue (or, when every earlier cue lies in the window, the first cue after it)
     begins where its shutter state can be held for the visibility latency plus settle
     it needs, moving on to the cue's next shutter change otherwise and dropping the
@@ -933,7 +933,7 @@ def apply_entry_window(
     dropped and recorded, and the next one is tried; later cues are unchanged. Fixtures not in `window_ends` keep every cue.
 
     Args:
-        segments: A section's compiled physical cues on the frame grid, each fixture's in
+        segments: A section's compiled cues on the frame grid, each fixture's in
             time order.
         window_ends: Each windowed fixture's window end, on the frame grid.
         profiles: Each fixture's physical profile.
@@ -962,9 +962,7 @@ def apply_entry_window(
         ):
             entered.add(segment.fixture_id)
             kept.append(
-                segment
-                if cut == segment.t0_ms
-                else slice_physical_segment(segment, cut, segment.t1_ms)
+                segment if cut == segment.t0_ms else slice_segment(segment, cut, segment.t1_ms)
             )
             continue
         dropped.append(

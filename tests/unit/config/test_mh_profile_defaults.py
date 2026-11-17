@@ -15,12 +15,12 @@ from typing import Any
 from pydantic import ValidationError
 import pytest
 
-from tests.support.mh_physical import (
-    PHYSICAL_INITIAL_STATE,
+from tests.support.moving_heads import (
+    INITIAL_STATE,
     minimal_head_profile_payload,
+    p1_job,
+    p1_rig,
     physical_head_profile,
-    physical_job,
-    physical_rig,
     profile_payload,
     zoom_pilot_profile_payload,
 )
@@ -241,7 +241,7 @@ def test_shorthand_states_are_reported_by_field_validation_naming_fixture_and_gu
     validation message, never a crash."""
     profile = minimal_head()
     profile["discrete"]["color"]["states"] = {"white": 0, "red": 10}
-    payload = physical_rig().model_dump(mode="json")
+    payload = p1_rig().model_dump(mode="json")
     payload["fixtures"][0]["config"]["physical_profile"] = profile
 
     with pytest.raises(ValidationError) as raised:
@@ -559,9 +559,7 @@ def test_default_initial_state_is_the_head_at_its_default_bytes_settled() -> Non
     state, settled, and dark exactly when those bytes extinguish."""
     profile = FixtureCapabilities.model_validate(physical_head_profile(inverted=False))
 
-    assert profile.default_initial_state() == InitialFixtureState.model_validate(
-        PHYSICAL_INITIAL_STATE
-    )
+    assert profile.default_initial_state() == InitialFixtureState.model_validate(INITIAL_STATE)
 
 
 def test_default_initial_state_is_lit_when_the_default_bytes_are_lit() -> None:
@@ -596,8 +594,8 @@ def _suggested_states(message: str) -> dict[str, Any]:
 def test_a_fixture_without_an_entry_is_refused_with_a_ready_to_paste_entry() -> None:
     """No entry stays unknown and is refused; the refusal prints the entry the profile's
     default bytes give, what pasting it asserts and the guide. Pasted, it passes."""
-    rig = physical_rig()
-    job = physical_job(initial_states={"MH2": PHYSICAL_INITIAL_STATE})
+    rig = p1_rig()
+    job = p1_job(initial_states={"MH2": INITIAL_STATE})
 
     with pytest.raises(UnsupportedRenderModeError) as raised:
         preflight_render_policy(job, rig)
@@ -614,12 +612,10 @@ def test_a_fixture_without_an_entry_is_refused_with_a_ready_to_paste_entry() -> 
     profile = rig.expand_fixtures()[0].config.physical_profile
     assert profile is not None
     assert suggested == {"MH1": profile.default_initial_state().model_dump(mode="json")}
-    assert suggested["MH1"] == InitialFixtureState.model_validate(
-        PHYSICAL_INITIAL_STATE
-    ).model_dump(mode="json")
-    preflight_render_policy(
-        physical_job(initial_states={"MH2": PHYSICAL_INITIAL_STATE, **suggested}), rig
+    assert suggested["MH1"] == InitialFixtureState.model_validate(INITIAL_STATE).model_dump(
+        mode="json"
     )
+    preflight_render_policy(p1_job(initial_states={"MH2": INITIAL_STATE, **suggested}), rig)
 
 
 @pytest.mark.parametrize("holder", ["fixture", "base_config"])
@@ -627,7 +623,7 @@ def test_a_missing_required_field_names_the_fixture_the_field_and_the_guide(hold
     profile = minimal_head()
     del profile["axes"]["pan"]["physical_min"]
     if holder == "fixture":
-        payload = physical_rig().model_dump(mode="json")
+        payload = p1_rig().model_dump(mode="json")
         payload["fixtures"][0]["config"]["physical_profile"] = profile
         owner = "fixture 'MH1'"
     else:
@@ -663,10 +659,10 @@ def test_user_guide_minimal_example_loads_as_the_explicit_head() -> None:
         assert fixture.config.physical_profile is not None
         assert fixture.config.physical_profile.model_dump(mode="json") == explicit
     with pytest.raises(UnsupportedRenderModeError) as raised:
-        preflight_render_policy(physical_job(initial_states={}), rig)
+        preflight_render_policy(p1_job(initial_states={}), rig)
     suggested = _suggested_states(str(raised.value))
     assert sorted(suggested) == ["MH1", "MH2", "MH3", "MH4"]
-    preflight_render_policy(physical_job(initial_states=suggested), rig)
+    preflight_render_policy(p1_job(initial_states=suggested), rig)
 
 
 def test_minimal_head_round_trips_through_its_dump() -> None:

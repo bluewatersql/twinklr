@@ -12,11 +12,11 @@ from typing import Any
 
 import pytest
 
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
+    bars_grid,
     hold_step,
-    physical_bars_grid,
-    physical_rig,
-    physical_template_doc,
+    loop_template_doc,
+    p1_rig,
     sweep_step,
 )
 from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
@@ -25,20 +25,19 @@ from twinklr.core.sequencer.models.enum import SemanticGroupType, TemplateCatego
 from twinklr.core.sequencer.models.moving_heads.physical import PhysicalChannelError
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
 from twinklr.core.sequencer.models.template import (
-    Dimmer,
-    PhysicalDimmerPulse,
+    DimmerPulse,
     RemainderPolicy,
     RepeatMode,
     StepPatch,
     TemplateDoc,
     TemplatePreset,
 )
-from twinklr.core.sequencer.moving_heads.compile.physical import PhysicalCompileError
+from twinklr.core.sequencer.moving_heads.compile.step import CompileError
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
-    compile_physical_template,
+    compile_template,
 )
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
-from twinklr.core.sequencer.moving_heads.pipeline import physical_cue_limits
+from twinklr.core.sequencer.moving_heads.pipeline import cue_limits
 from twinklr.core.sequencer.moving_heads.templates.library import TemplateRegistry
 from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map
 
@@ -46,8 +45,8 @@ Mutation = Callable[[TemplateDoc], None]
 
 
 def _rich_doc() -> TemplateDoc:
-    """Two physical steps over a one-bar cycle, and a preset patching the first."""
-    document = physical_template_doc(
+    """Two steps over a one-bar cycle, and a preset patching the first."""
+    document = loop_template_doc(
         "effect_probe",
         [
             sweep_step("main", -20.0, 40.0, duration=0.5, period_beats=2.0),
@@ -168,12 +167,12 @@ def test_template_metadata_field_changes_planner_prompt_context(
 
 
 def _compile_snapshot(document: TemplateDoc, *, preset: bool = False) -> dict[str, Any]:
-    """The physical compile of `document` over four bars on the two-head rig, or the
+    """The compile of `document` over four bars on the two-head rig, or the
     type of the refusal."""
-    rig = physical_rig()
-    grid = physical_bars_grid(*([500.0] * 4))
+    rig = p1_rig()
+    grid = bars_grid(*([500.0] * 4))
     phase_map = build_musical_phase_map(grid)
-    start_limit, end_limit = physical_cue_limits(phase_map, int(grid.duration_ms))
+    start_limit, end_limit = cue_limits(phase_map, int(grid.duration_ms))
     selected = document.presets[0] if preset and document.presets else None
     context = TemplateCompileContext(
         section_id="section",
@@ -186,7 +185,7 @@ def _compile_snapshot(document: TemplateDoc, *, preset: bool = False) -> dict[st
         presets=rig.presets,
     )
     try:
-        result = compile_physical_template(
+        result = compile_template(
             document.template,
             context,
             selected,
@@ -194,7 +193,7 @@ def _compile_snapshot(document: TemplateDoc, *, preset: bool = False) -> dict[st
             start_limit_ms=start_limit,
             end_limit_ms=end_limit,
         )
-    except (PhysicalCompileError, PhysicalChannelError, ValueError) as error:
+    except (CompileError, PhysicalChannelError, ValueError) as error:
         return {"rejected": type(error).__name__}
     return result.model_dump(mode="json")
 
@@ -248,18 +247,16 @@ _COMPILE_CASES: tuple[tuple[str, Mutation], ...] = (
     (
         "template.template.steps.movement",
         lambda document: setattr(
-            document.template.steps[0].movement,
-            "physical",
-            document.template.steps[0].movement.physical.model_copy(update={"start_pan_deg": 10.0}),
+            document.template.steps[0],
+            "movement",
+            document.template.steps[0].movement.model_copy(update={"start_pan_deg": 10.0}),
         ),
     ),
     (
         "template.template.steps.dimmer",
         _set(
             "template.steps.0.dimmer",
-            Dimmer(
-                physical=PhysicalDimmerPulse(period_beats=1.0, duty_cycle=0.5, low=0.0, high=1.0)
-            ),
+            DimmerPulse(period_beats=1.0, duty_cycle=0.5, low=0.0, high=1.0),
         ),
     ),
 )
@@ -273,7 +270,7 @@ _COMPILE_CASES: tuple[tuple[str, Mutation], ...] = (
 def test_template_compile_field_changes_emitted_snapshot(
     config_path: str, mutation: Mutation
 ) -> None:
-    """Each path changes the physical compile, or makes it refuse the template."""
+    """Each path changes the compile, or makes it refuse the template."""
     baseline = _rich_doc()
     changed = baseline.model_copy(deep=True)
     mutation(changed)
@@ -302,14 +299,14 @@ _PRESET_CASES: tuple[tuple[str, Mutation], ...] = (
         "template.presets.step_patches.movement",
         _set(
             "presets.0.step_patches",
-            {"main": StepPatch(movement={"physical": {"start_pan_deg": 10.0}})},
+            {"main": StepPatch(movement={"start_pan_deg": 10.0})},
         ),
     ),
     (
         "template.presets.step_patches.dimmer",
         _set(
             "presets.0.step_patches",
-            {"main": StepPatch(dimmer={"physical": {"duty_cycle": 0.5, "period_beats": 1.0}})},
+            {"main": StepPatch(dimmer={"duty_cycle": 0.5, "period_beats": 1.0})},
         ),
     ),
     (
@@ -330,7 +327,7 @@ _PRESET_CASES: tuple[tuple[str, Mutation], ...] = (
 def test_template_preset_field_changes_compiled_snapshot(
     config_path: str, mutation: Mutation
 ) -> None:
-    """Each path changes the physical compile under the preset, or makes it refuse."""
+    """Each path changes the compile under the preset, or makes it refuse."""
     baseline = _rich_doc()
     changed = baseline.model_copy(deep=True)
     mutation(changed)

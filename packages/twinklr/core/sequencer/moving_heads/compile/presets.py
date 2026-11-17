@@ -1,4 +1,4 @@
-"""Resolve a physical step's named rig components per fixture (P2.1).
+"""Resolve a step's named rig components per fixture (P2.1).
 
 A step's `component_refs` names a position preset and attribute presets the fixture
 group declares (`RigPresetLibrary`). Resolution is per fixture, per axis and per
@@ -45,7 +45,7 @@ def resolve_component_refs(
     """Resolve the step's references for each fixture, with per-channel provenance.
 
     Args:
-        step: A physical step with `component_refs`, after any template preset patch.
+        step: A step with `component_refs`, after any template preset patch.
         fixture_ids: The fixtures the step targets.
         presets: The fixture group's presets.
 
@@ -61,16 +61,12 @@ def resolve_component_refs(
     refs = step.component_refs
     if refs is None:
         raise ValueError(f"step {step.step_id!r} names no component references")
-    movement = step.movement.physical
-    step_pose = {
-        "pan": None if movement is None else movement.start_pan_deg,
-        "tilt": None if movement is None else movement.start_tilt_deg,
-    }
+    step_pose = {"pan": step.movement.start_pan_deg, "tilt": step.movement.start_tilt_deg}
     step_channels: dict[str, Any] = {
-        "shutter": step.physical_shutter_state or step.physical_shutter,
-        "color": step.physical_color,
-        "gobo": step.physical_gobo,
-        "dimmer": step.dimmer.physical,
+        "shutter": step.shutter_state or step.shutter,
+        "color": step.color,
+        "gobo": step.gobo,
+        "dimmer": step.dimmer,
     }
 
     resolved: dict[str, ResolvedStepComponents] = {}
@@ -91,7 +87,7 @@ def resolve_component_refs(
             else:
                 raise ComponentRefError(
                     f"step {step.step_id!r} sets no {axis} for fixture {fixture_id!r}: "
-                    "neither movement.physical nor a position reference sets it",
+                    "neither movement nor a position reference sets it",
                     fixture_id,
                 )
 

@@ -1,6 +1,6 @@
-"""Physical step compilation for the physical_v2 renderer.
+"""Step compilation.
 
-`compile_physical_step` turns a template step's explicit physical data into a
+`compile_step` turns a template step's explicit data into a
 `FixtureSegment` whose channels hold typed trajectories: pan/tilt and the zoom's beam
 angle in degrees, the dimmer as a normalized level, the shutter and color and gobo
 wheels as named states.
@@ -11,7 +11,7 @@ or zero. Motion and pulses are evaluated on musical phase from the step start, n
 on sample-index parity or an average tempo; a step distributed over the rig topology
 evaluates each fixture at the step phase minus its offset in that domain, and its pan
 displacement times its mirror sign. Relative paths (circle, lissajous, sweep) move
-about the resolved aim (`evaluate_physical_path`). Nothing is clamped: an out-of-range
+about the resolved aim (`evaluate_path`). Nothing is clamped: an out-of-range
 value, a travel rate above the configured speed, motion at an unknown speed, a pulse
 interval shorter than one frame, or a shutter change faster than its known latency
 and settle time is rejected.
@@ -52,10 +52,10 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
 )
 from twinklr.core.sequencer.models.template import (
     RELATIVE_PATH_SHAPES,
+    Movement,
     PathTransform,
-    PhysicalMovementSpec,
-    PhysicalPulseSpec,
-    PhysicalShutterPulse,
+    PulseSpec,
+    ShutterPulse,
     TemplateStep,
 )
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
@@ -72,8 +72,8 @@ _RATE_TOLERANCE = 1e-9
 """Relative slack so float noise on a path exactly at the configured speed passes."""
 
 
-class PhysicalCompileError(Exception):
-    """A step the physical renderer cannot compile, with its diagnostic."""
+class CompileError(Exception):
+    """A step the renderer cannot compile, with its diagnostic."""
 
     def __init__(self, diagnostic: MHDiagnostic) -> None:
         self.diagnostic = diagnostic
@@ -115,14 +115,14 @@ class DiscreteChange(BaseModel):
     settle_ms: int | None = Field(description="Declared settle of `to_state`; None when unknown")
 
 
-def compile_physical_step(
+def compile_step(
     step: TemplateStep,
     context: StepCompileContext,
     *,
     sample_times_ms: tuple[int, ...],
     shared: dict[tuple[Any, ...], PhysicalValue] | None = None,
 ) -> FixtureSegment:
-    """Compile a step's explicit physical data into typed trajectories.
+    """Compile a step's explicit data into typed trajectories.
 
     Args:
         step: The template step.
@@ -148,7 +148,7 @@ def compile_physical_step(
         the step end), DIMMER and SHUTTER when the step declares their pulses, and
         SHUTTER, COLOR and GOBO as one held event when it declares a static state,
         and DIMMER as one held level when a referenced attribute preset supplies it.
-        On a profile with a zoom axis, ZOOM always: the step's `physical_zoom` sampled
+        On a profile with a zoom axis, ZOOM always: the step's `zoom` sampled
         as pan is, or, without one, the profile's default word held through the step,
         so the transaction pass holds the zoom between cues. Without a zoom axis a step
         whose zoom declares `omit_optional_zoom` gets none and
@@ -156,7 +156,7 @@ def compile_physical_step(
         records the origin.
 
     Raises:
-        PhysicalCompileError: For a fixture without a physical profile, a start angle
+        CompileError: For a fixture without a physical profile, a start angle
             nothing sets, or a zoom on a profile without a zoom axis that is not
             optional.
         PhysicalChannelError: For a value, rate or state change the profile cannot honor,
@@ -166,9 +166,9 @@ def compile_physical_step(
     """
     t0_ms = context.start_ms
     t1_ms = context.start_ms + context.duration_ms
-    profile = _require_physical_step(step, context)
+    profile = _require_step(step, context)
     if context.phase_map is None:
-        raise ValueError("physical compile needs the song's musical phase map")
+        raise ValueError("the step compile needs the song's musical phase map")
     times = _check_sample_times(sample_times_ms, t0_ms, t1_ms)
     phase_map = context.phase_map
 
@@ -184,13 +184,12 @@ def compile_physical_step(
     )
     segment.add_metadata("phase_origin_ms", t0_ms)
 
-    movement = step.movement.physical
-    assert movement is not None  # checked by _require_physical_step
+    movement = step.movement
     components = context.resolved_components
     if components is not None:
         pose = components.pose
     else:
-        # Both set: checked by _require_physical_step.
+        # Both set: checked by _require_step.
         assert movement.start_pan_deg is not None and movement.start_tilt_deg is not None
         pose = PoseDegrees(pan_deg=movement.start_pan_deg, tilt_deg=movement.start_tilt_deg)
     offsets = context.phase_offset_by_channel
@@ -226,7 +225,7 @@ def compile_physical_step(
 
     _add_zoom(step, context, segment, profile, times, t1_ms, shared)
 
-    dimmer = step.dimmer.physical
+    dimmer = step.dimmer
     if dimmer is not None:
         offset = offsets.get(ChannelName.DIMMER, Fraction(0))
         dimmer_key = (ChannelName.DIMMER, offset)
@@ -267,7 +266,7 @@ def compile_physical_step(
         )
         _add(segment, ChannelName.DIMMER, level, profile)
 
-    shutter = step.physical_shutter
+    shutter = step.shutter
     if shutter is not None:
         offset = offsets.get(ChannelName.SHUTTER, Fraction(0))
         _check_pulse_widths(
@@ -281,7 +280,7 @@ def compile_physical_step(
     # state (wheel masking and settle) is the transaction pass's work. Resolved
     # components already carry the step's own states where it sets them.
     held_states = (
-        (step.physical_shutter_state, step.physical_color, step.physical_gobo)
+        (step.shutter_state, step.color, step.gobo)
         if components is None
         else (components.shutter, components.color, components.gobo)
     )
@@ -304,20 +303,20 @@ def _add_zoom(
     t1_ms: int,
     shared: dict[tuple[Any, ...], PhysicalValue],
 ) -> None:
-    """The step's ZOOM on a profile with a zoom axis; see `compile_physical_step`."""
-    zoom = step.physical_zoom
+    """The step's ZOOM on a profile with a zoom axis; see `compile_step`."""
+    zoom = step.zoom
     axis = profile.axes.get("zoom")
     if axis is None:
         if zoom is None:
             return
         if zoom.if_unsupported != "omit_optional_zoom":
-            raise PhysicalCompileError(
+            raise CompileError(
                 MHDiagnostic(
                     code="unsupported_attribute",
                     severity="error",
                     message=(
                         f"step {step.step_id!r} of template {context.template_id!r} sets "
-                        f"physical_zoom, but profile {profile.profile_id!r} declares no zoom "
+                        f"zoom, but profile {profile.profile_id!r} declares no zoom "
                         "axis; declare one, or make the zoom optional with "
                         "if_unsupported 'omit_optional_zoom'"
                     ),
@@ -345,10 +344,10 @@ def _add_zoom(
             PhysicalPoint(t_ms=t1_ms, value=value),
         )
     else:
-        movement = step.movement.physical
+        movement = step.movement
         phase_map = context.phase_map
         # Both checked: a zoom sine needs a periodic movement; the compile, a phase map.
-        assert movement is not None and movement.period_beats is not None
+        assert movement.period_beats is not None
         assert phase_map is not None
         period = movement.period_beats
         offset = context.phase_offset_by_channel.get(ChannelName.PAN, Fraction(0))
@@ -484,8 +483,8 @@ def _discrete_changes(
     )
 
 
-def slice_physical_segment(segment: FixtureSegment, start_ms: int, end_ms: int) -> FixtureSegment:
-    """Return the part of a physical segment in `[start_ms, end_ms)`.
+def slice_segment(segment: FixtureSegment, start_ms: int, end_ms: int) -> FixtureSegment:
+    """Return the part of a segment in `[start_ms, end_ms)`.
 
     Continuous values are interpolated at the boundaries (at the end only when a later
     point defines it, as a compiled pan/tilt terminal point always does, so the slice's
@@ -516,9 +515,9 @@ def slice_physical_segment(segment: FixtureSegment, start_ms: int, end_ms: int) 
     )
 
 
-def _require_physical_step(step: TemplateStep, context: StepCompileContext) -> FixtureCapabilities:
-    def reject(message: str) -> PhysicalCompileError:
-        return PhysicalCompileError(
+def _require_step(step: TemplateStep, context: StepCompileContext) -> FixtureCapabilities:
+    def reject(message: str) -> CompileError:
+        return CompileError(
             MHDiagnostic(
                 code="unsupported_attribute",
                 severity="error",
@@ -533,10 +532,10 @@ def _require_physical_step(step: TemplateStep, context: StepCompileContext) -> F
         raise reject(f"fixture {context.fixture_id!r} has no physical_profile")
     if context.resolved_components is None:
         for name in ("start_pan_deg", "start_tilt_deg"):
-            if getattr(step.movement.physical, name) is None:
+            if getattr(step.movement, name) is None:
                 raise reject(
                     f"step {step.step_id!r} of template {context.template_id!r} sets no "
-                    f"movement.physical.{name} and no position reference; an axis nothing "
+                    f"movement.{name} and no position reference; an axis nothing "
                     "sets is never centered"
                 )
     return context.physical_profile
@@ -544,7 +543,7 @@ def _require_physical_step(step: TemplateStep, context: StepCompileContext) -> F
 
 def _check_sample_times(times: Sequence[int], t0_ms: int, t1_ms: int) -> tuple[int, ...]:
     if not times:
-        raise ValueError("physical compile needs at least one sample time")
+        raise ValueError("the step compile needs at least one sample time")
     grid_times = (("step start", t0_ms), ("step end", t1_ms), *(("sample time", t) for t in times))
     for name, time_ms in grid_times:
         if time_ms % EFFECT_GRID_MS:
@@ -565,7 +564,7 @@ def _check_sample_times(times: Sequence[int], t0_ms: int, t1_ms: int) -> tuple[i
 
 
 def _path_values(
-    movement: PhysicalMovementSpec,
+    movement: Movement,
     pose: PoseDegrees,
     phase_map: MusicalPhaseMap,
     times: Sequence[int],
@@ -574,11 +573,11 @@ def _path_values(
     offset: Fraction = Fraction(0),
     sign: int = 1,
 ) -> list[tuple[float, float]]:
-    """The `(pan, tilt)` at each of `times`: `evaluate_physical_path` at the fixture's
+    """The `(pan, tilt)` at each of `times`: `evaluate_path` at the fixture's
     phase, the step phase minus `offset` (exact), with pan sign `sign`."""
     period = movement.period_beats
     if movement.shape == "hold" or period is None:
-        return [evaluate_physical_path(movement, pose, 0, 1, sign)] * len(times)
+        return [evaluate_path(movement, pose, 0, 1, sign)] * len(times)
     values = []
     for time_ms in times:
         phase = musical_phase_fraction(phase_map, time_ms, origin_ms=origin_ms, period_beats=period)
@@ -586,7 +585,7 @@ def _path_values(
         if offset:
             n, d = n * offset.denominator - offset.numerator * d, d * offset.denominator
         try:
-            values.append(evaluate_physical_path(movement, pose, n, d, sign))
+            values.append(evaluate_path(movement, pose, n, d, sign))
         except OverflowError as error:
             raise MusicalPhaseError(
                 f"phase at {time_ms} ms over a {period}-beat period is too large"
@@ -594,8 +593,8 @@ def _path_values(
     return values
 
 
-def evaluate_physical_path(
-    spec: PhysicalMovementSpec, pose: PoseDegrees, n: int, d: int, pan_sign: int = 1
+def evaluate_path(
+    spec: Movement, pose: PoseDegrees, n: int, d: int, pan_sign: int = 1
 ) -> tuple[float, float]:
     """The `(pan, tilt)` a movement kernel commands at the phase `n / d`, in unwrapped
     degrees.
@@ -654,9 +653,9 @@ _NO_TRANSFORM = PathTransform()
 """A relative path's transform when it sets none, built once rather than per sample."""
 
 
-def _centered_displacement(spec: PhysicalMovementSpec, n: int, d: int) -> tuple[float, float]:
+def _centered_displacement(spec: Movement, n: int, d: int) -> tuple[float, float]:
     """A relative shape's rotated displacement `(x', y')` at the phase `n / d`; see
-    `evaluate_physical_path`."""
+    `evaluate_path`."""
     transform = spec.transform or _NO_TRANSFORM
     if transform.phase_cycles:
         shift = exact_decimal(transform.phase_cycles)
@@ -683,7 +682,7 @@ def _centered_displacement(spec: PhysicalMovementSpec, n: int, d: int) -> tuple[
 
 
 def _pulse_high(
-    pulse: PhysicalPulseSpec,
+    pulse: PulseSpec,
     phase_map: MusicalPhaseMap,
     time_ms: int,
     origin_ms: int,
@@ -713,7 +712,7 @@ def _pulse_high(
 def _check_pulse_widths(
     fixture_id: str,
     channel: ChannelName,
-    pulse: PhysicalPulseSpec,
+    pulse: PulseSpec,
     phase_map: MusicalPhaseMap,
     t0_ms: int,
     t1_ms: int,
@@ -759,7 +758,7 @@ def _check_pulse_widths(
 
 
 def _shutter_states(
-    pulse: PhysicalShutterPulse,
+    pulse: ShutterPulse,
     phase_map: MusicalPhaseMap,
     times: tuple[int, ...],
     origin_ms: int,
@@ -787,7 +786,7 @@ def _add(
 
 def _reuse(segment: FixtureSegment, channel: ChannelName, value: PhysicalValue | None) -> bool:
     """Put a shared channel, already checked on this profile, on `segment`; False when
-    there is none (`compile_physical_step`)."""
+    there is none (`compile_step`)."""
     if value is None:
         return False
     segment.channels[channel] = ChannelValue(channel=channel, physical=value)

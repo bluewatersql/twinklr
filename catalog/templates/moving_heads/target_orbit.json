@@ -23,31 +23,26 @@
           }
         },
         "movement": {
-          "physical": {
-            "shape": "circle",
-            "mode": "periodic",
-            "start_pan_deg": 0.0,
-            "start_tilt_deg": 30.0,
-            "pan_extent_deg": 25.0,
-            "tilt_extent_deg": 15.0,
-            "period_beats": 4.0
-          }
+          "shape": "circle",
+          "mode": "periodic",
+          "start_pan_deg": 0.0,
+          "start_tilt_deg": 30.0,
+          "pan_extent_deg": 25.0,
+          "tilt_extent_deg": 15.0,
+          "period_beats": 4.0
         },
         "dimmer": {
-          "physical": {
-            "period_beats": 4.0,
-            "duty_cycle": 1.0,
-            "low": 0.0,
-            "high": 1.0
-          }
+          "period_beats": 4.0,
+          "duty_cycle": 1.0,
+          "low": 0.0,
+          "high": 1.0
         },
-        "physical_shutter_state": "open",
-        "physical_reposition_fallback": "drop_accent"
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent"
       }
     ],
     "metadata": {
       "tags": [
-        "physical_v2",
         "orbit",
         "circle",
         "continuous"
@@ -70,10 +65,8 @@
       "step_patches": {
         "orbit": {
           "movement": {
-            "physical": {
-              "pan_extent_deg": 15.0,
-              "tilt_extent_deg": 10.0
-            }
+            "pan_extent_deg": 15.0,
+            "tilt_extent_deg": 10.0
           }
         }
       }
@@ -83,9 +76,7 @@
       "step_patches": {
         "orbit": {
           "movement": {
-            "physical": {
-              "period_beats": 8.0
-            }
+            "period_beats": 8.0
           }
         }
       }

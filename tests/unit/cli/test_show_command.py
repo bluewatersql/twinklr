@@ -59,7 +59,7 @@ async def test_local_provider_reaches_show_wiring_without_openai_key(
         patch("twinklr.cli.show_cmd.load_job_config", return_value=JobConfig()),
         patch("twinklr.cli.show_cmd.load_fixture_group"),
         patch("twinklr.cli.show_cmd.preflight_render_policy"),
-        patch("twinklr.cli.show_cmd.admit_physical_catalog"),
+        patch("twinklr.cli.show_cmd.load_template_catalog"),
         patch("twinklr.cli.show_cmd.list_templates", return_value=[]),
         patch(
             "twinklr.cli.show_cmd.prepare_combined_show_pipeline",
@@ -144,7 +144,7 @@ async def test_show_fe_bundle_and_default_catalog_layers_are_forwarded(
         patch("twinklr.cli.show_cmd.load_fixture_group"),
         patch("twinklr.cli.show_cmd.load_display_fe_bundle", return_value=bundle) as loader,
         patch("twinklr.cli.show_cmd.preflight_render_policy"),
-        patch("twinklr.cli.show_cmd.admit_physical_catalog"),
+        patch("twinklr.cli.show_cmd.load_template_catalog"),
         patch("twinklr.cli.show_cmd.list_templates", return_value=[MagicMock(template_id="mh")]),
         patch(
             "twinklr.cli.show_cmd.prepare_combined_show_pipeline",
@@ -170,7 +170,7 @@ async def test_show_fe_bundle_and_default_catalog_layers_are_forwarded(
 
 
 @pytest.mark.asyncio
-async def test_show_refuses_a_physical_rig_without_profiles_before_any_analysis(
+async def test_show_refuses_a_rig_without_profiles_before_any_analysis(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A show checks the rig when its fixtures load, as `twinklr run` does, so a rig the

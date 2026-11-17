@@ -1,4 +1,4 @@
-"""`twinklr show` on the physical moving-head renderer (C1.1a), offline.
+"""`twinklr show` on the moving-head renderer (C1.1a), offline.
 
 The real combined pipeline definition runs with recorded planner stages in place of
 the provider-backed ones, on a synthetic two-head rig, a synthetic layout and a
@@ -21,12 +21,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
     assert_honest_transactions,
+    family_catalog,
     hold_step,
-    physical_catalog,
-    physical_job,
-    physical_template_doc,
+    loop_template_doc,
+    p1_job,
     registered_templates,
     sine_step,
     topology_rig,
@@ -59,9 +59,10 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
     plan_prepositions,
 )
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
-    PhysicalOutputError,
+    OutputError,
     frame_times,
 )
+from twinklr.core.sequencer.moving_heads.identity import RENDERER_REVISION
 from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline, TemplateAdmission
 from twinklr.core.sequencer.planning.group_plan import LanePlan, SectionCoordinationPlan
 from twinklr.core.sequencer.planning.models import (
@@ -102,18 +103,18 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_IDS = ("MH1", "MH2")
 SECTION_MS = (15, 8_015)
 """The one macro section: four bars of 500 ms beats from the first detected beat."""
-SONG = "physical_show"
+SONG = "combined_show"
 
 ARCH_GROUP, ARCH_ID = "Yard Arches", "YARD_ARCHES"
 """The arch group's layout name and the choreography id it derives."""
 
 _TEMPLATES = [
-    physical_template_doc("show_swing", [sine_step("swing", 0.0, 30.0)]),
-    physical_template_doc("show_hold", [hold_step("hold", 45.0)]),
+    loop_template_doc("show_swing", [sine_step("swing", 0.0, 30.0)]),
+    loop_template_doc("show_hold", [hold_step("hold", 45.0)]),
     *(
-        physical_template_doc(
+        loop_template_doc(
             f"show_swing_{mode}",
-            [sine_step("swing", 0.0, 30.0, physical_reposition_fallback=mode)],
+            [sine_step("swing", 0.0, 30.0, reposition_fallback=mode)],
         )
         for mode in ("drop_accent", "preserve_aim")
     ),
@@ -136,8 +137,8 @@ CALLS = [(15 + 1_000 * beat, 515 + 1_000 * beat) for beat in range(8)]
 
 @pytest.fixture(autouse=True)
 def _templates() -> Iterator[None]:
-    # The command admits the shipped physical catalog itself; the registry is restored.
-    with physical_catalog(admit=False), registered_templates(*_TEMPLATES):
+    # The command admits the shipped family catalog itself; the registry is restored.
+    with family_catalog(admit=False), registered_templates(*_TEMPLATES):
         yield
 
 
@@ -164,7 +165,7 @@ def _rig() -> FixtureGroup:
 
 
 def _job(**policy: Any) -> JobConfig:
-    return physical_job(**policy)
+    return p1_job(**policy)
 
 
 def _layout_xml(rig: FixtureGroup) -> str:
@@ -200,7 +201,7 @@ def _bundle() -> SimpleNamespace:
         timing=SimpleNamespace(duration_ms=8_030),
         lyrics=None,
         phonemes=None,
-        audio_path="physical-show.wav",
+        audio_path="combined-show.wav",
         metadata=None,
     )
 
@@ -405,7 +406,7 @@ async def _run(
     context = PipelineContext(session=session)
     context.set_state("layout_models", wiring.layout_models)
     with patch("twinklr.core.audio.analyzer.AudioAnalyzer", return_value=_analyzer()):
-        result = await PipelineExecutor().execute(wiring.pipeline, "physical-show.wav", context)
+        result = await PipelineExecutor().execute(wiring.pipeline, "combined-show.wav", context)
     return result, context
 
 
@@ -448,7 +449,7 @@ def _standalone(
     job: JobConfig,
     moving_heads: MovingHeadSpec = SWING,
 ) -> RenderingPipeline:
-    """The same plan rendered by the standalone physical path, `twinklr run`'s."""
+    """The same plan rendered by the standalone path, `twinklr run`'s."""
     admission = context.get_state("template_admission")
     assert isinstance(admission, TemplateAdmission)
     pipeline = RenderingPipeline(
@@ -504,7 +505,7 @@ async def test_gate_refuses_a_rig_without_a_profile_before_any_planner(tmp_path:
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_unified_show_renders_the_heads_as_the_standalone_physical_render(
+async def test_unified_show_renders_the_heads_as_the_standalone_render(
     tmp_path: Path,
 ) -> None:
     rig, job = _rig(), _job()
@@ -640,7 +641,7 @@ async def test_spans_follow_the_coordination_of_each_section(tmp_path: Path) -> 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_export_writes_one_show_with_the_physical_trace_of_twinklr_run(
+async def test_export_writes_one_show_with_the_moving_head_trace_of_twinklr_run(
     tmp_path: Path,
 ) -> None:
     rig, job = _rig(), _job()
@@ -687,7 +688,7 @@ async def test_export_writes_one_show_with_the_physical_trace_of_twinklr_run(
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_a_physical_show_is_deterministic(tmp_path: Path) -> None:
+async def test_a_show_is_deterministic(tmp_path: Path) -> None:
     written = []
     for attempt in ("first", "second"):
         result, _ = await _run(tmp_path / attempt, macro=CALL_RESPONSE)
@@ -714,7 +715,7 @@ async def test_output_budget_refuses_the_show_and_writes_nothing(tmp_path: Path)
     assert result.success, result.failed_stages
     artifact_dir = tmp_path / "show"
 
-    with pytest.raises(PhysicalOutputError, match="exceed max_effects 10"):
+    with pytest.raises(OutputError, match="exceed max_effects 10"):
         export_show_artifacts(
             result.outputs["show_render"],
             artifact_dir=artifact_dir,
@@ -758,7 +759,7 @@ async def test_export_publishes_the_sequence_and_its_trace_together(tmp_path: Pa
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_twinklr_show_writes_one_physical_show_offline(
+async def test_twinklr_show_writes_one_show_offline(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The command end to end: catalog, gate, recorded planners, render, export, manifest."""
@@ -767,7 +768,7 @@ async def test_twinklr_show_writes_one_physical_show_offline(
     layout_path, fixture_path = _write_inputs(tmp_path, rig)
     job_path = tmp_path / "job_config.json"
     job_path.write_text(_job().model_dump_json(), encoding="utf-8")
-    audio_path = tmp_path / "physical-show.wav"
+    audio_path = tmp_path / "combined-show.wav"
     audio_path.write_bytes(b"synthetic audio")
     local = AppConfig(
         llm_provider="ollama", llm_base_url="http://127.0.0.1:11434/v1", llm_api_key=""
@@ -795,7 +796,7 @@ async def test_twinklr_show_writes_one_physical_show_offline(
     song_name = clean_audio_filename(audio_path.stem)
     xsq_path = tmp_path / "out" / song_name / f"{song_name}_twinklr_show.xsq"
     trace = json.loads(Path(f"{xsq_path}.trace.json").read_text(encoding="utf-8"))
-    assert trace["render"]["renderer"] == "physical_v2"
+    assert trace["render"]["renderer_revision"] == RENDERER_REVISION
     assert trace["render"]["layout_check"] == "performed"
     assert trace["render"]["layout_sha256"]
     assert Path(f"{xsq_path}.evaluation.json").is_file()
@@ -809,7 +810,7 @@ async def test_twinklr_show_writes_one_physical_show_offline(
 
 
 class _SongMetadataOnly:
-    """The audio analysis `eval-report` runs, which a physical report reads only for the
+    """The audio analysis `eval-report` runs, which a report reads only for the
     song's metadata."""
 
     def __init__(self, **kwargs: object) -> None:
@@ -846,7 +847,7 @@ async def _show_command(
     layout_path, fixture_path = _write_inputs(tmp_path, _rig())
     job_path = tmp_path / "job_config.json"
     job_path.write_text((job or _job()).model_dump_json(), encoding="utf-8")
-    audio_path = tmp_path / "physical-show.wav"
+    audio_path = tmp_path / "combined-show.wav"
     audio_path.write_bytes(b"synthetic audio")
     local = AppConfig(
         llm_provider="ollama", llm_base_url="http://127.0.0.1:11434/v1", llm_api_key=""
@@ -919,16 +920,16 @@ async def test_eval_report_reproduces_a_show_render_with_its_dark_spans(
 
     report = await _evaluate(checkpoint, fixture_path, audio_path, tmp_path / "report")
 
-    physical = report.physical
-    assert physical is not None
-    assert physical.fingerprint_matches is True, physical.mismatched_inputs
-    assert physical.rerender_fingerprint == physical.run_fingerprint == trace["render_fingerprint"]
-    assert physical.dark_spans == spans
-    assert physical.dark_span_ms == sum(end - start for start, end in spans)
+    summary = report.render
+    assert summary is not None
+    assert summary.fingerprint_matches is True, summary.mismatched_inputs
+    assert summary.rerender_fingerprint == summary.run_fingerprint == trace["render_fingerprint"]
+    assert summary.dark_spans == spans
+    assert summary.dark_span_ms == sum(end - start for start, end in spans)
     markdown = (tmp_path / "report" / "report.md").read_text(encoding="utf-8")
-    assert f"**Dark spans**: {len(spans)}, {physical.dark_span_ms} ms in all" in markdown
+    assert f"**Dark spans**: {len(spans)}, {summary.dark_span_ms} ms in all" in markdown
     written = json.loads((tmp_path / "report" / "report.json").read_text(encoding="utf-8"))
-    assert written["physical"]["dark_spans"] == spans
+    assert written["render"]["dark_spans"] == spans
 
     # Lit-only figures leave the spans out by construction: in every frame of every span
     # each head emits nothing, and lit means emitted intensity above 0.
@@ -939,9 +940,9 @@ async def test_eval_report_reproduces_a_show_render_with_its_dark_spans(
             fixture_config_path=fixture_path,
             recorded=recorded_render(data),
         )
-    assert rerendered.physical is not None
+    assert rerendered.output is not None
     values = physical_channel_values(
-        rerendered.physical.frames, rerendered.physical.profiles, (0, sys.maxsize)
+        rerendered.output.frames, rerendered.output.profiles, (0, sys.maxsize)
     )
     for fixture_id in FIXTURE_IDS:
         intensity = values[fixture_id]["dimmer"]
@@ -975,9 +976,9 @@ async def test_dark_spans_that_are_not_the_shows_are_named_as_what_differs(
 
         report = await _evaluate(path, fixture_path, audio_path, tmp_path / change)
 
-        assert report.physical is not None
-        assert report.physical.fingerprint_matches is False, change
-        assert report.physical.mismatched_inputs == ["dark spans"], change
+        assert report.render is not None
+        assert report.render.fingerprint_matches is False, change
+        assert report.render.mismatched_inputs == ["dark spans"], change
 
 
 @pytest.mark.integration

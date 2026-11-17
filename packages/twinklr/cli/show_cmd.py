@@ -33,11 +33,11 @@ from twinklr.core.sequencer.display.renderer import RenderResult
 from twinklr.core.sequencer.display.xlights_mapping import XLightsMapping
 from twinklr.core.sequencer.moving_heads.delivery import DeliveryRollbackError, publish_files
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
-    PhysicalOutputError,
+    OutputError,
     check_output_budget,
     measure_output,
 )
-from twinklr.core.sequencer.moving_heads.templates.data_loader import admit_physical_catalog
+from twinklr.core.sequencer.moving_heads.templates.data_loader import load_template_catalog
 from twinklr.core.sequencer.moving_heads.templates.library import list_templates
 from twinklr.core.sequencer.planning import MacroPlan
 from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
@@ -96,7 +96,7 @@ async def run_show_pipeline_async(
         # planner, and admits the templates this rig can render.
         preflight_render_policy(job_config, fixture_group)
         fe_bundle = load_display_fe_bundle(fe_output_dir, style_name=style_name)
-        admit_physical_catalog()
+        load_template_catalog()
         available_templates = [template.template_id for template in list_templates()]
         song_name = clean_audio_filename(audio_path.stem)
         wiring = prepare_combined_show_pipeline(
@@ -178,7 +178,7 @@ async def run_show_pipeline_async(
             ),
             moving_head_target_ids=set(evaluation_contract.get("moving_head_target_ids", [])),
         )
-    except PhysicalOutputError as error:
+    except OutputError as error:
         console.print(f"[red]ERROR: {error}[/red]")
         return 1
     except (OSError, TypeError, ValueError) as error:
@@ -208,7 +208,7 @@ def export_show_artifacts(
 
     Raises:
         TypeError: If the output is not the combined render stage's.
-        PhysicalOutputError: If the output exceeds the budgets; nothing is written.
+        OutputError: If the output exceeds the budgets; nothing is written.
         DeliveryRollbackError: If publishing failed and an earlier file could not be
             put back; the staging directory is then kept and named.
     """

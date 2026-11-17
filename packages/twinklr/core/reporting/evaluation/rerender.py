@@ -21,7 +21,7 @@ from twinklr.core.reporting.evaluation.collect import RecordedRender
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import EncodedFixtureFrame
 from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
 from twinklr.core.sequencer.moving_heads.templates import get_template
-from twinklr.core.sequencer.moving_heads.templates.data_loader import admit_physical_catalog
+from twinklr.core.sequencer.moving_heads.templates.data_loader import load_template_catalog
 from twinklr.core.sequencer.moving_heads.templates.library import TemplateNotFoundError
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class PhysicalRerender:
+class RerenderOutput:
     """What a re-render adds to its segments: frames, profiles and identity.
 
     Attributes:
@@ -67,7 +67,7 @@ class RerenderResult:
         fixture_group: Fixture configuration
         beat_grid: Timing grid for bar/ms conversions
         fixture_contexts: List of fixture contexts with roles
-        physical: The re-render's frames, profiles and identity
+        output: The re-render's frames, profiles and identity
     """
 
     def __init__(
@@ -78,14 +78,14 @@ class RerenderResult:
         fixture_group: Any,
         beat_grid: BeatGrid,
         fixture_contexts: list[Any],
-        physical: PhysicalRerender,
+        output: RerenderOutput,
     ):
         self.segments = segments
         self.song_features = song_features
         self.fixture_group = fixture_group
         self.beat_grid = beat_grid
         self.fixture_contexts = fixture_contexts
-        self.physical = physical
+        self.output = output
 
 
 def admit_plan_templates(plan: ChoreographyPlan) -> None:
@@ -96,7 +96,7 @@ def admit_plan_templates(plan: ChoreographyPlan) -> None:
         UnsupportedRenderModeError: Naming each template id the registry does not hold,
             such as one a run loaded with `--template-dir`.
     """
-    admit_physical_catalog()
+    load_template_catalog()
     named = {
         selection.template_id
         for section in plan.sections
@@ -138,7 +138,7 @@ async def rerender_plan(
     The plan is re-rendered from the render its run recorded: under the recorded
     policy, against the recorded beat grid, over the recorded dark spans (a
     show's coordination rests) and with the recorded gate result, which decides the
-    variant a section naming no preset renders, with the physical
+    variant a section naming no preset renders, with the
     family catalog admitted as `twinklr run` admits it (`admit_plan_templates`). The
     audio is analyzed only for the song's metadata. The re-render's fingerprint is
     returned beside the run's, for the caller to compare.
@@ -228,7 +228,7 @@ async def rerender_plan(
     for fixture in fixture_group.expand_fixtures():
         assert fixture.config.physical_profile is not None  # required by the render
         profiles[fixture.fixture_id] = fixture.config.physical_profile
-    physical_rerender = PhysicalRerender(
+    output = RerenderOutput(
         frames=pipeline.frames,
         profiles=profiles,
         render_record=pipeline.render_record,
@@ -244,5 +244,5 @@ async def rerender_plan(
         fixture_group=fixture_group,
         beat_grid=beat_grid,
         fixture_contexts=fixture_contexts,
-        physical=physical_rerender,
+        output=output,
     )

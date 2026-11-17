@@ -1,4 +1,4 @@
-"""Typed physical channel values for the physical moving-head renderer.
+"""Typed physical channel values for the moving-head renderer.
 
 Trajectories carry absolute integer-millisecond times and explicit units: degrees for
 pan/tilt and the zoom's beam angle, normalized values for the dimmer, named states for

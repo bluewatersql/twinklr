@@ -1,11 +1,11 @@
-"""Visibility envelopes and masked attribute overlays for physical cues (P2.4b).
+"""Visibility envelopes and masked attribute overlays for cues (P2.4b).
 
 Both only cut compiled cues apart: `apply_visibility` keeps the lit slices of a cue and
 `apply_overlay` splits cues around a temporary wheel state. Every dark span they leave
 is a gap between cues, which `plan_prepositions` authors as an ordinary transaction
 (darkness, wheel turns, travel, settle, reveal), so there is one dark-motion algorithm
 and nothing here authors motion in the dark. Slices are cut with
-`slice_physical_segment`, so each keeps its cue's phase origin and its motion does not
+`slice_segment`, so each keeps its cue's phase origin and its motion does not
 restart.
 """
 
@@ -28,9 +28,9 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
     PhysicalPoint,
     check_physical_value,
 )
-from twinklr.core.sequencer.models.template import PhysicalMovementSpec, VisibilityEnvelope
+from twinklr.core.sequencer.models.template import Movement, VisibilityEnvelope
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile.physical import slice_physical_segment
+from twinklr.core.sequencer.moving_heads.compile.step import slice_segment
 from twinklr.core.sequencer.timing.musical_phase import (
     MusicalPhaseMap,
     exact_decimal,
@@ -43,7 +43,7 @@ def apply_visibility(
     segment: FixtureSegment,
     envelope: VisibilityEnvelope,
     *,
-    movement: PhysicalMovementSpec,
+    movement: Movement,
     offset: Fraction,
     profile: FixtureCapabilities,
     phase_map: MusicalPhaseMap,
@@ -61,7 +61,7 @@ def apply_visibility(
     the shutter at the cue's own static state, else the profile's `discrete.open_state`.
 
     Args:
-        segment: A compiled physical cue on the frame grid, with `phase_origin_ms`.
+        segment: A compiled cue on the frame grid, with `phase_origin_ms`.
         envelope: The step's envelope.
         movement: The step's movement, whose `period_beats` and mode set the cycles.
         offset: The fixture's pan/tilt phase offset in cycles.
@@ -160,7 +160,7 @@ def apply_visibility(
 
     slices: list[FixtureSegment] = []
     for lit_start, lit_end in spans:
-        lit = slice_physical_segment(segment, lit_start, lit_end)
+        lit = slice_segment(segment, lit_start, lit_end)
         if open_state is not None:
             held = DiscreteTrajectory(events=(DiscretePoint(t_ms=lit_start, state=open_state),))
             lit.channels[ChannelName.SHUTTER] = ChannelValue(
@@ -240,7 +240,7 @@ def apply_overlay(
             part_start, part_end = max(part_start, segment.t0_ms), min(part_end, segment.t1_ms)
             if part_start >= part_end:
                 continue
-            part = slice_physical_segment(segment, part_start, part_end)
+            part = slice_segment(segment, part_start, part_end)
             if flick:
                 held = DiscreteTrajectory(events=(DiscretePoint(t_ms=part_start, state=state),))
                 check_physical_value(

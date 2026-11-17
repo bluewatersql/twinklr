@@ -70,13 +70,13 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
 from twinklr.core.sequencer.moving_heads.compile.preset import apply_preset
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
     apply_entry_window,
-    compile_physical_template,
+    compile_template,
     whole_period_cycle,
 )
 from twinklr.core.sequencer.moving_heads.delivery import (
     DeliveryArtifacts,
-    build_physical_sequence,
-    export_physical_delivery,
+    build_sequence,
+    export_delivery,
 )
 from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
@@ -89,13 +89,13 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     quantized_cues,
 )
 from twinklr.core.sequencer.moving_heads.export.xsq_adapter import (
-    check_physical_models,
-    physical_run_requests,
+    check_models,
+    run_requests,
 )
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
 from twinklr.core.sequencer.moving_heads.identity import (
-    LEGACY_BACKEND_ID,
-    PHYSICAL_RENDERER_REVISION,
+    BACKEND_ID,
+    RENDERER_REVISION,
     render_fingerprint,
 )
 from twinklr.core.sequencer.moving_heads.templates import get_template
@@ -111,8 +111,8 @@ from twinklr.core.sequencer.timing.musical_phase import (
 logger = logging.getLogger(__name__)
 
 
-def physical_cue_limits(phase_map: MusicalPhaseMap, duration_ms: int) -> tuple[int, int]:
-    """The frame-grid span a physical cue may occupy: `(start_limit_ms, end_limit_ms)`.
+def cue_limits(phase_map: MusicalPhaseMap, duration_ms: int) -> tuple[int, int]:
+    """The frame-grid span a cue may occupy: `(start_limit_ms, end_limit_ms)`.
 
     The start is the covered phase span's start rounded up to the frame grid; the end
     is the earlier of the song's last whole frame and the covered end rounded down.
@@ -484,7 +484,7 @@ def _predecessor(
 
 def _pose_points(cue: FixtureSegment, channel: ChannelName) -> tuple[PhysicalPoint, ...]:
     trajectory = cue.channels[channel].physical
-    assert isinstance(trajectory, ContinuousTrajectory)  # a physical cue authors its pose
+    assert isinstance(trajectory, ContinuousTrajectory)  # a cue authors its pose
     return trajectory.points
 
 
@@ -535,7 +535,7 @@ def _wheel_states(
 
 @dataclass(frozen=True)
 class TemplateAdmission:
-    """What the pre-planning gate offers the planner (`check_physical_templates`).
+    """What the pre-planning gate offers the planner (`admit_templates`).
 
     A template's rungs are its base (no preset), then each preset it declares, in that
     order; a template is admitted when any rung passes. `admitted` keeps the order the
@@ -585,7 +585,7 @@ def _gc_paused[**P, R](function: Callable[P, R]) -> Callable[P, R]:
 
 
 @_gc_paused
-def check_physical_templates(
+def admit_templates(
     template_ids: Sequence[str],
     *,
     beat_grid: BeatGrid,
@@ -598,10 +598,10 @@ def check_physical_templates(
     """Dry-compile templates on the rig, so a plan can only name ones that will render.
 
     Each template is compiled with no preset and with each preset it declares (the
-    only presets the physical renderer applies), as one section from bar 1 over every
+    only presets the renderer applies), as one section from bar 1 over every
     bar that starts in the song, on every fixture of the rig, through the render's own
-    `compile_physical_template` against the song's phase map and within the render's
-    cue limits (`physical_cue_limits`). That checks target groups against the rig's
+    `compile_template` against the song's phase map and within the render's
+    cue limits (`cue_limits`). That checks target groups against the rig's
     roles, a preset patch the step models refuse, every step's states and channels against each
     profile, axis bounds, travel rate, pose motion the head can follow, and pulse and
     shutter timing for that placement, and each step's component references against
@@ -629,7 +629,7 @@ def check_physical_templates(
     A template is admitted through the first of its rungs that passes, the base (no
     preset) and then each preset in the order it declares them: that rung is its
     effective variant, and each failing rung is recorded with its reason. That applies
-    to a template in `excludable` (the shipped physical catalog), which is left out of
+    to a template in `excludable` (the shipped family catalog), which is left out of
     the offer with the reasons when no rung passes, instead of refusing the run. Any
     other template that fails on any rung refuses the run, so its effective variant is
     always its base.
@@ -643,7 +643,7 @@ def check_physical_templates(
             for any template not in `excludable`, or for every exclusion when none
             remains to admit, or none was offered.
     """
-    from twinklr.core.sequencer.moving_heads.compile.physical import PhysicalCompileError
+    from twinklr.core.sequencer.moving_heads.compile.step import CompileError
     from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
         UnsupportedRigShapeError,
     )
@@ -657,7 +657,7 @@ def check_physical_templates(
     topology = rig_topology(fixture_group)
     phase_map = build_musical_phase_map(beat_grid)
     duration_ms = int(beat_grid.duration_ms)
-    start_limit, end_limit = physical_cue_limits(phase_map, duration_ms)
+    start_limit, end_limit = cue_limits(phase_map, duration_ms)
     sequence_end_ms = len(frame_times(duration_ms)) * EFFECT_GRID_MS
     bars = sum(1 for start in beat_grid.bar_boundaries if start < beat_grid.duration_ms)
     # Keyed by (template id, preset id), None for the base.
@@ -721,7 +721,7 @@ def check_physical_templates(
                 # The previous placement's cues are released before this one is compiled.
                 compiled = None
                 try:
-                    compiled = compile_physical_template(
+                    compiled = compile_template(
                         document.template,
                         context,
                         preset,
@@ -731,7 +731,7 @@ def check_physical_templates(
                         step_cache=step_cache,
                     )
                 except (
-                    PhysicalCompileError,
+                    CompileError,
                     PhysicalChannelError,
                     UnsupportedRigShapeError,
                     ValueError,
@@ -854,7 +854,7 @@ def check_physical_templates(
     )
     for exclusion in exclusions:
         logger.warning(
-            "physical_v2: template %r is left out of the planner's offer: %s",
+            "moving heads: template %r is left out of the planner's offer: %s",
             exclusion["template_id"],
             exclusion["reason"],
         )
@@ -862,7 +862,7 @@ def check_physical_templates(
         template_id, preset_id = str(rung["template_id"]), rung["preset_id"]
         effective = effective_preset[template_id]
         logger.warning(
-            "physical_v2: %s of template %r is not admitted, so a section naming %s renders %s: %s",
+            "moving heads: %s of template %r is not admitted, so a section naming %s renders %s: %s",
             "the base" if preset_id is None else f"preset {preset_id!r}",
             template_id,
             "no preset" if preset_id is None else "it",
@@ -871,7 +871,7 @@ def check_physical_templates(
         )
     for template_id, dip in dips.items():
         logger.info(
-            "physical_v2: template %r enters a section dark for up to %s beat(s) at the "
+            "moving heads: template %r enters a section dark for up to %s beat(s) at the "
             "song's shortest beat (%s ms on fixture %r, from any admitted template)",
             template_id,
             dip["beats"],
@@ -1295,7 +1295,7 @@ def _plan_key(
     )
 
 
-def _physical_preset(
+def _section_preset(
     section: PlanSection,
     template_doc: TemplateDoc,
     diagnostics: list[MHDiagnostic],
@@ -1306,8 +1306,8 @@ def _physical_preset(
     template's effective variant (the base without a gate result), with a warning when
     the section named a preset.
 
-    An undeclared id is not turned into an energy preset under `physical_v2`: that is
-    planner intent, which Phase 1 does not apply.
+    An undeclared id is not turned into an energy preset: that is planner intent, which
+    Phase 1 does not apply.
     """
     template_id = template_doc.template.template_id
     declared = {preset.preset_id: preset for preset in template_doc.presets}
@@ -1337,9 +1337,9 @@ def _physical_preset(
                     else f"admitted for template {template_id!r} on this rig and song ({reason})"
                 )
                 + (
-                    "; physical_v2 applies no preset"
+                    "; the renderer applies no preset"
                     if fallback is None
-                    else f"; physical_v2 applies its effective variant {fallback!r}"
+                    else f"; the renderer applies its effective variant {fallback!r}"
                 )
             ),
             section_id=section.section_name,
@@ -1349,14 +1349,14 @@ def _physical_preset(
     return None if fallback is None else declared[fallback]
 
 
-class PhysicalRenderError(ValueError):
-    """The transaction pass refused a physical render; nothing was delivered."""
+class RenderRefusedError(ValueError):
+    """The transaction pass refused a render; nothing was delivered."""
 
     def __init__(self, diagnostics: Sequence[TransitionDiagnostic]) -> None:
         self.diagnostics = tuple(diagnostics)
         errors = [diagnostic for diagnostic in diagnostics if diagnostic.status == "error"]
         super().__init__(
-            "Physical render refused: "
+            "Moving-head render refused: "
             + "; ".join(
                 f"{diagnostic.fixture_id} cue at {diagnostic.cue_ms} ms: "
                 f"{diagnostic.code}: {diagnostic.reason}"
@@ -1473,9 +1473,9 @@ class RenderingPipeline:
             locks: Frames the render must leave as the cues alone make them.
             layout_models: The xLights layout's models, when known. The render then
                 refuses any fixture whose model is not a single-color DMX model with
-                enough channels (`check_physical_models`); without them the check is
+                enough channels (`check_models`); without them the check is
                 recorded as not performed.
-            layout_sha256: Content hash of the layout file, recorded in the physical
+            layout_sha256: Content hash of the layout file, recorded in the render
                 trace as evidence. Not render identity: the check passes or refuses
                 and never changes a byte.
             admission: The pre-planning gate's result, when it ran. The render plays each template's effective variant in a section naming no
@@ -1543,31 +1543,19 @@ class RenderingPipeline:
         # Create rig profile from fixture group
         self.rig_profile = rig_profile_from_fixture_group(fixture_group)
 
-    def render(self) -> list[FixtureSegment]:
-        """Render the choreography plan and, with an output path, deliver it
-        (`_render_physical`).
-
-        Returns:
-            The planned segments: the cues with their transactions and parks.
-        """
-        logger.debug("Starting plan rendering...")
-        return self._render_physical()
-
     def fingerprint(self) -> str:
         """Functional identity of this render; the output path is not part of it.
 
         Hashes the renderer and encoder revisions, the musical phase map built from the
         detected grid, any render locks and, for each section that renders a preset
-        other than the one it names (`_physical_preset`: the effective variant, or
+        other than the one it names (`_section_preset`: the effective variant, or
         none), the preset it renders, and its dark spans as snapped, when there are any.
         """
         substitutions: list[tuple[str, str | None]] = []
         for section in self.iterate_plan_sections(self.choreography_plan):
             if not section.template_id:
                 continue
-            preset = _physical_preset(
-                section, get_template(section.template_id), [], self.admission
-            )
+            preset = _section_preset(section, get_template(section.template_id), [], self.admission)
             rendered = None if preset is None else preset.preset_id
             if rendered != (section.preset_id or None):
                 substitutions.append((section.section_name, rendered))
@@ -1577,8 +1565,8 @@ class RenderingPipeline:
             fixtures=self.fixture_group,
             templates=self._plan_templates(),
             policy=self.job_config.moving_heads,
-            backend_id=LEGACY_BACKEND_ID,
-            renderer_revision=f"physical_v2.{PHYSICAL_RENDERER_REVISION}+encoder.{ENCODER_VERSION}",
+            backend_id=BACKEND_ID,
+            renderer_revision=f"renderer.{RENDERER_REVISION}+encoder.{ENCODER_VERSION}",
             phase_map=build_musical_phase_map(self.beat_grid),
             locks=self.locks,
             preset_substitutions=substitutions,
@@ -1586,7 +1574,7 @@ class RenderingPipeline:
         )
 
     def checkpoint_record(self, *, live_layout: bool = False) -> dict[str, Any]:
-        """What `twinklr eval-report` re-renders this physical render from, and what names
+        """What `twinklr eval-report` re-renders this render from, and what names
         the input that differs when its re-render is another render; written under the
         plan checkpoint's `render` key (`record_render`), for every command's render.
 
@@ -1640,11 +1628,12 @@ class RenderingPipeline:
             inputs["dark_spans"] = record["dark_spans"]
         return checkpoint
 
-    def _render_physical(self) -> list[FixtureSegment]:
-        """Render on the frame grid and, with an output path, deliver it.
+    def render(self) -> list[FixtureSegment]:
+        """Render the choreography plan on the frame grid and, with an output path,
+        deliver it.
 
         Each section's template compiles on the frame grid against the musical phase
-        of the detected grid, within its covered span (`physical_cue_limits`); the
+        of the detected grid, within its covered span (`cue_limits`); the
         transaction pass authors every fixture of the rig over the whole sequence,
         holding it dark outside every cue and so outside the covered span; each
         fixture's complete frames are encoded in rig order and merged into constant DMX
@@ -1657,15 +1646,16 @@ class RenderingPipeline:
             The planned segments: the cues with their transactions and parks.
 
         Raises:
-            PhysicalRenderError: If the transaction pass reports an error.
-            PhysicalCompileError, PhysicalChannelError, PhysicalOutputError,
-                ValueError: For a step, value, model or output the path refuses.
+            RenderRefusedError: If the transaction pass reports an error.
+            CompileError, PhysicalChannelError, OutputError,
+                ValueError: For a step, value, model or output the renderer refuses.
         """
+        logger.debug("Starting plan rendering...")
         policy = self.job_config.moving_heads
         topology = rig_topology(self.fixture_group)
         phase_map = build_musical_phase_map(self.beat_grid)
         duration_ms = int(self.beat_grid.duration_ms)
-        start_limit, end_limit = physical_cue_limits(phase_map, duration_ms)
+        start_limit, end_limit = cue_limits(phase_map, duration_ms)
         times = frame_times(duration_ms)
         fixtures = self.fixture_group.expand_fixtures()
         profiles = {}
@@ -1675,10 +1665,10 @@ class RenderingPipeline:
             profiles[fixture.fixture_id] = profile
         targets = {fixture.fixture_id: fixture.xlights_model_name for fixture in fixtures}
         if self.layout_models is not None:
-            check_physical_models(fixtures, self.layout_models)
+            check_models(fixtures, self.layout_models)
         else:
             logger.warning(
-                "physical_v2: the xLights model check was not performed (no layout given); "
+                "moving heads: the xLights model check was not performed (no layout given); "
                 "each fixture's model must be a single-color DMX model of at least its "
                 "profile's footprint, which nothing has verified"
             )
@@ -1702,7 +1692,7 @@ class RenderingPipeline:
                 template_doc = get_template(section.template_id)
             except Exception as e:
                 raise ValueError(f"Template not found: {section.template_id}") from e
-            preset = _physical_preset(section, template_doc, diagnostics, self.admission)
+            preset = _section_preset(section, template_doc, diagnostics, self.admission)
             context = TemplateCompileContext(
                 section_id=section.section_name,
                 template_id=template_doc.template.template_id,
@@ -1727,15 +1717,15 @@ class RenderingPipeline:
                         severity="warning",
                         message=(
                             f"section {section.section_name!r}: planner intent (intensity, "
-                            "color, shutter and gobo events) is not applied by physical_v2 "
-                            "in Phase 1; the template's physical data renders as authored"
+                            "color, shutter and gobo events) is not applied by the renderer "
+                            "in Phase 1; the template renders as authored"
                         ),
                         section_id=section.section_name,
                         action="unchanged",
                     )
                 )
             refused = 0 if unplayable is None else len(unplayable)
-            compiled = compile_physical_template(
+            compiled = compile_template(
                 template_doc.template,
                 context,
                 preset,
@@ -1749,7 +1739,7 @@ class RenderingPipeline:
                 # Only a refusal this placement adds is left dark: one the template shows
                 # from bar 1 over the song, where the gate places it, still raises.
                 basic_checked.add(key)
-                compile_physical_template(
+                compile_template(
                     template_doc.template,
                     context.model_copy(
                         update={
@@ -1803,7 +1793,7 @@ class RenderingPipeline:
             )
             if window_end is not None and window_end >= context.end_ms:
                 logger.warning(
-                    "physical_v2: section %r (%s-%s ms) is shorter than its entry window, "
+                    "moving heads: section %r (%s-%s ms) is shorter than its entry window, "
                     "which ends at %s ms; it renders dark",
                     section.section_name,
                     context.start_ms,
@@ -1812,7 +1802,7 @@ class RenderingPipeline:
                 )
         if dropped:
             logger.warning(
-                "physical_v2: %d cue(s) start outside the frames %s-%s ms that the covered "
+                "moving heads: %d cue(s) start outside the frames %s-%s ms that the covered "
                 "phase span and the song allow and are dropped (held dark); the trace's "
                 "dropped_cues lists them",
                 len(dropped),
@@ -1821,13 +1811,13 @@ class RenderingPipeline:
             )
         if in_window:
             logger.warning(
-                "physical_v2: %d cue(s) lie inside their section's entry window and are "
+                "moving heads: %d cue(s) lie inside their section's entry window and are "
                 "dropped (held dark); the trace's dropped_cues and entry_windows list them",
                 len(in_window),
             )
         if self.dark_spans:
             logger.info(
-                "physical_v2: every fixture is held dark over %d span(s), its cues playing "
+                "moving heads: every fixture is held dark over %d span(s), its cues playing "
                 "on there along their authored paths; the trace's dark_spans lists them",
                 len(self.dark_spans),
             )
@@ -1843,7 +1833,7 @@ class RenderingPipeline:
             on_unplayable=policy.on_unplayable,
         )
         if result.has_errors:
-            raise PhysicalRenderError(result.diagnostics)
+            raise RenderRefusedError(result.diagnostics)
         unplayable = [*(unplayable or ()), *result.unplayable]
         unplayable_totals: dict[str, dict[str, int]] = {}
         for record in unplayable:
@@ -1852,7 +1842,7 @@ class RenderingPipeline:
             total["frames"] += int(record["frames"])
         if unplayable:
             self.unplayable_warning = (
-                f"physical_v2: {len(unplayable)} cue(s) placed where they cannot play honestly "
+                f"moving heads: {len(unplayable)} cue(s) placed where they cannot play honestly "
                 f"are kept dark ({sum(t['frames'] for t in unplayable_totals.values())} "
                 "frame(s); "
                 + ", ".join(
@@ -1872,17 +1862,16 @@ class RenderingPipeline:
                 )
             )
         runs = coalesce_frames(frames)
-        requests = physical_run_requests(runs, result.segments, targets)
+        requests = run_requests(runs, result.segments, targets)
 
         self.frames = tuple(frames)
         self.runs = runs
         self.requests = requests
         self.render_record = {
-            "renderer": "physical_v2",
             "render_fingerprint": self.fingerprint(),
-            "renderer_revision": PHYSICAL_RENDERER_REVISION,
+            "renderer_revision": RENDERER_REVISION,
             "encoder_version": ENCODER_VERSION,
-            "backend_id": LEGACY_BACKEND_ID,
+            "backend_id": BACKEND_ID,
             "policy": policy.model_dump(mode="json"),
             "initial_states": {
                 fixture_id: state.model_dump(mode="json")
@@ -1999,7 +1988,7 @@ class RenderingPipeline:
             # step's declared alternative; left out when none was, like the exclusions.
             self.render_record["omitted_optional"] = omitted
         if self.output_path:
-            xsq = build_physical_sequence(
+            xsq = build_sequence(
                 requests,
                 time_markers,
                 media_file=self.media_file,
@@ -2008,7 +1997,7 @@ class RenderingPipeline:
                 artist=self.artist,
                 timeline_tracks=self.timeline_tracks,
             )
-            self.artifacts = export_physical_delivery(
+            self.artifacts = export_delivery(
                 xsq, runs, output_path=self.output_path, policy=policy, render=self.render_record
             )
             self.sequence = xsq

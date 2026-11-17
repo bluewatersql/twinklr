@@ -7,7 +7,7 @@ from typing import Any
 from pydantic import ValidationError
 import pytest
 
-from tests.support.mh_physical import profile_payload, unprofiled_rig
+from tests.support.moving_heads import profile_payload, unprofiled_rig
 from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import (

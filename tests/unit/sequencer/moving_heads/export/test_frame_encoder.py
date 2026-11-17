@@ -1,6 +1,6 @@
-"""Frame-accurate byte encoding for the physical moving-head path (P1.3).
+"""Frame-accurate byte encoding for the moving-head renderer (P1.3).
 
-Physical segments are sampled at every 20 ms frame start, composed into the complete
+Segments are sampled at every 20 ms frame start, composed into the complete
 declared channel footprint, encoded to coarse/fine bytes without carry artifacts,
 run-length merged only when every byte is identical, and serialized as constant DMX
 effects. Output budgets fail; they never drop frames.
@@ -18,7 +18,7 @@ from pydantic import ValidationError
 import pytest
 
 from scripts.validation._core.mh_xsq_validation import parse_dmx_settings
-from tests.support.mh_physical import physical_segment, profile_payload
+from tests.support.moving_heads import fixture_segment, profile_payload
 from twinklr.core.config.fixtures.capabilities import FixtureCapabilities
 from twinklr.core.config.models import MHRenderPolicy
 from twinklr.core.formats.xlights.sequence.emission import EmissionSession
@@ -39,7 +39,7 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     CueTiming,
     EncodedFixtureFrame,
     FrameRun,
-    PhysicalOutputError,
+    OutputError,
     check_output_budget,
     coalesce_frames,
     encode_fixture_frames,
@@ -48,7 +48,7 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     quantize_cue,
     quantized_cues,
 )
-from twinklr.core.sequencer.moving_heads.export.xsq_adapter import physical_run_requests
+from twinklr.core.sequencer.moving_heads.export.xsq_adapter import run_requests
 
 PAN = ChannelName.PAN
 TILT = ChannelName.TILT
@@ -108,7 +108,7 @@ def test_coarse_fine_pairs_reconstruct_word_and_inverted_complement(
     word: int, inverted: bool
 ) -> None:
     capabilities = _word_axis_profile(inverted=inverted)
-    segment = physical_segment({PAN: _hold(float(word))}, t0_ms=0, t1_ms=20)
+    segment = fixture_segment({PAN: _hold(float(word))}, t0_ms=0, t1_ms=20)
 
     (frame,) = encode_fixture_frames([segment], capabilities, frame_times_ms=(0,))
 
@@ -121,7 +121,7 @@ def test_coarse_fine_pairs_reconstruct_word_and_inverted_complement(
 def test_sweep_across_coarse_carry_has_no_intermediate_glitch() -> None:
     """Each frame carries its own complete coarse/fine pair; no carry is interpolated."""
     capabilities = _word_axis_profile()
-    segment = physical_segment({PAN: _linear((0, 250.0), (240, 262.0))}, t0_ms=0, t1_ms=240)
+    segment = fixture_segment({PAN: _linear((0, 250.0), (240, 262.0))}, t0_ms=0, t1_ms=240)
 
     frames = encode_fixture_frames([segment], capabilities, frame_times_ms=_grid(240))
 
@@ -133,7 +133,7 @@ def test_calibrated_sweep_is_monotonic_and_matches_the_profile_mapping() -> None
     capabilities = _profile()
     pan = capabilities.axes["pan"]
     # About 0.03 degrees per frame crosses several coarse carries in 1 s.
-    segment = physical_segment({PAN: _linear((0, -1.0), (1000, 0.5))}, t0_ms=0, t1_ms=1000)
+    segment = fixture_segment({PAN: _linear((0, -1.0), (1000, 0.5))}, t0_ms=0, t1_ms=1000)
 
     frames = encode_fixture_frames([segment], capabilities, frame_times_ms=_grid(1000))
 
@@ -147,7 +147,7 @@ def test_calibrated_sweep_is_monotonic_and_matches_the_profile_mapping() -> None
 
 def test_sampled_value_stays_exact_through_the_word_mapping() -> None:
     """At 20 ms the exact scaled word is 2.5, a tie that rounds up; a float rounds it down."""
-    segment = physical_segment({PAN: _linear((0, -270.0), (4369, -265.5))}, t0_ms=0, t1_ms=40)
+    segment = fixture_segment({PAN: _linear((0, -270.0), (4369, -265.5))}, t0_ms=0, t1_ms=40)
 
     frames = encode_fixture_frames([segment], _profile(), frame_times_ms=(0, 20))
 
@@ -155,7 +155,7 @@ def test_sampled_value_stays_exact_through_the_word_mapping() -> None:
 
 
 def test_downward_sweep_across_coarse_carry_has_no_intermediate_glitch() -> None:
-    segment = physical_segment({PAN: _linear((0, 262.0), (240, 250.0))}, t0_ms=0, t1_ms=240)
+    segment = fixture_segment({PAN: _linear((0, 262.0), (240, 250.0))}, t0_ms=0, t1_ms=240)
 
     frames = encode_fixture_frames([segment], _word_axis_profile(), frame_times_ms=_grid(240))
 
@@ -163,7 +163,7 @@ def test_downward_sweep_across_coarse_carry_has_no_intermediate_glitch() -> None
 
 
 def test_inverted_sweep_across_coarse_carry_has_no_intermediate_glitch() -> None:
-    segment = physical_segment({PAN: _linear((0, 250.0), (240, 262.0))}, t0_ms=0, t1_ms=240)
+    segment = fixture_segment({PAN: _linear((0, 250.0), (240, 262.0))}, t0_ms=0, t1_ms=240)
 
     frames = encode_fixture_frames(
         [segment], _word_axis_profile(inverted=True), frame_times_ms=_grid(240)
@@ -182,7 +182,7 @@ def test_eight_bit_endpoints_and_midpoint(level: float, direct: int, inverted: i
     for is_inverted, expected in ((False, direct), (True, inverted)):
         payload = profile_payload()
         payload["axes"]["dimmer"]["inverted"] = is_inverted
-        segment = physical_segment({DIMMER: _hold(level, unit="normalized")}, t0_ms=0, t1_ms=20)
+        segment = fixture_segment({DIMMER: _hold(level, unit="normalized")}, t0_ms=0, t1_ms=20)
 
         (frame,) = encode_fixture_frames([segment], _profile(payload), frame_times_ms=(0,))
 
@@ -192,7 +192,7 @@ def test_eight_bit_endpoints_and_midpoint(level: float, direct: int, inverted: i
 def test_eight_bit_pan_has_no_fine_byte() -> None:
     payload = profile_payload()
     payload["axes"]["pan"]["fine_offset"] = None
-    segment = physical_segment({PAN: _hold(270.0)}, t0_ms=0, t1_ms=20)
+    segment = fixture_segment({PAN: _hold(270.0)}, t0_ms=0, t1_ms=20)
 
     (frame,) = encode_fixture_frames([segment], _profile(payload), frame_times_ms=(0,))
 
@@ -205,7 +205,7 @@ def test_eight_bit_pan_has_no_fine_byte() -> None:
 
 def test_absent_authored_channels_receive_declared_defaults() -> None:
     capabilities = _profile()
-    segment = physical_segment({PAN: _hold(0.0)}, t0_ms=20, t1_ms=40)
+    segment = fixture_segment({PAN: _hold(0.0)}, t0_ms=20, t1_ms=40)
 
     frames = encode_fixture_frames([segment], capabilities, frame_times_ms=(0, 20, 40))
 
@@ -228,23 +228,23 @@ def test_unlisted_default_is_filled_and_the_encoder_refuses_an_incomplete_profil
     assert _profile(payload).defaults[8] == 0
 
     incomplete = _profile().model_copy(update={"defaults": dict.fromkeys(range(1, 8), 0)})
-    segment = physical_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=20)
+    segment = fixture_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=20)
     with pytest.raises(ValueError, match=r"no default byte for offsets \[8\]"):
         encode_fixture_frames([segment], incomplete, frame_times_ms=(0,))
 
 
 def test_footprint_beyond_the_backend_is_a_typed_error() -> None:
     oversized = _profile().model_copy(update={"footprint": 49})
-    segment = physical_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=20)
+    segment = fixture_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=20)
 
-    with pytest.raises(PhysicalOutputError) as excinfo:
+    with pytest.raises(OutputError) as excinfo:
         encode_fixture_frames([segment], oversized, frame_times_ms=(0,))
 
     assert excinfo.value.diagnostic.code == "unsupported_backend_channel"
 
 
 def test_discrete_states_emit_their_declared_bytes() -> None:
-    segment = physical_segment(
+    segment = fixture_segment(
         {SHUTTER: _states((0, "closed"), (40, "open")), COLOR: _states((0, "red"))},
         t0_ms=0,
         t1_ms=80,
@@ -257,8 +257,8 @@ def test_discrete_states_emit_their_declared_bytes() -> None:
 
 
 def test_segments_for_different_channels_compose_into_one_frame() -> None:
-    pan = physical_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=40, segment_id="pan")
-    shutter = physical_segment({SHUTTER: _states((0, "open"))}, t0_ms=0, t1_ms=40, segment_id="s")
+    pan = fixture_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=40, segment_id="pan")
+    shutter = fixture_segment({SHUTTER: _states((0, "open"))}, t0_ms=0, t1_ms=40, segment_id="s")
 
     frames = encode_fixture_frames([pan, shutter], _profile(), frame_times_ms=(0, 20))
 
@@ -271,8 +271,8 @@ def test_segments_for_different_channels_compose_into_one_frame() -> None:
 
 
 def test_equal_priority_overlap_on_one_attribute_fails() -> None:
-    first = physical_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=60, segment_id="a")
-    second = physical_segment({PAN: _hold(10.0, t_ms=40)}, t0_ms=40, t1_ms=100, segment_id="b")
+    first = fixture_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=60, segment_id="a")
+    second = fixture_segment({PAN: _hold(10.0, t_ms=40)}, t0_ms=40, t1_ms=100, segment_id="b")
 
     with pytest.raises(PhysicalChannelError) as excinfo:
         encode_fixture_frames([first, second], _profile(), frame_times_ms=_grid(100))
@@ -282,8 +282,8 @@ def test_equal_priority_overlap_on_one_attribute_fails() -> None:
 
 
 def test_adjacent_half_open_segments_do_not_conflict() -> None:
-    first = physical_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=40, segment_id="a")
-    second = physical_segment({PAN: _hold(10.0, t_ms=40)}, t0_ms=40, t1_ms=80, segment_id="b")
+    first = fixture_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=40, segment_id="a")
+    second = fixture_segment({PAN: _hold(10.0, t_ms=40)}, t0_ms=40, t1_ms=80, segment_id="b")
 
     frames = encode_fixture_frames([first, second], _profile(), frame_times_ms=_grid(80))
 
@@ -302,14 +302,14 @@ def test_adjacent_half_open_segments_do_not_conflict() -> None:
     ],
 )
 def test_unencodable_physical_values_fail(channels: dict[ChannelName, Any], match: str) -> None:
-    segment = physical_segment(channels, t0_ms=0, t1_ms=60)
+    segment = fixture_segment(channels, t0_ms=0, t1_ms=60)
 
     with pytest.raises(PhysicalChannelError, match=match):
         encode_fixture_frames([segment], _profile(), frame_times_ms=_grid(60))
 
 
 def test_frame_times_must_lie_on_the_effect_grid() -> None:
-    segment = physical_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=60)
+    segment = fixture_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=60)
 
     for times in ((0, 30), (20, 0), (0, 0)):
         with pytest.raises(ValueError, match="frame times"):
@@ -317,8 +317,8 @@ def test_frame_times_must_lie_on_the_effect_grid() -> None:
 
 
 def test_segments_must_belong_to_one_fixture() -> None:
-    first = physical_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=20)
-    other = physical_segment({TILT: _hold(0.0)}, t0_ms=0, t1_ms=20, fixture_id="MH2")
+    first = fixture_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=20)
+    other = fixture_segment({TILT: _hold(0.0)}, t0_ms=0, t1_ms=20, fixture_id="MH2")
 
     with pytest.raises(ValueError, match="one fixture"):
         encode_fixture_frames([first, other], _profile(), frame_times_ms=(0,))
@@ -346,7 +346,7 @@ def test_segment_bounds_and_discrete_cues_are_quantized_once() -> None:
         "range_max": 191,
         "value": 160,
     }
-    segment = physical_segment({SHUTTER: _states((5, "open"), (49, "strobe"))}, t0_ms=5, t1_ms=85)
+    segment = fixture_segment({SHUTTER: _states((5, "open"), (49, "strobe"))}, t0_ms=5, t1_ms=85)
 
     frames = encode_fixture_frames([segment], _profile(payload), frame_times_ms=_grid(120))
 
@@ -356,7 +356,7 @@ def test_segment_bounds_and_discrete_cues_are_quantized_once() -> None:
 
 
 def test_quantized_cues_report_requested_and_actual_times() -> None:
-    segment = physical_segment(
+    segment = fixture_segment(
         {SHUTTER: _states((0, "closed"), (45, "open")), COLOR: _states((30, "red"))},
         t0_ms=5,
         t1_ms=100,
@@ -375,14 +375,14 @@ def test_quantized_cues_report_requested_and_actual_times() -> None:
 
 def test_discrete_cue_at_or_past_the_segment_end_fails() -> None:
     """[0, 49) samples frames [0, 40); an open landing on 40 would never emit."""
-    segment = physical_segment({SHUTTER: _states((0, "closed"), (45, "open"))}, t0_ms=0, t1_ms=49)
+    segment = fixture_segment({SHUTTER: _states((0, "closed"), (45, "open"))}, t0_ms=0, t1_ms=49)
 
     with pytest.raises(PhysicalChannelError, match="at or after the segment's end"):
         encode_fixture_frames([segment], _profile(), frame_times_ms=_grid(100))
 
 
 def test_hold_point_past_the_segment_end_fails() -> None:
-    segment = physical_segment(
+    segment = fixture_segment(
         {
             PAN: ContinuousTrajectory.model_validate(
                 {
@@ -401,28 +401,28 @@ def test_hold_point_past_the_segment_end_fails() -> None:
 
 
 def test_segment_outside_every_frame_fails() -> None:
-    segment = physical_segment({PAN: _hold(0.0, t_ms=500)}, t0_ms=500, t1_ms=1000)
+    segment = fixture_segment({PAN: _hold(0.0, t_ms=500)}, t0_ms=500, t1_ms=1000)
 
     with pytest.raises(ValueError, match="samples no frame"):
         encode_fixture_frames([segment], _profile(), frame_times_ms=(0, 20))
 
 
 def test_empty_frame_times_fail() -> None:
-    segment = physical_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=20)
+    segment = fixture_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=20)
 
     with pytest.raises(ValueError, match="frame times"):
         encode_fixture_frames([segment], _profile(), frame_times_ms=())
 
 
 def test_cues_collapsing_onto_one_frame_fail() -> None:
-    segment = physical_segment({SHUTTER: _states((20, "closed"), (25, "open"))}, t0_ms=0, t1_ms=60)
+    segment = fixture_segment({SHUTTER: _states((20, "closed"), (25, "open"))}, t0_ms=0, t1_ms=60)
 
     with pytest.raises(PhysicalChannelError, match="same frame"):
         encode_fixture_frames([segment], _profile(), frame_times_ms=_grid(60))
 
 
 def test_segment_quantized_to_zero_length_fails() -> None:
-    segment = physical_segment({PAN: _hold(0.0, t_ms=0)}, t0_ms=0, t1_ms=5)
+    segment = fixture_segment({PAN: _hold(0.0, t_ms=0)}, t0_ms=0, t1_ms=5)
 
     with pytest.raises(ValueError, match="zero-length"):
         encode_fixture_frames([segment], _profile(), frame_times_ms=_grid(40))
@@ -433,7 +433,7 @@ def test_tail_frames_cover_every_start_below_duration() -> None:
     assert frame_times(1010)[-1] == 1000
     assert frame_times(1) == (0,)
 
-    segment = physical_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=1010)
+    segment = fixture_segment({PAN: _hold(0.0)}, t0_ms=0, t1_ms=1010)
     runs = coalesce_frames(
         encode_fixture_frames([segment], _profile(), frame_times_ms=frame_times(1010))
     )
@@ -495,7 +495,7 @@ def _wide_profile() -> FixtureCapabilities:
 
 
 def test_channels_17_and_48_emit_and_settings_round_trip() -> None:
-    segment = physical_segment(
+    segment = fixture_segment(
         {SHUTTER: _states((0, "open")), COLOR: _states((0, "red")), PAN: _hold(90.0)},
         t0_ms=0,
         t1_ms=20,
@@ -526,7 +526,7 @@ def test_channels_17_and_48_emit_and_settings_round_trip() -> None:
 def test_settings_refuse_an_incomplete_or_unaddressable_frame(
     channels: tuple[tuple[int, int], ...],
 ) -> None:
-    with pytest.raises(PhysicalOutputError) as excinfo:
+    with pytest.raises(OutputError) as excinfo:
         DmxSettingsBuilder.build_frame_settings(_frame(0, *channels))
 
     assert excinfo.value.diagnostic.code == "unsupported_backend_channel"
@@ -542,7 +542,7 @@ def test_settings_refuse_a_value_that_is_not_a_byte() -> None:
 
 def _show_segments() -> list[FixtureSegment]:
     return [
-        physical_segment(
+        fixture_segment(
             {
                 PAN: _linear((0, -10.0), (200, 10.0)),
                 DIMMER: _hold(1.0, unit="normalized"),
@@ -559,8 +559,8 @@ def _show(tmp_path: Path) -> tuple[tuple[EncodedFixtureFrame, ...], tuple[FrameR
     frames = encode_fixture_frames(segments, _profile(), frame_times_ms=frame_times(300))
     runs = coalesce_frames(frames)
     sequence = build_fresh_sequence(media_file="song.mp3", duration_ms=300)
-    EmissionSession(sequence).emit_batch(physical_run_requests(runs, segments, {"MH1": "Dmx MH1"}))
-    path = tmp_path / "physical.xsq"
+    EmissionSession(sequence).emit_batch(run_requests(runs, segments, {"MH1": "Dmx MH1"}))
+    path = tmp_path / "frames.xsq"
     XSQExporter().export(sequence, path)
     return frames, runs, path.read_bytes()
 
@@ -580,9 +580,7 @@ def test_aligned_runs_pass_through_emission_unchanged() -> None:
     )
     sequence = build_fresh_sequence(media_file="song.mp3", duration_ms=300)
 
-    records = EmissionSession(sequence).emit_batch(
-        physical_run_requests(runs, segments, {"MH1": "Dmx MH1"})
-    )
+    records = EmissionSession(sequence).emit_batch(run_requests(runs, segments, {"MH1": "Dmx MH1"}))
 
     assert [(r.start_ms, r.end_ms) for r in records] == [(r.start_ms, r.end_ms) for r in runs]
     assert {r.target for r in records} == {"Dmx MH1"}
@@ -599,11 +597,11 @@ def test_aligned_runs_pass_through_emission_unchanged() -> None:
 
 def test_run_sources_are_every_overlapping_segment_earliest_first() -> None:
     """A long early segment still overlaps late runs; the earliest source represents."""
-    long_dimmer = physical_segment(
+    long_dimmer = fixture_segment(
         {DIMMER: _hold(1.0, unit="normalized")}, t0_ms=0, t1_ms=200, segment_id="z_long"
     )
     pans = [
-        physical_segment(
+        fixture_segment(
             {PAN: _hold(float(i), t_ms=i * 40)},
             t0_ms=i * 40,
             t1_ms=(i + 1) * 40,
@@ -614,7 +612,7 @@ def test_run_sources_are_every_overlapping_segment_earliest_first() -> None:
     segments = [*pans, long_dimmer]
     runs = coalesce_frames(encode_fixture_frames(segments, _profile(), frame_times_ms=_grid(200)))
 
-    requests = physical_run_requests(runs, segments, {"MH1": "Dmx MH1"})
+    requests = run_requests(runs, segments, {"MH1": "Dmx MH1"})
 
     assert [r.start_ms for r in requests] == [0, 40, 80, 120, 160]
     for i, request in enumerate(requests):
@@ -627,11 +625,11 @@ def test_run_sources_are_every_overlapping_segment_earliest_first() -> None:
 def test_misaligned_or_unmapped_run_is_refused() -> None:
     frame = _frame(10, (1, 0))
     with pytest.raises(ValueError, match="frame-aligned"):
-        physical_run_requests([FrameRun(frame=frame, end_ms=30)], [], {"MH1": "Dmx MH1"})
+        run_requests([FrameRun(frame=frame, end_ms=30)], [], {"MH1": "Dmx MH1"})
 
     aligned = FrameRun(frame=_frame(0, (1, 0)), end_ms=20)
     with pytest.raises(ValueError, match="no xLights model"):
-        physical_run_requests([aligned], [], {})
+        run_requests([aligned], [], {})
 
 
 # --- Output budgets ------------------------------------------------------------------
@@ -660,7 +658,7 @@ def test_budget_field_changes_accept_reject(config_path: str, tmp_path: Path) ->
     actual = measure.effect_count if field == "max_effects" else measure.xsq_bytes
 
     check_output_budget(measure, MHRenderPolicy.model_validate({field: actual}))
-    with pytest.raises(PhysicalOutputError) as excinfo:
+    with pytest.raises(OutputError) as excinfo:
         check_output_budget(measure, MHRenderPolicy.model_validate({field: actual - 1}))
 
     assert excinfo.value.diagnostic.code == "output_budget_exceeded"

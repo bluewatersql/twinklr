@@ -1,4 +1,4 @@
-"""Feasible dark reposition transactions between physical moving-head cues.
+"""Feasible dark reposition transactions between moving-head cues.
 
 `plan_prepositions` authors every fixture explicitly over the whole sequence: in the
 span before each cue a transaction commands darkness, waits until the fixture is
@@ -66,7 +66,7 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
     check_physical_value,
 )
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile.physical import shutter_changes
+from twinklr.core.sequencer.moving_heads.compile.step import shutter_changes
 
 FailureMode = Literal["error", "preserve_aim", "drop_accent"]
 UnplayableMode = Literal["dark", "error"]
@@ -133,9 +133,9 @@ def plan_prepositions(
     reveal is reported `open_latency_ms` later.
 
     Args:
-        segments: Every fixture's physical cues, on the frame grid, each authoring the
+        segments: Every fixture's cues, on the frame grid, each authoring the
             pan, tilt and zoom its profile declares, all ending by `sequence_end_ms`.
-        capabilities: Each physical fixture's profile. A fixture without cues parks
+        capabilities: Each fixture's profile. A fixture without cues parks
             dark at its initial state over the whole sequence.
         initial_states: Run-supplied time-zero states; a missing fixture is unknown,
             which fails every fixture that has a profile.
@@ -271,7 +271,7 @@ def worst_case_entry_ms(
     - predecessor motion still under way after its last frame: `residual_ms` when the
       caller followed the actual predecessor (`follow_cues`), else once more latency
       plus settle and one word's travel. That suffices for a predecessor cue the
-      physical compile admits (`follow_lag` finds nothing) entered settled; a wheel
+      template compile admits (`follow_lag` finds nothing) entered settled; a wheel
       change inside a cue is covered only by `residual_ms`.
 
     Returns:

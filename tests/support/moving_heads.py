@@ -1,8 +1,8 @@
-"""Synthetic physical-renderer inputs: a fixture profile, a known initial state,
-physical fixture segments, the P1.6 pipeline case (rig, grid, job, plan and the
+"""Synthetic moving-head renderer inputs: a fixture profile, a known initial state,
+fixture segments, the P1.6 pipeline case (rig, grid, job, plan and the
 test-only template), rig presets with steps that reference them, multi-head rigs
 with a topology, steps on relative paths, visibility envelopes and attribute overlays,
-the physical family catalog with a rig and job for it, and the synthetic 16-channel zoom
+the family catalog with a rig and job for it, and the synthetic 16-channel zoom
 pilot profile with a rig and job for it.
 
 In-memory payloads only; no owner profile or measured data.
@@ -43,7 +43,7 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     frame_times,
 )
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
-    PHYSICAL_TEMPLATE_DIR,
+    TEMPLATE_CATALOG_DIR,
     load_template_document,
     load_templates_from_directory,
 )
@@ -51,7 +51,7 @@ from twinklr.core.sequencer.moving_heads.templates.library import REGISTRY
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 
-def physical_segment(
+def fixture_segment(
     channels: dict[ChannelName, PhysicalValue],
     *,
     t0_ms: int,
@@ -208,43 +208,38 @@ def discrete_profile_payload() -> dict[str, Any]:
 
 
 def discrete_step_payload() -> dict[str, Any]:
-    """A physical step holding its pose with static shutter, color and gobo states."""
+    """A step holding its pose with static shutter, color and gobo states."""
     return {
         "step_id": "look",
         "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 0.5}},
         "movement": {
-            "physical": {
-                "shape": "hold",
-                "mode": "periodic",
-                "start_pan_deg": 0.0,
-                "start_tilt_deg": 0.0,
-            }
+            "shape": "hold",
+            "mode": "periodic",
+            "start_pan_deg": 0.0,
+            "start_tilt_deg": 0.0,
         },
-        "dimmer": {},
-        "physical_shutter_state": "open",
-        "physical_color": "white",
-        "physical_gobo": "open",
+        "shutter_state": "open",
+        "color": "white",
+        "gobo": "open",
     }
 
 
-def physical_step_payload() -> dict[str, Any]:
-    """A physical-only template step: finite linear pan/tilt plus dimmer and shutter pulses."""
+def linear_step_payload() -> dict[str, Any]:
+    """A template step: finite linear pan/tilt plus dimmer and shutter pulses."""
     return {
         "step_id": "main",
         "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 0.5}},
         "movement": {
-            "physical": {
-                "shape": "linear",
-                "mode": "finite",
-                "start_pan_deg": 10.0,
-                "start_tilt_deg": 20.0,
-                "pan_extent_deg": 30.0,
-                "tilt_extent_deg": 10.0,
-                "period_beats": 1.0,
-            }
+            "shape": "linear",
+            "mode": "finite",
+            "start_pan_deg": 10.0,
+            "start_tilt_deg": 20.0,
+            "pan_extent_deg": 30.0,
+            "tilt_extent_deg": 10.0,
+            "period_beats": 1.0,
         },
-        "dimmer": {"physical": {"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0}},
-        "physical_shutter": {
+        "dimmer": {"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0},
+        "shutter": {
             "period_beats": 2.0,
             "duty_cycle": 0.5,
             "low_state": "closed",
@@ -253,12 +248,12 @@ def physical_step_payload() -> dict[str, Any]:
     }
 
 
-TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "moving_heads" / "physical_v2"
-"""Test-only physical templates, loaded by the data loader and never shipped."""
+TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "moving_heads" / "templates"
+"""Test-only templates, loaded by the data loader and never shipped."""
 TEMPLATE_ID = "p1_linear_reveal"
 SUBSET_TEMPLATE_ID = "p1_linear_reveal_right"
 GRID_SHIFT_MS = 15.0
-PHYSICAL_INITIAL_STATE = {
+INITIAL_STATE = {
     "pan_deg": 0.0,
     "tilt_deg": 0.0,
     "dimmer": 0.0,
@@ -269,7 +264,7 @@ PHYSICAL_INITIAL_STATE = {
 
 
 @contextmanager
-def physical_test_templates() -> Iterator[None]:
+def p1_templates() -> Iterator[None]:
     """Register the test template (and a variant targeting only RIGHT) for one test.
 
     They are never admitted to the production catalog: the process-wide registry,
@@ -298,21 +293,21 @@ FAMILY_IDS = (
     "mirror_wings",
     "target_orbit",
 )
-"""The physical families a zoomless rig can be offered (P2.4c), sorted."""
+"""The families a zoomless rig can be offered (P2.4c), sorted."""
 ZOOM_FAMILY_ID = "zoom_wave"
 """The zoom pilot family (P2.5), left out on a rig without a zoom axis."""
 CATALOG_IDS = tuple(sorted((*FAMILY_IDS, ZOOM_FAMILY_ID)))
-"""The whole physical family catalog (`PHYSICAL_TEMPLATE_DIR`), sorted."""
+"""The whole family catalog (`TEMPLATE_CATALOG_DIR`), sorted."""
 
 
 @contextmanager
-def physical_catalog(*, admit: bool = True) -> Iterator[list[str]]:
-    """Admit the physical family catalog to the shared registry for one test (with
+def family_catalog(*, admit: bool = True) -> Iterator[list[str]]:
+    """Admit the family catalog to the shared registry for one test (with
     `admit=False`, leave that to the code under test) and restore the registry on exit:
     every template registered inside the block is removed again."""
     before = {info.template_id for info in REGISTRY.list_all()}
     try:
-        yield load_templates_from_directory(PHYSICAL_TEMPLATE_DIR) if admit else []
+        yield load_templates_from_directory(TEMPLATE_CATALOG_DIR) if admit else []
     finally:
         for info in REGISTRY.list_all():
             if info.template_id not in before:
@@ -421,12 +416,12 @@ def minimal_family_rig(fixture_ids: Sequence[str]) -> FixtureGroup:
 
 
 def family_job(fixture_ids: Sequence[str], **policy: Any) -> JobConfig:
-    """`physical_job` with every head of `fixture_ids` in the known dark initial state."""
-    return physical_job(initial_states=dict.fromkeys(fixture_ids, PHYSICAL_INITIAL_STATE), **policy)
+    """`p1_job` with every head of `fixture_ids` in the known dark initial state."""
+    return p1_job(initial_states=dict.fromkeys(fixture_ids, INITIAL_STATE), **policy)
 
 
-ZOOM_INITIAL_STATE = {**PHYSICAL_INITIAL_STATE, "zoom_deg": 10.0}
-"""`PHYSICAL_INITIAL_STATE` with the zoom at its narrowest, for a rig with a zoom axis."""
+ZOOM_INITIAL_STATE = {**INITIAL_STATE, "zoom_deg": 10.0}
+"""`INITIAL_STATE` with the zoom at its narrowest, for a rig with a zoom axis."""
 
 
 def zoom_pilot_profile_payload(*, inverted: bool = False) -> dict[str, Any]:
@@ -473,11 +468,11 @@ def zoom_rig(fixture_ids: Sequence[str], *, topology: bool = True) -> FixtureGro
 
 
 def zoom_job(fixture_ids: Sequence[str], **policy: Any) -> JobConfig:
-    """`physical_job` with every head of `fixture_ids` in `ZOOM_INITIAL_STATE`."""
-    return physical_job(initial_states=dict.fromkeys(fixture_ids, ZOOM_INITIAL_STATE), **policy)
+    """`p1_job` with every head of `fixture_ids` in `ZOOM_INITIAL_STATE`."""
+    return p1_job(initial_states=dict.fromkeys(fixture_ids, ZOOM_INITIAL_STATE), **policy)
 
 
-def physical_grid() -> BeatGrid:
+def p1_grid() -> BeatGrid:
     """P0's variable-tempo grid (500 ms beats in bar 1, then 400 ms in bar 2), moved off
     the frame grid."""
     tempo = [0.0, 500.0, 1000.0, 1500.0, 2000.0, 2400.0, 2800.0, 3200.0, 3600.0]
@@ -493,12 +488,10 @@ def physical_grid() -> BeatGrid:
     )
 
 
-def physical_edge_grid(
-    *, lead_in_ms: float, tail_ms: float, grid: BeatGrid | None = None
-) -> BeatGrid:
-    """`grid` (default `physical_grid()`) with silent song edges: its beats and bars move
+def edge_grid(*, lead_in_ms: float, tail_ms: float, grid: BeatGrid | None = None) -> BeatGrid:
+    """`grid` (default `p1_grid()`) with silent song edges: its beats and bars move
     `lead_in_ms` later and the song ends `tail_ms` after its last beat."""
-    grid = grid or physical_grid()
+    grid = grid or p1_grid()
     beats = [beat + lead_in_ms for beat in grid.beat_boundaries]
     return grid.model_copy(
         update={
@@ -511,7 +504,7 @@ def physical_edge_grid(
     )
 
 
-def physical_bars_grid(*beat_ms: float) -> BeatGrid:
+def bars_grid(*beat_ms: float) -> BeatGrid:
     """A 4/4 grid moved `GRID_SHIFT_MS` off the frame grid, whose nth bar has four beats of
     `beat_ms[n]`; the song ends `GRID_SHIFT_MS` after its last beat."""
     beats = [GRID_SHIFT_MS]
@@ -537,20 +530,18 @@ def hold_step(
     duration: float = 1.0,
     **fields: Any,
 ) -> dict[str, Any]:
-    """A lit physical step holding one aim over `duration` bars from `start` bars."""
+    """A lit step holding one aim over `duration` bars from `start` bars."""
     return {
         "step_id": step_id,
         "timing": {"base_timing": {"start_offset_bars": start, "duration_bars": duration}},
         "movement": {
-            "physical": {
-                "shape": "hold",
-                "mode": "periodic",
-                "start_pan_deg": pan,
-                "start_tilt_deg": tilt,
-            }
+            "shape": "hold",
+            "mode": "periodic",
+            "start_pan_deg": pan,
+            "start_tilt_deg": tilt,
         },
-        "dimmer": {"physical": {"period_beats": 4.0, "duty_cycle": 1.0, "low": 0.0, "high": 1.0}},
-        "physical_shutter_state": "open",
+        "dimmer": {"period_beats": 4.0, "duty_cycle": 1.0, "low": 0.0, "high": 1.0},
+        "shutter_state": "open",
         **fields,
     }
 
@@ -560,7 +551,7 @@ def sweep_step(
 ) -> dict[str, Any]:
     """`hold_step` whose pan moves linearly by `extent` over `period_beats`, then holds."""
     step = hold_step(step_id, pan, **fields)
-    step["movement"]["physical"].update(
+    step["movement"].update(
         shape="linear", mode="finite", pan_extent_deg=extent, period_beats=period_beats
     )
     return step
@@ -585,7 +576,7 @@ def path_step(
     step = hold_step(step_id, pan, tilt=tilt, **fields)
     if tilt_extent is None:
         tilt_extent = 0.0 if shape == "sweep" else 10.0
-    step["movement"]["physical"].update(
+    step["movement"].update(
         shape=shape,
         mode=mode,
         pan_extent_deg=pan_extent,
@@ -593,7 +584,7 @@ def path_step(
         period_beats=period_beats,
     )
     if transform is not None:
-        step["movement"]["physical"]["transform"] = transform
+        step["movement"]["transform"] = transform
     return step
 
 
@@ -612,8 +603,8 @@ def envelope_step(
     """`sine_step` lit only over the movement phases `lit` by a visibility envelope, which
     replaces its dimmer; the shutter holds `open`."""
     step = sine_step(step_id, pan, extent, period_beats=period_beats, **fields)
-    step["dimmer"] = {}
-    step["physical_visibility"] = {
+    step.pop("dimmer", None)
+    step["visibility"] = {
         "visible_phase_start": lit[0],
         "visible_phase_end": lit[1],
         "attack_beats": attack,
@@ -639,7 +630,7 @@ def overlay(
     return payload
 
 
-def physical_template_doc(
+def loop_template_doc(
     template_id: str,
     steps: Sequence[dict[str, Any]],
     *,
@@ -648,7 +639,7 @@ def physical_template_doc(
     remainder_policy: str = "HOLD_LAST_POSE",
     overlays: Sequence[dict[str, Any]] = (),
 ) -> TemplateDoc:
-    """A physical template looping every step once per `cycle_bars` (JOINER by default),
+    """A template looping every step once per `cycle_bars` (JOINER by default),
     with optional attribute `overlays`."""
     template: dict[str, Any] = {
         "template_id": template_id,
@@ -663,14 +654,14 @@ def physical_template_doc(
         },
         "steps": list(steps),
         "metadata": {
-            "tags": ["test_only", "physical_v2"],
+            "tags": ["test_only"],
             "recommended_sections": ["verse"],
             "energy_range": [0, 100],
-            "description": "Test-only physical template, never in the catalog.",
+            "description": "Test-only template, never in the catalog.",
         },
     }
     if overlays:
-        template["physical_overlays"] = list(overlays)
+        template["overlays"] = list(overlays)
     return TemplateDoc.model_validate({"template": template})
 
 
@@ -688,7 +679,7 @@ def registered_templates(*documents: TemplateDoc) -> Iterator[None]:
             REGISTRY._remove_registration(template_id)
 
 
-def physical_sections(*sections: tuple[str, int, int]) -> ChoreographyPlan:
+def sections_plan(*sections: tuple[str, int, int]) -> ChoreographyPlan:
     """A plan of `(template_id, start_bar, end_bar)` sections, no planner intent."""
     return ChoreographyPlan(
         sections=[
@@ -716,7 +707,7 @@ def physical_head_profile(*, inverted: bool, pan_max: float = 270.0) -> dict[str
 
 
 def _fine_carry_rig() -> FixtureGroup:
-    """P0's two-head rig, pan 11, tilt 13, dimmer 15; `physical_rig` gives each head its
+    """P0's two-head rig, pan 11, tilt 13, dimmer 15; `p1_rig` gives each head its
     16-bit profile."""
     group = FixtureGroup(group_id="MOVING_HEADS", xlights_group="GROUP - MOVING HEADS")
     for fixture_id in ("MH1", "MH2"):
@@ -752,7 +743,7 @@ def unprofiled_rig(fixture_count: int = 4) -> FixtureGroup:
     return group
 
 
-def physical_rig(*, mh1_pan_max: float = 270.0) -> FixtureGroup:
+def p1_rig(*, mh1_pan_max: float = 270.0) -> FixtureGroup:
     """P0's two-head 16-bit rig with a synthetic physical profile per head."""
     payload = _fine_carry_rig().model_dump(mode="python")
     for fixture in payload["fixtures"]:
@@ -764,7 +755,7 @@ def physical_rig(*, mh1_pan_max: float = 270.0) -> FixtureGroup:
 
 
 def preset_library_payload() -> dict[str, Any]:
-    """Rig presets for `physical_rig`'s two heads, in its profile's state names.
+    """Rig presets for `p1_rig`'s two heads, in its profile's state names.
 
     `front` and `wash` declare MH1 only and fall back to `home` and `wash_all` for MH2;
     `side` and `cool` declare both heads.
@@ -806,9 +797,9 @@ def preset_library_payload() -> dict[str, Any]:
     }
 
 
-def physical_preset_rig(presets: dict[str, Any] | None = None) -> FixtureGroup:
-    """`physical_rig` carrying `presets` (default `preset_library_payload()`)."""
-    payload = physical_rig().model_dump(mode="python")
+def preset_rig(presets: dict[str, Any] | None = None) -> FixtureGroup:
+    """`p1_rig` carrying `presets` (default `preset_library_payload()`)."""
+    payload = p1_rig().model_dump(mode="python")
     payload["presets"] = preset_library_payload() if presets is None else presets
     return FixtureGroup.model_validate(payload)
 
@@ -822,12 +813,11 @@ def referencing_step(
     duration: float = 1.0,
     **fields: Any,
 ) -> dict[str, Any]:
-    """A physical hold step whose aim and held states come from rig presets alone."""
+    """A hold step whose aim and held states come from rig presets alone."""
     return {
         "step_id": step_id,
         "timing": {"base_timing": {"start_offset_bars": start, "duration_bars": duration}},
-        "movement": {"physical": {"shape": "hold", "mode": "periodic"}},
-        "dimmer": {},
+        "movement": {"shape": "hold", "mode": "periodic"},
         "component_refs": {
             "position_id": position_id,
             "attribute_preset_ids": list(attribute_preset_ids),
@@ -861,9 +851,9 @@ def topology_rig(
     position_indexes: Sequence[int] | None = None,
     presets: dict[str, Any] | None = None,
 ) -> FixtureGroup:
-    """A rig of `fixture_ids` heads, each `physical_rig`'s MH1 (one non-inverted profile),
+    """A rig of `fixture_ids` heads, each `p1_rig`'s MH1 (one non-inverted profile),
     with an optional declared `topology`, `position.position_index` per head and presets."""
-    payload = physical_rig().model_dump(mode="python")
+    payload = p1_rig().model_dump(mode="python")
     head = payload["fixtures"][0]
     fixtures = []
     for index, fixture_id in enumerate(fixture_ids):
@@ -891,29 +881,29 @@ def sine_step(
     **fields: Any,
 ) -> dict[str, Any]:
     """`hold_step` whose pan swings `extent * sin(2*pi*phase)` over `period_beats`, with
-    an optional `physical_distribution`."""
+    an optional `distribution`."""
     step = hold_step(step_id, pan, **fields)
-    step["movement"]["physical"].update(
+    step["movement"].update(
         shape="sine_pan", mode="periodic", pan_extent_deg=extent, period_beats=period_beats
     )
     if distribution:
-        step["physical_distribution"] = list(distribution)
+        step["distribution"] = list(distribution)
     return step
 
 
-def physical_job(**policy: Any) -> JobConfig:
+def p1_job(**policy: Any) -> JobConfig:
     """A job with both heads' known dark initial state."""
     return JobConfig.model_validate(
         {
             "moving_heads": {
-                "initial_states": {"MH1": PHYSICAL_INITIAL_STATE, "MH2": PHYSICAL_INITIAL_STATE},
+                "initial_states": {"MH1": INITIAL_STATE, "MH2": INITIAL_STATE},
                 **policy,
             },
         }
     )
 
 
-def physical_plan(template_id: str = TEMPLATE_ID) -> ChoreographyPlan:
+def p1_plan(template_id: str = TEMPLATE_ID) -> ChoreographyPlan:
     """One two-bar section, no planner intent, naming `template_id`."""
     return ChoreographyPlan(
         sections=[
@@ -930,8 +920,8 @@ def physical_plan(template_id: str = TEMPLATE_ID) -> ChoreographyPlan:
     )
 
 
-def physical_layout_xml(models: dict[str, dict[str, str]] | None = None) -> str:
-    """A synthetic `xlights_rgbeffects.xml` with the physical rig's two DMX models.
+def p1_layout_xml(models: dict[str, dict[str, str]] | None = None) -> str:
+    """A synthetic `xlights_rgbeffects.xml` with the P1 rig's two DMX models.
 
     Each model carries the attributes xLights 2026.19 writes for an 18-channel DMX
     moving head (`DmxChannelCount`, no `parm1`) unless `models` overrides them (an

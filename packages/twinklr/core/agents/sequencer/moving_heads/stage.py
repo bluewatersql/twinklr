@@ -58,7 +58,7 @@ class MovingHeadStage:
 
     State consumed:
         - "template_admission": the render preflight's `TemplateAdmission`, when a
-          physical run has one; the planner is then offered its admitted templates
+          run has one; the planner is then offered its admitted templates
           instead of `available_templates`
 
     State stored:
@@ -198,7 +198,7 @@ class MovingHeadStage:
                 groups=self.fixture_groups,
             )
 
-            # A physical run offers only what the render preflight admitted on this rig.
+            # A run offers only what the render preflight admitted on this rig.
             admission = context.get_state("template_admission")
             offered = (
                 list(admission.admitted)

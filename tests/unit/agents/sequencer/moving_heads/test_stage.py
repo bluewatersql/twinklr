@@ -131,7 +131,7 @@ def _section(name: str, start: int, end: int, template_id: str = "t") -> PlanSec
 
 
 def test_regenerate_with_a_base_plan_replaces_only_the_named_section_in_place() -> None:
-    """A physical regeneration renders the whole song: the stage returns the plan of the
+    """A regeneration renders the whole song: the stage returns the plan of the
     effects already injected (the base) with the re-planned section in its place."""
     base = ChoreographyPlan(
         sections=[_section("intro", 1, 8), _section("chorus_1", 9, 16), _section("outro", 21, 24)],
@@ -467,7 +467,7 @@ class TestMovingHeadStageExecute:
         assert planning_context.beat_grid is shared_grid
 
     @pytest.mark.asyncio
-    async def test_execute_offers_only_the_templates_the_physical_gate_admitted(
+    async def test_execute_offers_only_the_templates_the_gate_admitted(
         self, stage: MovingHeadStage, mock_context: MagicMock, valid_input: dict
     ) -> None:
         """A template the render preflight left out of the offer is neither offered nor

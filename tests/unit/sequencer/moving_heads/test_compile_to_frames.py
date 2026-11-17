@@ -1,11 +1,11 @@
-"""Physical steps from off-grid musical bounds through compile, preposition, frame
+"""Steps from off-grid musical bounds through compile, preposition, frame
 encoding and emission."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
     assert_honest_transactions,
     discrete_profile_payload,
     discrete_step_payload,
@@ -16,15 +16,15 @@ from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import ContinuousTrajectory
 from twinklr.core.sequencer.models.template import TemplateStep
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile.physical import compile_physical_step
 from twinklr.core.sequencer.moving_heads.compile.preposition import plan_prepositions
+from twinklr.core.sequencer.moving_heads.compile.step import compile_step
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     coalesce_frames,
     encode_fixture_frames,
     frame_times,
     quantize_cue,
 )
-from twinklr.core.sequencer.moving_heads.export.xsq_adapter import physical_run_requests
+from twinklr.core.sequencer.moving_heads.export.xsq_adapter import run_requests
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map, musical_phase_at
 
@@ -49,7 +49,7 @@ def _context(
     return StepCompileContext(
         section_id=section_id,
         segment_id=section_id,
-        template_id="physical_probe",
+        template_id="step_probe",
         fixture_id="MH1",
         role="OUTER_LEFT",
         start_ms=t0,
@@ -73,24 +73,20 @@ def test_off_grid_step_compiles_encodes_and_emits_on_the_frame_grid() -> None:
         {
             **discrete_step_payload(),
             "movement": {
-                "physical": {
-                    "shape": "linear",
-                    "mode": "finite",
-                    "start_pan_deg": 0.0,
-                    "start_tilt_deg": 0.0,
-                    "pan_extent_deg": _PAN_EXTENT,
-                    "period_beats": _PERIOD_BEATS,
-                }
+                "shape": "linear",
+                "mode": "finite",
+                "start_pan_deg": 0.0,
+                "start_tilt_deg": 0.0,
+                "pan_extent_deg": _PAN_EXTENT,
+                "period_beats": _PERIOD_BEATS,
             },
-            "dimmer": {
-                "physical": {"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0}
-            },
-            "physical_shutter_state": "open",
-            "physical_color": "red",
-            "physical_gobo": None,
+            "dimmer": {"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0},
+            "shutter_state": "open",
+            "color": "red",
+            "gobo": None,
         }
     )
-    segment = compile_physical_step(step, context, sample_times_ms=tuple(range(t0, t1, 20)))
+    segment = compile_step(step, context, sample_times_ms=tuple(range(t0, t1, 20)))
 
     def kernel_pan(time_ms: int) -> float:
         phase = musical_phase_at(phase_map, time_ms, origin_ms=t0, period_beats=_PERIOD_BEATS)
@@ -103,7 +99,7 @@ def test_off_grid_step_compiles_encodes_and_emits_on_the_frame_grid() -> None:
     times = frame_times(2200)
     frames = encode_fixture_frames([segment], profile, frame_times_ms=times)
     runs = coalesce_frames(frames)
-    requests = physical_run_requests(runs, [segment], {"MH1": "Head 1"})
+    requests = run_requests(runs, [segment], {"MH1": "Head 1"})
 
     assert len(requests) == len(runs)
     assert all(request.effect == "DMX" for request in requests)
@@ -149,18 +145,14 @@ def test_two_cues_compile_preposition_and_encode_dark_between_them() -> None:
         step: dict[str, Any] = {
             **discrete_step_payload(),
             "movement": {
-                "physical": {
-                    "shape": "hold",
-                    "mode": "periodic",
-                    "start_pan_deg": pan,
-                    "start_tilt_deg": 0.0,
-                }
+                "shape": "hold",
+                "mode": "periodic",
+                "start_pan_deg": pan,
+                "start_tilt_deg": 0.0,
             },
-            "dimmer": {
-                "physical": {"period_beats": 1.0, "duty_cycle": 1.0, "low": 0.0, "high": 1.0}
-            },
+            "dimmer": {"period_beats": 1.0, "duty_cycle": 1.0, "low": 0.0, "high": 1.0},
         }
-        return compile_physical_step(
+        return compile_step(
             TemplateStep.model_validate(step),
             _context(profile, t0, t1, section_id=name),
             sample_times_ms=tuple(range(t0, t1, 20)),

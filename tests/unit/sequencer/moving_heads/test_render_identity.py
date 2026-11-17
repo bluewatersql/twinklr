@@ -13,13 +13,13 @@ from typing import Any
 from pydantic import BaseModel
 import pytest
 
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
+    bars_grid,
+    family_catalog,
     family_job,
     family_rig,
     initial_state_payload,
-    physical_bars_grid,
-    physical_catalog,
-    physical_sections,
+    sections_plan,
 )
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
 from twinklr.core.config.fixtures import FixtureGroup
@@ -27,8 +27,8 @@ from twinklr.core.config.models import JobConfig, MHRenderPolicy
 from twinklr.core.sequencer.models.template import StepPatch, TemplateDoc
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import ENCODER_VERSION
 from twinklr.core.sequencer.moving_heads.identity import (
-    LEGACY_BACKEND_ID,
-    PHYSICAL_RENDERER_REVISION,
+    BACKEND_ID,
+    RENDERER_REVISION,
     render_fingerprint,
 )
 from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
@@ -41,7 +41,7 @@ HEADS = ("MH1", "MH2", "MH3", "MH4")
 
 @pytest.fixture(autouse=True)
 def _catalog() -> Iterator[None]:
-    with physical_catalog():
+    with family_catalog():
         yield
 
 
@@ -52,11 +52,11 @@ class _PhaseMap(BaseModel):
 
 
 def _plan() -> ChoreographyPlan:
-    return physical_sections(("mirror_wings", 1, 4), ("target_orbit", 5, 8))
+    return sections_plan(("mirror_wings", 1, 4), ("target_orbit", 5, 8))
 
 
 def _grid() -> BeatGrid:
-    return physical_bars_grid(*([500.0] * 8))
+    return bars_grid(*([500.0] * 8))
 
 
 def _templates(plan: ChoreographyPlan) -> list[TemplateDoc]:
@@ -73,8 +73,8 @@ def _inputs() -> dict[str, Any]:
         "fixtures": family_rig(HEADS),
         "templates": _templates(plan),
         "policy": family_job(HEADS).moving_heads,
-        "backend_id": LEGACY_BACKEND_ID,
-        "renderer_revision": f"physical_v2.{PHYSICAL_RENDERER_REVISION}+encoder.{ENCODER_VERSION}",
+        "backend_id": BACKEND_ID,
+        "renderer_revision": f"renderer.{RENDERER_REVISION}+encoder.{ENCODER_VERSION}",
         "phase_map": build_musical_phase_map(_grid()),
     }
 
@@ -121,15 +121,10 @@ def test_template_content_changes_the_hash() -> None:
     first = templates[0]
     steps = []
     for step in first.template.steps:
-        movement = step.movement.physical
+        movement = step.movement
         assert movement is not None and movement.period_beats is not None
         slower = movement.model_copy(update={"period_beats": movement.period_beats * 2})
-        steps.append(
-            step.model_copy(
-                update={"movement": step.movement.model_copy(update={"physical": slower})},
-                deep=True,
-            )
-        )
+        steps.append(step.model_copy(update={"movement": slower}, deep=True))
     edited = [_edit_template(first, steps=steps), *templates[1:]]
 
     assert _fingerprint(templates=edited) != _fingerprint()
@@ -149,7 +144,7 @@ def test_preset_content_changes_the_hash() -> None:
     )
     doc = get_template("mirror_wings")
     narrow = next(preset for preset in doc.presets if preset.preset_id == "narrow")
-    patch = StepPatch(movement={"physical": {"pan_extent_deg": 21.0, "tilt_extent_deg": 10.0}})
+    patch = StepPatch(movement={"pan_extent_deg": 21.0, "tilt_extent_deg": 10.0})
     edited_presets = [
         preset.model_copy(update={"step_patches": {"wings": patch}}, deep=True)
         if preset is narrow
@@ -191,7 +186,7 @@ def test_physical_profile_and_initial_states_change_the_hash() -> None:
 
 
 def test_beat_grid_changes_the_hash() -> None:
-    faster = physical_bars_grid(*([495.0] * 8))
+    faster = bars_grid(*([495.0] * 8))
 
     assert _fingerprint(beat_grid=faster) != _fingerprint()
 

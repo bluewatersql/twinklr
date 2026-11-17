@@ -1,6 +1,6 @@
-"""Physical-output metrics of `eval-report` (P3-C1.1b), against hand-computed values.
+"""`eval-report` metrics in physical units (P3-C1.1b), against hand-computed values.
 
-A tiny synthetic render: one head's physical segments encoded by the renderer's own
+A tiny synthetic render: one head's segments encoded by the renderer's own
 frame encoder, then read back by the report. Pan moves linearly from 0° to 90° over one
 second, tilt holds 30°, the dimmer holds 0.5 and the shutter opens at 0 ms and closes at
 500 ms. The 50 frames start at 0, 20, ..., 980 ms.
@@ -12,8 +12,8 @@ import math
 
 import pytest
 
-from tests.support.mh_physical import (
-    physical_segment,
+from tests.support.moving_heads import (
+    fixture_segment,
     profile_payload,
     zoom_pilot_profile_payload,
 )
@@ -49,7 +49,7 @@ def _profile(*, inverted: bool) -> FixtureCapabilities:
 
 
 def _frames(profile: FixtureCapabilities):
-    segment = physical_segment(
+    segment = fixture_segment(
         {
             ChannelName.PAN: ContinuousTrajectory(
                 unit="degree",
@@ -166,7 +166,7 @@ def test_largest_step_with_its_time() -> None:
 def test_zoom_is_read_in_degrees_where_the_profile_declares_it() -> None:
     """The zoom pilot's 8-bit zoom maps 10°-40° over bytes 20-220: 25° is byte 120."""
     profile = FixtureCapabilities.model_validate(zoom_pilot_profile_payload())
-    segment = physical_segment(
+    segment = fixture_segment(
         {
             ChannelName.ZOOM: ContinuousTrajectory(
                 unit="degree", points=(PhysicalPoint(t_ms=0, value=25.0),), interpolation="hold"

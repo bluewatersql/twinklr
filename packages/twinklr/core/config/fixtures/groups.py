@@ -12,14 +12,14 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from twinklr.core.config.fixtures.capabilities import PROFILE_GUIDE, FixtureCapabilities
 from twinklr.core.config.fixtures.dmx import DmxMapping
 from twinklr.core.config.fixtures.instances import FixtureConfig, FixtureInstance, FixturePosition
-from twinklr.core.config.fixtures.physical import (
+from twinklr.core.config.fixtures.presets import RigPresetLibrary
+from twinklr.core.config.fixtures.removed_fields import (
     REMOVED_DMX_MAPPING_FIELDS,
     REMOVED_FIXTURE_FIELDS,
     drop_retired_fields,
     reject_removed_fields,
     reject_removed_position_fields,
 )
-from twinklr.core.config.fixtures.presets import RigPresetLibrary
 from twinklr.core.sequencer.models.moving_heads.topology import FixtureTopology
 
 
@@ -37,7 +37,7 @@ class BaseFixtureConfig(BaseModel):
     # DMX channel assignments (shared mapping)
     dmx_mapping: DmxMapping = Field(..., description="DMX channel assignments")
 
-    # Shared physical renderer profile; a fixture's config_overrides entry replaces it.
+    # Shared physical profile; a fixture's config_overrides entry replaces it.
     # Left out of dumps when absent.
     physical_profile: FixtureCapabilities | None = Field(
         default=None,

@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.support.mh_physical import family_rig
+from tests.support.moving_heads import family_rig
 from twinklr.cli.main import build_arg_parser, build_moving_head_graph, build_run_pipeline
 from twinklr.core.agents.audio.profile.models import AudioProfileModel
 from twinklr.core.agents.sequencer.moving_heads.context import (

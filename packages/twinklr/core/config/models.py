@@ -569,11 +569,11 @@ class AppConfig(ConfigBase):
 
 
 DEFAULT_MAX_EFFECTS = 1_000_000
-"""Default physical effect budget. Eight heads in four minutes of continuous 16-bit
+"""Default moving-head effect budget. Eight heads in four minutes of continuous 16-bit
 motion emit about 95,000 effects, so the byte budget is the one that binds."""
 
 DEFAULT_MAX_XSQ_BYTES = 134_217_728
-"""Default physical `.xsq` size budget: 128 MiB."""
+"""Default moving-head `.xsq` size budget: 128 MiB."""
 
 
 class MHRenderPolicy(BaseModel):
@@ -590,7 +590,7 @@ class MHRenderPolicy(BaseModel):
         default_factory=dict,
         exclude_if=lambda value: not value,
         description=(
-            "Run-supplied time-zero state per fixture id for the physical renderer. A "
+            "Run-supplied time-zero state per fixture id for the moving-head renderer. A "
             "fixture without an entry has an unknown initial state."
         ),
     )
@@ -601,8 +601,8 @@ class MHRenderPolicy(BaseModel):
         gt=0,
         exclude_if=lambda value: value == DEFAULT_MAX_EFFECTS,
         description=(
-            "Most coalesced DMX effects one physical render may emit; more fails with "
-            "output_budget_exceeded instead of dropping frames. Physical output only. "
+            "Most coalesced DMX effects one moving-head render may emit; more fails with "
+            "output_budget_exceeded instead of dropping frames. Moving-head output only. "
             "A non-default value is part of render identity."
         ),
     )
@@ -611,9 +611,9 @@ class MHRenderPolicy(BaseModel):
         gt=0,
         exclude_if=lambda value: value == DEFAULT_MAX_XSQ_BYTES,
         description=(
-            "Largest serialized .xsq, in UTF-8 bytes, one physical render may write; "
+            "Largest serialized .xsq, in UTF-8 bytes, one moving-head render may write; "
             "larger fails with output_budget_exceeded instead of dropping frames. "
-            "Physical output only. A non-default value is part of render identity."
+            "Moving-head output only. A non-default value is part of render identity."
         ),
     )
     # Left out of dumps at its default; a non-default value enters render identity.
@@ -621,10 +621,10 @@ class MHRenderPolicy(BaseModel):
         default="error",
         exclude_if=lambda value: value == "error",
         description=(
-            "What a physical render does with a cue whose dark repositioning cannot be "
+            "What the moving-head render does with a cue whose dark repositioning cannot be "
             "planned. `error` refuses the render; `preserve_aim` plays the cue at the aim "
             "the head holds; `drop_accent` keeps it dark. A fallback applies only to cues "
-            "of steps that declare the same `physical_reposition_fallback`. A non-default "
+            "of steps that declare the same `reposition_fallback`. A non-default "
             "value is part of render identity."
         ),
     )
@@ -633,7 +633,7 @@ class MHRenderPolicy(BaseModel):
         default="dark",
         exclude_if=lambda value: value == "dark",
         description=(
-            "What a physical render does with a cue the plan placed where it cannot play "
+            "What the moving-head render does with a cue the plan placed where it cannot play "
             "honestly, after any reposition fallback the cue and the job both declare. "
             "`dark` leaves the fixture dark over that cue, lists it in the trace's "
             "dropped_cues and logs one warning with the counts; `error` refuses the "

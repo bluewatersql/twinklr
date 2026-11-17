@@ -1,6 +1,6 @@
 """Retired and removed fixture-config fields.
 
-A retired field (dropped before the physical renderer) still loads, with a warning. A
+A retired field (dropped before the current renderer) still loads, with a warning. A
 field removed with the old moving-head renderer is refused by name.
 """
 

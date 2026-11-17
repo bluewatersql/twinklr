@@ -1,7 +1,7 @@
 """The pre-planning gate's reuse and exact shortcuts never change what it or the render decides.
 
 The gate time cut (Phase 3) reuses work where the inputs are the same: a step instance's
-sampled channels across heads that share a channel's phase (`compile_physical_step`'s
+sampled channels across heads that share a channel's phase (`compile_step`'s
 `shared`), the rest of a fixture's plan from a cue an earlier section entry reached in
 the same state (`plan_prepositions`' `memo`), and plan groups keyed only for heads alike
 in their cheap features (`_plan_groups`); and it evaluates paths, pulses, DMX words and
@@ -22,16 +22,16 @@ import weakref
 
 import pytest
 
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
     FAMILY_IDS,
+    bars_grid,
+    family_catalog,
     family_job,
     family_rig,
+    fixture_segment,
+    loop_template_doc,
+    p1_grid,
     path_step,
-    physical_bars_grid,
-    physical_catalog,
-    physical_grid,
-    physical_segment,
-    physical_template_doc,
     preposition_profile_payload,
     topology_payload,
     topology_rig,
@@ -58,12 +58,13 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
 from twinklr.core.sequencer.models.moving_heads.topology import resolve_distribution, rig_topology
 from twinklr.core.sequencer.models.template import (
-    PhysicalMovementSpec,
-    PhysicalPulseSpec,
+    Movement,
+    PulseSpec,
     Template,
 )
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile import physical, preposition, template_compiler
+from twinklr.core.sequencer.moving_heads.compile import preposition, template_compiler
+from twinklr.core.sequencer.moving_heads.compile import step as step_module
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     FALLBACK_METADATA_KEY,
     PrepositionMemo,
@@ -75,8 +76,8 @@ from twinklr.core.sequencer.moving_heads.pipeline import (
     TemplateAdmission,
     _plan_groups,
     _plan_key,
-    check_physical_templates,
-    physical_cue_limits,
+    admit_templates,
+    cue_limits,
 )
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.timing.musical_phase import (
@@ -111,7 +112,7 @@ def _wings_template(*, zoom: bool = False, dimmer_spread: float | None = None) -
     pan phase."""
     fields: dict[str, Any] = {}
     if zoom:
-        fields["physical_zoom"] = {"shape": "sine", "start_deg": 25.0, "extent_deg": 10.0}
+        fields["zoom"] = {"shape": "sine", "start_deg": 25.0, "extent_deg": 10.0}
     distribution = list(_WINGS)
     if dimmer_spread is not None:
         distribution.append({"domains": ["dimmer"], "spread_cycles": dimmer_spread})
@@ -121,11 +122,11 @@ def _wings_template(*, zoom: bool = False, dimmer_spread: float | None = None) -
         pan_extent=20.0,
         tilt_extent=10.0,
         period_beats=2.0,
-        dimmer={"physical": {"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0}},
-        physical_distribution=distribution,
+        dimmer={"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0},
+        distribution=distribution,
         **fields,
     )
-    return physical_template_doc("reuse_wings", [step], cycle_bars=1.0).template
+    return loop_template_doc("reuse_wings", [step], cycle_bars=1.0).template
 
 
 def _mixed_rig(edit_mh3: Any, *, zoom: bool = False) -> FixtureGroup:
@@ -141,7 +142,7 @@ def _mixed_rig(edit_mh3: Any, *, zoom: bool = False) -> FixtureGroup:
 
 
 def _compile(template: Template, rig: FixtureGroup) -> list[FixtureSegment]:
-    grid = physical_grid()
+    grid = p1_grid()
     phase_map = build_musical_phase_map(grid)
     context = TemplateCompileContext(
         section_id="verse",
@@ -154,8 +155,8 @@ def _compile(template: Template, rig: FixtureGroup) -> list[FixtureSegment]:
         topology=rig_topology(rig),
         fixture_group_id=rig.group_id,
     )
-    start_limit, end_limit = physical_cue_limits(phase_map, int(grid.duration_ms))
-    segments: list[FixtureSegment] = template_compiler.compile_physical_template(
+    start_limit, end_limit = cue_limits(phase_map, int(grid.duration_ms))
+    segments: list[FixtureSegment] = template_compiler.compile_template(
         template, context, phase_map=phase_map, start_limit_ms=start_limit, end_limit_ms=end_limit
     ).segments
     return segments
@@ -165,13 +166,12 @@ def _compile_unshared(
     template: Template, rig: FixtureGroup, monkeypatch: pytest.MonkeyPatch
 ) -> list[FixtureSegment]:
     """`_compile` with every head's channels made by its own compile."""
-    compile_step = physical.compile_physical_step
 
     def alone(*args: Any, shared: Any = None, **kwargs: Any) -> FixtureSegment:
-        return compile_step(*args, **kwargs)
+        return step_module.compile_step(*args, **kwargs)
 
     with monkeypatch.context() as patched:
-        patched.setattr(template_compiler, "compile_physical_step", alone)
+        patched.setattr(template_compiler, "compile_step", alone)
         segments: list[FixtureSegment] = _compile(template, rig)
     return segments
 
@@ -204,13 +204,11 @@ def test_shared_channels_are_each_heads_own_on_every_profile(
     assert mh3.channels[_TILT].physical is not mh2.channels[_TILT].physical
     assert mh3.channels[_TILT].physical == mh2.channels[_TILT].physical
     # Each channel at its own phase: pan and zoom at the pan phase, tilt at the tilt one.
-    distribution = resolve_distribution(
-        rig_topology(rig), template.steps[0].physical_distribution, _IDS
-    )
-    movement = template.steps[0].movement.physical
+    distribution = resolve_distribution(rig_topology(rig), template.steps[0].distribution, _IDS)
+    movement = template.steps[0].movement
     assert movement is not None
     pose = PoseDegrees(pan_deg=0.0, tilt_deg=0.0)
-    phase_map = build_musical_phase_map(physical_grid())
+    phase_map = build_musical_phase_map(p1_grid())
     for segment in (mh1, mh2):
         phases = distribution[segment.fixture_id]
         channels = [_PAN, _TILT, *([_ZOOM] if zoom else [])]
@@ -228,7 +226,7 @@ def test_shared_channels_are_each_heads_own_on_every_profile(
                 if channel is _ZOOM:
                     expected = 25.0 + 10.0 * math.sin(2 * math.pi * float(phase))
                 else:
-                    at = physical.evaluate_physical_path(
+                    at = step_module.evaluate_path(
                         movement, pose, phase.numerator, phase.denominator, phases.pan_sign
                     )
                     expected = at[0] if channel is _PAN else at[1]
@@ -315,7 +313,7 @@ def _cue(
             )
         ),
     }
-    return physical_segment(trajectories, t0_ms=t0, t1_ms=t1, segment_id=name, section_id=name)
+    return fixture_segment(trajectories, t0_ms=t0, t1_ms=t1, segment_id=name, section_id=name)
 
 
 _CUES = (
@@ -724,7 +722,7 @@ def _random_cues(rng: random.Random) -> list[FixtureSegment]:
                 events=tuple(DiscretePoint(t_ms=at, state=state) for at, state in colors)
             ),
         }
-        cue = physical_segment(
+        cue = fixture_segment(
             trajectories,
             t0_ms=t0,
             t1_ms=t1,
@@ -809,7 +807,7 @@ def _held(fixture_id: str, values: tuple[float, ...]) -> FixtureSegment:
             interpolation="linear",
         ),
     }
-    return physical_segment(
+    return fixture_segment(
         trajectories, t0_ms=t0, t1_ms=points[-1].t_ms, fixture_id=fixture_id, segment_id="s"
     )
 
@@ -843,7 +841,7 @@ def test_plan_groups_are_the_groups_of_equal_plan_keys() -> None:
 
 def _gate(rig: FixtureGroup, grid: Any, heads: tuple[str, ...]) -> TemplateAdmission:
     job = family_job(heads)
-    return check_physical_templates(
+    return admit_templates(
         list(FAMILY_IDS),
         beat_grid=grid,
         fixture_group=rig,
@@ -866,9 +864,9 @@ def test_gate_runs_in_one_process_give_each_runs_own_result() -> None:
     """A gate after another on a slower rig and another tempo admits, excludes and dips
     exactly as it does before it: nothing one run keeps reaches the next."""
     heads = _IDS[:3]
-    fast = (family_rig(heads), physical_bars_grid(*([500.0] * 5)))
-    slow = (_slow(family_rig(heads)), physical_bars_grid(430.0, 500.0, 340.0, 580.0, 470.0))
-    with physical_catalog():
+    fast = (family_rig(heads), bars_grid(*([500.0] * 5)))
+    slow = (_slow(family_rig(heads)), bars_grid(430.0, 500.0, 340.0, 580.0, 470.0))
+    with family_catalog():
         first_fast = _gate(*fast, heads)
         first_slow = _gate(*slow, heads)
         again_fast = _gate(*fast, heads)
@@ -984,19 +982,19 @@ def test_paths_and_pulses_evaluate_as_from_the_fraction_phase() -> None:
             }
             if transform and shape in ("circle", "lissajous", "sweep"):
                 fields["transform"] = transform
-            spec = PhysicalMovementSpec.model_validate(fields)
+            spec = Movement.model_validate(fields)
             for _ in range(40):
                 phase = Fraction(rng.randint(-500, 5000), rng.choice([1, 3, 28, 4369]))
                 sign = rng.choice([-1, 0, 1])
                 n, d = phase.numerator, phase.denominator
-                assert physical.evaluate_physical_path(spec, pose, n, d, sign) == _reference_path(
+                assert step_module.evaluate_path(spec, pose, n, d, sign) == _reference_path(
                     spec, pose, phase, sign
                 )
 
-    grid = physical_grid()
+    grid = p1_grid()
     phase_map = build_musical_phase_map(grid)
     for _ in range(200):
-        pulse = PhysicalPulseSpec.model_validate(
+        pulse = PulseSpec.model_validate(
             {
                 "period_beats": rng.choice([0.5, 1.0, 4.0]),
                 "duty_cycle": rng.choice([0.25, 0.5, 0.3]),
@@ -1014,7 +1012,7 @@ def test_paths_and_pulses_evaluate_as_from_the_fraction_phase() -> None:
             + Fraction(repr(pulse.phase_cycles))
         )
         expected = phase - math.floor(phase) < Fraction(repr(pulse.duty_cycle))
-        assert physical._pulse_high(pulse, phase_map, time_ms, origin, offset=offset) == expected
+        assert step_module._pulse_high(pulse, phase_map, time_ms, origin, offset=offset) == expected
 
 
 @pytest.mark.parametrize(
@@ -1029,10 +1027,10 @@ def test_a_pulse_is_low_from_the_exact_end_of_its_duty(offset: Fraction, end_ms:
     cycle: high just before `end_ms`, where the phase's fractional part is exactly the
     duty, low at it, and high again a cycle on."""
     phase_map = build_musical_phase_map(BeatGrid.from_tempo(tempo_bpm=120, total_bars=2))
-    pulse = PhysicalPulseSpec.model_validate({"period_beats": 2.0, "duty_cycle": 0.5})
+    pulse = PulseSpec.model_validate({"period_beats": 2.0, "duty_cycle": 0.5})
     start_ms = end_ms - 500
     high = [
-        physical._pulse_high(pulse, phase_map, time_ms, 0, offset=offset)
+        step_module._pulse_high(pulse, phase_map, time_ms, 0, offset=offset)
         for time_ms in (start_ms, end_ms - 1, end_ms, start_ms + 1000)
     ]
     assert high == [True, True, False, True]
@@ -1072,9 +1070,9 @@ def test_a_refused_float_reads_as_its_exact_fraction() -> None:
 
 
 def _reference_path(
-    spec: PhysicalMovementSpec, pose: PoseDegrees, phase: Fraction, sign: int
+    spec: Movement, pose: PoseDegrees, phase: Fraction, sign: int
 ) -> tuple[float, float]:
-    """`evaluate_physical_path` with every float taken of a `Fraction`."""
+    """`evaluate_path` with every float taken of a `Fraction`."""
     pan_extent = sign * spec.pan_extent_deg
     if spec.shape in ("circle", "lissajous", "sweep"):
         transform = spec.transform

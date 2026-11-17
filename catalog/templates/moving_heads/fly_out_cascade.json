@@ -23,19 +23,16 @@
           }
         },
         "movement": {
-          "physical": {
-            "shape": "sweep",
-            "mode": "periodic",
-            "start_pan_deg": 0.0,
-            "start_tilt_deg": 30.0,
-            "pan_extent_deg": 45.0,
-            "tilt_extent_deg": 0.0,
-            "period_beats": 4.0
-          }
+          "shape": "sweep",
+          "mode": "periodic",
+          "start_pan_deg": 0.0,
+          "start_tilt_deg": 30.0,
+          "pan_extent_deg": 45.0,
+          "tilt_extent_deg": 0.0,
+          "period_beats": 4.0
         },
-        "dimmer": {},
-        "physical_reposition_fallback": "drop_accent",
-        "physical_distribution": [
+        "reposition_fallback": "drop_accent",
+        "distribution": [
           {
             "domains": [
               "pan",
@@ -45,7 +42,7 @@
             "spread_cycles": 0.25
           }
         ],
-        "physical_visibility": {
+        "visibility": {
           "visible_phase_start": 0.25,
           "visible_phase_end": 0.5
         }
@@ -53,7 +50,6 @@
     ],
     "metadata": {
       "tags": [
-        "physical_v2",
         "fly",
         "cascade",
         "mirror"
@@ -76,9 +72,7 @@
       "step_patches": {
         "fly": {
           "movement": {
-            "physical": {
-              "pan_extent_deg": 30.0
-            }
+            "pan_extent_deg": 30.0
           }
         }
       }
@@ -88,9 +82,7 @@
       "step_patches": {
         "fly": {
           "movement": {
-            "physical": {
-              "period_beats": 8.0
-            }
+            "period_beats": 8.0
           }
         }
       }

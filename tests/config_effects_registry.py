@@ -1648,37 +1648,37 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_registration_field_changes_public_registry[template.enabled]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_registration_field_changes_public_registry[template.template]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.template_id": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_registration_field_changes_public_registry[template.template.template_id]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.version": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_registration_field_changes_public_registry[template.template.version]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.name": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_registration_field_changes_public_registry[template.template.name]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.category": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_registration_field_changes_public_registry[template.template.category]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.roles": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -1689,7 +1689,7 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_compile_field_changes_emitted_snapshot[template.template.repeat]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.repeat.repeatable": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -1700,55 +1700,55 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_compile_field_changes_emitted_snapshot[template.template.repeat.mode]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.repeat.cycle_bars": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_compile_field_changes_emitted_snapshot[template.template.repeat.cycle_bars]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.repeat.loop_step_ids": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_compile_field_changes_emitted_snapshot[template.template.repeat.loop_step_ids]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.repeat.remainder_policy": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_compile_field_changes_emitted_snapshot[template.template.repeat.remainder_policy]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.steps": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_compile_field_changes_emitted_snapshot[template.template.steps]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.steps.step_id": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_compile_field_changes_emitted_snapshot[template.template.steps.step_id]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.steps.target": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_compile_field_changes_emitted_snapshot[template.template.steps.target]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.steps.timing": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_compile_field_changes_emitted_snapshot[template.template.steps.timing]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.steps.timing.base_timing": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_compile_field_changes_emitted_snapshot[template.template.steps.timing.base_timing]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.steps.timing.base_timing.mode": ConfigDisposition(
         ConfigDispositionKind.INVARIANT_TEST,
@@ -1764,13 +1764,13 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_compile_field_changes_emitted_snapshot[template.template.steps.timing.base_timing.start_offset_bars]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.steps.timing.base_timing.duration_bars": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_compile_field_changes_emitted_snapshot[template.template.steps.timing.base_timing.duration_bars]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.steps.timing.phase_offset.group": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -1786,7 +1786,7 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_compile_field_changes_emitted_snapshot[template.template.steps.movement]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.steps.movement.amplitude_override": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -1807,7 +1807,7 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_compile_field_changes_emitted_snapshot[template.template.steps.dimmer]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.steps.dimmer.cycles": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -1883,67 +1883,67 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_registration_field_changes_public_registry[template.template.metadata]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.metadata.tags": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_registration_field_changes_public_registry[template.template.metadata.tags]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.metadata.recommended_sections": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_metadata_field_changes_planner_prompt_context[template.template.metadata.recommended_sections]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.metadata.energy_range": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_metadata_field_changes_planner_prompt_context[template.template.metadata.energy_range]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.template.metadata.description": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_metadata_field_changes_planner_prompt_context[template.template.metadata.description]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.presets": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_preset_field_changes_compiled_snapshot[template.presets]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.presets.preset_id": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_preset_field_changes_compiled_snapshot[template.presets.preset_id]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.presets.step_patches": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_preset_field_changes_compiled_snapshot[template.presets.step_patches]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.presets.step_patches.movement": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_preset_field_changes_compiled_snapshot[template.presets.step_patches.movement]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.presets.step_patches.dimmer": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_preset_field_changes_compiled_snapshot[template.presets.step_patches.dimmer]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "template.presets.step_patches.timing": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         "test_template_preset_field_changes_compiled_snapshot[template.presets.step_patches.timing]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, or makes the compile refuse the template",
     ),
     "app.audio_processing.cache_enabled": ConfigDisposition(
         ConfigDispositionKind.REMOVED,
@@ -2043,60 +2043,60 @@ for _fixture_path, _fixture_disposition in tuple(CONFIG_EFFECTS.items()):
             "exact path changes expansion, rig order, or the planner's xLights group mapping or channel listing",
         )
 
-# Physical-profile and run initial-state fields feed the physical renderer. Registered
+# Physical-profile and run initial-state fields feed the moving-head renderer. Registered
 # after the loop above, each exact path mutates its field and must change the one component of
-# the physical contract its note names. "Identity only" paths have no consumer
-# beyond the render fingerprint; the task that adds one repoints them.
-_PHYSICAL_REJECTED = "exact path's alternative values are rejected by validation"
-_PHYSICAL_WORDS = "exact path changes the encoded DMX word"
-_PHYSICAL_CHECK = "exact path changes the initial-state check"
-_PHYSICAL_IDENTITY_ONLY = "identity only; no physical consumer yet"
-_PHYSICAL_PREPOSITION = "exact path changes the planned preposition transactions"
-_PHYSICAL_DARKNESS = "exact path changes which planned cues start dark"
-_PHYSICAL_FRAMES = "exact path changes the encoded fixture frames"
-_PHYSICAL_CHANGES = "exact path changes the listed wheel state changes"
-_PHYSICAL_PROFILE_FIELDS = {
-    "": _PHYSICAL_WORDS,
-    "schema_version": _PHYSICAL_REJECTED,
-    "profile_id": _PHYSICAL_IDENTITY_ONLY,
-    "provenance": _PHYSICAL_PREPOSITION,
-    "footprint": _PHYSICAL_FRAMES,
-    "defaults": _PHYSICAL_FRAMES,
-    "axes": _PHYSICAL_WORDS,
-    "axes.unit": _PHYSICAL_REJECTED,
-    "axes.physical_min": _PHYSICAL_WORDS,
-    "axes.physical_max": _PHYSICAL_WORDS,
-    "axes.allowed_min": _PHYSICAL_WORDS,
-    "axes.allowed_max": _PHYSICAL_WORDS,
-    "axes.coarse_offset": _PHYSICAL_FRAMES,
-    "axes.fine_offset": _PHYSICAL_WORDS,
-    "axes.inverted": _PHYSICAL_WORDS,
-    "axes.dmx_min": _PHYSICAL_WORDS,
-    "axes.dmx_max": _PHYSICAL_WORDS,
-    "axes.travel_speed_per_s": _PHYSICAL_PREPOSITION,
-    "axes.latency_ms": _PHYSICAL_PREPOSITION,
-    "axes.settle_ms": _PHYSICAL_PREPOSITION,
-    "discrete": _PHYSICAL_CHECK,
-    "discrete.offset": _PHYSICAL_FRAMES,
-    "discrete.states": _PHYSICAL_CHECK,
-    "discrete.states.range_min": _PHYSICAL_IDENTITY_ONLY,
-    "discrete.states.range_max": _PHYSICAL_IDENTITY_ONLY,
-    "discrete.states.value": _PHYSICAL_FRAMES,
-    "discrete.states.settle_ms": _PHYSICAL_CHANGES,
-    "discrete.settle_ms": _PHYSICAL_CHANGES,
-    "discrete.default_state": _PHYSICAL_CHANGES,
-    "discrete.closed_state": _PHYSICAL_PREPOSITION,
-    "visibility": _PHYSICAL_PREPOSITION,
-    "visibility.dimmer_zero_extinguishes": _PHYSICAL_DARKNESS,
-    "visibility.extinguishing_shutter_states": _PHYSICAL_DARKNESS,
-    "visibility.close_latency_ms": _PHYSICAL_PREPOSITION,
-    "visibility.open_latency_ms": _PHYSICAL_PREPOSITION,
+# the profile and initial-state contract its note names. "Identity only" paths have no
+# consumer beyond the render fingerprint; the task that adds one repoints them.
+_PROFILE_REJECTED = "exact path's alternative values are rejected by validation"
+_PROFILE_WORDS = "exact path changes the encoded DMX word"
+_PROFILE_CHECK = "exact path changes the initial-state check"
+_PROFILE_IDENTITY_ONLY = "identity only; no consumer yet"
+_PROFILE_PREPOSITION = "exact path changes the planned preposition transactions"
+_PROFILE_DARKNESS = "exact path changes which planned cues start dark"
+_PROFILE_FRAMES = "exact path changes the encoded fixture frames"
+_PROFILE_CHANGES = "exact path changes the listed wheel state changes"
+_PROFILE_FIELDS = {
+    "": _PROFILE_WORDS,
+    "schema_version": _PROFILE_REJECTED,
+    "profile_id": _PROFILE_IDENTITY_ONLY,
+    "provenance": _PROFILE_PREPOSITION,
+    "footprint": _PROFILE_FRAMES,
+    "defaults": _PROFILE_FRAMES,
+    "axes": _PROFILE_WORDS,
+    "axes.unit": _PROFILE_REJECTED,
+    "axes.physical_min": _PROFILE_WORDS,
+    "axes.physical_max": _PROFILE_WORDS,
+    "axes.allowed_min": _PROFILE_WORDS,
+    "axes.allowed_max": _PROFILE_WORDS,
+    "axes.coarse_offset": _PROFILE_FRAMES,
+    "axes.fine_offset": _PROFILE_WORDS,
+    "axes.inverted": _PROFILE_WORDS,
+    "axes.dmx_min": _PROFILE_WORDS,
+    "axes.dmx_max": _PROFILE_WORDS,
+    "axes.travel_speed_per_s": _PROFILE_PREPOSITION,
+    "axes.latency_ms": _PROFILE_PREPOSITION,
+    "axes.settle_ms": _PROFILE_PREPOSITION,
+    "discrete": _PROFILE_CHECK,
+    "discrete.offset": _PROFILE_FRAMES,
+    "discrete.states": _PROFILE_CHECK,
+    "discrete.states.range_min": _PROFILE_IDENTITY_ONLY,
+    "discrete.states.range_max": _PROFILE_IDENTITY_ONLY,
+    "discrete.states.value": _PROFILE_FRAMES,
+    "discrete.states.settle_ms": _PROFILE_CHANGES,
+    "discrete.settle_ms": _PROFILE_CHANGES,
+    "discrete.default_state": _PROFILE_CHANGES,
+    "discrete.closed_state": _PROFILE_PREPOSITION,
+    "visibility": _PROFILE_PREPOSITION,
+    "visibility.dimmer_zero_extinguishes": _PROFILE_DARKNESS,
+    "visibility.extinguishing_shutter_states": _PROFILE_DARKNESS,
+    "visibility.close_latency_ms": _PROFILE_PREPOSITION,
+    "visibility.open_latency_ms": _PROFILE_PREPOSITION,
 }
 for _profile_root in (
     "fixture.fixtures[FixtureInstance].config.physical_profile",
     "fixture.base_config.physical_profile",
 ):
-    for _field, _note in _PHYSICAL_PROFILE_FIELDS.items():
+    for _field, _note in _PROFILE_FIELDS.items():
         _physical_path = f"{_profile_root}.{_field}" if _field else _profile_root
         CONFIG_EFFECTS[_physical_path] = ConfigDisposition(
             ConfigDispositionKind.EFFECT_TEST,
@@ -2105,14 +2105,14 @@ for _profile_root in (
             _note,
         )
 for _field, _note in {
-    "": _PHYSICAL_CHECK,
-    "pan_deg": _PHYSICAL_CHECK,
-    "tilt_deg": _PHYSICAL_CHECK,
-    "zoom_deg": _PHYSICAL_CHECK,
-    "dimmer": _PHYSICAL_CHECK,
-    "discrete_states": _PHYSICAL_CHECK,
-    "settled": _PHYSICAL_PREPOSITION,
-    "dark": _PHYSICAL_PREPOSITION,
+    "": _PROFILE_CHECK,
+    "pan_deg": _PROFILE_CHECK,
+    "tilt_deg": _PROFILE_CHECK,
+    "zoom_deg": _PROFILE_CHECK,
+    "dimmer": _PROFILE_CHECK,
+    "discrete_states": _PROFILE_CHECK,
+    "settled": _PROFILE_PREPOSITION,
+    "dark": _PROFILE_PREPOSITION,
 }.items():
     _initial_state_path = "job.moving_heads.initial_states" + (f".{_field}" if _field else "")
     CONFIG_EFFECTS[_initial_state_path] = ConfigDisposition(
@@ -2122,15 +2122,15 @@ for _field, _note in {
         _note,
     )
 
-# P1.3 physical output budgets. They bound only physical output, so each exact path is
-# evidenced by a fixed physical render that its limit accepts at the measured size and
+# P1.3 output budgets. They bound only moving-head output, so each exact path is
+# evidenced by a fixed render that its limit accepts at the measured size and
 # rejects one below it.
 for _budget_path in ("job.moving_heads.max_effects", "job.moving_heads.max_xsq_bytes"):
     CONFIG_EFFECTS[_budget_path] = ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/sequencer/moving_heads/export/test_frame_encoder.py::"
         f"test_budget_field_changes_accept_reject[{_budget_path}]",
-        "exact path changes whether a fixed physical output is accepted or rejected",
+        "exact path changes whether a fixed moving-head output is accepted or rejected",
     )
 
 _TEMPLATE_REGISTRATION_PATHS = {
@@ -2167,82 +2167,83 @@ for _template_path, _template_disposition in tuple(CONFIG_EFFECTS.items()):
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/config/test_template_effect_discriminators.py::"
         f"{_template_test}[{_template_path}]",
-        "exact path changes a shipped registry, planner, preset, or physical-compile seam, "
-        "or makes the physical compile refuse the template",
+        "exact path changes a shipped registry, planner, preset, or compile seam, "
+        "or makes the compile refuse the template",
     )
 
-# P1.2 physical template fields. They feed the physical compile; registered after the
-# loop above, each exact path mutates its field and must either change `compile_physical_step`'s
-# result or be rejected by physical validation/compile. `shape` is coupled to `mode`,
-# extents and period, so no single-field alternative is valid; its evidence is the
-# kernel test, which fails if the compiler ignored it.
-_PHYSICAL_TEMPLATE_REJECTED = (
-    "exact path's alternative is rejected by physical validation or compile"
-)
-_PHYSICAL_TEMPLATE_COMPILED = "exact path changes the physical compile result"
+# P1.2 template step fields. They feed the step compile; registered after the loop
+# above, each exact path mutates its field and must either change `compile_step`'s
+# result or be rejected by validation or compile. Since C1.4 flattened `movement.physical`
+# and `dimmer.physical`, `movement` and `dimmer` are these paths, so the entries here
+# replace that loop's for them (its two snapshot cases still run). `shape` is coupled to
+# `mode`, extents and period, so no single-field alternative is valid; its evidence is
+# the kernel test, which fails if the compiler ignored it.
+_TEMPLATE_REJECTED = "exact path's alternative is rejected by validation or compile"
+_TEMPLATE_COMPILED = "exact path changes the compile result"
 for _field, _note in {
-    "movement.physical": _PHYSICAL_TEMPLATE_REJECTED,
-    "movement.physical.mode": _PHYSICAL_TEMPLATE_REJECTED,
-    "movement.physical.start_pan_deg": _PHYSICAL_TEMPLATE_COMPILED,
-    "movement.physical.start_tilt_deg": _PHYSICAL_TEMPLATE_COMPILED,
-    "movement.physical.pan_extent_deg": _PHYSICAL_TEMPLATE_COMPILED,
-    "movement.physical.tilt_extent_deg": _PHYSICAL_TEMPLATE_COMPILED,
-    "movement.physical.period_beats": _PHYSICAL_TEMPLATE_COMPILED,
-    "dimmer.physical": _PHYSICAL_TEMPLATE_COMPILED,
-    "dimmer.physical.period_beats": _PHYSICAL_TEMPLATE_COMPILED,
-    "dimmer.physical.duty_cycle": _PHYSICAL_TEMPLATE_COMPILED,
-    "dimmer.physical.phase_cycles": _PHYSICAL_TEMPLATE_COMPILED,
-    "dimmer.physical.low": _PHYSICAL_TEMPLATE_COMPILED,
-    "dimmer.physical.high": _PHYSICAL_TEMPLATE_COMPILED,
-    "physical_shutter": _PHYSICAL_TEMPLATE_COMPILED,
-    "physical_shutter.period_beats": _PHYSICAL_TEMPLATE_COMPILED,
-    "physical_shutter.duty_cycle": _PHYSICAL_TEMPLATE_COMPILED,
-    "physical_shutter.phase_cycles": _PHYSICAL_TEMPLATE_COMPILED,
-    "physical_shutter.low_state": _PHYSICAL_TEMPLATE_COMPILED,
-    "physical_shutter.high_state": _PHYSICAL_TEMPLATE_COMPILED,
+    "movement": _TEMPLATE_REJECTED,
+    "movement.mode": _TEMPLATE_REJECTED,
+    "movement.start_pan_deg": _TEMPLATE_COMPILED,
+    "movement.start_tilt_deg": _TEMPLATE_COMPILED,
+    "movement.pan_extent_deg": _TEMPLATE_COMPILED,
+    "movement.tilt_extent_deg": _TEMPLATE_COMPILED,
+    "movement.period_beats": _TEMPLATE_COMPILED,
+    "dimmer": _TEMPLATE_COMPILED,
+    "dimmer.period_beats": _TEMPLATE_COMPILED,
+    "dimmer.duty_cycle": _TEMPLATE_COMPILED,
+    "dimmer.phase_cycles": _TEMPLATE_COMPILED,
+    "dimmer.low": _TEMPLATE_COMPILED,
+    "dimmer.high": _TEMPLATE_COMPILED,
+    "shutter": _TEMPLATE_COMPILED,
+    "shutter.period_beats": _TEMPLATE_COMPILED,
+    "shutter.duty_cycle": _TEMPLATE_COMPILED,
+    "shutter.phase_cycles": _TEMPLATE_COMPILED,
+    "shutter.low_state": _TEMPLATE_COMPILED,
+    "shutter.high_state": _TEMPLATE_COMPILED,
 }.items():
-    _physical_template_path = f"template.template.steps.{_field}"
-    CONFIG_EFFECTS[_physical_template_path] = ConfigDisposition(
+    _step_field_path = f"template.template.steps.{_field}"
+    CONFIG_EFFECTS[_step_field_path] = ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/compile/test_physical.py::"
-        f"test_physical_template_field_changes_compile[{_physical_template_path}]",
+        "tests/unit/sequencer/moving_heads/compile/test_step.py::"
+        f"test_step_field_changes_compile[{_step_field_path}]",
         _note,
     )
-CONFIG_EFFECTS["template.template.steps.movement.physical.shape"] = ConfigDisposition(
+CONFIG_EFFECTS["template.template.steps.movement.shape"] = ConfigDisposition(
     ConfigDispositionKind.EFFECT_TEST,
-    "tests/unit/sequencer/moving_heads/compile/test_physical.py::"
+    "tests/unit/sequencer/moving_heads/compile/test_step.py::"
     "test_each_kernel_shapes_the_compiled_path[sine_tilt]",
     "each kernel shapes the compiled path",
 )
 
-# P1.4 physical discrete template fields: named shutter, color and gobo states held
-# for a step. Like P1.2's, they feed the physical compile; each exact
-# path selects another declared state and must change `compile_physical_step`'s
+# P1.4 discrete template step fields: named shutter, color and gobo states held
+# for a step. Like P1.2's, they feed the step compile; each exact
+# path selects another declared state and must change `compile_step`'s
 # result, so a compile that ignored the field fails its case.
-for _field in ("physical_shutter_state", "physical_color", "physical_gobo"):
-    _physical_template_path = f"template.template.steps.{_field}"
-    CONFIG_EFFECTS[_physical_template_path] = ConfigDisposition(
+for _field in ("shutter_state", "color", "gobo"):
+    _step_field_path = f"template.template.steps.{_field}"
+    CONFIG_EFFECTS[_step_field_path] = ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/compile/test_physical_discrete.py::"
-        f"test_physical_discrete_field_changes_compile[{_physical_template_path}]",
-        _PHYSICAL_TEMPLATE_COMPILED,
+        "tests/unit/sequencer/moving_heads/compile/test_step_discrete.py::"
+        f"test_discrete_field_changes_compile[{_step_field_path}]",
+        _TEMPLATE_COMPILED,
     )
 
 # P2.4a reposition fallbacks: a step's opt-in and the job's policy, both required. Each
-# exact path is evidenced by a physical render whose cue that cannot be repositioned is
+# exact path is evidenced by a render whose cue that cannot be repositioned is
 # kept dark with both set and refused once that one path is back at its default.
 for _fallback_path in (
-    "template.template.steps.physical_reposition_fallback",
+    "template.template.steps.reposition_fallback",
     "job.moving_heads.reposition_fallback",
 ):
     CONFIG_EFFECTS[_fallback_path] = ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/sequencer/moving_heads/compile/test_entry_window.py::"
         f"test_reposition_fallback_field_changes_preposition[{_fallback_path}]",
-        _PHYSICAL_PREPOSITION,
+        "exact path changes whether a cue that cannot be repositioned is kept dark or the "
+        "render is refused",
     )
 
-# What a physical render does with a cue the plan placed where it cannot play. Evidenced
+# What a render does with a cue the plan placed where it cannot play. Evidenced
 # by a render that keeps such a cue dark at the default and is refused under `error`.
 CONFIG_EFFECTS["job.moving_heads.on_unplayable"] = ConfigDisposition(
     ConfigDispositionKind.EFFECT_TEST,
@@ -2252,26 +2253,26 @@ CONFIG_EFFECTS["job.moving_heads.on_unplayable"] = ConfigDisposition(
 )
 
 # P2.1 named rig components: a fixture group's position and attribute presets and the
-# step references that name them. They feed the physical compile; each
-# exact path mutates its field and must either change `compile_physical_template`'s
+# step references that name them. They feed the compile; each
+# exact path mutates its field and must either change `compile_template`'s
 # result or be refused by validation or compile (a reference that no longer resolves).
 for _component_path, _note in {
-    "fixture.presets": _PHYSICAL_TEMPLATE_REJECTED,
-    "fixture.presets.positions": _PHYSICAL_TEMPLATE_REJECTED,
-    "fixture.presets.positions.fixtures": _PHYSICAL_TEMPLATE_COMPILED,
-    "fixture.presets.positions.fixtures.pan_deg": _PHYSICAL_TEMPLATE_COMPILED,
-    "fixture.presets.positions.fixtures.tilt_deg": _PHYSICAL_TEMPLATE_COMPILED,
-    "fixture.presets.positions.fallback": _PHYSICAL_TEMPLATE_COMPILED,
-    "fixture.presets.attributes": _PHYSICAL_TEMPLATE_REJECTED,
-    "fixture.presets.attributes.fixtures": _PHYSICAL_TEMPLATE_COMPILED,
-    "fixture.presets.attributes.fixtures.shutter": _PHYSICAL_TEMPLATE_COMPILED,
-    "fixture.presets.attributes.fixtures.color": _PHYSICAL_TEMPLATE_COMPILED,
-    "fixture.presets.attributes.fixtures.gobo": _PHYSICAL_TEMPLATE_COMPILED,
-    "fixture.presets.attributes.fixtures.dimmer": _PHYSICAL_TEMPLATE_COMPILED,
-    "fixture.presets.attributes.fallback": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.steps.component_refs": _PHYSICAL_TEMPLATE_REJECTED,
-    "template.template.steps.component_refs.position_id": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.steps.component_refs.attribute_preset_ids": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.presets": _TEMPLATE_REJECTED,
+    "fixture.presets.positions": _TEMPLATE_REJECTED,
+    "fixture.presets.positions.fixtures": _TEMPLATE_COMPILED,
+    "fixture.presets.positions.fixtures.pan_deg": _TEMPLATE_COMPILED,
+    "fixture.presets.positions.fixtures.tilt_deg": _TEMPLATE_COMPILED,
+    "fixture.presets.positions.fallback": _TEMPLATE_COMPILED,
+    "fixture.presets.attributes": _TEMPLATE_REJECTED,
+    "fixture.presets.attributes.fixtures": _TEMPLATE_COMPILED,
+    "fixture.presets.attributes.fixtures.shutter": _TEMPLATE_COMPILED,
+    "fixture.presets.attributes.fixtures.color": _TEMPLATE_COMPILED,
+    "fixture.presets.attributes.fixtures.gobo": _TEMPLATE_COMPILED,
+    "fixture.presets.attributes.fixtures.dimmer": _TEMPLATE_COMPILED,
+    "fixture.presets.attributes.fallback": _TEMPLATE_COMPILED,
+    "template.template.steps.component_refs": _TEMPLATE_REJECTED,
+    "template.template.steps.component_refs.position_id": _TEMPLATE_COMPILED,
+    "template.template.steps.component_refs.attribute_preset_ids": _TEMPLATE_COMPILED,
 }.items():
     CONFIG_EFFECTS[_component_path] = ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
@@ -2281,23 +2282,23 @@ for _component_path, _note in {
     )
 
 # P2.2 rig topology and phase distribution: a fixture group's canonical rig and the step
-# distributions that spread phase over it. They feed the physical compile;
+# distributions that spread phase over it. They feed the compile;
 # each exact path mutates its field and must either change the compiled pan, tilt,
 # dimmer or shutter values or be refused (a distribution on a rig left without topology).
 for _topology_path, _note in {
-    "fixture.topology": _PHYSICAL_TEMPLATE_REJECTED,
-    "fixture.topology.members": _PHYSICAL_TEMPLATE_COMPILED,
-    "fixture.topology.members.fixture_id": _PHYSICAL_TEMPLATE_COMPILED,
-    "fixture.topology.members.row": _PHYSICAL_TEMPLATE_COMPILED,
-    "fixture.topology.members.column": _PHYSICAL_TEMPLATE_COMPILED,
-    "fixture.topology.members.ordinal": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.steps.physical_distribution": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.steps.physical_distribution.domains": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.steps.physical_distribution.block_size": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.steps.physical_distribution.group_count": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.steps.physical_distribution.wings": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.steps.physical_distribution.spread_cycles": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.steps.physical_distribution.direction": _PHYSICAL_TEMPLATE_COMPILED,
+    "fixture.topology": _TEMPLATE_REJECTED,
+    "fixture.topology.members": _TEMPLATE_COMPILED,
+    "fixture.topology.members.fixture_id": _TEMPLATE_COMPILED,
+    "fixture.topology.members.row": _TEMPLATE_COMPILED,
+    "fixture.topology.members.column": _TEMPLATE_COMPILED,
+    "fixture.topology.members.ordinal": _TEMPLATE_COMPILED,
+    "template.template.steps.distribution": _TEMPLATE_COMPILED,
+    "template.template.steps.distribution.domains": _TEMPLATE_COMPILED,
+    "template.template.steps.distribution.block_size": _TEMPLATE_COMPILED,
+    "template.template.steps.distribution.group_count": _TEMPLATE_COMPILED,
+    "template.template.steps.distribution.wings": _TEMPLATE_COMPILED,
+    "template.template.steps.distribution.spread_cycles": _TEMPLATE_COMPILED,
+    "template.template.steps.distribution.direction": _TEMPLATE_COMPILED,
 }.items():
     CONFIG_EFFECTS[_topology_path] = ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
@@ -2307,10 +2308,10 @@ for _topology_path, _note in {
     )
 
 # P2.3 relative paths: the template-owned transform of a circle, lissajous or sweep and
-# the lissajous frequency ratio. They feed the physical compile; each exact
+# the lissajous frequency ratio. They feed the compile; each exact
 # path mutates its field and must change the compiled pan and tilt values. The `ONCE`
 # repeat value has no path of its own: `template.template.repeat.mode` keeps its
-# discriminator, and ONCE's physical scheduling is tested in the same module.
+# discriminator, and ONCE's scheduling is tested in the same module.
 for _path_field in (
     "transform",
     "transform.rotation_deg",
@@ -2318,34 +2319,34 @@ for _path_field in (
     "transform.phase_cycles",
     "lissajous_ratio",
 ):
-    _path_path = f"template.template.steps.movement.physical.{_path_field}"
+    _path_path = f"template.template.steps.movement.{_path_field}"
     CONFIG_EFFECTS[_path_path] = ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/compile/test_physical_paths.py::"
+        "tests/unit/sequencer/moving_heads/compile/test_paths.py::"
         f"test_path_field_changes_compile[{_path_path}]",
-        _PHYSICAL_TEMPLATE_COMPILED,
+        _TEMPLATE_COMPILED,
     )
 
 # P2.4b visibility envelopes and attribute overlays: a step's lit window and the
-# template's temporary wheel states. They feed the physical compile; each
+# template's temporary wheel states. They feed the compile; each
 # exact path mutates its field and must change the compiled cues or be refused. The
 # profile's `discrete.open_state`, identity-only until now, is what an envelope step
 # without a static shutter state is lit through; its records are repointed here.
 for _visibility_path, _note in {
-    "template.template.steps.physical_visibility": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.steps.physical_visibility.visible_phase_start": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.steps.physical_visibility.visible_phase_end": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.steps.physical_visibility.attack_beats": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.steps.physical_visibility.release_beats": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.steps.physical_visibility.level": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.physical_overlays": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.physical_overlays.start_beats": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.physical_overlays.end_beats": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.physical_overlays.mask_beats": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.physical_overlays.channel": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.physical_overlays.state": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.physical_overlays.attribute_preset_id": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.physical_overlays.release": _PHYSICAL_TEMPLATE_REJECTED,
+    "template.template.steps.visibility": _TEMPLATE_COMPILED,
+    "template.template.steps.visibility.visible_phase_start": _TEMPLATE_COMPILED,
+    "template.template.steps.visibility.visible_phase_end": _TEMPLATE_COMPILED,
+    "template.template.steps.visibility.attack_beats": _TEMPLATE_COMPILED,
+    "template.template.steps.visibility.release_beats": _TEMPLATE_COMPILED,
+    "template.template.steps.visibility.level": _TEMPLATE_COMPILED,
+    "template.template.overlays": _TEMPLATE_COMPILED,
+    "template.template.overlays.start_beats": _TEMPLATE_COMPILED,
+    "template.template.overlays.end_beats": _TEMPLATE_COMPILED,
+    "template.template.overlays.mask_beats": _TEMPLATE_COMPILED,
+    "template.template.overlays.channel": _TEMPLATE_COMPILED,
+    "template.template.overlays.state": _TEMPLATE_COMPILED,
+    "template.template.overlays.attribute_preset_id": _TEMPLATE_COMPILED,
+    "template.template.overlays.release": _TEMPLATE_REJECTED,
 }.items():
     CONFIG_EFFECTS[_visibility_path] = ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
@@ -2362,20 +2363,20 @@ for _profile_root in (
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/sequencer/moving_heads/compile/test_visibility.py::"
         f"test_open_state_changes_the_lit_shutter[{_open_state_path}]",
-        _PHYSICAL_TEMPLATE_COMPILED,
+        _TEMPLATE_COMPILED,
     )
 
 # P2.5 zoom pilot: a step's beam angle on a profile's zoom axis. It feeds only the opt-in
-# physical compile; each exact path mutates its field and must change the cues compiled
+# compile; each exact path mutates its field and must change the cues compiled
 # on a zoom rig and a zoomless one, or be refused (`if_unsupported` back at `error` on the
 # zoomless rig). The profile's `axes.dmx_min`/`dmx_max` and the initial state's
 # `zoom_deg` are evidenced with the other profile and initial-state paths above.
 for _zoom_path, _note in {
-    "template.template.steps.physical_zoom": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.steps.physical_zoom.shape": _PHYSICAL_TEMPLATE_REJECTED,
-    "template.template.steps.physical_zoom.start_deg": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.steps.physical_zoom.extent_deg": _PHYSICAL_TEMPLATE_COMPILED,
-    "template.template.steps.physical_zoom.if_unsupported": _PHYSICAL_TEMPLATE_REJECTED,
+    "template.template.steps.zoom": _TEMPLATE_COMPILED,
+    "template.template.steps.zoom.shape": _TEMPLATE_REJECTED,
+    "template.template.steps.zoom.start_deg": _TEMPLATE_COMPILED,
+    "template.template.steps.zoom.extent_deg": _TEMPLATE_COMPILED,
+    "template.template.steps.zoom.if_unsupported": _TEMPLATE_REJECTED,
 }.items():
     CONFIG_EFFECTS[_zoom_path] = ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,

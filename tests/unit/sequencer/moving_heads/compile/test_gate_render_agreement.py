@@ -28,15 +28,15 @@ from typing import Any
 from pydantic import ValidationError
 import pytest
 
-from tests.support.mh_physical import (
-    PHYSICAL_INITIAL_STATE,
+from tests.support.moving_heads import (
+    INITIAL_STATE,
     assert_honest_transactions,
     hold_step,
+    loop_template_doc,
+    p1_job,
     path_step,
-    physical_job,
-    physical_sections,
-    physical_template_doc,
     registered_templates,
+    sections_plan,
     sine_step,
     sweep_step,
     topology_payload,
@@ -49,16 +49,16 @@ from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.models.moving_heads.physical import PhysicalChannelError
 from twinklr.core.sequencer.models.template import TemplateDoc
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile.physical import PhysicalCompileError
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     TRANSACTION_METADATA_KEY,
     plan_prepositions,
 )
+from twinklr.core.sequencer.moving_heads.compile.step import CompileError
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import frame_times
 from twinklr.core.sequencer.moving_heads.pipeline import (
-    PhysicalRenderError,
     RenderingPipeline,
-    check_physical_templates,
+    RenderRefusedError,
+    admit_templates,
 )
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
@@ -77,7 +77,7 @@ Seeds 163 and 1427 did too until a cycle holding no whole number of its movement
 grew to one that does (`whole_period_cycle`): their one-beat cycles of 3- and 4-beat
 periods now play over whole bars, and no other seed below 4000 reaches the case."""
 _ONCE_CUT = 5440
-_RENDER_ERRORS = (PhysicalRenderError, PhysicalCompileError, PhysicalChannelError, ValueError)
+_RENDER_ERRORS = (RenderRefusedError, CompileError, PhysicalChannelError, ValueError)
 
 _SHAPES = [
     "sine_pan",
@@ -181,16 +181,14 @@ def _step(rng: random.Random, step_id: str, start: float, duration: float, once:
     gobo = rng.choice([None, None, "open", "dots", "star"])
     extra: dict[str, Any] = {}
     if color:
-        extra["physical_color"] = color
+        extra["color"] = color
     if gobo:
-        extra["physical_gobo"] = gobo
+        extra["gobo"] = gobo
     if shape in ("sine_pan", "sine_tilt"):
         step = sine_step(step_id, pan, extent, period_beats=period, tilt=tilt, **timing, **extra)
-        step["movement"]["physical"]["shape"] = shape
+        step["movement"]["shape"] = shape
         if shape == "sine_tilt":
-            step["movement"]["physical"].update(
-                pan_extent_deg=0.0, tilt_extent_deg=min(extent, 30.0)
-            )
+            step["movement"].update(pan_extent_deg=0.0, tilt_extent_deg=min(extent, 30.0))
     elif shape == "linear":
         step = sweep_step(step_id, pan, extent, period_beats=period, tilt=tilt, **timing, **extra)
     elif shape == "hold":
@@ -226,8 +224,8 @@ def _step(rng: random.Random, step_id: str, start: float, duration: float, once:
         release = rng.choice([0.0, 0.0, 0.25, 0.5])
         if attack + release > lit_beats:
             attack = release = 0.0
-        step["dimmer"] = {}
-        step["physical_visibility"] = {
+        step.pop("dimmer", None)
+        step["visibility"] = {
             "visible_phase_start": low,
             "visible_phase_end": high,
             "attack_beats": attack,
@@ -236,14 +234,12 @@ def _step(rng: random.Random, step_id: str, start: float, duration: float, once:
         }
         draw = rng.random()
         if draw < 0.25:
-            step.pop("physical_shutter_state")
+            step.pop("shutter_state")
         elif draw < 0.3:
-            step["physical_shutter_state"] = "closed"
+            step["shutter_state"] = "closed"
     if rng.random() < 0.5 and shape != "hold":
         domains = (
-            ["pan", "tilt"]
-            if "physical_visibility" in step
-            else rng.choice([["pan", "tilt"], ["pan"]])
+            ["pan", "tilt"] if "visibility" in step else rng.choice([["pan", "tilt"], ["pan"]])
         )
         distribution: dict[str, Any] = {
             "domains": domains,
@@ -252,9 +248,9 @@ def _step(rng: random.Random, step_id: str, start: float, duration: float, once:
         }
         if rng.random() < 0.3:
             distribution["direction"] = "reverse"
-        step["physical_distribution"] = [distribution]
+        step["distribution"] = [distribution]
     if rng.random() < 0.4:
-        step["physical_reposition_fallback"] = rng.choice(["drop_accent", "preserve_aim"])
+        step["reposition_fallback"] = rng.choice(["drop_accent", "preserve_aim"])
     return step
 
 
@@ -295,7 +291,7 @@ def _document(
                 entry["state"] = rng.choice(states)
             overlays.append(entry)
     policy = rng.choice(["HOLD_LAST_POSE", "TRUNCATE"])
-    return physical_template_doc(
+    return loop_template_doc(
         template_id,
         steps,
         cycle_bars=cycle,
@@ -388,10 +384,10 @@ def _target_step(
     )
     extra: dict[str, Any] = {"start": start, "duration": duration}
     if fallback:
-        extra["physical_reposition_fallback"] = fallback
+        extra["reposition_fallback"] = fallback
     color = rng.choice([None, None, "red", "blue", "white"])
     if color:
-        extra["physical_color"] = color
+        extra["color"] = color
     shapes = (
         ["linear", "hold", "sweepf"]
         if once
@@ -422,12 +418,12 @@ def _target_step(
         )
     if presets and rng.random() < 0.3:
         step["component_refs"] = {"position_id": None, "attribute_preset_ids": ["aa"]}
-        step.pop("physical_color", None)
+        step.pop("color", None)
     draw = rng.random()
     if draw < 0.25 and not once:
         pulse_period = rng.choice([0.5, 1.0, 2.0])
         duty = rng.choice([0.25, 0.5, 0.75])
-        step["dimmer"]["physical"] = {
+        step["dimmer"] = {
             "period_beats": pulse_period,
             "duty_cycle": duty,
             "low": 0.0,
@@ -435,10 +431,10 @@ def _target_step(
             "phase_cycles": rng.choice([0.0, 0.3, 0.9]),
         }
     elif draw < 0.45 and not once:
-        step.pop("physical_shutter_state", None)
+        step.pop("shutter_state", None)
         shutter_period = rng.choice([1.0, 2.0])
         duty = rng.choice([0.25, 0.5])
-        step["physical_shutter"] = {
+        step["shutter"] = {
             "period_beats": shutter_period,
             "duty_cycle": duty,
             "phase_cycles": rng.choice([0.0, 0.45]),
@@ -448,8 +444,8 @@ def _target_step(
     elif draw < 0.7 and shape != "hold":
         low = rng.choice([0.0, 0.2, 0.5])
         high = min(1.0, low + rng.choice([0.2, 0.3, 0.5, 1.0]))
-        step["dimmer"] = {}
-        step["physical_visibility"] = {
+        step.pop("dimmer", None)
+        step["visibility"] = {
             "visible_phase_start": low,
             "visible_phase_end": high,
             "attack_beats": 0.0,
@@ -459,13 +455,13 @@ def _target_step(
     if shape != "hold" and rng.random() < 0.35:
         domains = (
             ["pan", "tilt"]
-            if "physical_visibility" in step
+            if "visibility" in step
             else rng.choice([["pan"], ["pan", "tilt"], ["pan", "dimmer"]])
         )
-        if "physical_shutter" in step and "dimmer" in domains:
+        if "shutter" in step and "dimmer" in domains:
             domains = ["pan"]
         spread = rng.choice([0.25, 0.5, 1.0])
-        step["physical_distribution"] = [
+        step["distribution"] = [
             {"domains": domains, "spread_cycles": spread, "wings": rng.choice([1, 2])}
         ]
     return step
@@ -510,7 +506,7 @@ def _target_document(
                     "state": rng.choice(["dots", "star"]),
                 }
             )
-    return physical_template_doc(
+    return loop_template_doc(
         template_id,
         steps,
         cycle_bars=cycle,
@@ -524,9 +520,9 @@ def _target_document(
 
 
 def _job(ids: tuple[str, ...], policy: str, on_unplayable: str) -> JobConfig:
-    states = dict.fromkeys(ids, PHYSICAL_INITIAL_STATE)
+    states = dict.fromkeys(ids, INITIAL_STATE)
     fallback = {} if policy == "error" else {"reposition_fallback": policy}
-    return physical_job(initial_states=states, on_unplayable=on_unplayable, **fallback)
+    return p1_job(initial_states=states, on_unplayable=on_unplayable, **fallback)
 
 
 def _admitted(
@@ -540,7 +536,7 @@ def _admitted(
     admitted = []
     for document in documents:
         try:
-            check_physical_templates(
+            admit_templates(
                 [document.template.template_id],
                 beat_grid=grid,
                 fixture_group=rig,
@@ -558,7 +554,7 @@ def _render(
     sections: list[tuple[str, int, int]], grid: BeatGrid, rig: FixtureGroup, job: JobConfig
 ) -> tuple[RenderingPipeline, list[FixtureSegment]]:
     pipeline = RenderingPipeline(
-        choreography_plan=physical_sections(*sections),
+        choreography_plan=sections_plan(*sections),
         beat_grid=grid,
         fixture_group=rig,
         job_config=job,
@@ -662,7 +658,7 @@ def _check_subset(
             preset["fixtures"].pop(gone, None)
     present = tuple(i for i in ids if i != gone)
     policy = job.moving_heads
-    subset_job = physical_job(
+    subset_job = p1_job(
         initial_states={i: policy.initial_states[i] for i in present},
         reposition_fallback=policy.reposition_fallback,
         on_unplayable=policy.on_unplayable,

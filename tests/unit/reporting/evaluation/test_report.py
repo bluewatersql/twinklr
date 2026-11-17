@@ -1,9 +1,9 @@
-"""`eval-report` on a physical run's checkpoint (P3-C1.1b).
+"""`eval-report` on a run's checkpoint (P3-C1.1b).
 
-The run is real down to the render: the pre-planning gate admits the physical family
+The run is real down to the render: the pre-planning gate admits the family
 catalog on a four-head rig, the planning stage writes its checkpoint and the render
 stage renders, delivers and records its render in that checkpoint. Only the audio
-analysis is replaced: a physical re-render takes its beat grid from the checkpoint, and
+analysis is replaced: a re-render takes its beat grid from the checkpoint, and
 the analysis supplies the report's song metadata alone. No provider, owner data or
 xLights is touched.
 """
@@ -21,15 +21,15 @@ from unittest.mock import patch
 from click.testing import CliRunner
 import pytest
 
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
     FAMILY_IDS,
     ZOOM_FAMILY_ID,
+    bars_grid,
+    family_catalog,
     family_job,
     family_rig,
-    physical_bars_grid,
-    physical_catalog,
     physical_head_profile,
-    physical_sections,
+    sections_plan,
     zoom_job,
     zoom_pilot_profile_payload,
     zoom_rig,
@@ -63,12 +63,12 @@ from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.session import TwinklrSession
 
 HEADS = ("MH1", "MH2", "MH3", "MH4")
-GRID = physical_bars_grid(500.0, 500.0, 430.0, 500.0)
+GRID = bars_grid(500.0, 500.0, 430.0, 500.0)
 FLICK = "masked_wheel_flick"  # left out: the rig declares no `flick` attribute preset
 
 
 class _FakeAnalyzer:
-    """Stands in for the audio analysis, which a physical report reads only for the
+    """Stands in for the audio analysis, which a report reads only for the
     song's metadata."""
 
     def __init__(self, **kwargs: object) -> None:
@@ -87,16 +87,16 @@ class _FakeAnalyzer:
 def _plan(*sections: tuple[str, int, int]) -> ChoreographyPlan:
     # Through JSON, as a planner's plan states every field: a section built without the
     # planner-intent fields marks itself in a private flag that a checkpoint cannot carry.
-    return ChoreographyPlan.model_validate(physical_sections(*sections).model_dump(mode="json"))
+    return ChoreographyPlan.model_validate(sections_plan(*sections).model_dump(mode="json"))
 
 
 PLAN = _plan(("target_orbit", 1, 2), ("mirror_wings", 3, 4))
 
 
 def _grid(shift_ms: float, *beat_ms: float) -> BeatGrid:
-    """`physical_bars_grid(*beat_ms)` moved `shift_ms` (instead of 15 ms) off the frame
+    """`bars_grid(*beat_ms)` moved `shift_ms` (instead of 15 ms) off the frame
     grid."""
-    grid = physical_bars_grid(*beat_ms)
+    grid = bars_grid(*beat_ms)
     move = shift_ms - grid.bar_boundaries[0]
     beats = [beat + move for beat in grid.beat_boundaries]
     return grid.model_copy(
@@ -118,7 +118,7 @@ async def _run(
     gate: bool = True,
     zoom: bool = False,
 ) -> tuple[Path, Path, dict[str, Any]]:
-    """A physical run: gate (unless `gate` is false), plan checkpoint, render, on the
+    """A run: gate (unless `gate` is false), plan checkpoint, render, on the
     family rig (with `zoom`, the zoom pilot rig and every family). Returns the
     checkpoint, the fixture config and the run's trace."""
     rig = zoom_rig(HEADS) if zoom else family_rig(HEADS, presets=False)
@@ -127,7 +127,7 @@ async def _run(
     fixture_path = tmp_path / "fixture_config.json"
     fixture_path.write_text(rig.model_dump_json(), encoding="utf-8")
     output_dir = tmp_path / "artifacts"
-    session = TwinklrSession(job_config=job, session_id="physical-eval", project_root=tmp_path)
+    session = TwinklrSession(job_config=job, session_id="family-eval", project_root=tmp_path)
     context = PipelineContext(session=session, output_dir=output_dir)
     context.set_state("beat_grid", grid)
 
@@ -162,27 +162,27 @@ async def _report(
 
 
 @pytest.mark.asyncio
-async def test_physical_checkpoint_reports_the_render_the_run_made(tmp_path: Path) -> None:
-    with physical_catalog():
+async def test_checkpoint_reports_the_render_the_run_made(tmp_path: Path) -> None:
+    with family_catalog():
         checkpoint, fixture_path, trace = await _run(tmp_path)
         report = await _report(tmp_path, checkpoint, fixture_path, "report")
         again = await _report(tmp_path, checkpoint, fixture_path, "again")
 
     run = trace["render"]
-    physical = report.physical
+    summary = report.render
     # The re-render is the run's render: its fingerprint, recorded in the trace, matches.
-    assert physical.run_fingerprint == run["render_fingerprint"]
-    assert physical.rerender_fingerprint == run["render_fingerprint"]
-    assert physical.fingerprint_matches is True
+    assert summary.run_fingerprint == run["render_fingerprint"]
+    assert summary.rerender_fingerprint == run["render_fingerprint"]
+    assert summary.fingerprint_matches is True
     # The gate's facts, as the run's trace records them.
-    assert [e["template_id"] for e in physical.admission_exclusions] == [FLICK]
-    assert physical.admission_exclusions == run["admission_exclusions"]
-    assert physical.admission_preset_exclusions == run.get("admission_preset_exclusions", [])
-    assert physical.admission_effective_presets == run.get("admission_effective_presets", {})
-    assert physical.unplayable_totals == run["unplayable_totals"]
+    assert [e["template_id"] for e in summary.admission_exclusions] == [FLICK]
+    assert summary.admission_exclusions == run["admission_exclusions"]
+    assert summary.admission_preset_exclusions == run.get("admission_preset_exclusions", [])
+    assert summary.admission_effective_presets == run.get("admission_effective_presets", {})
+    assert summary.unplayable_totals == run["unplayable_totals"]
     # A run renders no dark spans; its record and report say none.
     assert "dark_spans" not in json.loads(checkpoint.read_text())["render"]
-    assert (physical.dark_spans, physical.dark_span_ms) == ([], 0)
+    assert (summary.dark_spans, summary.dark_span_ms) == ([], 0)
 
     assert report.summary.sections == 2
     for section, (start_bar, end_bar) in zip(report.sections, ((1, 2), (3, 4)), strict=True):
@@ -214,12 +214,12 @@ async def test_physical_checkpoint_reports_the_render_the_run_made(tmp_path: Pat
             assert curve.plot_path is not None and curve.plot_path.exists()
 
     written = json.loads((tmp_path / "report" / "report.json").read_text(encoding="utf-8"))
-    assert written["physical"]["fingerprint_matches"] is True
+    assert written["render"]["fingerprint_matches"] is True
     # The old renderer's metrics are not in the report at all.
     assert not {"physics_violations", "compliance_issues", "harsh_transitions"} & set(
         written["summary"]
     )
-    assert "not_reported" not in written["physical"]
+    assert "not_reported" not in written["render"]
     for section in written["sections"]:
         assert not {"template_compliance", "transition_to_next"} & set(section)
         assert "steps" not in section["selected_template"]
@@ -234,7 +234,7 @@ async def test_physical_checkpoint_reports_the_render_the_run_made(tmp_path: Pat
             "static_dmx",
         } & set(curve)
     markdown = (tmp_path / "report" / "report.md").read_text(encoding="utf-8")
-    assert "Physical render" in markdown
+    assert "## Render\n" in markdown
     assert run["render_fingerprint"] in markdown
     assert "Not reported" not in markdown
     assert "clamp=" not in markdown and "loop=" not in markdown
@@ -317,17 +317,17 @@ async def test_a_fingerprint_mismatch_is_reported_with_the_input_that_differs(
 ) -> None:
     """A re-render that is not the run's render is reported as an error naming the
     recorded input that differs, and the report is still written."""
-    with physical_catalog():
+    with family_catalog():
         checkpoint, fixture_path, _ = await _run(tmp_path)
         change(fixture_path, checkpoint)
         run_fingerprint = json.loads(checkpoint.read_text())["render"]["render_fingerprint"]
         report = await _report(tmp_path, checkpoint, fixture_path, "report")
 
-    assert report.physical is not None
-    assert report.physical.fingerprint_matches is False
-    assert report.physical.run_fingerprint == run_fingerprint
-    assert report.physical.rerender_fingerprint != run_fingerprint
-    assert report.physical.mismatched_inputs == named
+    assert report.render is not None
+    assert report.render.fingerprint_matches is False
+    assert report.render.run_fingerprint == run_fingerprint
+    assert report.render.rerender_fingerprint != run_fingerprint
+    assert report.render.mismatched_inputs == named
     [mismatch] = [f for f in report.sections[0].flags if f.code == "RENDER_FINGERPRINT_MISMATCH"]
     assert mismatch.level == ReportFlagLevel.ERROR
     for input_name in named:
@@ -343,7 +343,7 @@ async def test_a_fingerprint_mismatch_is_reported_with_the_input_that_differs(
 
 
 def test_the_command_prints_a_mismatch(tmp_path: Path) -> None:
-    with physical_catalog():
+    with family_catalog():
         checkpoint, fixture_path, _ = asyncio.run(_run(tmp_path))
         _rename_model(fixture_path, checkpoint)
         audio = tmp_path / "song.wav"
@@ -369,10 +369,8 @@ async def test_a_skipped_entry_reports_its_lit_step_across_the_boundary(tmp_path
     16000 ms to the wings' 35° at 16020 ms (bar 9 starts at 16015 ms, on frame 16020).
     That is within the 14.4° a 720°/s head travels in a frame (plus one 16-bit word)."""
     plan = _plan(("target_orbit", 1, 4), ("target_orbit", 5, 8), ("mirror_wings", 9, 12))
-    with physical_catalog():
-        checkpoint, fixture_path, _ = await _run(
-            tmp_path, grid=physical_bars_grid(*[500.0] * 12), plan=plan
-        )
+    with family_catalog():
+        checkpoint, fixture_path, _ = await _run(tmp_path, grid=bars_grid(*[500.0] * 12), plan=plan)
         report = await _report(tmp_path, checkpoint, fixture_path, "report")
 
     wings = report.sections[2]
@@ -398,13 +396,13 @@ async def test_a_skipped_entry_reports_its_lit_step_across_the_boundary(tmp_path
 async def test_a_zoom_axis_is_reported_like_pan_and_tilt(tmp_path: Path) -> None:
     """On the zoom pilot rig the zoom wave's zoom is read in degrees, within the axis'
     10°-40° beam angle, with its lit range and its largest lit step per head."""
-    with physical_catalog():
+    with family_catalog():
         checkpoint, fixture_path, _ = await _run(
             tmp_path, plan=_plan((ZOOM_FAMILY_ID, 1, 4)), zoom=True
         )
         report = await _report(tmp_path, checkpoint, fixture_path, "report")
 
-    assert report.physical is not None and report.physical.fingerprint_matches
+    assert report.render is not None and report.render.fingerprint_matches
     [section] = report.sections
     zoom = next(c for c in section.curves if c.channel == "zoom")
     assert zoom.space == "degree"
@@ -423,7 +421,7 @@ async def test_sections_are_windowed_on_the_frames_their_cues_land_on(tmp_path: 
     """Bar 3 starts at 4005 ms, which a cue lands on as frame 4000: that frame and the
     entry transactions there belong to the wings, so the orbit's pan stays within its
     ±25° and each section counts its own four entries."""
-    with physical_catalog():
+    with family_catalog():
         checkpoint, fixture_path, _ = await _run(
             tmp_path, grid=_grid(5.0, 500.0, 500.0, 430.0, 500.0)
         )
@@ -441,14 +439,14 @@ async def test_sections_are_windowed_on_the_frames_their_cues_land_on(tmp_path: 
 async def test_a_plan_naming_a_template_eval_report_cannot_load_is_refused_early(
     tmp_path: Path,
 ) -> None:
-    with physical_catalog():
+    with family_catalog():
         checkpoint, fixture_path, _ = await _run(tmp_path)
     data = json.loads(checkpoint.read_text(encoding="utf-8"))
     data["plan"]["sections"][1]["template_id"] = "my_user_template"
     checkpoint.write_text(json.dumps(data), encoding="utf-8")
 
     with (
-        physical_catalog(admit=False),
+        family_catalog(admit=False),
         patch("twinklr.core.audio.analyzer.AudioAnalyzer") as analyzer,
         pytest.raises(UnsupportedRenderModeError, match=r"my_user_template.*--template-dir"),
     ):
@@ -494,7 +492,7 @@ async def test_a_malformed_render_record_is_refused_with_a_message(
     tmp_path: Path, damage: Any
 ) -> None:
     """Refused before any audio is analyzed, whichever part is damaged."""
-    with physical_catalog():
+    with family_catalog():
         checkpoint, fixture_path, _ = await _run(tmp_path)
         data = json.loads(checkpoint.read_text(encoding="utf-8"))
         data["render"] = damage(data["render"])
@@ -513,13 +511,13 @@ async def test_a_malformed_render_record_is_refused_with_a_message(
 
 
 @pytest.mark.asyncio
-async def test_a_physical_checkpoint_without_a_record_is_refused_with_what_is_true(
+async def test_a_checkpoint_without_a_record_is_refused_with_what_is_true(
     tmp_path: Path,
 ) -> None:
     """`run`, `show`, `inject` and `regenerate` all plan, then record their render: a
     checkpoint without the record stopped before its render was delivered or could not
     record it, and re-running the command writes it. Refused before any analysis."""
-    with physical_catalog():
+    with family_catalog():
         checkpoint, fixture_path, _ = await _run(tmp_path)
         data = json.loads(checkpoint.read_text(encoding="utf-8"))
         del data["render"]
@@ -547,9 +545,9 @@ async def test_a_physical_checkpoint_without_a_record_is_refused_with_what_is_tr
 async def test_a_record_whose_policy_names_mode_is_refused_with_the_remedy(
     tmp_path: Path,
 ) -> None:
-    """The physical renderer wrote `policy.mode` while a job could choose between two
-    renderers; such a record is refused, not read, naming why and what to do."""
-    with physical_catalog():
+    """A record written before the cutover to one renderer has `policy.mode`; it is
+    refused, not read, naming why and what to do."""
+    with family_catalog():
         checkpoint, fixture_path, _ = await _run(tmp_path)
         data = json.loads(checkpoint.read_text(encoding="utf-8"))
         data["render"]["policy"]["mode"] = "physical_v2"
@@ -567,22 +565,22 @@ async def test_a_record_whose_policy_names_mode_is_refused_with_the_remedy(
     analyzer.assert_not_called()
     message = " ".join(str(refused.value).split())
     assert "its policy names `mode`" in message
-    assert "re-running the command that planned it plans and records it again" in message
+    assert "re-run the command that planned it to plan and record it again" in message
 
 
 @pytest.mark.asyncio
 async def test_a_run_without_a_gate_result_validates_against_the_catalog(tmp_path: Path) -> None:
     """With no recorded gate result, the plan is validated against the registry with the
-    physical catalog loaded, as the run loaded it."""
-    with physical_catalog():
+    family catalog loaded, as the run loaded it."""
+    with family_catalog():
         checkpoint, fixture_path, _ = await _run(tmp_path, gate=False)
     assert json.loads(checkpoint.read_text())["render"]["admission"] is None
 
-    with physical_catalog(admit=False):
+    with family_catalog(admit=False):
         report = await _report(tmp_path, checkpoint, fixture_path, "report")
 
     assert report.summary.validation_errors == 0
-    assert report.physical is not None and report.physical.fingerprint_matches
+    assert report.render is not None and report.render.fingerprint_matches
 
 
 def test_section_facts_select_the_sections_records_and_flag_what_was_kept_dark() -> None:

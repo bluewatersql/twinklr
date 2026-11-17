@@ -1,4 +1,4 @@
-"""The render preflight: a physical job that cannot render is refused right after audio
+"""The render preflight: a job that cannot render is refused right after audio
 analysis, before the profile, lyrics, macro and moving-head planners spend anything."""
 
 from __future__ import annotations
@@ -12,24 +12,24 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
     FAMILY_IDS,
-    PHYSICAL_INITIAL_STATE,
+    INITIAL_STATE,
     SUBSET_TEMPLATE_ID,
     TEMPLATE_DIR,
     TEMPLATE_ID,
+    bars_grid,
+    family_catalog,
     family_job,
     family_rig,
     hold_step,
-    physical_bars_grid,
-    physical_catalog,
-    physical_grid,
-    physical_job,
-    physical_rig,
-    physical_sections,
-    physical_template_doc,
-    physical_test_templates,
+    loop_template_doc,
+    p1_grid,
+    p1_job,
+    p1_rig,
+    p1_templates,
     registered_templates,
+    sections_plan,
     unprofiled_rig,
 )
 from twinklr.core.agents.audio.lyrics.stage import LyricsStage
@@ -79,19 +79,19 @@ async def _run(
 
 
 def _long_tail_grid() -> BeatGrid:
-    """The physical grid with two silent seconds after its last observed beat."""
-    grid = physical_grid()
+    """The P1 grid with two silent seconds after its last observed beat."""
+    grid = p1_grid()
     return grid.model_copy(update={"duration_ms": grid.duration_ms + 2000})
 
 
 @pytest.mark.asyncio
-async def test_physical_job_on_a_rig_without_profiles_is_refused() -> None:
-    with physical_test_templates():
+async def test_job_on_a_rig_without_profiles_is_refused() -> None:
+    with p1_templates():
         result, _ = await _run(
-            physical_job(),
+            p1_job(),
             templates=[TEMPLATE_ID],
             rig=unprofiled_rig(),
-            beat_grid=physical_grid(),
+            beat_grid=p1_grid(),
         )
 
     assert not result.success
@@ -102,9 +102,7 @@ async def test_physical_job_on_a_rig_without_profiles_is_refused() -> None:
 async def test_a_job_offered_no_template_is_refused_before_planning() -> None:
     """With no template loaded there is nothing to offer the planner: the gate refuses
     the run before any provider request."""
-    result, _ = await _run(
-        physical_job(), templates=[], rig=physical_rig(), beat_grid=physical_grid()
-    )
+    result, _ = await _run(p1_job(), templates=[], rig=p1_rig(), beat_grid=p1_grid())
 
     assert not result.success
     assert "has no template this rig can render" in (result.error or "")
@@ -112,17 +110,17 @@ async def test_a_job_offered_no_template_is_refused_before_planning() -> None:
 
 
 @pytest.mark.asyncio
-async def test_physical_job_whose_song_has_an_uncovered_tail_is_accepted(
+async def test_job_whose_song_has_an_uncovered_tail_is_accepted(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Two silent seconds after the last beat are outside the covered span: the render
     holds the heads dark there instead of inferring tempo, so the job passes and the
     gate logs the span it will cover."""
-    with physical_test_templates(), caplog.at_level("INFO"):
+    with p1_templates(), caplog.at_level("INFO"):
         result, _ = await _run(
-            physical_job(),
+            p1_job(),
             templates=[TEMPLATE_ID],
-            rig=physical_rig(),
+            rig=p1_rig(),
             beat_grid=_long_tail_grid(),
         )
 
@@ -132,9 +130,9 @@ async def test_physical_job_whose_song_has_an_uncovered_tail_is_accepted(
 
 
 @pytest.mark.asyncio
-async def test_physical_job_whose_grid_has_one_beat_is_refused() -> None:
+async def test_job_whose_grid_has_one_beat_is_refused() -> None:
     """One observed beat gives no interval to measure phase by; nothing is inferred."""
-    grid = physical_grid()
+    grid = p1_grid()
     one_beat = grid.model_copy(
         update={
             "bar_boundaries": grid.bar_boundaries[:1],
@@ -143,10 +141,8 @@ async def test_physical_job_whose_grid_has_one_beat_is_refused() -> None:
             "sixteenth_boundaries": grid.sixteenth_boundaries[:1],
         }
     )
-    with physical_test_templates():
-        result, _ = await _run(
-            physical_job(), templates=[TEMPLATE_ID], rig=physical_rig(), beat_grid=one_beat
-        )
+    with p1_templates():
+        result, _ = await _run(p1_job(), templates=[TEMPLATE_ID], rig=p1_rig(), beat_grid=one_beat)
 
     assert not result.success
     assert "musical phase" in (result.error or "")
@@ -154,13 +150,13 @@ async def test_physical_job_whose_grid_has_one_beat_is_refused() -> None:
 
 
 @pytest.mark.asyncio
-async def test_prepared_physical_job_passes_and_shares_its_beat_grid() -> None:
-    grid = physical_grid()
-    with physical_test_templates():
+async def test_prepared_job_passes_and_shares_its_beat_grid() -> None:
+    grid = p1_grid()
+    with p1_templates():
         result, context = await _run(
-            physical_job(),
+            p1_job(),
             templates=[TEMPLATE_ID, SUBSET_TEMPLATE_ID],
-            rig=physical_rig(),
+            rig=p1_rig(),
             beat_grid=grid,
         )
 
@@ -208,8 +204,8 @@ def _variant(step_update: dict[str, Any] | None = None, presets: list[dict] | No
 
 
 def _rig_with(change: Callable[[dict[str, Any]], None]) -> FixtureGroup:
-    """`physical_rig` with the same edit applied to both heads' profiles."""
-    payload = physical_rig().model_dump(mode="json")
+    """`p1_rig` with the same edit applied to both heads' profiles."""
+    payload = p1_rig().model_dump(mode="json")
     for fixture in payload["fixtures"]:
         change(fixture["config"]["physical_profile"])
     return FixtureGroup.model_validate(payload)
@@ -226,22 +222,20 @@ def _remove_gobo(profile: dict[str, Any]) -> None:
 
 
 def _job_without_gobo() -> JobConfig:
-    """`physical_job` whose initial states name no gobo, for a rig that has none."""
+    """`p1_job` whose initial states name no gobo, for a rig that has none."""
     state = {
-        **PHYSICAL_INITIAL_STATE,
+        **INITIAL_STATE,
         "discrete_states": {"shutter": "closed", "color": "white"},
     }
-    return physical_job(initial_states={"MH1": state, "MH2": state})
+    return p1_job(initial_states={"MH1": state, "MH2": state})
 
 
 _TILT_OUT_OF_RANGE = {
     "movement": {
-        "physical": {
-            "shape": "hold",
-            "mode": "periodic",
-            "start_pan_deg": 0.0,
-            "start_tilt_deg": 200.0,
-        }
+        "shape": "hold",
+        "mode": "periodic",
+        "start_pan_deg": 0.0,
+        "start_tilt_deg": 200.0,
     }
 }
 
@@ -249,13 +243,13 @@ _CASES = [
     pytest.param(
         lambda: nullcontext(),
         lambda: _rig_with(_rename_open_state),
-        physical_job,
+        p1_job,
         TEMPLATE_ID,
         [f"template '{TEMPLATE_ID}'", "step 'reveal'", "fixture 'MH1'", "state 'open'"],
         id="renamed-shutter-state",
     ),
     pytest.param(
-        lambda: _variant({"physical_gobo": "open"}),
+        lambda: _variant({"gobo": "open"}),
         lambda: _rig_with(_remove_gobo),
         _job_without_gobo,
         _VARIANT_ID,
@@ -264,8 +258,8 @@ _CASES = [
     ),
     pytest.param(
         lambda: _variant(_TILT_OUT_OF_RANGE),
-        physical_rig,
-        physical_job,
+        p1_rig,
+        p1_job,
         _VARIANT_ID,
         [f"template '{_VARIANT_ID}'", "step 'reveal'", "fixture 'MH1'", "tilt", "200"],
         id="axis-target-out-of-bounds",
@@ -288,7 +282,7 @@ async def test_template_the_rig_cannot_render_is_refused_before_planning(
         name: AsyncMock(side_effect=AssertionError(f"{name} planned"))
         for name in ("AudioProfileStage", "LyricsStage", "MacroPlannerStage", "MovingHeadStage")
     }
-    grid = physical_grid()
+    grid = p1_grid()
 
     async def analyzed(self: Any, input: Any, context: PipelineContext) -> Any:
         context.set_state("beat_grid", grid)
@@ -304,7 +298,7 @@ async def test_template_the_rig_cannot_render_is_refused_before_planning(
     context = _context(job())
     context.set_state("live_fixture_group", rig())
     with (
-        physical_test_templates(),
+        p1_templates(),
         template(),
         patch.object(AudioAnalysisStage, "execute", analyzed),
         patch.object(AudioProfileStage, "execute", planners["AudioProfileStage"]),
@@ -329,8 +323,8 @@ _JUMP_ID = "p24a_preflight_jump"
 def _jump_template(fallback: str | None) -> TemplateDoc:
     """Two lit steps per cycle back to back at -90 and +90 degrees: the second cannot
     continue the first, whatever the plan does around the template."""
-    extra = {} if fallback is None else {"physical_reposition_fallback": fallback}
-    return physical_template_doc(
+    extra = {} if fallback is None else {"reposition_fallback": fallback}
+    return loop_template_doc(
         _JUMP_ID,
         [
             hold_step("left", -90.0, duration=0.5, **extra),
@@ -354,11 +348,9 @@ async def test_template_whose_own_cycles_cannot_reposition_is_refused_before_pla
     """The gate plans the dark repositioning between a template's own cues: under the
     default `error` a template that cannot reposition inside itself is refused before
     any planner runs; under a fallback the template declares, it is admitted."""
-    job = physical_job(reposition_fallback=policy) if policy else physical_job()
-    with physical_test_templates(), registered_templates(_jump_template(declared)):
-        result, _ = await _run(
-            job, templates=[_JUMP_ID], rig=physical_rig(), beat_grid=physical_grid()
-        )
+    job = p1_job(reposition_fallback=policy) if policy else p1_job()
+    with p1_templates(), registered_templates(_jump_template(declared)):
+        result, _ = await _run(job, templates=[_JUMP_ID], rig=p1_rig(), beat_grid=p1_grid())
 
     assert result.success is admitted, result.error
     if not admitted:
@@ -368,7 +360,7 @@ async def test_template_whose_own_cycles_cannot_reposition_is_refused_before_pla
 
 
 _HEADS = ("MH1", "MH2", "MH3", "MH4")
-_FAMILY_GRID = physical_bars_grid(500.0, 500.0, 430.0, 500.0)
+_FAMILY_GRID = bars_grid(500.0, 500.0, 430.0, 500.0)
 _NO_TOPOLOGY = "declares no topology"
 _NO_FLICK = "attribute preset 'flick', which the fixture group does not declare"
 
@@ -396,7 +388,7 @@ async def test_rig_is_offered_every_family_it_can_render_and_told_why_not_the_re
     """A catalog family the rig cannot render is left out of the offer with its reason;
     the run goes on with the rest, which the gate publishes for the planner, logging
     each exclusion and each admitted family's worst-case entry dip."""
-    with physical_catalog(), caplog.at_level("INFO"):
+    with family_catalog(), caplog.at_level("INFO"):
         result, context = await _run(
             family_job(_HEADS),
             templates=list(FAMILY_IDS),
@@ -425,7 +417,7 @@ async def test_a_rig_without_a_shutter_state_named_open_is_offered_only_the_casc
     payload = family_rig(_HEADS).model_dump(mode="json")
     for fixture in payload["fixtures"]:
         _rename_open_state(fixture["config"]["physical_profile"])
-    with physical_catalog():
+    with family_catalog():
         result, context = await _run(
             family_job(_HEADS),
             templates=list(FAMILY_IDS),
@@ -444,14 +436,14 @@ async def test_a_rig_without_a_shutter_state_named_open_is_offered_only_the_casc
 @pytest.mark.asyncio
 async def test_render_stage_records_the_gates_exclusions_in_the_trace(tmp_path: Path) -> None:
     rig = family_rig(_HEADS, presets=False)
-    with physical_catalog():
+    with family_catalog():
         _, context = await _run(
             family_job(_HEADS), templates=list(FAMILY_IDS), rig=rig, beat_grid=_FAMILY_GRID
         )
         context.set_state("live_fixture_group", rig)
         stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "show.xsq")
         result = await stage.execute(
-            {"moving_heads": physical_sections(("target_orbit", 1, 2))}, context
+            {"moving_heads": sections_plan(("target_orbit", 1, 2))}, context
         )
 
     assert result.success, result.error
@@ -470,7 +462,7 @@ async def test_rig_that_can_render_no_family_is_refused() -> None:
     for fixture in payload["fixtures"]:
         tilt = fixture["config"]["physical_profile"]["axes"]["tilt"]
         tilt.update(physical_min=-5.0, physical_max=5.0)
-    with physical_catalog():
+    with family_catalog():
         result, context = await _run(
             family_job(_HEADS),
             templates=list(FAMILY_IDS),
@@ -490,7 +482,7 @@ async def test_rig_that_can_render_no_family_is_refused() -> None:
 async def test_template_dir_template_that_fails_still_refuses_the_run() -> None:
     """Exclusion is only for the shipped catalog: a user template that fails the gate
     refuses the run although every family would be admitted."""
-    with physical_catalog(), registered_templates(_jump_template(None)):
+    with family_catalog(), registered_templates(_jump_template(None)):
         result, _ = await _run(
             family_job(_HEADS),
             templates=[*FAMILY_IDS, _JUMP_ID],
@@ -508,7 +500,7 @@ async def test_template_dir_template_that_fails_still_refuses_the_run() -> None:
 async def test_layout_models_in_state_are_checked_before_planning() -> None:
     """A caller that hands the run a layout gets the model check at the gate too."""
     stage = RenderPreflightStage(available_templates=[TEMPLATE_ID])
-    context = _context(physical_job(), physical_grid())
+    context = _context(p1_job(), p1_grid())
     context.set_state(
         "layout_models",
         (
@@ -521,10 +513,10 @@ async def test_layout_models_in_state_are_checked_before_planning() -> None:
         ),
     )
     with (
-        physical_test_templates(),
+        p1_templates(),
         patch(
             "twinklr.core.agents.sequencer.moving_heads.rendering_stage.load_render_fixture_group",
-            return_value=physical_rig(),
+            return_value=p1_rig(),
         ),
     ):
         result = await stage.execute(_BUNDLE, context)

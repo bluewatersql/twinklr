@@ -1,4 +1,4 @@
-"""Physical step compilation: explicit template data to typed trajectories on musical phase."""
+"""Step compilation: explicit template data to typed trajectories on musical phase."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pydantic import ValidationError
 import pytest
 
 from tests.config_effects_registry import CONFIG_EFFECTS, ConfigDispositionKind
-from tests.support.mh_physical import motion_profile_payload, physical_step_payload
+from tests.support.moving_heads import linear_step_payload, motion_profile_payload
 from twinklr.core.config.fixtures import FixtureCapabilities
 from twinklr.core.sequencer.models.context import StepCompileContext
 from twinklr.core.sequencer.models.enum import ChannelName
@@ -20,13 +20,13 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
     DiscreteTrajectory,
     PhysicalChannelError,
 )
-from twinklr.core.sequencer.models.template import PhysicalMovementSpec, TemplateStep
+from twinklr.core.sequencer.models.template import Movement, TemplateStep
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile.physical import (
+from twinklr.core.sequencer.moving_heads.compile.step import (
+    CompileError,
     OffGridTimeError,
-    PhysicalCompileError,
-    compile_physical_step,
-    slice_physical_segment,
+    compile_step,
+    slice_segment,
 )
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map
@@ -60,7 +60,7 @@ def _context(
     return StepCompileContext(
         section_id="verse",
         segment_id="A",
-        template_id="physical_probe",
+        template_id="step_probe",
         fixture_id="MH1",
         role="OUTER_LEFT",
         start_ms=0,
@@ -76,7 +76,7 @@ def _context(
 
 
 def _step(**updates: Any) -> TemplateStep:
-    payload = physical_step_payload()
+    payload = linear_step_payload()
     for path, value in updates.items():
         target = payload
         *parents, leaf = path.split("__")
@@ -119,7 +119,7 @@ def _sine(shape: str, **values: float) -> dict[str, Any]:
 
 
 def test_finite_linear_ends_at_its_final_value_and_holds() -> None:
-    segment = compile_physical_step(_step(), _context(), sample_times_ms=_FRAMES)
+    segment = compile_step(_step(), _context(), sample_times_ms=_FRAMES)
 
     pan = _values(segment, ChannelName.PAN)
     tilt = _values(segment, ChannelName.TILT)
@@ -141,25 +141,21 @@ def test_finite_path_stores_its_exact_terminal_value() -> None:
     }
 
     # The period fills the step: the last frame starts at 980 ms, the path ends at 90.
-    filled = compile_physical_step(
-        _step(movement__physical=linear), _context(), sample_times_ms=_FRAMES
-    )
+    filled = compile_step(_step(movement=linear), _context(), sample_times_ms=_FRAMES)
     pan = _values(filled, ChannelName.PAN)
     assert max(pan) == 1000
     assert pan[980] == pytest.approx(88.2)
     assert pan[1000] == 90.0
 
     # A shorter period holds the final value through the terminal point.
-    held = compile_physical_step(_step(), _context(), sample_times_ms=_FRAMES)
+    held = compile_step(_step(), _context(), sample_times_ms=_FRAMES)
     assert _values(held, ChannelName.PAN)[1000] == 40.0
     assert _values(held, ChannelName.TILT)[1000] == 30.0
 
 
 def test_periodic_terminal_value_is_the_kernel_at_the_step_end() -> None:
     sine = _sine("sine_pan", pan_extent_deg=30, period_beats=0.75)
-    segment = compile_physical_step(
-        _step(movement__physical=sine), _context(), sample_times_ms=_FRAMES
-    )
+    segment = compile_step(_step(movement=sine), _context(), sample_times_ms=_FRAMES)
 
     pan = _values(segment, ChannelName.PAN)
     assert max(pan) == 1000
@@ -171,9 +167,7 @@ def test_single_sample_cannot_hide_motion() -> None:
     del unknown["axes"]["pan"]["travel_speed_per_s"]
 
     with pytest.raises(PhysicalChannelError, match="unknown travel speed"):
-        compile_physical_step(
-            _step(), _context(duration_ms=20, profile=unknown), sample_times_ms=(0,)
-        )
+        compile_step(_step(), _context(duration_ms=20, profile=unknown), sample_times_ms=(0,))
 
 
 @pytest.mark.parametrize("shape", ["hold", "sine_pan", "sine_tilt", "linear"])
@@ -193,8 +187,8 @@ def test_each_kernel_shapes_the_compiled_path(shape: str) -> None:
         },
     }[shape]
     times = (0, 100, 200, 300, 400)
-    segment = compile_physical_step(
-        _step(movement__physical=movement),
+    segment = compile_step(
+        _step(movement=movement),
         _context(grid=_FAST_GRID),
         sample_times_ms=_FRAMES,
     )
@@ -216,8 +210,8 @@ def test_reach_and_rate_are_independent() -> None:
     context = _context(grid=_FAST_GRID)
 
     def pan(**values: float) -> list[float]:
-        step = _step(movement__physical=_sine("sine_pan", **values))
-        segment = compile_physical_step(step, context, sample_times_ms=_FRAMES)
+        step = _step(movement=_sine("sine_pan", **values))
+        segment = compile_step(step, context, sample_times_ms=_FRAMES)
         return [_values(segment, ChannelName.PAN)[t] for t in times]
 
     base = pan(pan_extent_deg=20)
@@ -247,23 +241,23 @@ def test_reach_and_rate_are_independent() -> None:
 )
 def test_unsupported_kernel_variants_are_rejected(movement: dict[str, Any], match: str) -> None:
     with pytest.raises(ValidationError, match=match):
-        PhysicalMovementSpec.model_validate({"start_pan_deg": 0, "start_tilt_deg": 0, **movement})
+        Movement.model_validate({"start_pan_deg": 0, "start_tilt_deg": 0, **movement})
 
 
 # --- Bounds and travel rate -------------------------------------------------------
 
 
 def test_axis_bounds_reject_instead_of_clamping() -> None:
-    step = _step(movement__physical__start_pan_deg=250.0)  # 250 + 30 exceeds 270
+    step = _step(movement__start_pan_deg=250.0)  # 250 + 30 exceeds 270
 
     with pytest.raises(PhysicalChannelError, match="outside the operable range") as error:
-        compile_physical_step(step, _context(), sample_times_ms=_FRAMES)
+        compile_step(step, _context(), sample_times_ms=_FRAMES)
     assert error.value.channel is ChannelName.PAN
 
     narrowed = motion_profile_payload()
     narrowed["axes"]["tilt"]["allowed_max"] = 25.0
     with pytest.raises(PhysicalChannelError) as error:
-        compile_physical_step(_step(), _context(profile=narrowed), sample_times_ms=_FRAMES)
+        compile_step(_step(), _context(profile=narrowed), sample_times_ms=_FRAMES)
     assert error.value.channel is ChannelName.TILT
 
 
@@ -272,12 +266,12 @@ def test_travel_rate_is_validated_against_configured_speed() -> None:
     slow["axes"]["pan"]["travel_speed_per_s"] = 59.0  # the path needs 60 deg/s
 
     with pytest.raises(PhysicalChannelError, match="speed") as error:
-        compile_physical_step(_step(), _context(profile=slow), sample_times_ms=_FRAMES)
+        compile_step(_step(), _context(profile=slow), sample_times_ms=_FRAMES)
     assert error.value.channel is ChannelName.PAN
 
     exact = motion_profile_payload()
     exact["axes"]["pan"]["travel_speed_per_s"] = 60.0
-    compile_physical_step(_step(), _context(profile=exact), sample_times_ms=_FRAMES)
+    compile_step(_step(), _context(profile=exact), sample_times_ms=_FRAMES)
 
 
 def test_unknown_speed_rejects_motion_but_not_a_hold() -> None:
@@ -285,29 +279,27 @@ def test_unknown_speed_rejects_motion_but_not_a_hold() -> None:
     del unknown["axes"]["tilt"]["travel_speed_per_s"]
 
     with pytest.raises(PhysicalChannelError, match="unknown travel speed") as error:
-        compile_physical_step(_step(), _context(profile=unknown), sample_times_ms=_FRAMES)
+        compile_step(_step(), _context(profile=unknown), sample_times_ms=_FRAMES)
     assert error.value.channel is ChannelName.TILT
 
     hold = {"shape": "hold", "mode": "periodic", "start_pan_deg": 0, "start_tilt_deg": 0}
-    compile_physical_step(
-        _step(movement__physical=hold), _context(profile=unknown), sample_times_ms=_FRAMES
-    )
+    compile_step(_step(movement=hold), _context(profile=unknown), sample_times_ms=_FRAMES)
 
 
 # --- Step requirements ------------------------------------------------------------------
 
 
 def test_fixture_without_physical_profile_is_rejected() -> None:
-    with pytest.raises(PhysicalCompileError, match="physical_profile"):
-        compile_physical_step(_step(), _context(with_profile=False), sample_times_ms=_FRAMES)
+    with pytest.raises(CompileError, match="physical_profile"):
+        compile_step(_step(), _context(with_profile=False), sample_times_ms=_FRAMES)
 
 
-def test_absent_physical_fields_stay_out_of_template_dumps() -> None:
-    step = _step(dimmer={}, physical_shutter=_DELETE)
+def test_absent_step_fields_stay_out_of_template_dumps() -> None:
+    step = _step(dimmer=_DELETE, shutter=_DELETE)
 
     dumped = step.model_dump(mode="json")
-    assert dumped["dimmer"] == {}
-    assert "physical_shutter" not in dumped
+    assert "dimmer" not in dumped
+    assert "shutter" not in dumped
 
 
 @pytest.mark.parametrize(
@@ -325,7 +317,7 @@ def test_sample_times_must_cover_the_step_from_its_start(
     times: tuple[int, ...], match: str
 ) -> None:
     with pytest.raises(ValueError, match=match):
-        compile_physical_step(_step(), _context(), sample_times_ms=times)
+        compile_step(_step(), _context(), sample_times_ms=times)
 
 
 @pytest.mark.parametrize(
@@ -344,7 +336,7 @@ def test_off_grid_step_bounds_and_samples_are_rejected(
     times = tuple(sorted({*range(start_ms, start_ms + duration_ms, 20), *extra}))
 
     with pytest.raises(OffGridTimeError, match=f"{name} {value} ms") as error:
-        compile_physical_step(_step(), context, sample_times_ms=times)
+        compile_step(_step(), context, sample_times_ms=times)
     assert (error.value.name, error.value.time_ms) == (name, value)
 
 
@@ -357,10 +349,10 @@ _BEAT_TIMES = (0, 240, 260, 500, 740, 760, 1000, 1260, 1480, 1500)
 
 def test_variable_tempo_dimmer_pulse_follows_musical_phase() -> None:
     hold = {"shape": "hold", "mode": "periodic", "start_pan_deg": 0, "start_tilt_deg": 0}
-    step = _step(movement__physical=hold, physical_shutter=_DELETE)
+    step = _step(movement=hold, shutter=_DELETE)
     context = _context(duration_ms=2000, grid=_VARIABLE_GRID)
 
-    segment = compile_physical_step(step, context, sample_times_ms=_frames(2000))
+    segment = compile_step(step, context, sample_times_ms=_frames(2000))
     dimmer = {t: _values(segment, ChannelName.DIMMER)[t] for t in _BEAT_TIMES}
 
     # High at each beat onset, low from the first frame of each half beat; the third
@@ -382,7 +374,7 @@ def test_variable_tempo_dimmer_pulse_follows_musical_phase() -> None:
 
     # Each value depends only on its time: a shorter step from the same origin agrees.
     shorter = _values(
-        compile_physical_step(
+        compile_step(
             step, _context(duration_ms=1000, grid=_VARIABLE_GRID), sample_times_ms=_FRAMES
         ),
         ChannelName.DIMMER,
@@ -395,9 +387,9 @@ def test_variable_tempo_dimmer_pulse_follows_musical_phase() -> None:
 def test_variable_tempo_shutter_pulse_follows_musical_phase() -> None:
     hold = {"shape": "hold", "mode": "periodic", "start_pan_deg": 0, "start_tilt_deg": 0}
     step = _step(
-        movement__physical=hold,
-        dimmer__physical=_DELETE,
-        physical_shutter={
+        movement=hold,
+        dimmer=_DELETE,
+        shutter={
             "period_beats": 1,
             "duty_cycle": 0.5,
             "low_state": "closed",
@@ -406,7 +398,7 @@ def test_variable_tempo_shutter_pulse_follows_musical_phase() -> None:
     )
     context = _context(duration_ms=2000, grid=_VARIABLE_GRID)
 
-    segment = compile_physical_step(step, context, sample_times_ms=_frames(2000))
+    segment = compile_step(step, context, sample_times_ms=_frames(2000))
     states = _states(segment, _BEAT_TIMES)
     assert states == {
         0: "open",
@@ -421,7 +413,7 @@ def test_variable_tempo_shutter_pulse_follows_musical_phase() -> None:
         1500: "closed",
     }
 
-    shorter = compile_physical_step(
+    shorter = compile_step(
         step, _context(duration_ms=1000, grid=_VARIABLE_GRID), sample_times_ms=_FRAMES
     )
     early = tuple(t for t in _BEAT_TIMES if t < 1000)
@@ -434,45 +426,43 @@ _NARROW = {"period_beats": 0.25, "duty_cycle": 0.1}  # 12.5 ms high every 125 ms
 
 def test_dimmer_pulse_narrower_than_a_frame_is_rejected() -> None:
     step = _step(
-        movement__physical=_HOLD,
-        physical_shutter=_DELETE,
-        dimmer__physical={**_NARROW, "low": 0.0, "high": 1.0},
+        movement=_HOLD,
+        shutter=_DELETE,
+        dimmer={**_NARROW, "low": 0.0, "high": 1.0},
     )
 
     with pytest.raises(PhysicalChannelError, match=r"12\.5 ms") as error:
-        compile_physical_step(step, _context(), sample_times_ms=_FRAMES)
+        compile_step(step, _context(), sample_times_ms=_FRAMES)
     assert error.value.channel is ChannelName.DIMMER
 
 
 def test_shutter_pulse_narrower_than_a_frame_is_rejected() -> None:
     step = _step(
-        movement__physical=_HOLD,
-        dimmer__physical=_DELETE,
-        physical_shutter={**_NARROW, "low_state": "closed", "high_state": "open"},
+        movement=_HOLD,
+        dimmer=_DELETE,
+        shutter={**_NARROW, "low_state": "closed", "high_state": "open"},
     )
 
     with pytest.raises(PhysicalChannelError, match=r"12\.5 ms") as error:
-        compile_physical_step(step, _context(), sample_times_ms=_FRAMES)
+        compile_step(step, _context(), sample_times_ms=_FRAMES)
     assert error.value.channel is ChannelName.SHUTTER
 
 
 def test_narrow_low_interval_is_rejected_and_truncated_ends_are_exempt() -> None:
     def dimmer(**pulse: float) -> TemplateStep:
         return _step(
-            movement__physical=_HOLD,
-            physical_shutter=_DELETE,
-            dimmer__physical={"period_beats": 1.0, "low": 0.0, "high": 1.0, **pulse},
+            movement=_HOLD,
+            shutter=_DELETE,
+            dimmer={"period_beats": 1.0, "low": 0.0, "high": 1.0, **pulse},
         )
 
     with pytest.raises(PhysicalChannelError, match=r"15 ms"):
-        compile_physical_step(dimmer(duty_cycle=0.97), _context(), sample_times_ms=_FRAMES)
+        compile_step(dimmer(duty_cycle=0.97), _context(), sample_times_ms=_FRAMES)
 
     # The step opens 10 ms before the end of a high interval and closes 10 ms into a
     # low one; both truncated intervals are shorter than a frame.
     shifted = dimmer(duty_cycle=0.5, phase_cycles=0.48)
-    segment = compile_physical_step(
-        shifted, _context(duration_ms=1020), sample_times_ms=_frames(1020)
-    )
+    segment = compile_step(shifted, _context(duration_ms=1020), sample_times_ms=_frames(1020))
     assert _values(segment, ChannelName.DIMMER)[0] == 1.0
 
 
@@ -481,16 +471,12 @@ def test_absurdly_short_periods_are_rejected_by_the_model(period: float) -> None
     with pytest.raises(ValidationError, match="period_beats"):
         TemplateStep.model_validate(
             {
-                **physical_step_payload(),
-                "dimmer": {
-                    "physical": {"period_beats": period, "duty_cycle": 0.5, "low": 0, "high": 1}
-                },
+                **linear_step_payload(),
+                "dimmer": {"period_beats": period, "duty_cycle": 0.5, "low": 0, "high": 1},
             }
         )
     with pytest.raises(ValidationError, match="period_beats"):
-        PhysicalMovementSpec.model_validate(
-            _sine("sine_pan", pan_extent_deg=10, period_beats=period)
-        )
+        Movement.model_validate(_sine("sine_pan", pan_extent_deg=10, period_beats=period))
 
 
 def test_pulse_decision_is_exact_at_a_shifted_half_beat() -> None:
@@ -499,9 +485,9 @@ def test_pulse_decision_is_exact_at_a_shifted_half_beat() -> None:
     In floats the sum is 0.49999999999999994, which would read as high.
     """
     step = _step(
-        movement__physical=_HOLD,
-        physical_shutter=_DELETE,
-        dimmer__physical={
+        movement=_HOLD,
+        shutter=_DELETE,
+        dimmer={
             "period_beats": 1.0,
             "duty_cycle": 0.5,
             "phase_cycles": -0.34,
@@ -511,7 +497,7 @@ def test_pulse_decision_is_exact_at_a_shifted_half_beat() -> None:
     )
     context = _context(duration_ms=2000, grid=_VARIABLE_GRID)
 
-    segment = compile_physical_step(step, context, sample_times_ms=_frames(2000))
+    segment = compile_step(step, context, sample_times_ms=_frames(2000))
     dimmer = _values(segment, ChannelName.DIMMER)
     assert (dimmer[400], dimmer[420], dimmer[700]) == (1.0, 0.0, 1.0)
 
@@ -521,42 +507,42 @@ def test_unresolved_shutter_latency_rejects_a_pulse_schedule() -> None:
     unknown["visibility"]["close_latency_ms"] = None
 
     with pytest.raises(PhysicalChannelError, match="latency") as error:
-        compile_physical_step(_step(), _context(profile=unknown), sample_times_ms=_FRAMES)
+        compile_step(_step(), _context(profile=unknown), sample_times_ms=_FRAMES)
     assert error.value.channel is ChannelName.SHUTTER
 
     unsettled = motion_profile_payload()
     del unsettled["discrete"]["shutter"]["states"]["closed"]["settle_ms"]
     with pytest.raises(PhysicalChannelError, match="settle"):
-        compile_physical_step(_step(), _context(profile=unsettled), sample_times_ms=_FRAMES)
+        compile_step(_step(), _context(profile=unsettled), sample_times_ms=_FRAMES)
 
 
 def test_shutter_pulse_faster_than_latency_is_rejected() -> None:
-    step = _step(physical_shutter__period_beats=1.0)  # open again for 250 ms from 500 ms
+    step = _step(shutter__period_beats=1.0)  # open again for 250 ms from 500 ms
     slow = motion_profile_payload()
     slow["visibility"]["open_latency_ms"] = 300
 
     with pytest.raises(PhysicalChannelError, match="needs 300 ms") as error:
-        compile_physical_step(step, _context(profile=slow), sample_times_ms=_FRAMES)
+        compile_step(step, _context(profile=slow), sample_times_ms=_FRAMES)
     assert error.value.time_ms == 500
 
     slow["visibility"]["open_latency_ms"] = 250
-    compile_physical_step(step, _context(profile=slow), sample_times_ms=_FRAMES)
+    compile_step(step, _context(profile=slow), sample_times_ms=_FRAMES)
 
 
 def test_pulse_state_must_be_declared_by_the_profile() -> None:
-    step = _step(physical_shutter__high_state="strobe")
+    step = _step(shutter__high_state="strobe")
 
     with pytest.raises(PhysicalChannelError, match="strobe"):
-        compile_physical_step(step, _context(), sample_times_ms=_FRAMES)
+        compile_step(step, _context(), sample_times_ms=_FRAMES)
 
 
 # --- Slicing --------------------------------------------------------------------------
 
 
 def test_slice_interpolates_boundaries_and_carries_discrete_state() -> None:
-    segment = compile_physical_step(_step(), _context(), sample_times_ms=_FRAMES)
+    segment = compile_step(_step(), _context(), sample_times_ms=_FRAMES)
 
-    sliced = slice_physical_segment(segment, 310, 710)
+    sliced = slice_segment(segment, 310, 710)
 
     assert (sliced.t0_ms, sliced.t1_ms) == (310, 710)
     pan = _values(sliced, ChannelName.PAN)
@@ -589,127 +575,125 @@ def test_slice_to_the_step_end_keeps_the_terminal_point() -> None:
         "pan_extent_deg": 90.0,
         "period_beats": 2.0,
     }
-    segment = compile_physical_step(
-        _step(movement__physical=linear), _context(), sample_times_ms=_FRAMES
-    )
+    segment = compile_step(_step(movement=linear), _context(), sample_times_ms=_FRAMES)
 
-    tail = slice_physical_segment(segment, 990, 1000)
+    tail = slice_segment(segment, 990, 1000)
     assert _values(tail, ChannelName.PAN) == pytest.approx({990: 89.1, 1000: 90.0})
 
 
 def test_slice_bounds_must_lie_inside_the_segment() -> None:
-    segment = compile_physical_step(_step(), _context(), sample_times_ms=_FRAMES)
+    segment = compile_step(_step(), _context(), sample_times_ms=_FRAMES)
 
     with pytest.raises(ValueError):
-        slice_physical_segment(segment, 500, 500)
+        slice_segment(segment, 500, 500)
     with pytest.raises(ValueError):
-        slice_physical_segment(segment, 500, 1001)
+        slice_segment(segment, 500, 1001)
 
 
-# --- Registry evidence for physical-only template fields -----------------------------
+# --- Registry evidence for template step fields --------------------------------------
 
 Component = Literal["rejected", "compiled"]
 
 _COMPONENT_NOTES: dict[Component, str] = {
-    "rejected": "exact path's alternative is rejected by physical validation or compile",
-    "compiled": "exact path changes the physical compile result",
+    "rejected": "exact path's alternative is rejected by validation or compile",
+    "compiled": "exact path changes the compile result",
 }
 
 _STEP_PREFIX = "template.template.steps."
 
 _TEMPLATE_MUTATIONS: dict[str, tuple[Component, Callable[[dict[str, Any]], Any]]] = {
-    "movement.physical": ("rejected", lambda s: s["movement"].pop("physical")),
-    "movement.physical.mode": (
+    "movement": ("rejected", lambda s: s.pop("movement")),
+    "movement.mode": (
         "rejected",
-        lambda s: s["movement"]["physical"].update(mode="periodic"),
+        lambda s: s["movement"].update(mode="periodic"),
     ),
-    "movement.physical.start_pan_deg": (
+    "movement.start_pan_deg": (
         "compiled",
-        lambda s: s["movement"]["physical"].update(start_pan_deg=15.0),
+        lambda s: s["movement"].update(start_pan_deg=15.0),
     ),
-    "movement.physical.start_tilt_deg": (
+    "movement.start_tilt_deg": (
         "compiled",
-        lambda s: s["movement"]["physical"].update(start_tilt_deg=25.0),
+        lambda s: s["movement"].update(start_tilt_deg=25.0),
     ),
-    "movement.physical.pan_extent_deg": (
+    "movement.pan_extent_deg": (
         "compiled",
-        lambda s: s["movement"]["physical"].update(pan_extent_deg=40.0),
+        lambda s: s["movement"].update(pan_extent_deg=40.0),
     ),
-    "movement.physical.tilt_extent_deg": (
+    "movement.tilt_extent_deg": (
         "compiled",
-        lambda s: s["movement"]["physical"].update(tilt_extent_deg=5.0),
+        lambda s: s["movement"].update(tilt_extent_deg=5.0),
     ),
-    "movement.physical.period_beats": (
+    "movement.period_beats": (
         "compiled",
-        lambda s: s["movement"]["physical"].update(period_beats=2.0),
+        lambda s: s["movement"].update(period_beats=2.0),
     ),
-    "dimmer.physical": ("compiled", lambda s: s["dimmer"].pop("physical")),
-    "dimmer.physical.period_beats": (
+    "dimmer": ("compiled", lambda s: s.pop("dimmer")),
+    "dimmer.period_beats": (
         "compiled",
-        lambda s: s["dimmer"]["physical"].update(period_beats=0.5),
+        lambda s: s["dimmer"].update(period_beats=0.5),
     ),
-    "dimmer.physical.duty_cycle": (
+    "dimmer.duty_cycle": (
         "compiled",
-        lambda s: s["dimmer"]["physical"].update(duty_cycle=0.25),
+        lambda s: s["dimmer"].update(duty_cycle=0.25),
     ),
-    "dimmer.physical.phase_cycles": (
+    "dimmer.phase_cycles": (
         "compiled",
-        lambda s: s["dimmer"]["physical"].update(phase_cycles=0.25),
+        lambda s: s["dimmer"].update(phase_cycles=0.25),
     ),
-    "dimmer.physical.low": ("compiled", lambda s: s["dimmer"]["physical"].update(low=0.2)),
-    "dimmer.physical.high": ("compiled", lambda s: s["dimmer"]["physical"].update(high=0.8)),
-    "physical_shutter": ("compiled", lambda s: s.pop("physical_shutter")),
-    "physical_shutter.period_beats": (
+    "dimmer.low": ("compiled", lambda s: s["dimmer"].update(low=0.2)),
+    "dimmer.high": ("compiled", lambda s: s["dimmer"].update(high=0.8)),
+    "shutter": ("compiled", lambda s: s.pop("shutter")),
+    "shutter.period_beats": (
         "compiled",
-        lambda s: s["physical_shutter"].update(period_beats=1.0),
+        lambda s: s["shutter"].update(period_beats=1.0),
     ),
-    "physical_shutter.duty_cycle": (
+    "shutter.duty_cycle": (
         "compiled",
-        lambda s: s["physical_shutter"].update(duty_cycle=0.75),
+        lambda s: s["shutter"].update(duty_cycle=0.75),
     ),
-    "physical_shutter.phase_cycles": (
+    "shutter.phase_cycles": (
         "compiled",
-        lambda s: s["physical_shutter"].update(phase_cycles=0.5),
+        lambda s: s["shutter"].update(phase_cycles=0.5),
     ),
-    "physical_shutter.low_state": (
+    "shutter.low_state": (
         "compiled",
-        lambda s: s["physical_shutter"].update(low_state="open"),
+        lambda s: s["shutter"].update(low_state="open"),
     ),
-    "physical_shutter.high_state": (
+    "shutter.high_state": (
         "compiled",
-        lambda s: s["physical_shutter"].update(high_state="closed"),
+        lambda s: s["shutter"].update(high_state="closed"),
     ),
 }
 """Per template path below the step: the one component its alternative must change."""
 
-_SHAPE_PATH = f"{_STEP_PREFIX}movement.physical.shape"
+_SHAPE_PATH = f"{_STEP_PREFIX}movement.shape"
 _SHAPE_NOTE = "each kernel shapes the compiled path"
 """`shape` is coupled to `mode`, extents and period, so no single-field alternative
 is valid; its evidence is the kernel test, which fails if the compiler ignored it."""
 
-PHYSICAL_TEMPLATE_PATHS = tuple(
+STEP_FIELD_PATHS = tuple(
     path
     for path, disposition in CONFIG_EFFECTS.items()
     if disposition.kind is ConfigDispositionKind.EFFECT_TEST
     and disposition.test_nodeid is not None
-    and "::test_physical_template_field_changes_compile[" in disposition.test_nodeid
+    and "::test_step_field_changes_compile[" in disposition.test_nodeid
 )
 
 
 def _compile_snapshot(step_payload: dict[str, Any]) -> dict[str, Any]:
     try:
         step = TemplateStep.model_validate(step_payload)
-        segment = compile_physical_step(step, _context(), sample_times_ms=_FRAMES)
-    except (ValidationError, PhysicalCompileError, PhysicalChannelError) as error:
+        segment = compile_step(step, _context(), sample_times_ms=_FRAMES)
+    except (ValidationError, CompileError, PhysicalChannelError) as error:
         return {"rejected": f"{type(error).__name__}: {error}"}
     return {"compiled": segment.model_dump(mode="json")}
 
 
-def test_physical_template_evidence_paths_cover_every_mutation() -> None:
+def test_step_field_evidence_paths_cover_every_mutation() -> None:
     """The registry, its notes and the mutation table describe the same evidence."""
     expected = {f"{_STEP_PREFIX}{suffix}": c for suffix, (c, _) in _TEMPLATE_MUTATIONS.items()}
 
-    assert set(PHYSICAL_TEMPLATE_PATHS) == set(expected)
+    assert set(STEP_FIELD_PATHS) == set(expected)
     for path, component in expected.items():
         assert CONFIG_EFFECTS[path].note == _COMPONENT_NOTES[component], path
     assert CONFIG_EFFECTS[_SHAPE_PATH].note == _SHAPE_NOTE
@@ -718,14 +702,14 @@ def test_physical_template_evidence_paths_cover_every_mutation() -> None:
     )
 
 
-@pytest.mark.parametrize("config_path", PHYSICAL_TEMPLATE_PATHS, ids=PHYSICAL_TEMPLATE_PATHS)
-def test_physical_template_field_changes_compile(config_path: str) -> None:
-    """Each physical template path changes the one compile component its note names."""
+@pytest.mark.parametrize("config_path", STEP_FIELD_PATHS, ids=STEP_FIELD_PATHS)
+def test_step_field_changes_compile(config_path: str) -> None:
+    """Each template step path changes the one compile component its note names."""
     component, mutate = _TEMPLATE_MUTATIONS[config_path.removeprefix(_STEP_PREFIX)]
-    payload = copy.deepcopy(physical_step_payload())
+    payload = copy.deepcopy(linear_step_payload())
     mutate(payload)
 
-    base = _compile_snapshot(physical_step_payload())
+    base = _compile_snapshot(linear_step_payload())
     changed = _compile_snapshot(payload)
 
     assert "rejected" not in base, base

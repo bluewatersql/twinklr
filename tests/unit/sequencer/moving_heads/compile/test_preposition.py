@@ -1,4 +1,4 @@
-"""Dark reposition transactions between physical cues: extinguish, move, settle, reveal.
+"""Dark reposition transactions between cues: extinguish, move, settle, reveal.
 
 Every feasible plan below is encoded and checked from its bytes
 (`assert_honest_transactions`): frames that move pan/tilt or a wheel inside a
@@ -13,9 +13,9 @@ from typing import Any
 
 import pytest
 
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
     assert_honest_transactions,
-    physical_segment,
+    fixture_segment,
     preposition_profile_payload,
 )
 from twinklr.core.config.fixtures import FixtureCapabilities, InitialFixtureState
@@ -90,7 +90,7 @@ def _cue(
     level = ContinuousTrajectory(
         unit="normalized", points=(PhysicalPoint(t_ms=t0, value=dimmer),), interpolation="hold"
     )
-    return physical_segment(
+    return fixture_segment(
         {
             _PAN: _line(pan, t0, t1),
             _TILT: _line(tilt, t0, t1),
@@ -607,7 +607,7 @@ def test_oracle_credits_initial_darkness_only_to_its_evidenced_mechanism(
     initial = _initial(dimmer=1.0)
     cue = _cue("A", 400, 600, pan=45.0)
     planned = _plan([cue], profile, initial)
-    switched = physical_segment(
+    switched = fixture_segment(
         {
             _PAN: _line(45.0, 0, 400),
             _TILT: _line(0.0, 0, 400),
@@ -1001,7 +1001,7 @@ def _pan_path(values: list[float]) -> FixtureSegment:
     points = (*(PhysicalPoint(t_ms=20 * i, value=v) for i, v in enumerate(values)),)
     points += (PhysicalPoint(t_ms=t1, value=values[-1]),)
     pan = ContinuousTrajectory(unit="degree", points=points, interpolation="linear")
-    return physical_segment({_PAN: pan, _TILT: _line(0.0, 0, t1)}, t0_ms=0, t1_ms=t1)
+    return fixture_segment({_PAN: pan, _TILT: _line(0.0, 0, t1)}, t0_ms=0, t1_ms=t1)
 
 
 @pytest.mark.parametrize(
@@ -1056,7 +1056,7 @@ def _moving(
         points=tuple(PhysicalPoint(t_ms=t, value=v) for t, v in levels),
         interpolation="hold",
     )
-    return physical_segment(
+    return fixture_segment(
         {
             _PAN: pan,
             _TILT: _line(0.0, t0, t1),
@@ -1106,7 +1106,7 @@ def _doctored(
 
 
 def _dark_hold(t0: int, t1: int, pan: float) -> FixtureSegment:
-    return physical_segment(
+    return fixture_segment(
         {
             _PAN: _line(pan, t0, t1),
             _TILT: _line(0.0, t0, t1),
@@ -1170,7 +1170,7 @@ def test_a_wheel_turning_inside_a_lit_cue_is_dishonest() -> None:
     level = ContinuousTrajectory(
         unit="normalized", points=(PhysicalPoint(t_ms=1000, value=1.0),), interpolation="hold"
     )
-    cue = physical_segment(
+    cue = fixture_segment(
         {
             _PAN: _line(0.0, 1000, 1400),
             _TILT: _line(0.0, 1000, 1400),

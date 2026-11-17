@@ -1,9 +1,9 @@
 """Visibility envelopes and masked attribute overlays (P2.4b).
 
-A step's `physical_visibility` lights it only over part of each movement period, read at
+A step's `visibility` lights it only over part of each movement period, read at
 the head's own movement phase (its pan/tilt distribution offset included, its path
 transform not); the dark rest is left between cues for the transaction pass, which
-performs every dark return. A template's `physical_overlays` split each cue they cross
+performs every dark return. A template's `overlays` split each cue they cross
 into base, dark mask, overlay (the base with one wheel replaced), dark mask and base, and
 the base resumed after release is whichever step is in force then. Neither authors dark
 motion inside a cue.
@@ -30,20 +30,20 @@ from pydantic import ValidationError
 import pytest
 
 from tests.config_effects_registry import CONFIG_EFFECTS, ConfigDispositionKind
-from tests.support.mh_physical import (
-    PHYSICAL_INITIAL_STATE,
+from tests.support.moving_heads import (
+    INITIAL_STATE,
     assert_honest_transactions,
+    bars_grid,
     envelope_step,
     hold_step,
+    loop_template_doc,
     overlay,
+    p1_job,
+    p1_rig,
     path_step,
-    physical_bars_grid,
-    physical_job,
-    physical_preset_rig,
-    physical_rig,
-    physical_sections,
-    physical_template_doc,
+    preset_rig,
     registered_templates,
+    sections_plan,
     sweep_step,
     topology_payload,
     topology_rig,
@@ -64,21 +64,21 @@ from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixt
 from twinklr.core.sequencer.models.moving_heads.topology import rig_topology
 from twinklr.core.sequencer.models.template import Template, TemplateDoc, TemplateStep
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile.physical import PhysicalCompileError
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     TRANSACTION_METADATA_KEY,
     plan_prepositions,
 )
+from twinklr.core.sequencer.moving_heads.compile.step import CompileError
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
-    compile_physical_template,
+    compile_template,
 )
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import frame_times
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
 from twinklr.core.sequencer.moving_heads.pipeline import (
-    PhysicalRenderError,
     RenderingPipeline,
-    check_physical_templates,
-    physical_cue_limits,
+    RenderRefusedError,
+    admit_templates,
+    cue_limits,
 )
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map
@@ -91,12 +91,12 @@ _GOBO_OPEN, _DOTS, _STAR = 0, 10, 20
 
 def _grid(*beat_ms: float) -> BeatGrid:
     """Four-beat bars from 15 ms (so steps quantize to 20 ms, 2020 ms, ...)."""
-    return physical_bars_grid(*(beat_ms or (500.0,) * 8))
+    return bars_grid(*(beat_ms or (500.0,) * 8))
 
 
 def _rig(edit: Callable[[dict[str, Any]], None] | None = None) -> FixtureGroup:
-    """`physical_rig`, each head's profile passed through `edit`."""
-    payload = physical_rig().model_dump(mode="json")
+    """`p1_rig`, each head's profile passed through `edit`."""
+    payload = p1_rig().model_dump(mode="json")
     if edit is not None:
         for fixture in payload["fixtures"]:
             edit(fixture["config"]["physical_profile"])
@@ -200,9 +200,9 @@ def _render(
     locks: Sequence[RenderLock] = (),
 ) -> tuple[RenderingPipeline, list[FixtureSegment]]:
     """Gate the sections' templates, render them and check every fixture's bytes."""
-    grid, rig, job = grid or _grid(), rig or physical_rig(), job or physical_job()
+    grid, rig, job = grid or _grid(), rig or p1_rig(), job or p1_job()
     with registered_templates(*docs):
-        check_physical_templates(
+        admit_templates(
             sorted({template_id for template_id, _, _ in sections}),
             beat_grid=grid,
             fixture_group=rig,
@@ -210,7 +210,7 @@ def _render(
             failure_mode=job.moving_heads.reposition_fallback,
         )
         pipeline = RenderingPipeline(
-            choreography_plan=physical_sections(*sections),
+            choreography_plan=sections_plan(*sections),
             beat_grid=grid,
             fixture_group=rig,
             job_config=job,
@@ -230,9 +230,9 @@ def _gate_error(
     grid: BeatGrid | None = None,
 ) -> str:
     """The gate's refusal of `doc` (on the default grid unless given)."""
-    rig, job = rig or physical_rig(), job or physical_job()
+    rig, job = rig or p1_rig(), job or p1_job()
     with registered_templates(doc), pytest.raises(UnsupportedRenderModeError) as error:
-        check_physical_templates(
+        admit_templates(
             [doc.template.template_id],
             beat_grid=grid or _grid(),
             fixture_group=rig,
@@ -249,9 +249,9 @@ def _compile(
     bars: int = 1,
     grid: BeatGrid | None = None,
 ) -> list[FixtureSegment]:
-    rig, grid = rig or physical_rig(), grid or _grid()
+    rig, grid = rig or p1_rig(), grid or _grid()
     phase_map = build_musical_phase_map(grid)
-    start, end = physical_cue_limits(phase_map, int(grid.duration_ms))
+    start, end = cue_limits(phase_map, int(grid.duration_ms))
     context = TemplateCompileContext(
         section_id="verse",
         template_id=template.template_id,
@@ -263,7 +263,7 @@ def _compile(
         topology=rig_topology(rig),
         fixture_group_id=rig.group_id,
     )
-    return compile_physical_template(
+    return compile_template(
         template, context, phase_map=phase_map, start_limit_ms=start, end_limit_ms=end
     ).segments
 
@@ -283,9 +283,9 @@ def _state(cue: FixtureSegment, channel: ChannelName) -> list[str]:
 # --- Envelopes ---------------------------------------------------------------------------
 
 
-_FLY_OUT = physical_template_doc("vis_fly_out", [envelope_step("out", 0.0, 60.0, lit=(0.0, 0.25))])
+_FLY_OUT = loop_template_doc("vis_fly_out", [envelope_step("out", 0.0, 60.0, lit=(0.0, 0.25))])
 """A sine pan swing, lit only while it travels from center to its right edge."""
-_FLY_IN = physical_template_doc("vis_fly_in", [envelope_step("in", 0.0, 60.0, lit=(0.25, 0.5))])
+_FLY_IN = loop_template_doc("vis_fly_in", [envelope_step("in", 0.0, 60.0, lit=(0.25, 0.5))])
 """The same swing, lit only on its way back from the edge to center."""
 
 
@@ -323,7 +323,7 @@ def test_the_lit_window_follows_each_heads_phase_offset() -> None:
     own path is at center: the window follows each head's path, not the step clock."""
     rig = topology_rig(("MH1", "MH2"), topology=topology_payload(("MH1", "MH2")))
     distribution = [{"domains": ["pan", "tilt"], "spread_cycles": 0.25}]
-    doc = physical_template_doc(
+    doc = loop_template_doc(
         "vis_lag", [envelope_step("out", 0.0, 60.0, lit=(0.0, 0.25), distribution=distribution)]
     )
     _, segments = _render(("vis_lag", 1, 2), docs=(doc,), rig=rig)
@@ -338,7 +338,7 @@ def test_a_frame_is_lit_when_its_start_lies_in_the_window() -> None:
     """Phases [0.125, 0.375) of a 2000 ms period from 20 ms are 270-770 ms, off the frame
     grid: the frame at 260 ms starts before the window and stays dark, the one at 760 ms
     starts inside it and is lit."""
-    doc = physical_template_doc("vis_off_grid", [envelope_step("o", 0.0, 60.0, lit=(0.125, 0.375))])
+    doc = loop_template_doc("vis_off_grid", [envelope_step("o", 0.0, 60.0, lit=(0.125, 0.375))])
     assert _spans(_compile(doc.template)) == [(280, 780)]
 
 
@@ -351,10 +351,10 @@ def test_a_path_transform_moves_the_path_but_not_the_lit_window(transform: dict[
     never when it is lit."""
 
     def compiled(transform: dict[str, Any] | None) -> list[FixtureSegment]:
-        step = path_step("orbit", "circle", transform=transform, physical_shutter_state="open")
-        step["dimmer"] = {}
-        step["physical_visibility"] = {"visible_phase_start": 0.25, "visible_phase_end": 0.5}
-        return _compile(physical_template_doc("vis_orbit", [step]).template, bars=2)
+        step = path_step("orbit", "circle", transform=transform, shutter_state="open")
+        step.pop("dimmer", None)
+        step["visibility"] = {"visible_phase_start": 0.25, "visible_phase_end": 0.5}
+        return _compile(loop_template_doc("vis_orbit", [step]).template, bars=2)
 
     plain, moved = compiled(None), compiled(transform)
     assert _spans(moved) == _spans(plain) == [(520, 1020), (2520, 3020)]
@@ -368,7 +368,7 @@ def test_attack_and_release_ramps_sit_inside_the_lit_slice() -> None:
     the dimmer is 0 on the slice's first frame, 0.48 up 0.48 beat in, full from one
     beat to the release, and still above zero on its last frame; every frame around the
     slice is dark."""
-    doc = physical_template_doc(
+    doc = loop_template_doc(
         "vis_ramps", [envelope_step("r", 0.0, 60.0, lit=(0.0, 0.5), attack=1.0, release=0.5)]
     )
     pipeline, segments = _render(("vis_ramps", 1, 1), docs=(doc,))
@@ -385,7 +385,7 @@ def test_attack_and_release_ramps_sit_inside_the_lit_slice() -> None:
 def test_ramps_repeat_in_every_cycle_of_a_step() -> None:
     """A two-beat period lit over its first beat, up over half a beat: each of the step's
     two cycles ramps from 0, not only the one at its phase origin."""
-    doc = physical_template_doc(
+    doc = loop_template_doc(
         "vis_cycles",
         [envelope_step("c", 0.0, 20.0, lit=(0.0, 0.5), attack=0.5, period_beats=2.0)],
     )
@@ -402,9 +402,7 @@ def test_ramps_repeat_in_every_cycle_of_a_step() -> None:
 
 
 def test_level_sets_the_lit_dimmer() -> None:
-    doc = physical_template_doc(
-        "vis_half", [envelope_step("h", 0.0, 60.0, lit=(0.0, 0.25), level=0.5)]
-    )
+    doc = loop_template_doc("vis_half", [envelope_step("h", 0.0, 60.0, lit=(0.0, 0.25), level=0.5)])
     pipeline, _ = _render(("vis_half", 1, 1), docs=(doc,))
     assert {_frames(pipeline)[t][_DIMMER] for t in range(20, 520, EFFECT_GRID_MS)} == {128}
 
@@ -414,17 +412,15 @@ def test_level_sets_the_lit_dimmer() -> None:
     [
         (
             lambda s: s.update(
-                dimmer={
-                    "physical": {"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0}
-                }
+                dimmer={"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0}
             ),
             "replaces the dimmer",
         ),
         (
             lambda s: (
-                s.pop("physical_shutter_state"),
+                s.pop("shutter_state"),
                 s.update(
-                    physical_shutter={
+                    shutter={
                         "period_beats": 1.0,
                         "duty_cycle": 0.5,
                         "low_state": "closed",
@@ -435,8 +431,8 @@ def test_level_sets_the_lit_dimmer() -> None:
             "replaces the dimmer",
         ),
         (
-            lambda s: s["movement"].update(
-                physical={
+            lambda s: s.update(
+                movement={
                     "shape": "hold",
                     "mode": "periodic",
                     "start_pan_deg": 0.0,
@@ -446,23 +442,23 @@ def test_level_sets_the_lit_dimmer() -> None:
             "hold step",
         ),
         (
-            lambda s: s["physical_visibility"].update(attack_beats=0.6, release_beats=0.5),
+            lambda s: s["visibility"].update(attack_beats=0.6, release_beats=0.5),
             "exceed the lit window",
         ),
         (
-            lambda s: s.update(physical_distribution=[{"domains": ["pan"], "spread_cycles": 0.2}]),
+            lambda s: s.update(distribution=[{"domains": ["pan"], "spread_cycles": 0.2}]),
             "pan and tilt must be distributed together",
         ),
         (
             lambda s: s.update(
-                physical_distribution=[
+                distribution=[
                     {"domains": ["pan", "tilt"], "spread_cycles": 0.2},
                     {"domains": ["dimmer"], "spread_cycles": 0.2},
                 ]
             ),
             "would do nothing",
         ),
-        (lambda s: s["physical_visibility"].update(visible_phase_end=0.1), "after visible"),
+        (lambda s: s["visibility"].update(visible_phase_end=0.1), "after visible"),
     ],
 )
 def test_an_envelope_owns_the_dimmer_and_reads_one_movement_phase(
@@ -487,12 +483,12 @@ def test_a_profile_without_a_dimmer_axis_needs_zero_ramps_and_full_level() -> No
     """Without a dimmer the slice is lit by the shutter alone, so a ramp or a level below 1
     cannot be honored and is refused, never dropped."""
     rig = _rig(_no_dimmer)
-    plain = physical_template_doc("vis_nod", [envelope_step("n", 0.0, 60.0, lit=(0.0, 0.25))])
+    plain = loop_template_doc("vis_nod", [envelope_step("n", 0.0, 60.0, lit=(0.0, 0.25))])
     segments = _compile(plain.template, rig)
     assert all(ChannelName.DIMMER not in cue.channels for cue in segments)
     assert all(_state(cue, ChannelName.SHUTTER) == ["open"] for cue in segments)
     for fields in ({"attack": 0.5}, {"release": 0.5}, {"level": 0.5}):
-        doc = physical_template_doc(
+        doc = loop_template_doc(
             "vis_nod_ramp", [envelope_step("n", 0.0, 60.0, lit=(0.0, 0.25), **fields)]
         )
         with pytest.raises(PhysicalChannelError, match="no dimmer axis"):
@@ -513,11 +509,11 @@ def test_the_lit_shutter_is_the_steps_state_else_the_profiles_open_state() -> No
     """A step without a static shutter state is lit through the profile's `open_state`;
     one with a state keeps it; with neither the step is refused."""
     unset = envelope_step("s", 0.0, 60.0, lit=(0.0, 0.25))
-    unset.pop("physical_shutter_state")
-    strobe = {**copy.deepcopy(unset), "physical_shutter_state": "strobe"}
+    unset.pop("shutter_state")
+    strobe = {**copy.deepcopy(unset), "shutter_state": "strobe"}
 
     def shutters(step: dict[str, Any], rig: FixtureGroup) -> set[str]:
-        doc = physical_template_doc("vis_shutter", [step])
+        doc = loop_template_doc("vis_shutter", [step])
         return {s for cue in _compile(doc.template, rig) for s in _state(cue, ChannelName.SHUTTER)}
 
     assert shutters(unset, _rig(_strobe)) == {"open"}
@@ -546,7 +542,7 @@ def test_a_window_or_gap_shorter_than_a_frame_is_refused(
     """0.004 of a 2000 ms period, or 0.03 of a 500 ms one, is under a frame: a lit window
     or a dark interval that short inside a step is refused by the compile, and so by the
     gate before planning, never dropped."""
-    doc = physical_template_doc(
+    doc = loop_template_doc(
         "vis_short", [envelope_step("s", 0.0, 20.0, lit=lit, period_beats=period)]
     )
     with pytest.raises(PhysicalChannelError, match=f"{what} .* shorter than one 20 ms frame"):
@@ -558,13 +554,13 @@ def _return_doc(fallback: str | None) -> TemplateDoc:
     """A linear pan out by 60 degrees over three beats, lit while it moves, then dark for
     the bar's last beat: 500 ms to return 60 degrees."""
     step = sweep_step("out", 0.0, 60.0, period_beats=3.0)
-    step["dimmer"] = {}
+    step.pop("dimmer", None)
     # Ending at 1 would light the hold too (the finite phase clamps); 0.99 ends at 1505 ms,
     # so the first frame left dark is 1520 ms.
-    step["physical_visibility"] = {"visible_phase_start": 0.0, "visible_phase_end": 0.99}
+    step["visibility"] = {"visible_phase_start": 0.0, "visible_phase_end": 0.99}
     if fallback is not None:
-        step["physical_reposition_fallback"] = fallback
-    return physical_template_doc(f"vis_return_{fallback}", [step])
+        step["reposition_fallback"] = fallback
+    return loop_template_doc(f"vis_return_{fallback}", [step])
 
 
 def test_a_dark_return_too_short_fails_and_a_declared_fallback_drops_the_slice() -> None:
@@ -575,7 +571,7 @@ def test_a_dark_return_too_short_fails_and_a_declared_fallback_drops_the_slice()
     slow = _rig(_speed(45.0))
     refused = _gate_error(_return_doc(None), rig=slow)
     assert "infeasible_transition" in refused and "needs" in refused
-    job = physical_job(reposition_fallback="drop_accent")
+    job = p1_job(reposition_fallback="drop_accent")
     pipeline, _ = _render(
         ("vis_return_drop_accent", 1, 4), docs=(_return_doc("drop_accent"),), rig=slow, job=job
     )
@@ -593,7 +589,7 @@ def test_a_dark_return_too_short_fails_and_a_declared_fallback_drops_the_slice()
 # --- Overlays ----------------------------------------------------------------------------
 
 
-_FLICK = physical_template_doc(
+_FLICK = loop_template_doc(
     "vis_flick", [hold_step("h", 0.0)], overlays=[overlay("gobo", 1.0, 3.0, 0.5, "dots")]
 )
 """A lit hold (open gobo) with a gobo flick to `dots` over beats [1, 3) of each bar."""
@@ -628,10 +624,10 @@ def _base_change_doc(channel: str, state: str, *, overlays: bool = True) -> Temp
     """Step A red on bar 1, step B blue on bar 2, both aimed alike; an overlay over beats
     [3, 5): from bar 0.75 to 1.25."""
     steps = [
-        hold_step("a", 0.0, physical_color="red"),
-        hold_step("b", 0.0, start=1.0, physical_color="blue"),
+        hold_step("a", 0.0, color="red"),
+        hold_step("b", 0.0, start=1.0, color="blue"),
     ]
-    return physical_template_doc(
+    return loop_template_doc(
         f"vis_base_{channel}_{overlays}",
         steps,
         cycle_bars=2.0,
@@ -665,8 +661,8 @@ def test_an_overlay_never_smuggles_a_lit_wheel_change_through_its_flick() -> Non
 
 def _short_mask_doc(fallback: str | None) -> TemplateDoc:
     """A gobo flick whose masks last a quarter beat (120 ms), under the 150 ms settle."""
-    step = hold_step("h", 0.0, **({"physical_reposition_fallback": fallback} if fallback else {}))
-    return physical_template_doc(
+    step = hold_step("h", 0.0, **({"reposition_fallback": fallback} if fallback else {}))
+    return loop_template_doc(
         f"vis_short_mask_{fallback}", [step], overlays=[overlay("gobo", 1.0, 3.0, 0.25, "dots")]
     )
 
@@ -674,7 +670,7 @@ def _short_mask_doc(fallback: str | None) -> TemplateDoc:
 def test_a_mask_too_short_for_the_wheel_fails_and_a_declared_fallback_drops_the_flick() -> None:
     refused = _gate_error(_short_mask_doc(None))
     assert "infeasible_transition" in refused and "needs 160 ms" in refused
-    job = physical_job(reposition_fallback="drop_accent")
+    job = p1_job(reposition_fallback="drop_accent")
     pipeline, _ = _render(
         ("vis_short_mask_drop_accent", 1, 1), docs=(_short_mask_doc("drop_accent"),), job=job
     )
@@ -691,12 +687,12 @@ def test_a_lock_on_the_masked_wheel_fails_before_emission() -> None:
     """A lock over the first mask leaves the wheel no frame to turn: the transaction's
     `lock_conflict`, and the render delivers nothing."""
     lock = RenderLock(start_ms=520, end_ms=760, fixture_ids=("MH1",), channels=(ChannelName.GOBO,))
-    with registered_templates(_FLICK), pytest.raises(PhysicalRenderError, match="lock_conflict"):
+    with registered_templates(_FLICK), pytest.raises(RenderRefusedError, match="lock_conflict"):
         RenderingPipeline(
-            choreography_plan=physical_sections(("vis_flick", 1, 1)),
+            choreography_plan=sections_plan(("vis_flick", 1, 1)),
             beat_grid=_grid(),
-            fixture_group=physical_rig(),
-            job_config=physical_job(),
+            fixture_group=p1_rig(),
+            job_config=p1_job(),
             output_path=None,
             locks=(lock,),
         ).render()
@@ -706,7 +702,7 @@ def test_overlays_on_different_channels_compose_and_on_one_channel_may_not_overl
     """A color flick over beats [1, 3) and a gobo flick over [2, 4): each splits what the
     other left, so the color flick shows on beats 1.5-2 and the gobo flick on 3-3.5 over
     the base color; between them both wheels turn in the dark."""
-    doc = physical_template_doc(
+    doc = loop_template_doc(
         "vis_two",
         [hold_step("h", 0.0)],
         overlays=[overlay("color", 1.0, 3.0, 0.5, "blue"), overlay("gobo", 2.0, 4.0, 0.5, "star")],
@@ -723,7 +719,7 @@ def test_overlays_on_different_channels_compose_and_on_one_channel_may_not_overl
             (frames[t][_COLOR], frames[t][_GOBO]) for t in range(start, end, EFFECT_GRID_MS)
         } == {(color, gobo)}
     with pytest.raises(ValidationError, match="overlap at beat 2"):
-        physical_template_doc(
+        loop_template_doc(
             "vis_overlap",
             [hold_step("h", 0.0)],
             overlays=[
@@ -738,7 +734,7 @@ def _remainder_doc(policy: str = "HOLD_LAST_POSE") -> TemplateDoc:
     and a gobo flick on beats 1.5-3.5, inside a's dark part, so no full cycle shows it."""
     a = envelope_step("a", 0.0, 30.0, lit=(0.0, 0.25))
     b = hold_step("b", 0.0, start=1.0)
-    return physical_template_doc(
+    return loop_template_doc(
         f"vis_rem_{policy.lower()}",
         [a, b],
         cycle_bars=2.0,
@@ -765,7 +761,7 @@ def test_an_overlay_takes_no_hold_last_pose_remainder() -> None:
 
 def _cycle_head_doc(policy: str) -> TemplateDoc:
     """Holds a (bar 1) and b (bar 2) at one aim, with a gobo flick on beats 1-3 of bar 1."""
-    return physical_template_doc(
+    return loop_template_doc(
         f"vis_head_{policy.lower()}",
         [hold_step("a", 0.0), hold_step("b", 0.0, start=1.0)],
         cycle_bars=2.0,
@@ -795,17 +791,17 @@ def test_an_overlay_the_base_already_holds_is_a_no_op() -> None:
     """A flick to the state a cue already holds would only dip it dark twice: that cue is
     kept whole and records the channel. Over a base change only the cue that differs is
     masked."""
-    same = physical_template_doc(
+    same = loop_template_doc(
         "vis_same", [hold_step("h", 0.0)], overlays=[overlay("gobo", 1.0, 3.0, 0.5, "open")]
     )
     _, segments = _render(("vis_same", 1, 1), docs=(same,))
     assert _spans(segments) == [(20, 2020)]
     assert {c.metadata["overlay_unchanged"] for c in _cues(segments)} == {"gobo"}
     steps = [
-        hold_step("a", 0.0, physical_color="red"),
-        hold_step("b", 0.0, start=1.0, physical_color="white"),
+        hold_step("a", 0.0, color="red"),
+        hold_step("b", 0.0, start=1.0, color="white"),
     ]
-    mixed = physical_template_doc(
+    mixed = loop_template_doc(
         "vis_mixed", steps, cycle_bars=2.0, overlays=[overlay("color", 3.0, 5.0, 0.5, "white")]
     )
     _, segments = _render(("vis_mixed", 1, 2), docs=(mixed,), grid=_TWO_BARS)
@@ -818,8 +814,8 @@ def test_an_overlay_the_base_already_holds_is_a_no_op() -> None:
 def test_an_entry_window_drop_records_the_slice_it_dropped() -> None:
     """The fly-out's first lit slice falls inside its section's entry window: the record
     names that slice's frames, not the whole step instance, whose later slices render."""
-    far = physical_template_doc("vis_far", [hold_step("h", 150.0)])
-    fly = physical_template_doc(
+    far = loop_template_doc("vis_far", [hold_step("h", 150.0)])
+    fly = loop_template_doc(
         "vis_fly", [envelope_step("o", -100.0, 40.0, lit=(0.0, 0.25), period_beats=2.0)]
     )
     pipeline, segments = _render(
@@ -841,13 +837,13 @@ def test_an_entry_window_drop_records_the_slice_it_dropped() -> None:
 def _once_doc(lit_end: float, **fields: Any) -> TemplateDoc:
     """ONCE with HOLD_LAST_POSE: a finite sweep from 0 to 40 degrees over the cycle's bar."""
     step = path_step("f", "sweep", pan=20.0, mode="finite", period_beats=4.0)
-    step["dimmer"] = {}
-    step["physical_visibility"] = {
+    step.pop("dimmer", None)
+    step["visibility"] = {
         "visible_phase_start": 0.0,
         "visible_phase_end": lit_end,
         **fields,
     }
-    return physical_template_doc(f"vis_once_{lit_end:g}", [step], mode="ONCE")
+    return loop_template_doc(f"vis_once_{lit_end:g}", [step], mode="ONCE")
 
 
 @pytest.mark.parametrize(("lit_end", "spans"), [(1.0, [(20, 6020)]), (0.75, [(20, 1520)])])
@@ -870,13 +866,13 @@ def test_a_finite_window_ending_at_one_stays_lit_through_the_once_hold(
 def test_an_overlay_state_is_named_never_a_byte() -> None:
     """A state the wheel does not declare is refused, never replaced by an open slot or a
     zero byte; an attribute preset supplies each fixture's own state."""
-    bad = physical_template_doc(
+    bad = loop_template_doc(
         "vis_bad", [hold_step("h", 0.0)], overlays=[overlay("gobo", 1.0, 3.0, 0.5, "0")]
     )
     with pytest.raises(PhysicalChannelError, match="state '0' is not declared"):
         _compile(bad.template)
-    rig = physical_preset_rig()
-    doc = physical_template_doc(
+    rig = preset_rig()
+    doc = loop_template_doc(
         "vis_preset",
         [hold_step("h", 0.0)],
         overlays=[overlay("gobo", 1.0, 3.0, 0.5, attribute_preset_id="wash")],
@@ -887,12 +883,12 @@ def test_an_overlay_state_is_named_never_a_byte() -> None:
         if cue.t0_ms == 760
     }
     assert flicks == {"MH1": ["dots"], "MH2": ["star"]}  # MH2 through wash's fallback
-    no_gobo = physical_template_doc(
+    no_gobo = loop_template_doc(
         "vis_no_gobo",
         [hold_step("h", 0.0)],
         overlays=[overlay("gobo", 1.0, 3.0, 0.5, attribute_preset_id="cool")],
     )
-    with pytest.raises(PhysicalCompileError, match="'cool' sets no gobo for fixture 'MH1'"):
+    with pytest.raises(CompileError, match="'cool' sets no gobo for fixture 'MH1'"):
         _compile(no_gobo.template, rig)
 
 
@@ -902,53 +898,50 @@ def test_overlay_shape_is_refused_where_it_cannot_follow_the_cycle() -> None:
     `whole_period_cycle`), with both or neither state source, or with masks that leave
     no flick."""
     with pytest.raises(ValidationError, match="PING_PONG"):
-        physical_template_doc(
+        loop_template_doc(
             "vis_pp",
             [hold_step("h", 0.0)],
             mode="PING_PONG",
             overlays=[overlay("gobo", 1, 3, 0.5, "dots")],
         )
-    late = physical_template_doc(
+    late = loop_template_doc(
         "vis_late",
         [hold_step("h", 0.0, duration=0.5), hold_step("k", 0.0, start=0.5, duration=0.5)],
         overlays=[overlay("gobo", 3.0, 5.0, 0.5, "dots")],
     )
-    with pytest.raises(PhysicalCompileError, match="ends after its 4-beat cycle"):
+    with pytest.raises(CompileError, match="ends after its 4-beat cycle"):
         _compile(late.template)
     for fields in ({"state": "dots", "attribute_preset_id": "wash"}, {}):
         with pytest.raises(ValidationError, match="exactly one"):
-            physical_template_doc(
+            loop_template_doc(
                 "vis_src",
                 [hold_step("h", 0.0)],
                 overlays=[overlay("gobo", 1.0, 3.0, 0.5, **fields)],
             )
     with pytest.raises(ValidationError, match="outlast its two masks"):
-        physical_template_doc(
+        loop_template_doc(
             "vis_masks", [hold_step("h", 0.0)], overlays=[overlay("gobo", 1.0, 2.0, 0.5, "dots")]
         )
 
 
-def test_envelopes_and_overlays_are_physical_only_and_absent_from_dumps() -> None:
+def test_envelopes_and_overlays_are_absent_from_dumps_when_unset() -> None:
     """At their defaults neither appears in a dump, so every existing template dumps and
     fingerprints as before."""
     plain = {
         "step_id": "plain",
         "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
         "movement": {
-            "physical": {
-                "shape": "hold",
-                "mode": "periodic",
-                "start_pan_deg": 0,
-                "start_tilt_deg": 0,
-            }
+            "shape": "hold",
+            "mode": "periodic",
+            "start_pan_deg": 0,
+            "start_tilt_deg": 0,
         },
-        "dimmer": {},
     }
     dumped = TemplateStep.model_validate(plain).model_dump(mode="json")
-    assert "physical_visibility" not in dumped
+    assert "visibility" not in dumped
     assert (
-        "physical_overlays"
-        not in physical_template_doc("vis_dump", [hold_step("h", 0.0)]).model_dump(mode="json")[
+        "overlays"
+        not in loop_template_doc("vis_dump", [hold_step("h", 0.0)]).model_dump(mode="json")[
             "template"
         ]
     )
@@ -966,17 +959,17 @@ def _rig_of(fixture_ids: Sequence[str], full_ids: Sequence[str], speed: float) -
 
 
 def _job_of(fixture_ids: Sequence[str], policy: str = "error") -> JobConfig:
-    states = dict.fromkeys(fixture_ids, PHYSICAL_INITIAL_STATE)
+    states = dict.fromkeys(fixture_ids, INITIAL_STATE)
     if policy == "error":
-        return physical_job(initial_states=states)
-    return physical_job(initial_states=states, reposition_fallback=policy)
+        return p1_job(initial_states=states)
+    return p1_job(initial_states=states, reposition_fallback=policy)
 
 
 def _encoded(
     sections: Sequence[tuple[str, int, int]], grid: BeatGrid, rig: FixtureGroup, job: JobConfig
 ) -> dict[str, list[tuple[int, tuple[tuple[int, int], ...]]]]:
     pipeline = RenderingPipeline(
-        choreography_plan=physical_sections(*sections),
+        choreography_plan=sections_plan(*sections),
         beat_grid=grid,
         fixture_group=rig,
         job_config=job,
@@ -1005,7 +998,7 @@ def _assert_subset_stable(
     rig's byte for byte."""
     full_ids = tuple(f"MH{index}" for index in range(1, heads + 1))
     rig, job = _rig_of(full_ids, full_ids, speed), _job_of(full_ids, policy)
-    check_physical_templates(
+    admit_templates(
         sorted({template_id for template_id, _, _ in sections}),
         beat_grid=grid,
         fixture_group=rig,
@@ -1022,7 +1015,7 @@ def _assert_subset_stable(
             assert subset[fixture_id] == full[fixture_id], (gone, fixture_id)
 
 
-_WINGS = physical_template_doc(
+_WINGS = loop_template_doc(
     "vis_wings",
     [
         envelope_step(
@@ -1079,7 +1072,7 @@ def _fuzz_step(rng: random.Random, step_id: str, start: float, duration: float) 
     timing = {"start": start, "duration": duration}
     if shape == "sine_pan":
         step = sweep_step(step_id, 0.0, extent, period_beats=period, **timing)
-        step["movement"]["physical"].update(shape="sine_pan", mode="periodic")
+        step["movement"].update(shape="sine_pan", mode="periodic")
     elif shape == "linear":
         step = sweep_step(step_id, -extent / 2, extent, period_beats=period, **timing)
     else:
@@ -1094,15 +1087,15 @@ def _fuzz_step(rng: random.Random, step_id: str, start: float, duration: float) 
     release = rng.choice([0.0, 0.25])
     if shape == "linear" and lit_end == 1:
         release = 0.0  # a finite window ending at 1 stays lit through the hold
-    step["dimmer"] = {}
-    step["physical_visibility"] = {
+    step.pop("dimmer", None)
+    step["visibility"] = {
         "visible_phase_start": lit_start,
         "visible_phase_end": lit_end,
         "attack_beats": rng.choice([0.0, 0.25]),
         "release_beats": release,
     }
     if rng.random() < 0.5:
-        step["physical_distribution"] = [
+        step["distribution"] = [
             {
                 "domains": ["pan", "tilt"],
                 "spread_cycles": rng.choice([0.25, 0.5]),
@@ -1111,7 +1104,7 @@ def _fuzz_step(rng: random.Random, step_id: str, start: float, duration: float) 
         ]
     fallback = rng.choice([None, "preserve_aim", "drop_accent"])
     if fallback is not None:
-        step["physical_reposition_fallback"] = fallback
+        step["reposition_fallback"] = fallback
     return step
 
 
@@ -1133,7 +1126,7 @@ def _fuzz_doc(rng: random.Random, seed: int) -> TemplateDoc:
             )
             end = min(4 * cycle, start + 2 * mask + rng.choice([0.5, 1.0, 1.5]))
             overlays.append(overlay(channel, start, end, mask, rng.choice(states)))
-    return physical_template_doc(
+    return loop_template_doc(
         f"vis_fuzz_{seed}",
         steps,
         cycle_bars=cycle,
@@ -1172,13 +1165,13 @@ def _reference_admits(template_id: str, grid: BeatGrid, rig: FixtureGroup, job: 
     policy = job.moving_heads
     bars = sum(1 for bar in grid.bar_boundaries if bar < grid.duration_ms)
     pipeline = RenderingPipeline(
-        choreography_plan=physical_sections((template_id, 1, bars)),
+        choreography_plan=sections_plan((template_id, 1, bars)),
         beat_grid=grid,
         fixture_group=rig,
         job_config=job,
     )
     phase_map = build_musical_phase_map(grid)
-    start, end = physical_cue_limits(phase_map, int(grid.duration_ms))
+    start, end = cue_limits(phase_map, int(grid.duration_ms))
     profiles = {f.fixture_id: f.config.physical_profile for f in rig.expand_fixtures()}
     context = TemplateCompileContext(
         section_id="reference",
@@ -1194,14 +1187,14 @@ def _reference_admits(template_id: str, grid: BeatGrid, rig: FixtureGroup, job: 
     from twinklr.core.sequencer.moving_heads.templates import get_template
 
     try:
-        compiled = compile_physical_template(
+        compiled = compile_template(
             get_template(template_id).template,
             context,
             phase_map=phase_map,
             start_limit_ms=start,
             end_limit_ms=end,
         )
-    except (PhysicalCompileError, PhysicalChannelError, ValueError):
+    except (CompileError, PhysicalChannelError, ValueError):
         return False
     cues, _, _ = _enter_section(
         compiled.segments,
@@ -1244,7 +1237,7 @@ def _fuzz_case(seed: int) -> bool:
     where = f"seed {seed}: {policy}, {speed} deg/s, {heads} heads, steady {steady}"
     with registered_templates(document):
         try:
-            check_physical_templates(
+            admit_templates(
                 [template_id],
                 beat_grid=grid,
                 fixture_group=rig,
@@ -1265,7 +1258,7 @@ def _fuzz_case(seed: int) -> bool:
             plans.append(tuple((template_id, first + 1, last) for first, last in pairwise(bounds)))
         for sections in plans:
             pipeline = RenderingPipeline(
-                choreography_plan=physical_sections(*sections),
+                choreography_plan=sections_plan(*sections),
                 beat_grid=grid,
                 fixture_group=rig,
                 job_config=job,
@@ -1273,7 +1266,7 @@ def _fuzz_case(seed: int) -> bool:
             )
             try:
                 segments = pipeline.render()
-            except (PhysicalRenderError, PhysicalChannelError) as error:
+            except (RenderRefusedError, PhysicalChannelError) as error:
                 raise AssertionError(
                     f"{where}: admitted, then {sections} failed: {error}"
                 ) from error
@@ -1298,15 +1291,15 @@ def test_gate_render_and_bytes_agree_over_envelopes_overlays_distributions_and_p
 
 
 _COMPONENT_NOTES = {
-    "rejected": "exact path's alternative is rejected by physical validation or compile",
-    "compiled": "exact path changes the physical compile result",
+    "rejected": "exact path's alternative is rejected by validation or compile",
+    "compiled": "exact path changes the compile result",
 }
 
 
 def _evidence_payload() -> dict[str, Any]:
     """A fully lit envelope step with a gobo flick that names a rig preset, then a color
     flick; moving the preset flick onto the color wheel keeps them apart."""
-    return physical_template_doc(
+    return loop_template_doc(
         "vis_evidence",
         [envelope_step("e", 0.0, 40.0, lit=(0.0, 1.0))],
         overlays=[
@@ -1317,19 +1310,19 @@ def _evidence_payload() -> dict[str, Any]:
 
 
 def _visibility(change: Callable[[dict[str, Any]], Any]) -> Callable[[dict[str, Any]], Any]:
-    return lambda doc: change(doc["template"]["steps"][0]["physical_visibility"])
+    return lambda doc: change(doc["template"]["steps"][0]["visibility"])
 
 
 def _overlay(
     index: int, change: Callable[[dict[str, Any]], Any]
 ) -> Callable[[dict[str, Any]], Any]:
-    return lambda doc: change(doc["template"]["physical_overlays"][index])
+    return lambda doc: change(doc["template"]["overlays"][index])
 
 
-_STEP = "template.template.steps.physical_visibility"
-_OVERLAYS = "template.template.physical_overlays"
+_STEP = "template.template.steps.visibility"
+_OVERLAYS = "template.template.overlays"
 _MUTATIONS: dict[str, tuple[str, Callable[[dict[str, Any]], Any]]] = {
-    _STEP: ("compiled", lambda doc: doc["template"]["steps"][0].pop("physical_visibility")),
+    _STEP: ("compiled", lambda doc: doc["template"]["steps"][0].pop("visibility")),
     f"{_STEP}.visible_phase_start": (
         "compiled",
         _visibility(lambda v: v.update(visible_phase_start=0.125)),
@@ -1341,7 +1334,7 @@ _MUTATIONS: dict[str, tuple[str, Callable[[dict[str, Any]], Any]]] = {
     f"{_STEP}.attack_beats": ("compiled", _visibility(lambda v: v.update(attack_beats=0.5))),
     f"{_STEP}.release_beats": ("compiled", _visibility(lambda v: v.update(release_beats=0.5))),
     f"{_STEP}.level": ("compiled", _visibility(lambda v: v.update(level=0.5))),
-    _OVERLAYS: ("compiled", lambda doc: doc["template"].pop("physical_overlays")),
+    _OVERLAYS: ("compiled", lambda doc: doc["template"].pop("overlays")),
     f"{_OVERLAYS}.start_beats": ("compiled", _overlay(0, lambda o: o.update(start_beats=0.5))),
     f"{_OVERLAYS}.end_beats": ("compiled", _overlay(0, lambda o: o.update(end_beats=3.5))),
     f"{_OVERLAYS}.mask_beats": ("compiled", _overlay(1, lambda o: o.update(mask_beats=0.25))),
@@ -1367,8 +1360,8 @@ VISIBILITY_PATHS = tuple(
 def _evidence_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
     try:
         template = TemplateDoc.model_validate(payload).template
-        segments = _compile(template, physical_preset_rig())
-    except (ValidationError, PhysicalCompileError, PhysicalChannelError) as error:
+        segments = _compile(template, preset_rig())
+    except (ValidationError, CompileError, PhysicalChannelError) as error:
         return {"rejected": f"{type(error).__name__}: {error}"}
     return {"compiled": [s.model_dump(mode="json", exclude={"metadata"}) for s in segments]}
 
@@ -1401,9 +1394,9 @@ _OPEN_STATE_ROOTS = {
 
 
 def _open_state_rig(root: str, open_state: str) -> FixtureGroup:
-    """`physical_rig` with a `strobe` shutter state and `open_state`, its profile on each
+    """`p1_rig` with a `strobe` shutter state and `open_state`, its profile on each
     fixture's config or on the group's shared base config."""
-    payload = physical_rig().model_dump(mode="json")
+    payload = p1_rig().model_dump(mode="json")
     profile = payload["fixtures"][0]["config"]["physical_profile"]
     _strobe(profile)
     profile["discrete"]["shutter"]["open_state"] = open_state
@@ -1432,8 +1425,8 @@ def test_open_state_changes_the_lit_shutter(config_path: str) -> None:
         f"::test_open_state_changes_the_lit_shutter[{config_path}]"
     )
     step = envelope_step("s", 0.0, 60.0, lit=(0.0, 0.25))
-    step.pop("physical_shutter_state")
-    template = physical_template_doc("vis_open_state", [step]).template
+    step.pop("shutter_state")
+    template = loop_template_doc("vis_open_state", [step]).template
     root = _OPEN_STATE_ROOTS[config_path]
     shutters = {
         state: {

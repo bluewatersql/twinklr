@@ -1,7 +1,7 @@
-"""Explicit fixture capabilities and run initial state for the physical renderer.
+"""Explicit fixture capabilities and run initial state for the moving-head renderer.
 
-They are validated, enter render identity, and feed the physical compile, frame
-encoder and preposition pass. Physical-only config paths are evidenced here, not by the
+They are validated, enter render identity, and feed the compile, frame
+encoder and preposition pass. Profile and initial-state paths are evidenced here, not by the
 generic fixture snapshot, because they change only the moving-head render.
 """
 
@@ -20,11 +20,11 @@ from pydantic import ValidationError
 import pytest
 
 from tests.config_effects_registry import CONFIG_EFFECTS, ConfigDispositionKind
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
+    family_catalog,
+    fixture_segment,
     initial_state_payload,
-    physical_catalog,
-    physical_grid,
-    physical_segment,
+    p1_grid,
     preposition_profile_payload,
     profile_payload,
     unprofiled_rig,
@@ -46,22 +46,22 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
     PhysicalChannelError,
 )
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile.physical import DiscreteChange, wheel_changes
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     PrepositionResult,
     plan_prepositions,
 )
+from twinklr.core.sequencer.moving_heads.compile.step import DiscreteChange, wheel_changes
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     EncodedFixtureFrame,
     encode_fixture_frames,
 )
 from twinklr.core.sequencer.moving_heads.identity import (
-    LEGACY_BACKEND_ID,
-    PHYSICAL_RENDERER_REVISION,
+    BACKEND_ID,
+    RENDERER_REVISION,
     render_fingerprint,
 )
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
-    PHYSICAL_TEMPLATE_DIR,
+    TEMPLATE_CATALOG_DIR,
     load_template_document,
 )
 
@@ -651,7 +651,7 @@ def test_other_invalid_fixture_config_keeps_its_behavior() -> None:
         group.expand_fixtures()
 
 
-# --- Registry evidence for physical-only config paths -----------------------------------
+# --- Registry evidence for profile and initial-state paths ------------------------------
 
 Component = Literal[
     "rejected", "words", "frames", "changes", "check", "preposition", "darkness", "fingerprint"
@@ -665,7 +665,7 @@ _COMPONENT_NOTES: dict[Component, str] = {
     "check": "exact path changes the initial-state check",
     "preposition": "exact path changes the planned preposition transactions",
     "darkness": "exact path changes which planned cues start dark",
-    "fingerprint": "identity only; no physical consumer yet",
+    "fingerprint": "identity only; no consumer yet",
 }
 """The registry note each evidence component must carry, so none overclaims."""
 
@@ -800,7 +800,7 @@ def _split(path: str, prefixes: tuple[str, ...]) -> tuple[str, str]:
             return prefix, ""
         if path.startswith(f"{prefix}."):
             return prefix, path.removeprefix(f"{prefix}.")
-    raise AssertionError(f"unexpected physical evidence path {path}")
+    raise AssertionError(f"unexpected profile evidence path {path}")
 
 
 @cache
@@ -813,10 +813,10 @@ def _identity_inputs() -> dict[str, Any]:
     )
     return {
         "plan": plan,
-        "beat_grid": physical_grid(),
-        "templates": [load_template_document(PHYSICAL_TEMPLATE_DIR / "mirror_wings.json")],
-        "backend_id": LEGACY_BACKEND_ID,
-        "renderer_revision": PHYSICAL_RENDERER_REVISION,
+        "beat_grid": p1_grid(),
+        "templates": [load_template_document(TEMPLATE_CATALOG_DIR / "mirror_wings.json")],
+        "backend_id": BACKEND_ID,
+        "renderer_revision": RENDERER_REVISION,
     }
 
 
@@ -829,7 +829,7 @@ def _probe_segment() -> FixtureSegment:
     def state(name: str) -> DiscreteTrajectory:
         return DiscreteTrajectory.model_validate({"events": [{"t_ms": 0, "state": name}]})
 
-    return physical_segment(
+    return fixture_segment(
         {
             ChannelName.PAN: hold("degree", 10.0),
             ChannelName.TILT: hold("degree", -20.0),
@@ -847,7 +847,7 @@ def _probe_wheel_segments() -> list[FixtureSegment]:
     red = DiscreteTrajectory.model_validate({"events": [{"t_ms": 80, "state": "red"}]})
     return [
         _probe_segment(),
-        physical_segment({ChannelName.COLOR: red}, t0_ms=80, t1_ms=120, segment_id="later"),
+        fixture_segment({ChannelName.COLOR: red}, t0_ms=80, t1_ms=120, segment_id="later"),
     ]
 
 
@@ -885,7 +885,7 @@ def _probe_cues() -> list[FixtureSegment]:
                 "interpolation": "hold",
             }
         )
-        return physical_segment(
+        return fixture_segment(
             {
                 ChannelName.PAN: line(pan),
                 ChannelName.TILT: line(0.0),
@@ -910,7 +910,8 @@ def _probe_cues() -> list[FixtureSegment]:
 def _contract_snapshot(
     prefix: str, profile: dict[str, Any] | None, initial_states: dict[str, Any]
 ) -> dict[Component, Any]:
-    """What the physical contract makes of MH1's profile and the run's initial states.
+    """What the profile and initial-state contract makes of MH1's profile and the run's
+    initial states.
 
     The validation error locations, the encoded DMX word at probe values on every
     declared axis, the frames encoded from a probe segment that writes every attribute
@@ -976,7 +977,7 @@ def _contract_snapshot(
 
 def _fingerprint(group: FixtureGroup, policy: MHRenderPolicy) -> str:
     # The plan's template id resolves through the shared registry.
-    with physical_catalog():
+    with family_catalog():
         return render_fingerprint(fixtures=group, policy=policy, **_identity_inputs())
 
 

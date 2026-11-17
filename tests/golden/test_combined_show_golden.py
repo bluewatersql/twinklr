@@ -1,8 +1,8 @@
-"""Headline P3-T5 artifact: physical moving-head DMX + Spirals + chase in one XSequence.
+"""Headline P3-T5 artifact: moving-head DMX + Spirals + chase in one XSequence.
 
 The display half is pinned effect for effect (type, time ranges, settings and palette
 strings, and its trace entries without their shared-table indices); the moving-head
-half is the physical render, pinned by its render fingerprint, effect count and the
+half is the moving-head render, pinned by its render fingerprint, effect count and the
 hash of its effects and trace entries.
 """
 
@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from tests.support.mh_physical import family_job, family_rig, physical_catalog
+from tests.support.moving_heads import family_catalog, family_job, family_rig
 from twinklr.core.agents.audio.profile.models import SongSectionRef
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
 from twinklr.core.formats.xlights.sequence.models.xsq import TimeMarker, XSequence
@@ -31,7 +31,7 @@ from twinklr.core.sequencer.display.models.render_plan import (
     RenderLayerPlan,
     RenderPlan,
 )
-from twinklr.core.sequencer.moving_heads.delivery import build_physical_sequence
+from twinklr.core.sequencer.moving_heads.delivery import build_sequence
 from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
 from twinklr.core.sequencer.planning.models import (
     CallResponsePair,
@@ -168,7 +168,7 @@ MH_ELEMENT = "Dmx MH1"
 
 @pytest.fixture(autouse=True)
 def _catalog() -> Iterator[None]:
-    with physical_catalog():
+    with family_catalog():
         yield
 
 
@@ -197,7 +197,7 @@ def _build_combined() -> tuple[XSequence, dict[str, Any], RenderingPipeline]:
         ),
     )
     pipeline.render()
-    sequence = build_physical_sequence(
+    sequence = build_sequence(
         pipeline.requests,
         [TimeMarker(name="drop", time_ms=0, end_time_ms=4400)],
         media_file="combined-show.wav",

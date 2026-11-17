@@ -2,11 +2,10 @@
 
 This module defines all template-related models:
 - Timing models: BaseTiming, RepeatContract
-- Step components: Movement, Dimmer, StepTiming, TemplateStep
-- Physical step data: PhysicalMovementSpec and its PathTransform, PhysicalPulseSpec
-  and its dimmer and shutter forms, named shutter, color and gobo states,
-  ComponentRefs, PhaseDistribution, the VisibilityEnvelope and the PhysicalZoomSpec
-- Template structure: Template (with its physical AttributeOverlays), TemplatePreset,
+- Step components: Movement and its PathTransform, PulseSpec and its dimmer and
+  shutter forms, named shutter, color and gobo states, ComponentRefs,
+  PhaseDistribution, the VisibilityEnvelope, the ZoomSpec, StepTiming and TemplateStep
+- Template structure: Template (with its AttributeOverlays), TemplatePreset,
   TemplateDoc
 
 These models define how choreography is structured and executed.
@@ -71,7 +70,7 @@ class RepeatContract(BaseModel):
     Defines how a template section loops during playback.
 
     Attributes:
-        mode: How to repeat (PING_PONG or JOINER), or ONCE: the physical renderer plays
+        mode: How to repeat (PING_PONG or JOINER), or ONCE: the renderer plays
             one cycle at its nominal rate and never repeats it. Every step of a ONCE
             template is finite and its move ends within the step, so a head without a
             phase offset reaches its terminal pose by the cycle end. After the cycle,
@@ -112,8 +111,8 @@ class RepeatContract(BaseModel):
 # =============================================================================
 
 
-MIN_PHYSICAL_PERIOD_BEATS = 1 / 64
-"""Shortest physical period: 1/64 beat is under 8 ms at 120 BPM, already far below one
+MIN_PERIOD_BEATS = 1 / 64
+"""Shortest period: 1/64 beat is under 8 ms at 120 BPM, already far below one
 20 ms frame, so anything shorter is an authoring error rather than a pulse."""
 
 
@@ -138,8 +137,8 @@ class PathTransform(BaseModel):
     phase_cycles: float = Field(default=0.0, allow_inf_nan=False)
 
 
-class PhysicalMovementSpec(BaseModel):
-    """Physical motion of a step for the physical renderer, in fixture-local degrees.
+class Movement(BaseModel):
+    """Movement of a template step, in fixture-local degrees.
 
     Template-owned renderer data, never an LLM control. Reach (`*_extent_deg`) and
     rate (`period_beats`) are independent. Kernels: `hold` keeps the start pose;
@@ -148,7 +147,7 @@ class PhysicalMovementSpec(BaseModel):
     holds, and is finite. `circle`, `lissajous` (periodic) and `sweep` (periodic or
     finite) move about the start pose; each extent is that axis's maximum signed
     displacement before rotation, and `transform` rotates, shifts or reverses them
-    (`evaluate_physical_path` states each formula). `lissajous_ratio` is the pan and
+    (`evaluate_path` states each formula). `lissajous_ratio` is the pan and
     tilt cycles per period, default 1:2. A start angle left unset comes from the
     step's position reference (`TemplateStep.component_refs`); a step without one
     must set both.
@@ -164,18 +163,24 @@ class PhysicalMovementSpec(BaseModel):
     tilt_extent_deg: float = Field(default=0.0, allow_inf_nan=False)
     period_beats: float | None = Field(
         default=None,
-        ge=MIN_PHYSICAL_PERIOD_BEATS,
+        ge=MIN_PERIOD_BEATS,
         allow_inf_nan=False,
         description="Required unless shape is hold",
     )
-    # Left out of dumps when absent, so existing physical templates dump as before.
+    # Left out of dumps when absent.
     lissajous_ratio: tuple[PositiveInt, PositiveInt] | None = Field(
         default=None, exclude_if=lambda value: value is None
     )
     transform: PathTransform | None = Field(default=None, exclude_if=lambda value: value is None)
 
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        _reject_removed_movement_fields(value)
+        return value
+
     @model_validator(mode="after")
-    def _validate_kernel(self) -> "PhysicalMovementSpec":
+    def _validate_kernel(self) -> "Movement":
         if self.shape == "linear" and self.mode != "finite":
             raise ValueError("linear motion is finite; periodic linear is not supported")
         if self.shape in ("sine_pan", "sine_tilt") and self.mode != "periodic":
@@ -218,24 +223,30 @@ class PhysicalMovementSpec(BaseModel):
             raise ValueError("a sweep turned onto tilt ignores pan_extent_deg; set it to zero")
 
 
-class PhysicalPulseSpec(BaseModel):
+class PulseSpec(BaseModel):
     """A musical-phase pulse: high while the fractional phase is in `[0, duty_cycle)`."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    period_beats: float = Field(ge=MIN_PHYSICAL_PERIOD_BEATS, allow_inf_nan=False)
+    period_beats: float = Field(ge=MIN_PERIOD_BEATS, allow_inf_nan=False)
     duty_cycle: float = Field(gt=0, le=1)
     phase_cycles: float = Field(default=0.0, allow_inf_nan=False)
 
 
-class PhysicalDimmerPulse(PhysicalPulseSpec):
+class DimmerPulse(PulseSpec):
     """A dimmer pulse between explicit normalized levels; duty 1 holds `high`."""
 
     low: float = Field(ge=0, le=1)
     high: float = Field(ge=0, le=1)
 
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        _reject_removed_dimmer_fields(value)
+        return value
 
-class PhysicalShutterPulse(PhysicalPulseSpec):
+
+class ShutterPulse(PulseSpec):
     """A shutter pulse between named profile states."""
 
     low_state: StateName
@@ -243,7 +254,7 @@ class PhysicalShutterPulse(PhysicalPulseSpec):
 
 
 class VisibilityEnvelope(BaseModel):
-    """Where along its movement a physical step is lit; dark everywhere else.
+    """Where along its movement a step is lit; dark everywhere else.
 
     The phases are fractions of the step's movement period (`period_beats`), read at the
     fixture's own movement phase: the step phase minus its pan/tilt distribution offset,
@@ -276,12 +287,12 @@ class VisibilityEnvelope(BaseModel):
         return self
 
 
-class PhysicalZoomSpec(BaseModel):
-    """The beam angle of a physical step on the fixture's zoom axis, in degrees.
+class ZoomSpec(BaseModel):
+    """The beam angle of a step on the fixture's zoom axis, in degrees.
 
     Template-owned renderer data, never an LLM control. `hold` keeps `start_deg`;
     `sine` adds `extent_deg * sin(2*pi*phase)`, where the phase is the step's movement
-    phase (`movement.physical.period_beats`) at the head's pan distribution offset, so
+    phase (`movement.period_beats`) at the head's pan distribution offset, so
     the beam follows the path's own rate and wave. A fixture whose profile declares no
     zoom axis refuses the step, unless `if_unsupported` is `omit_optional_zoom`: the step
     then plays without its zoom, and the render trace records that.
@@ -295,7 +306,7 @@ class PhysicalZoomSpec(BaseModel):
     if_unsupported: Literal["error", "omit_optional_zoom"] = "error"
 
     @model_validator(mode="after")
-    def _validate_kernel(self) -> "PhysicalZoomSpec":
+    def _validate_kernel(self) -> "ZoomSpec":
         if self.shape == "hold" and self.extent_deg:
             raise ValueError("a zoom hold takes no extent_deg")
         if self.shape == "sine" and not self.extent_deg:
@@ -304,7 +315,7 @@ class PhysicalZoomSpec(BaseModel):
 
 
 class AttributeOverlay(BaseModel):
-    """A temporary wheel state over part of every cycle of a physical template.
+    """A temporary wheel state over part of every cycle of a template.
 
     `start_beats` and `end_beats` are offsets from the cycle start and may span a step
     boundary. Each fixture is held dark for `mask_beats` after the start while the wheel
@@ -337,7 +348,7 @@ class AttributeOverlay(BaseModel):
 
 
 class ComponentRefs(BaseModel):
-    """Rig presets a physical step names, resolved per fixture from the fixture group.
+    """Rig presets a step names, resolved per fixture from the fixture group.
 
     `position_id` supplies each start angle the step leaves unset; the attribute presets
     supply each held shutter, color, gobo or dimmer channel the step does not set
@@ -359,6 +370,11 @@ class ComponentRefs(BaseModel):
 
 
 def _reject_removed_movement_fields(value: object) -> None:
+    if isinstance(value, dict) and "physical" in value:
+        raise ValueError(
+            "movement field 'physical' was flattened into movement: move its keys (shape, "
+            "mode, start angles, extents, period_beats, ...) up into movement itself"
+        )
     if isinstance(value, dict):
         removed = sorted(
             {"amplitude_override", "frequency_override", "center_offset_override"} & value.keys()
@@ -372,11 +388,21 @@ def _reject_removed_movement_fields(value: object) -> None:
             raise ValueError(
                 f"movement fields {removed} were removed with the old moving-head "
                 "renderer, their only reader; delete them and state the motion in "
-                "movement.physical"
+                "movement (shape, mode, start angles, extents and period_beats)"
             )
 
 
 def _reject_removed_dimmer_fields(value: object) -> None:
+    if isinstance(value, dict) and "physical" in value:
+        if value["physical"] is None:
+            raise ValueError(
+                "dimmer field 'physical' was flattened into dimmer, and a null pulse is no "
+                "pulse: leave dimmer out"
+            )
+        raise ValueError(
+            "dimmer field 'physical' was flattened into dimmer: move its keys (period_beats, "
+            "duty_cycle, phase_cycles, low, high) up into dimmer itself"
+        )
     if isinstance(value, dict) and "cycles" in value:
         raise ValueError("dimmer field 'cycles' was removed because handlers ignored it")
     if isinstance(value, dict):
@@ -387,7 +413,7 @@ def _reject_removed_dimmer_fields(value: object) -> None:
             raise ValueError(
                 f"dimmer fields {removed} were removed with the old moving-head "
                 "renderer, their only reader; delete them and state the pulse in "
-                "dimmer.physical"
+                "dimmer (period_beats, duty_cycle, phase_cycles, low and high)"
             )
 
 
@@ -395,40 +421,8 @@ def _reject_removed_timing_fields(value: object) -> None:
     if isinstance(value, dict) and "phase_offset" in value:
         raise ValueError(
             "timing field 'phase_offset' was removed with the old moving-head renderer, its "
-            "only reader; delete it and spread phase with physical_distribution"
+            "only reader; delete it and spread phase with distribution"
         )
-
-
-class Movement(BaseModel):
-    """Movement of a template step: its physical motion, in fixture-local degrees."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    physical: PhysicalMovementSpec
-
-    @model_validator(mode="before")
-    @classmethod
-    def reject_removed_fields(cls, value: object) -> object:
-        _reject_removed_movement_fields(value)
-        return value
-
-
-class Dimmer(BaseModel):
-    """Dimmer of a template step: a physical pulse between normalized levels, or none
-    (held by a component reference, or replaced by a visibility envelope)."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    # Left out of dumps when absent.
-    physical: PhysicalDimmerPulse | None = Field(
-        default=None, exclude_if=lambda value: value is None
-    )
-
-    @model_validator(mode="before")
-    @classmethod
-    def reject_removed_fields(cls, value: object) -> object:
-        _reject_removed_dimmer_fields(value)
-        return value
 
 
 class StepTiming(BaseModel):
@@ -449,6 +443,20 @@ class StepTiming(BaseModel):
         return value
 
 
+RENAMED_STEP_FIELDS = {
+    "physical_shutter": "shutter",
+    "physical_shutter_state": "shutter_state",
+    "physical_color": "color",
+    "physical_gobo": "gobo",
+    "physical_reposition_fallback": "reposition_fallback",
+    "physical_distribution": "distribution",
+    "physical_visibility": "visibility",
+    "physical_zoom": "zoom",
+}
+"""Template-step keys renamed when the moving-head renderer became the only one: each is
+refused by name with its new key."""
+
+
 class TemplateStep(BaseModel):
     """A single step in a template.
 
@@ -456,15 +464,16 @@ class TemplateStep(BaseModel):
     - Which fixtures to target
     - When it happens (timing)
     - How fixtures move (movement)
-    - The brightness pattern (dimmer, or a visibility envelope)
-    - The physical shutter, color, gobo and zoom it holds or plays
+    - The brightness pattern (a dimmer pulse, or a visibility envelope)
+    - The shutter, color, gobo and zoom it holds or plays
 
     Attributes:
         step_id: Unique identifier for this step within the template.
         target: Target group for this step (must exist in template groups).
         timing: When and how long this step runs.
         movement: Motion specification.
-        dimmer: Brightness specification.
+        dimmer: A pulse between normalized levels, or none (held by a component
+            reference, or replaced by a visibility envelope).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -473,21 +482,18 @@ class TemplateStep(BaseModel):
     target: SemanticGroupType = SemanticGroupType.ALL
     timing: StepTiming
     movement: Movement
-    dimmer: Dimmer
     # Left out of dumps when absent.
-    physical_shutter: PhysicalShutterPulse | None = Field(
-        default=None, exclude_if=lambda value: value is None
-    )
+    dimmer: DimmerPulse | None = Field(default=None, exclude_if=lambda value: value is None)
+    # Left out of dumps when absent.
+    shutter: ShutterPulse | None = Field(default=None, exclude_if=lambda value: value is None)
     # Left out of dumps when absent. Named profile states held
     # for the whole step, never a byte. A static shutter excludes the pulse form.
-    physical_shutter_state: StateName | None = Field(
-        default=None, exclude_if=lambda value: value is None
-    )
-    physical_color: StateName | None = Field(default=None, exclude_if=lambda value: value is None)
-    physical_gobo: StateName | None = Field(default=None, exclude_if=lambda value: value is None)
+    shutter_state: StateName | None = Field(default=None, exclude_if=lambda value: value is None)
+    color: StateName | None = Field(default=None, exclude_if=lambda value: value is None)
+    gobo: StateName | None = Field(default=None, exclude_if=lambda value: value is None)
     # Left out of dumps when absent. The step's cues opt into
     # the run's `moving_heads.reposition_fallback` when it names the same mode.
-    physical_reposition_fallback: Literal["preserve_aim", "drop_accent"] | None = Field(
+    reposition_fallback: Literal["preserve_aim", "drop_accent"] | None = Field(
         default=None, exclude_if=lambda value: value is None
     )
     # Left out of dumps when absent. Named rig presets for the
@@ -497,43 +503,41 @@ class TemplateStep(BaseModel):
     )
     # Left out of dumps when empty. Phase spread over the rig
     # topology, each distribution over its own domains.
-    physical_distribution: tuple[PhaseDistribution, ...] = Field(
+    distribution: tuple[PhaseDistribution, ...] = Field(
         default=(), exclude_if=lambda value: not value
     )
     # Left out of dumps when absent. Lights only part of each
     # movement period and replaces the dimmer.
-    physical_visibility: VisibilityEnvelope | None = Field(
+    visibility: VisibilityEnvelope | None = Field(
         default=None, exclude_if=lambda value: value is None
     )
     # Left out of dumps when absent. The beam angle on a
     # profile's zoom axis.
-    physical_zoom: PhysicalZoomSpec | None = Field(
-        default=None, exclude_if=lambda value: value is None
-    )
+    zoom: ZoomSpec | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode="after")
-    def _validate_physical_shutter(self) -> "TemplateStep":
-        if self.physical_shutter is not None and self.physical_shutter_state is not None:
-            raise ValueError("set physical_shutter_state or physical_shutter, not both")
+    def _validate_shutter(self) -> "TemplateStep":
+        if self.shutter is not None and self.shutter_state is not None:
+            raise ValueError("set shutter_state or shutter, not both")
         return self
 
     @model_validator(mode="after")
     def _validate_visibility(self) -> "TemplateStep":
         """An envelope needs a movement period, owns the dimmer, and reads one movement
         phase, so pan and tilt share their distribution offset."""
-        envelope = self.physical_visibility
+        envelope = self.visibility
         if envelope is None:
             return self
-        movement = self.movement.physical
+        movement = self.movement
         if movement.period_beats is None:
             raise ValueError(
-                f"step {self.step_id!r}: physical_visibility needs movement.physical with a "
-                "period; a hold step has no movement phase to light"
+                f"step {self.step_id!r}: visibility needs a movement with a period; a hold "
+                "step has no movement phase to light"
             )
-        if self.dimmer.physical is not None or self.physical_shutter is not None:
+        if self.dimmer is not None or self.shutter is not None:
             raise ValueError(
-                f"step {self.step_id!r}: physical_visibility replaces the dimmer and needs a "
-                "static shutter; remove dimmer.physical and the physical_shutter pulse"
+                f"step {self.step_id!r}: visibility replaces the dimmer and needs a static "
+                "shutter; remove the dimmer and the shutter pulse"
             )
         window_beats = exact_decimal(envelope.visible_phase_end) - exact_decimal(
             envelope.visible_phase_start
@@ -552,23 +556,23 @@ class TemplateStep(BaseModel):
             )
         owners = [
             [ChannelName.PAN in spec.domains, ChannelName.TILT in spec.domains]
-            for spec in self.physical_distribution
+            for spec in self.distribution
             if {ChannelName.PAN, ChannelName.TILT} & set(spec.domains)
         ]
         if owners and owners != [[True, True]]:
             raise ValueError(
-                f"step {self.step_id!r}: physical_visibility reads the movement phase, so pan "
+                f"step {self.step_id!r}: visibility reads the movement phase, so pan "
                 "and tilt must be distributed together, by one distribution"
             )
         light = [
             domain.value
-            for spec in self.physical_distribution
+            for spec in self.distribution
             for domain in spec.domains
             if domain in (ChannelName.DIMMER, ChannelName.SHUTTER)
         ]
         if light:
             raise ValueError(
-                f"step {self.step_id!r}: physical_visibility follows the movement phase; "
+                f"step {self.step_id!r}: visibility follows the movement phase; "
                 f"distributing {light} would do nothing"
             )
         return self
@@ -576,34 +580,34 @@ class TemplateStep(BaseModel):
     @model_validator(mode="after")
     def _validate_zoom(self) -> "TemplateStep":
         """A zoom sine waves on the movement phase, so it needs a periodic movement."""
-        zoom = self.physical_zoom
-        movement = self.movement.physical
+        zoom = self.zoom
+        movement = self.movement
         if (
             zoom is not None
             and zoom.shape == "sine"
             and (movement.mode != "periodic" or movement.period_beats is None)
         ):
             raise ValueError(
-                f"step {self.step_id!r}: a physical_zoom sine waves on the movement phase, so "
-                "it needs a periodic movement.physical with a period"
+                f"step {self.step_id!r}: a zoom sine waves on the movement phase, so it needs "
+                "a periodic movement with a period"
             )
         return self
 
     @model_validator(mode="after")
     def _validate_distribution(self) -> "TemplateStep":
-        check_domain_ownership(self.physical_distribution)
+        check_domain_ownership(self.distribution)
         return self
 
     @model_validator(mode="after")
     def _validate_pose_source(self) -> "TemplateStep":
         """Each start angle is set on the step or supplied by a position reference."""
-        movement = self.movement.physical
+        movement = self.movement
         if self.component_refs is not None and self.component_refs.position_id is not None:
             return self
         for name in ("start_pan_deg", "start_tilt_deg"):
             if getattr(movement, name) is None:
                 raise ValueError(
-                    f"step {self.step_id!r} sets no movement.physical.{name} and no "
+                    f"step {self.step_id!r} sets no movement.{name} and no "
                     "component_refs.position_id: an axis nothing sets is never centered"
                 )
         return self
@@ -619,13 +623,21 @@ class TemplateStep(BaseModel):
                 raise ValueError(
                     f"template-step fields {removed} were removed because they never affected output"
                 )
-            removed = sorted({"geometry", "color", "shutter", "gobo"} & value.keys())
-            if removed:
+            if "geometry" in value:
                 raise ValueError(
-                    f"template-step fields {removed} were removed with the old moving-head "
-                    "renderer, their only reader; delete them and state the step's aim in "
-                    "movement.physical or component_refs, and its wheels in "
-                    "physical_shutter_state, physical_shutter, physical_color and physical_gobo"
+                    "template-step field 'geometry' was removed with the old moving-head "
+                    "renderer, its only reader; delete it and state the step's aim in "
+                    "movement or component_refs"
+                )
+            renamed = [key for key in RENAMED_STEP_FIELDS if key in value]
+            if renamed:
+                raise ValueError(
+                    "template-step fields were renamed: "
+                    + ", ".join(f"{key!r} is now {RENAMED_STEP_FIELDS[key]!r}" for key in renamed)
+                )
+            if value.get("dimmer") == {}:
+                raise ValueError(
+                    "an empty dimmer object no longer means no pulse: leave dimmer out instead"
                 )
         return value
 
@@ -675,12 +687,16 @@ class StepPatch(BaseModel):
     @classmethod
     def reject_removed_fields(cls, value: object) -> object:
         if isinstance(value, dict):
-            removed = sorted({"geometry", "color", "shutter", "gobo"} & value.keys())
-            if removed:
+            if "geometry" in value:
                 raise ValueError(
-                    f"step-patch fields {removed} were removed with the old moving-head "
-                    "renderer, their only reader; delete them and patch movement, dimmer "
-                    "or timing"
+                    "step-patch field 'geometry' was removed with the old moving-head "
+                    "renderer, its only reader; delete it and patch movement, dimmer or timing"
+                )
+            step_keys = sorted({"color", "shutter", "gobo"} & value.keys())
+            if step_keys:
+                raise ValueError(
+                    f"a step patch sets only movement, dimmer or timing; set {step_keys} on "
+                    "the step itself"
                 )
         return value
 
@@ -761,9 +777,7 @@ class Template(BaseModel):
     steps: list["TemplateStep"] = Field(default_factory=list)
     metadata: TemplateMetadata | None = None
     # Left out of dumps when empty.
-    physical_overlays: tuple[AttributeOverlay, ...] = Field(
-        default=(), exclude_if=lambda value: not value
-    )
+    overlays: tuple[AttributeOverlay, ...] = Field(default=(), exclude_if=lambda value: not value)
 
     @model_validator(mode="before")
     @classmethod
@@ -773,6 +787,8 @@ class Template(BaseModel):
             raise ValueError(
                 "template field 'roles' was removed because fixture context is the role authority"
             )
+        if isinstance(data, dict) and "physical_overlays" in data:
+            raise ValueError("template field 'physical_overlays' was renamed: it is now 'overlays'")
         if isinstance(data, dict) and "defaults" in data:
             raise ValueError(
                 "template field 'defaults' was removed with the old moving-head renderer, its "
@@ -805,38 +821,38 @@ class Template(BaseModel):
     def _validate_overlays(self) -> None:
         """Overlays on one channel may not overlap; a PING_PONG cycle mirrors its steps,
         which an overlay's offsets from the cycle start would not follow."""
-        if not self.physical_overlays:
+        if not self.overlays:
             return
         if self.repeat.mode is RepeatMode.PING_PONG:
             raise ValueError(
-                "physical_overlays are offsets from the cycle start; repeat mode PING_PONG "
+                "overlays are offsets from the cycle start; repeat mode PING_PONG "
                 "mirrors every other cycle, so use JOINER or ONCE"
             )
         for channel in ("color", "gobo"):
             spans = sorted(
                 (overlay.start_beats, overlay.end_beats)
-                for overlay in self.physical_overlays
+                for overlay in self.overlays
                 if overlay.channel == channel
             )
             for (_, end), (start, _) in pairwise(spans):
                 if start < end:
                     raise ValueError(
-                        f"two physical_overlays on {channel} overlap at beat {start:g}; an "
+                        f"two overlays on {channel} overlap at beat {start:g}; an "
                         "overlay on a channel must end before the next starts"
                     )
 
     def _require_finite_steps(self) -> None:
         """A ONCE cycle ends in a terminal state its remainder holds, so each step must
-        declare finite physical motion and no dimmer or shutter pulse below duty 1."""
+        declare finite motion and no dimmer or shutter pulse below duty 1."""
         for step in self.steps:
-            if step.movement.physical.mode != "finite":
+            if step.movement.mode != "finite":
                 raise ValueError(
                     f"repeat mode ONCE needs every step finite, but step {step.step_id!r} "
-                    "declares no finite movement.physical (mode 'finite')"
+                    "declares no finite movement (mode 'finite')"
                 )
             pulses = (
-                ("dimmer.physical", step.dimmer.physical),
-                ("physical_shutter", step.physical_shutter),
+                ("dimmer", step.dimmer),
+                ("shutter", step.shutter),
             )
             for name, pulse in pulses:
                 if pulse is not None and pulse.duty_cycle != 1:

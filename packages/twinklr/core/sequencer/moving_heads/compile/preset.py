@@ -1,7 +1,7 @@
 from typing import Literal, overload
 
 from twinklr.core.sequencer.models.template import (
-    Dimmer,
+    DimmerPulse,
     Movement,
     StepPatch,
     StepTiming,
@@ -26,7 +26,7 @@ def apply_step_patch(step: TemplateStep, patch: StepPatch) -> TemplateStep:
         A new TemplateStep with patches applied.
     """
     movement_dict = step.movement.model_dump()
-    dimmer_dict = step.dimmer.model_dump()
+    dimmer_dict = step.dimmer.model_dump() if step.dimmer is not None else {}
     timing_dict = step.timing.model_dump()
 
     if patch.movement is not None:
@@ -40,7 +40,7 @@ def apply_step_patch(step: TemplateStep, patch: StepPatch) -> TemplateStep:
         update={
             "timing": StepTiming(**timing_dict),
             "movement": Movement(**movement_dict),
-            "dimmer": Dimmer(**dimmer_dict),
+            "dimmer": DimmerPulse(**dimmer_dict) if dimmer_dict else None,
         },
         deep=True,
     )
@@ -116,7 +116,7 @@ def apply_preset(
         repeat=template.repeat,
         steps=new_steps,
         metadata=template.metadata,
-        physical_overlays=template.physical_overlays,
+        overlays=template.overlays,
     )
 
     if return_provenance:

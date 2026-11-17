@@ -75,12 +75,12 @@ from twinklr.core.sequencer.display.xlights_mapping import (
     XLightsGroupMapping,
     XLightsMapping,
 )
-from twinklr.core.sequencer.moving_heads.export.frame_encoder import PhysicalOutputError
-from twinklr.core.sequencer.moving_heads.export.xsq_adapter import check_physical_models
+from twinklr.core.sequencer.moving_heads.export.frame_encoder import OutputError
+from twinklr.core.sequencer.moving_heads.export.xsq_adapter import check_models
 from twinklr.core.sequencer.moving_heads.templates import load_templates_from_directory
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
-    PHYSICAL_TEMPLATE_DIR,
-    admit_physical_catalog,
+    TEMPLATE_CATALOG_DIR,
+    load_template_catalog,
 )
 from twinklr.core.sequencer.moving_heads.templates.library import list_templates
 from twinklr.core.sequencer.templates.group.models.choreography import (
@@ -138,7 +138,7 @@ logger = logging.getLogger(__name__)
 
 LIVE_PLANS_FILENAME = ".twinklr-live-plans.json"
 """Beside the ownership manifest in the song's artifact directory: per open sequence,
-the plan of the physical moving-head effects last injected and what it was injected
+the plan of the moving-head effects last injected and what it was injected
 from (`LIVE_PLAN_IDENTITY`)."""
 
 LIVE_PLAN_IDENTITY = {
@@ -152,7 +152,7 @@ LIVE_PLAN_IDENTITY = {
 """What a recorded plan is valid for, and why `regenerate` refuses when one differs."""
 
 LIVE_DRY_RUN_FILENAME = "live-dry-run.jsonl"
-"""Where a physical dry run writes its planned xLights writes, one JSON object a line."""
+"""Where a dry run writes its planned xLights writes, one JSON object a line."""
 
 
 def _sha256(text: str) -> str:
@@ -193,7 +193,7 @@ def _read_live_plans(path: Path) -> dict[str, Any]:
 def _load_live_plan(
     path: Path, sequence_path: Path
 ) -> tuple[ChoreographyPlan, dict[str, str]] | None:
-    """The plan behind the physical effects last injected into `sequence_path` and its
+    """The plan behind the moving-head effects last injected into `sequence_path` and its
     recorded identity, if any.
 
     Raises:
@@ -451,18 +451,18 @@ async def _run_pipeline_async(
     # Load templates
     console.print("[bold]Loading templates...[/bold]")
     try:
-        catalog_ids = admit_physical_catalog()
+        catalog_ids = load_template_catalog()
     except (OSError, ValueError) as error:
-        console.print(f"[red]ERROR: Could not load the physical template catalog: {error}[/red]")
+        console.print(f"[red]ERROR: Could not load the moving-head template catalog: {error}[/red]")
         return 1
     if catalog_ids:
         console.print(
-            f"[green]📄 Physical templates loaded:[/green] {len(catalog_ids)} "
-            f"from {PHYSICAL_TEMPLATE_DIR}"
+            f"[green]📄 Moving-head templates loaded:[/green] {len(catalog_ids)} "
+            f"from {TEMPLATE_CATALOG_DIR}"
         )
-    if template_dir is not None and catalog_ids and template_dir.resolve() == PHYSICAL_TEMPLATE_DIR:
+    if template_dir is not None and catalog_ids and template_dir.resolve() == TEMPLATE_CATALOG_DIR:
         console.print(
-            f"[dim]--template-dir {template_dir} is the physical catalog, already admitted; "
+            f"[dim]--template-dir {template_dir} is the moving-head catalog, already admitted; "
             "not loaded again[/dim]"
         )
     elif template_dir is not None:
@@ -548,7 +548,7 @@ async def _run_pipeline_async(
     base_plan: ChoreographyPlan | None = None
     regenerated_sequence: Path | None = None
     if live_client is not None and section_id is not None:
-        # A physical render plans each head's dark repositioning across section edges,
+        # The render plans each head's dark repositioning across section edges,
         # so one section cannot be swapped in alone: the whole song is re-rendered from
         # the plan of the effects already injected, with only this section re-planned.
         try:
@@ -593,7 +593,7 @@ async def _run_pipeline_async(
         console.print(f"[red]ERROR: {error}[/red]")
         return 1
     layout_models: tuple[Model, ...] | None = None
-    console.print(f"[green]🎛️  Physical templates offered:[/green] {len(available_templates)}")
+    console.print(f"[green]🎛️  Moving-head templates offered:[/green] {len(available_templates)}")
     if layout_path is None:
         console.print(
             "[yellow]WARNING: the xLights model check was not performed: no --layout "
@@ -604,8 +604,8 @@ async def _run_pipeline_async(
         try:
             layout = load_layout(layout_path)
             layout_models = tuple(layout.models.model if layout.models else ())
-            check_physical_models(fixture_group.expand_fixtures(), layout_models)
-        except (OSError, ValueError, PhysicalOutputError) as error:
+            check_models(fixture_group.expand_fixtures(), layout_models)
+        except (OSError, ValueError, OutputError) as error:
             console.print(f"[red]ERROR: xLights layout {layout_path.name}: {error}[/red]")
             return 1
         console.print(f"[green]✅ xLights models checked against[/green] {layout_path.name}")
@@ -709,7 +709,7 @@ async def _run_pipeline_async(
         if section_id is not None:
             console.print(
                 f"Re-planned section {section_id} only, then re-rendered the moving "
-                "heads for the whole song: a physical render plans each head's dark "
+                "heads for the whole song: the render plans each head's dark "
                 "repositioning across section edges, so one section cannot be swapped "
                 "in alone. Every Twinklr moving-head effect in the sequence is replaced; "
                 "identical ones are left in place."

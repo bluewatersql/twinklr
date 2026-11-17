@@ -2,12 +2,12 @@
 
 | File | Behavior pinned |
 |---|---|
-| `test_combined_show_golden.py` | One coordinated sequence: the display effects (type, time ranges, settings and palette strings, and their trace entries without shared-table indices) against `fixtures/combined_show_drop.json` and `fixtures/combined_show_drop.trace.json`; the moving heads' physical render by its fingerprint, effect count and the hash of its effects and trace entries; and the display's call windows equal to the spans the heads rest dark over |
+| `test_combined_show_golden.py` | One coordinated sequence: the display effects (type, time ranges, settings and palette strings, and their trace entries without shared-table indices) against `fixtures/combined_show_drop.json` and `fixtures/combined_show_drop.trace.json`; the moving heads' render by its fingerprint, effect count and the hash of its effects and trace entries; and the display's call windows equal to the spans the heads rest dark over |
 | `test_xsq_round_trip.py` | `parse → export → parse` over the repo's first tracked `.xsq` |
 | `test_preview_render_local.py` | LOCAL-ONLY smoke test of a windowed xLights preview export |
 
 Moving-head output of every catalog family is pinned in
-`tests/regression/test_mh_physical_pins.py`.
+`tests/regression/test_mh_pins.py`.
 
 The golden suite of the removed second moving-head renderer (per-rig settings-string
 goldens, its harness and its xLights acceptance suite) was deleted with that renderer in

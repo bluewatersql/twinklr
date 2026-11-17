@@ -6,7 +6,7 @@ from twinklr.core.reporting.evaluation.models import (
     CurveAnalysis,
     CurveStats,
     EvaluationReport,
-    PhysicalRenderSummary,
+    RenderSummary,
     ReportFlag,
     ReportFlagLevel,
     ReportSummary,
@@ -18,9 +18,7 @@ from twinklr.core.reporting.evaluation.models import (
     TemplateSelection,
 )
 
-_PHYSICAL = PhysicalRenderSummary(
-    run_fingerprint="a", rerender_fingerprint="a", fingerprint_matches=True
-)
+_RENDER = RenderSummary(run_fingerprint="a", rerender_fingerprint="a", fingerprint_matches=True)
 
 
 class TestReportFlag:
@@ -183,9 +181,7 @@ class TestEvaluationReport:
         song = SongMetadata(bpm=120.0, time_signature="4/4", bars_total=64, bar_duration_ms=2000.0)
         summary = ReportSummary(sections=0)
 
-        report = EvaluationReport(
-            run=run, song=song, summary=summary, sections=[], physical=_PHYSICAL
-        )
+        report = EvaluationReport(run=run, song=song, summary=summary, sections=[], render=_RENDER)
         assert report.schema_version == "2.0.0"
         assert report.run.run_id == "test"
         assert len(report.sections) == 0
@@ -201,9 +197,7 @@ class TestEvaluationReport:
         song = SongMetadata(bpm=120.0, time_signature="4/4", bars_total=64, bar_duration_ms=2000.0)
         summary = ReportSummary(sections=0)
 
-        report = EvaluationReport(
-            run=run, song=song, summary=summary, sections=[], physical=_PHYSICAL
-        )
+        report = EvaluationReport(run=run, song=song, summary=summary, sections=[], render=_RENDER)
         data = report.model_dump(mode="json")
 
         assert data["schema_version"] == "2.0.0"

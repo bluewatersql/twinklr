@@ -11,7 +11,7 @@ an ambiguous timeout/read failure is never replayed: the result reports the conf
 prefix and tells the operator to inspect and idempotently re-run.
 
 The API also has no batch command: every effect read, deleted or added is one request.
-A physical moving-head render emits tens of thousands of effects, so a command is
+A moving-head render emits tens of thousands of effects, so a command is
 bounded by ``MAX_LIVE_EFFECTS`` and refused before any write beyond it.
 """
 
@@ -46,14 +46,14 @@ MAX_LIVE_EFFECTS = 50_000
 """Most effects one live command may add, and most owned effects it may replace.
 
 xLights takes one request per effect read, deleted or added, so a command that
-replaces everything costs about three requests per effect. A physical render of four
+replaces everything costs about three requests per effect. A render of four
 heads over a three-minute song emits roughly 20,000-30,000 effects; this bound admits
 that with headroom and refuses, before any write, the far larger renders the output
 budget (`moving_heads.max_effects`) still allows. Chosen, not measured: how long xLights
 takes per request is unverified."""
 
 NO_SECTION_ID = "_unsectioned"
-"""Section provenance of an effect no planned section produced (a physical render's
+"""Section provenance of an effect no planned section produced (a render's
 park after the last section); live effects require a non-empty section id."""
 
 

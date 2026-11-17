@@ -12,12 +12,12 @@ from pathlib import Path
 from pydantic import BaseModel
 import pytest
 
-from tests.support.mh_physical import (
-    physical_grid,
-    physical_job,
-    physical_plan,
-    physical_rig,
-    physical_test_templates,
+from tests.support.moving_heads import (
+    p1_grid,
+    p1_job,
+    p1_plan,
+    p1_rig,
+    p1_templates,
 )
 from twinklr.core.caching import CacheKey, config_fingerprint, derive_session_id
 from twinklr.core.caching.backends.fs import FSCache
@@ -52,13 +52,13 @@ def _job_config(**overrides: object) -> JobConfig:
     return JobConfig.model_validate(payload)
 
 
-def _physical_fingerprint(job: JobConfig) -> str:
-    """The render fingerprint of the P1.6 physical pipeline case under `job`."""
-    with physical_test_templates():
+def _p1_fingerprint(job: JobConfig) -> str:
+    """The render fingerprint of the P1.6 pipeline case under `job`."""
+    with p1_templates():
         return RenderingPipeline(
-            choreography_plan=physical_plan(),
-            beat_grid=physical_grid(),
-            fixture_group=physical_rig(),
+            choreography_plan=p1_plan(),
+            beat_grid=p1_grid(),
+            fixture_group=p1_rig(),
             job_config=job,
         ).fingerprint()
 
@@ -172,7 +172,7 @@ class TestDerivedSessionId:
     def test_session_id_ignores_render_only_policy_fields(self, audio_file: Path) -> None:
         """A start pose or an output budget changes only the render, never the plan,
         so editing one must not re-key the planner's cache."""
-        physical = {"schema_version": "3.1"}
+        plain = {"schema_version": "3.1"}
         state = {
             "pan_deg": 0.0,
             "tilt_deg": 0.0,
@@ -182,7 +182,7 @@ class TestDerivedSessionId:
             "dark": True,
         }
         base = derive_session_id(
-            audio_path=audio_file, configs=(_app_config(), _job_config(**physical))
+            audio_path=audio_file, configs=(_app_config(), _job_config(**plain))
         )
         for render_only in (
             {"initial_states": {"MH1": state}},
@@ -207,17 +207,13 @@ class TestDerivedSessionId:
     ) -> None:
         """`reposition_fallback` at its default `error` is left out of the job's dump, so
         neither the planner's session id nor the render fingerprint changes."""
-        physical = {"schema_version": "3.1"}
+        plain = {"schema_version": "3.1"}
         explicit = {"schema_version": "3.1", "moving_heads": {"reposition_fallback": "error"}}
-        assert _job_config(**explicit).model_dump() == _job_config(**physical).model_dump()
+        assert _job_config(**explicit).model_dump() == _job_config(**plain).model_dump()
         assert derive_session_id(
             audio_path=audio_file, configs=(_app_config(), _job_config(**explicit))
-        ) == derive_session_id(
-            audio_path=audio_file, configs=(_app_config(), _job_config(**physical))
-        )
-        assert _physical_fingerprint(physical_job(reposition_fallback="error")) == (
-            _physical_fingerprint(physical_job())
-        )
+        ) == derive_session_id(audio_path=audio_file, configs=(_app_config(), _job_config(**plain)))
+        assert _p1_fingerprint(p1_job(reposition_fallback="error")) == (_p1_fingerprint(p1_job()))
 
     def test_non_default_reposition_fallback_changes_fingerprint_not_session_id(
         self, audio_file: Path
@@ -231,8 +227,8 @@ class TestDerivedSessionId:
         assert derive_session_id(
             audio_path=audio_file, configs=(_app_config(), fallback)
         ) == derive_session_id(audio_path=audio_file, configs=(_app_config(), base))
-        assert _physical_fingerprint(physical_job(reposition_fallback="drop_accent")) != (
-            _physical_fingerprint(physical_job())
+        assert _p1_fingerprint(p1_job(reposition_fallback="drop_accent")) != (
+            _p1_fingerprint(p1_job())
         )
 
     def test_config_fingerprint_masks_secrets(self) -> None:

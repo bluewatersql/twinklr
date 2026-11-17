@@ -800,8 +800,8 @@ The live schema accepts only version 3.1, the default; a job naming `schema_vers
 "3.0", `moving_heads.mode` or `transitions` (keys of the removed second moving-head
 renderer) is refused when it loads. A job is refused when its fixtures load, before any
 analysis, unless every fixture declares a `physical_profile` and has a usable
-`moving_heads.initial_states` entry, and the planner is offered only templates with
-physical data: the seven families in `catalog/templates/moving_heads_physical` (six
+`moving_heads.initial_states` entry, and the planner is offered the seven families
+in `catalog/templates/moving_heads` (six
 P2.4c families and the `zoom_wave` zoom pilot, which needs a zoom axis), which every run
 loads, plus any `--template-dir` documents. The moving-head pipeline's
 `render_preflight` stage repeats those checks right after audio analysis, before any
@@ -814,7 +814,7 @@ renders (`admission_effective_presets` when it is not the base). Each failing va
 is logged and traced (`admission_preset_exclusions`, `preset_id` null for the base); a
 family none of whose variants renders is left out of the offer, its reasons logged and
 traced (`admission_exclusions`). A `--template-dir` template that fails, with or
-without a preset, refuses the run, as does a rig that can render no template. The physical
+without a preset, refuses the run, as does a rig that can render no template. The
 compile, for the gate and the render alike, grows a repeating cycle that would end
 mid-period in the song's meter to whole bars holding whole periods, so the families
 play in any meter. The stage logs each offered template's worst-case section-entry
@@ -822,25 +822,25 @@ dip. A song with silence or a fade at
 either end renders only its covered span, the detected beats plus one beat interval
 beyond the first and last (or up to the song's edge when nearer); every fixture is held
 dark outside it and no tempo is inferred there. The gate logs that span, and the trace
-records it with each dropped cue. `twinklr show` renders a physical job's moving heads
-physically: its pipeline starts with the moving-head definition's prefix, so the same
+records it with each dropped cue. `twinklr show` renders a job's moving heads
+with the same renderer: its pipeline starts with the moving-head definition's prefix, so the same
 `render_preflight` gate runs before any planner, and the combined render stage turns the
 coordination schedule's rests for the moving heads, inside each macro section, into the
 renderer's `dark_spans`: the cues they cover keep playing their authored paths there,
 commanded dark, before section entry and repositioning are planned, so no re-entry
 follows a span. The show's export applies the output budgets and publishes the
-sequence and its trace, which carries the physical render record, together. `inject` sends the
-physical render's effects to the open sequence and `regenerate` re-renders the whole
+sequence and its trace, which carries the moving-head render record, together. `inject` sends the
+render's effects to the open sequence and `regenerate` re-renders the whole
 song's moving heads from the recorded plan
 ([user guide](user-guide.md#live-injection-and-section-regeneration-local-only)); both
 render the moving heads on their own, never a show's render. `run`, `show`, `inject` and
-`regenerate` record their physical render in the plan checkpoint, once their `.xsq` is
+`regenerate` record their render in the plan checkpoint, once their `.xsq` is
 written, through one writer (`record_render`, from `RenderingPipeline.checkpoint_record`),
 a show's dark spans included, and all write the same checkpoint path for a song, so the last one wins.
-`eval-report` re-renders a physical checkpoint from that record, over its dark spans,
-and reports physical metrics
+`eval-report` re-renders a checkpoint from that record, over its dark spans,
+and reports each channel's metrics in its own unit
 ([user guide](user-guide.md#evaluation-report-twinklr-eval-report)).
-With `twinklr run --layout`, a physical job's fixture models are checked against
+With `twinklr run --layout`, a job's fixture models are checked against
 the xLights layout before analysis; without it that check is skipped with a warning.
 `twinklr display` renders no moving heads and ignores the mode. Do not reuse the
 removed version-2 examples from this guide's history.
@@ -1032,7 +1032,7 @@ None of these targets touch the feature store, profiles, or FE output.
 - Verify the tracked recipe index and JSON files exist in `catalog/templates/`.
 - If using local extensions, verify `data/templates/index.json` and every referenced
   recipe file; an invalid optional overlay fails preflight rather than being ignored.
-- Load the family catalog (`admit_physical_catalog()`) before checking available
+- Load the family catalog (`load_template_catalog()`) before checking available
   template IDs.
 - Ensure the template ID is in the `available_templates` list passed to
   `build_moving_heads_pipeline()`.

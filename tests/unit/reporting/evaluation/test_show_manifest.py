@@ -67,14 +67,14 @@ def test_trace_rejects_old_version_and_count_mismatch(tmp_path, field, value, me
     assert message in str(error.value)
 
 
-def test_physical_trace_carries_its_render_record_and_sectionless_parks(tmp_path) -> None:
-    """A physical show's trace holds the render record, and a run that only parks a head
+def test_moving_head_trace_carries_its_render_record_and_sectionless_parks(tmp_path) -> None:
+    """A show's trace holds the render record, and a run that only parks a head
     after its last cue belongs to no section or template; any other entry still needs
     both."""
     payload = trace(entry("display", 0, 500), entry("moving_head", 500, 1_000)).model_dump(
         mode="json"
     )
-    payload["render"] = {"renderer": "physical_v2"}
+    payload["render"] = {"renderer_revision": "2"}
     park = payload["entries"][1]
     park.update(section_id="", template_id="")
     park["sources"] = [
@@ -83,7 +83,7 @@ def test_physical_trace_carries_its_render_record_and_sectionless_parks(tmp_path
     path = tmp_path / "trace.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
 
-    assert load_show_trace(path).render == {"renderer": "physical_v2"}
+    assert load_show_trace(path).render == {"renderer_revision": "2"}
 
 
 _PARK = {"fixture_id": "MH1", "segment_id": "MH1/park/preposition", "step_id": "preposition"}

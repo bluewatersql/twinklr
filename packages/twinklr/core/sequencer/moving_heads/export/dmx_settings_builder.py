@@ -1,6 +1,6 @@
 """DMX settings string builder for xLights EffectDB entries.
 
-Builds the constant DMX effect settings string for one encoded physical frame.
+Builds the constant DMX effect settings string for one encoded frame.
 """
 
 from __future__ import annotations
@@ -12,22 +12,22 @@ if TYPE_CHECKING:
 
 from twinklr.core.config.fixtures.capabilities import MAX_DMX_EFFECT_CHANNELS
 from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
-from twinklr.core.sequencer.moving_heads.export.frame_encoder import PhysicalOutputError
+from twinklr.core.sequencer.moving_heads.export.frame_encoder import OutputError
 
 
 class DmxSettingsBuilder:
-    """Builds xLights DMX effect settings strings from encoded physical frames."""
+    """Builds xLights DMX effect settings strings from encoded frames."""
 
     @staticmethod
     def build_frame_settings(frame: EncodedFixtureFrame) -> str:
-        """Build a constant DMX effect settings string for one complete physical frame.
+        """Build a constant DMX effect settings string for one complete frame.
 
         Writes every channel 1..n explicitly, so nothing falls back to xLights' zero
-        for an absent channel, and sets no inversion flag: the physical encoder has
+        for an absent channel, and sets no inversion flag: the frame encoder has
         already applied inversion to the bytes. No value curve is written.
 
         Raises:
-            PhysicalOutputError: If the frame's channels are not exactly 1..n, n <= 48.
+            OutputError: If the frame's channels are not exactly 1..n, n <= 48.
             ValueError: If a channel's value is not a DMX byte.
         """
         offsets = [offset for offset, _ in frame.channels]
@@ -36,7 +36,7 @@ class DmxSettingsBuilder:
             or offsets != list(range(1, len(offsets) + 1))
             or len(offsets) > MAX_DMX_EFFECT_CHANNELS
         ):
-            raise PhysicalOutputError(
+            raise OutputError(
                 MHDiagnostic(
                     code="unsupported_backend_channel",
                     severity="error",

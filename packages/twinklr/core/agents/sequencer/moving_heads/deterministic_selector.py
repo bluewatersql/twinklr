@@ -79,7 +79,7 @@ class ExcludedTemplate(BaseModel):
 
 class SelectorAdmission(BaseModel):
     """The selector's candidate set for one rig and song: the gate's admission
-    (`check_physical_templates`) in its order, and its whole-template exclusions.
+    (`admit_templates`) in its order, and its whole-template exclusions.
 
     The selector reads only `templates`. `exclusions` is provenance: it records why a
     family is absent, travels in the three-arm `AnalysisSnapshot` and is covered by the

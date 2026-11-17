@@ -2,7 +2,7 @@
 
 This module provides functions to schedule template repeats within
 a playback window, handling PING_PONG and JOINER repeat modes,
-and remainder policies, and the physical renderer's single-cycle ONCE mode.
+and remainder policies, and the renderer's single-cycle ONCE mode.
 
 Steps are placed at the ``start_offset_bars`` they declare, measured from the start
 of the cycle. That field used to be ignored: the scheduler laid every loop step end
@@ -208,7 +208,7 @@ def _schedule_once(
     """Schedule exactly one cycle at its nominal rate, never repeated or compressed.
 
     A window shorter than the cycle gets the cycle's head with no complete cycle; the
-    physical compile refuses that cut. After a complete cycle, HOLD_LAST_POSE extends
+    template compile refuses that cut. After a complete cycle, HOLD_LAST_POSE extends
     the instances that close it to the window end, so each stays one instance with one
     start (``_hold_last_pose`` would append a new one at the remainder start); every
     other policy schedules nothing after it.

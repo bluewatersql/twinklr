@@ -73,7 +73,7 @@ def eval_report_cli(
 
     This command re-renders a choreography plan through the sequencing pipeline,
     analyzes the resulting channels, and generates a comprehensive evaluation report
-    with plots. A physical checkpoint is re-rendered from the render its run recorded.
+    with plots. A checkpoint is re-rendered from the render its run recorded.
 
     Example:
         twinklr eval-report \\
@@ -144,8 +144,8 @@ def eval_report_cli(
 
         click.echo("")
         click.echo("✓ Report generated successfully!")
-        if not report.physical.fingerprint_matches:
-            click.echo(f"  ✗ {mismatch_message(report.physical)}")
+        if not report.render.fingerprint_matches:
+            click.echo(f"  ✗ {mismatch_message(report.render)}")
         click.echo(f"  Report: {out / 'report.md'}")
         click.echo(f"  JSON: {out / 'report.json'}")
         click.echo(f"  Plots: {out / 'plots/'}")

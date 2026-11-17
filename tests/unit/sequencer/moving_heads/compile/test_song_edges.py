@@ -1,35 +1,35 @@
-"""Silent song edges: a physical compile covers only the detected span of the song (P2.0).
+"""Silent song edges: a compile covers only the detected span of the song (P2.0).
 
 A cue that would start before the covered start, or at or after the covered end, is
 dropped with a record; one that runs past the covered end is cut there on the frame
-grid. Limits come from `physical_cue_limits`, as the render and the gate take them.
+grid. Limits come from `cue_limits`, as the render and the gate take them.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
     TEMPLATE_DIR,
     TEMPLATE_ID,
-    physical_edge_grid,
-    physical_grid,
-    physical_rig,
+    edge_grid,
+    p1_grid,
+    p1_rig,
 )
 from twinklr.core.sequencer.models.context import TemplateCompileContext
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
 from twinklr.core.sequencer.models.template import Template
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
     TemplateCompileResult,
-    compile_physical_template,
+    compile_template,
 )
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
-from twinklr.core.sequencer.moving_heads.pipeline import physical_cue_limits
+from twinklr.core.sequencer.moving_heads.pipeline import cue_limits
 from twinklr.core.sequencer.moving_heads.templates.data_loader import load_template_document
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map
 
-_EDGE_GRID = physical_edge_grid(lead_in_ms=3000, tail_ms=4000)
+_EDGE_GRID = edge_grid(lead_in_ms=3000, tail_ms=4000)
 """Beats from 3015 ms (500 ms apart, then 400 ms) to 6615 ms; the song ends at 10615 ms.
 Covered from 2515 ms to 7015 ms; cue limits 2520 and 7000 ms."""
 
@@ -47,7 +47,7 @@ def _template(*, whole_bar: bool = False) -> Template:
 def _compile(
     grid: BeatGrid, *, start_bar: int, duration_bars: int, template: Template | None = None
 ) -> TemplateCompileResult:
-    rig = physical_rig()
+    rig = p1_rig()
     template = template or _template()
     context = TemplateCompileContext(
         section_id="verse",
@@ -58,8 +58,8 @@ def _compile(
         duration_bars=duration_bars,
     )
     phase_map = build_musical_phase_map(grid)
-    start_limit, end_limit = physical_cue_limits(phase_map, int(grid.duration_ms))
-    return compile_physical_template(
+    start_limit, end_limit = cue_limits(phase_map, int(grid.duration_ms))
+    return compile_template(
         template, context, phase_map=phase_map, start_limit_ms=start_limit, end_limit_ms=end_limit
     )
 
@@ -72,9 +72,9 @@ def test_cue_limits_round_the_covered_span_inward_to_the_frame_grid() -> None:
     phase_map = build_musical_phase_map(_EDGE_GRID)
 
     assert (phase_map.covered_start_ms, phase_map.covered_end_ms) == (2515, 7015)
-    assert physical_cue_limits(phase_map, 10615) == (2520, 7000)
+    assert cue_limits(phase_map, 10615) == (2520, 7000)
     # A covered end past the song's last whole frame is limited by the frame.
-    assert physical_cue_limits(build_musical_phase_map(physical_grid()), 3615) == (0, 3600)
+    assert cue_limits(build_musical_phase_map(p1_grid()), 3615) == (0, 3600)
 
 
 def test_cue_before_covered_start_is_dropped_with_a_record() -> None:
@@ -115,7 +115,7 @@ def test_cue_past_covered_end_is_cut_on_the_frame_grid() -> None:
 def test_cue_starting_at_covered_end_is_dropped() -> None:
     """At 120 BPM from 0 ms with three silent seconds after the last beat (3500 ms), the
     covered end is 4000 ms, where bar 3 starts: its step has no covered frame."""
-    grid = physical_edge_grid(
+    grid = edge_grid(
         lead_in_ms=0, tail_ms=3000, grid=BeatGrid.from_tempo(tempo_bpm=120, total_bars=2)
     )
     result = _compile(grid, start_bar=1, duration_bars=3, template=_template(whole_bar=True))
@@ -136,8 +136,8 @@ def test_cue_starting_at_covered_end_is_dropped() -> None:
 def test_phase1_grid_compiles_identical_segments() -> None:
     """On a grid Phase 1 accepted, the limits are Phase 1's (0 and the last whole frame)
     and the compile is the one Phase 1 made without a start limit."""
-    grid = physical_grid()
-    rig = physical_rig()
+    grid = p1_grid()
+    rig = p1_rig()
     context: dict[str, Any] = {
         "section_id": "verse",
         "template_id": TEMPLATE_ID,
@@ -146,7 +146,7 @@ def test_phase1_grid_compiles_identical_segments() -> None:
         "start_bar": 1,
         "duration_bars": 2,
     }
-    phase1 = compile_physical_template(
+    phase1 = compile_template(
         _template(),
         TemplateCompileContext(**context),
         phase_map=build_musical_phase_map(grid),

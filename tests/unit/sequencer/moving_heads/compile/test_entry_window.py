@@ -1,4 +1,4 @@
-"""Section entry windows (P2.4a): a section of a physical render whose first cue cannot
+"""Section entry windows (P2.4a): a section of a render whose first cue cannot
 be played as authored after the previous one opens with a derived dark window long
 enough for any reposition into it; an entry that plays as authored is kept uncut.
 
@@ -19,18 +19,18 @@ from typing import Any
 
 import pytest
 
-from tests.support.mh_physical import (
-    PHYSICAL_INITIAL_STATE,
+from tests.support.moving_heads import (
+    INITIAL_STATE,
     assert_honest_transactions,
+    bars_grid,
+    fixture_segment,
     hold_step,
-    physical_bars_grid,
-    physical_job,
-    physical_rig,
-    physical_sections,
-    physical_segment,
-    physical_template_doc,
-    physical_test_templates,
+    loop_template_doc,
+    p1_job,
+    p1_rig,
+    p1_templates,
     registered_templates,
+    sections_plan,
     sine_step,
     sweep_step,
     topology_payload,
@@ -58,32 +58,32 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
 )
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
     apply_entry_window,
-    compile_physical_template,
+    compile_template,
 )
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import frame_times
 from twinklr.core.sequencer.moving_heads.pipeline import (
-    PhysicalRenderError,
     RenderingPipeline,
-    check_physical_templates,
-    physical_cue_limits,
+    RenderRefusedError,
+    admit_templates,
+    cue_limits,
 )
 from twinklr.core.sequencer.moving_heads.templates import get_template
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map
 
-_LEFT = physical_template_doc("p24a_left", [hold_step("hold", -90.0)])
-_LEFT_RED = physical_template_doc("p24a_left_red", [hold_step("hold", -90.0, physical_color="red")])
-_LEFT_NEAR = physical_template_doc("p24a_left_near", [hold_step("hold", -80.0)])
-_LEFT_FAR = physical_template_doc("p24a_left_far", [hold_step("hold", -60.0)])
-_RIGHT = physical_template_doc("p24a_right", [hold_step("hold", 90.0)])
-_CENTER = physical_template_doc("p24a_center", [hold_step("hold", 0.0)])
-_CENTER_NEAR = physical_template_doc("p24a_center_near", [hold_step("hold", 10.0)])
-_RIGHT_ONLY = physical_template_doc("p24a_right_only", [hold_step("hold", 90.0, target="RIGHT")])
-_SHORT_HIT = physical_template_doc(
+_LEFT = loop_template_doc("p24a_left", [hold_step("hold", -90.0)])
+_LEFT_RED = loop_template_doc("p24a_left_red", [hold_step("hold", -90.0, color="red")])
+_LEFT_NEAR = loop_template_doc("p24a_left_near", [hold_step("hold", -80.0)])
+_LEFT_FAR = loop_template_doc("p24a_left_far", [hold_step("hold", -60.0)])
+_RIGHT = loop_template_doc("p24a_right", [hold_step("hold", 90.0)])
+_CENTER = loop_template_doc("p24a_center", [hold_step("hold", 0.0)])
+_CENTER_NEAR = loop_template_doc("p24a_center_near", [hold_step("hold", 10.0)])
+_RIGHT_ONLY = loop_template_doc("p24a_right_only", [hold_step("hold", 90.0, target="RIGHT")])
+_SHORT_HIT = loop_template_doc(
     "p24a_short_hit", [hold_step("hit", 90.0, duration=0.25)], cycle_bars=0.25
 )
 """One-beat cues, back to back."""
-_SWEEP = physical_template_doc(
+_SWEEP = loop_template_doc(
     "p24a_sweep",
     [
         sweep_step("out", 10.0, 200.0, period_beats=3.0, duration=0.75),
@@ -96,12 +96,12 @@ _SWEEP = physical_template_doc(
 def _jump(fallback: str | None = "drop_accent") -> Any:
     """Two lit steps per cycle, back to back at -90 and +90 degrees: the second cannot
     continue the first, so only a declared fallback lets the template render."""
-    extra = {} if fallback is None else {"physical_reposition_fallback": fallback}
+    extra = {} if fallback is None else {"reposition_fallback": fallback}
     steps = [
         hold_step("left", -90.0, duration=0.5, **extra),
         hold_step("right", 90.0, start=0.5, duration=0.5, **extra),
     ]
-    return physical_template_doc("p24a_jump" if fallback else "p24a_jump_plain", steps)
+    return loop_template_doc("p24a_jump" if fallback else "p24a_jump_plain", steps)
 
 
 _DOCS = (_LEFT, _LEFT_RED, _LEFT_NEAR, _LEFT_FAR, _RIGHT, _CENTER, _RIGHT_ONLY, _SHORT_HIT)
@@ -110,12 +110,12 @@ _DOCS += (_SWEEP, _jump(), _jump(None))
 
 
 def _grid(*beat_ms: float) -> BeatGrid:
-    return physical_bars_grid(*(beat_ms or (500.0,) * 6))
+    return bars_grid(*(beat_ms or (500.0,) * 6))
 
 
 def _slow_rig() -> FixtureGroup:
-    """`physical_rig` with pan and tilt at 45 degrees/s: 180 degrees take four seconds."""
-    payload = physical_rig().model_dump(mode="json")
+    """`p1_rig` with pan and tilt at 45 degrees/s: 180 degrees take four seconds."""
+    payload = p1_rig().model_dump(mode="json")
     for fixture in payload["fixtures"]:
         for axis in ("pan", "tilt"):
             fixture["config"]["physical_profile"]["axes"][axis]["travel_speed_per_s"] = 45.0
@@ -131,10 +131,10 @@ def _render(
 ) -> tuple[RenderingPipeline, list[FixtureSegment]]:
     """Gate the sections' templates, render them and check every fixture's transactions
     from its bytes: the gate must admit what renders."""
-    grid, rig, job = grid or _grid(), rig or physical_rig(), job or physical_job()
+    grid, rig, job = grid or _grid(), rig or p1_rig(), job or p1_job()
     policy = job.moving_heads
     with registered_templates(*_DOCS, *docs):
-        check_physical_templates(
+        admit_templates(
             sorted({template_id for template_id, _, _ in sections}),
             beat_grid=grid,
             fixture_group=rig,
@@ -142,7 +142,7 @@ def _render(
             failure_mode=policy.reposition_fallback,
         )
         pipeline = RenderingPipeline(
-            choreography_plan=physical_sections(*sections),
+            choreography_plan=sections_plan(*sections),
             beat_grid=grid,
             fixture_group=rig,
             job_config=job,
@@ -362,13 +362,13 @@ def test_window_fits_a_moving_first_cue_cut_at_its_end() -> None:
     [
         pytest.param(
             (("p24a_left", 1, 2), ("p24a_right_only", 3, 4), ("p24a_right", 5, 6)),
-            physical_rig,
+            p1_rig,
             None,
             id="previous-section-has-no-cue-on-the-fixture",
         ),
         pytest.param(
             (("p24a_left", 1, 2), ("p24a_short_hit", 3, 3), ("p24a_center", 4, 5)),
-            physical_rig,
+            p1_rig,
             None,
             id="every-cue-of-the-previous-section-was-dropped",
         ),
@@ -380,7 +380,7 @@ def test_window_fits_a_moving_first_cue_cut_at_its_end() -> None:
         ),
         pytest.param(
             (("p24a_jump", 1, 2), ("p24a_right", 3, 4)),
-            physical_rig,
+            p1_rig,
             "drop_accent",
             id="previous-cue-was-substituted-under-drop-accent",
         ),
@@ -391,7 +391,7 @@ def test_entry_is_sized_from_the_last_kept_cue(
 ) -> None:
     """Each case renders without a transaction error (checked from the bytes by
     `_render`): the entry is sized from where the last kept cue left each head."""
-    job = physical_job(reposition_fallback=fallback) if fallback else physical_job()
+    job = p1_job(reposition_fallback=fallback) if fallback else p1_job()
     pipeline, _ = _render(*sections, rig=rig(), job=job)
 
     assert pipeline.render_record is not None
@@ -402,9 +402,7 @@ def test_entry_is_sized_from_the_last_kept_cue(
 
 
 def test_a_declared_drop_accent_keeps_the_cue_dark_and_error_refuses() -> None:
-    pipeline, segments = _render(
-        ("p24a_jump", 1, 4), job=physical_job(reposition_fallback="drop_accent")
-    )
+    pipeline, segments = _render(("p24a_jump", 1, 4), job=p1_job(reposition_fallback="drop_accent"))
 
     assert pipeline.render_record is not None
     dropped = [d for d in pipeline.render_record["transactions"] if d["status"] == "drop_accent"]
@@ -419,12 +417,12 @@ def test_a_declared_drop_accent_keeps_the_cue_dark_and_error_refuses() -> None:
         if any(start <= frame.time_ms < start + 1000 for start in (1020, 3020, 5020, 7020)):
             assert dict(frame.channels)[5] == 0
 
-    with registered_templates(*_DOCS), pytest.raises(PhysicalRenderError, match="jumps across"):
+    with registered_templates(*_DOCS), pytest.raises(RenderRefusedError, match="jumps across"):
         RenderingPipeline(
-            choreography_plan=physical_sections(("p24a_jump", 1, 4)),
+            choreography_plan=sections_plan(("p24a_jump", 1, 4)),
             beat_grid=_grid(),
-            fixture_group=physical_rig(),
-            job_config=physical_job(on_unplayable="error"),
+            fixture_group=p1_rig(),
+            job_config=p1_job(on_unplayable="error"),
             output_path=None,
         ).render()
 
@@ -433,25 +431,25 @@ def test_a_declared_drop_accent_keeps_the_cue_dark_and_error_refuses() -> None:
     "config_path",
     [
         "job.moving_heads.reposition_fallback",
-        "template.template.steps.physical_reposition_fallback",
+        "template.template.steps.reposition_fallback",
     ],
 )
 def test_reposition_fallback_field_changes_preposition(config_path: str) -> None:
     """Both opt-ins are needed: with the job policy and the step's declaration a cue that
     cannot reposition is kept dark; resetting either one to its default refuses it."""
-    _render(("p24a_jump", 1, 2), job=physical_job(reposition_fallback="drop_accent"))
+    _render(("p24a_jump", 1, 2), job=p1_job(reposition_fallback="drop_accent"))
 
-    job = physical_job(reposition_fallback="drop_accent", on_unplayable="error")
+    job = p1_job(reposition_fallback="drop_accent", on_unplayable="error")
     template_id = "p24a_jump"
     if config_path.startswith("job."):
-        job = physical_job(on_unplayable="error")
+        job = p1_job(on_unplayable="error")
     else:
         template_id = "p24a_jump_plain"
-    with registered_templates(*_DOCS), pytest.raises(PhysicalRenderError, match="jumps across"):
+    with registered_templates(*_DOCS), pytest.raises(RenderRefusedError, match="jumps across"):
         RenderingPipeline(
-            choreography_plan=physical_sections((template_id, 1, 2)),
+            choreography_plan=sections_plan((template_id, 1, 2)),
             beat_grid=_grid(),
-            fixture_group=physical_rig(),
+            fixture_group=p1_rig(),
             job_config=job,
             output_path=None,
         ).render()
@@ -473,7 +471,7 @@ def test_apply_entry_window_cuts_drops_and_skips() -> None:
             ),
             interpolation="linear",
         )
-        segment = physical_segment(
+        segment = fixture_segment(
             {ChannelName.PAN: line, ChannelName.TILT: line},
             t0_ms=t0,
             t1_ms=t1,
@@ -487,7 +485,7 @@ def test_apply_entry_window_cuts_drops_and_skips() -> None:
     inside, across, after = cue("MH1", 0, 100), cue("MH1", 100, 300), cue("MH1", 300, 400)
     skipped = cue("MH2", 0, 100)
 
-    profile = physical_rig().expand_fixtures()[0].config.physical_profile
+    profile = p1_rig().expand_fixtures()[0].config.physical_profile
     assert profile is not None
     kept, dropped = apply_entry_window(
         [inside, across, after, skipped], {"MH1": 200}, profiles={"MH1": profile, "MH2": profile}
@@ -514,30 +512,27 @@ def test_apply_entry_window_cuts_drops_and_skips() -> None:
     ]
 
 
-def test_reposition_fallback_is_physical_only_and_absent_from_dumps() -> None:
+def test_reposition_fallback_is_absent_from_dumps_when_unset() -> None:
     """Unset, the step field is left out of the template's dump (so no fingerprint moves)."""
     payload = {
         "step_id": "plain",
         "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
         "movement": {
-            "physical": {
-                "shape": "hold",
-                "mode": "periodic",
-                "start_pan_deg": 0,
-                "start_tilt_deg": 0,
-            }
+            "shape": "hold",
+            "mode": "periodic",
+            "start_pan_deg": 0,
+            "start_tilt_deg": 0,
         },
-        "dimmer": {},
     }
-    assert "physical_reposition_fallback" not in TemplateStep.model_validate(payload).model_dump()
+    assert "reposition_fallback" not in TemplateStep.model_validate(payload).model_dump()
 
 
 # --- Review fixes ----------------------------------------------------------------------
 
 
 def _rig(edit: Callable[[dict[str, Any]], None]) -> FixtureGroup:
-    """`physical_rig` with the same edit applied to both heads' profiles."""
-    payload = physical_rig().model_dump(mode="json")
+    """`p1_rig` with the same edit applied to both heads' profiles."""
+    payload = p1_rig().model_dump(mode="json")
     for fixture in payload["fixtures"]:
         edit(fixture["config"]["physical_profile"])
     return FixtureGroup.model_validate(payload)
@@ -557,7 +552,7 @@ def _coarse(speed: float) -> Callable[[dict[str, Any]], None]:
 
 def _sine_step(step_id: str, pan: float, extent: float, period: float) -> dict[str, Any]:
     step = hold_step(step_id, pan)
-    step["movement"]["physical"].update(
+    step["movement"].update(
         shape="sine_pan", mode="periodic", pan_extent_deg=extent, period_beats=period
     )
     return step
@@ -567,8 +562,8 @@ def _uncut(
     sections: tuple[tuple[str, int, int], ...], grid: BeatGrid, rig: FixtureGroup
 ) -> list[FixtureSegment]:
     """Phase 1's render of the sections: every cue as compiled, planned in `error` mode."""
-    job = physical_job()
-    plan = physical_sections(*sections)
+    job = p1_job()
+    plan = sections_plan(*sections)
     with registered_templates(*_DOCS):
         return _plan_uncut(plan, grid, rig, job)
 
@@ -580,7 +575,7 @@ def _plan_uncut(
         choreography_plan=plan, beat_grid=grid, fixture_group=rig, job_config=job
     )
     phase_map = build_musical_phase_map(grid)
-    start, end = physical_cue_limits(phase_map, int(grid.duration_ms))
+    start, end = cue_limits(phase_map, int(grid.duration_ms))
     cues: list[FixtureSegment] = []
     for section in plan.sections:
         assert section.template_id is not None
@@ -593,7 +588,7 @@ def _plan_uncut(
             start_bar=section.start_bar,
             duration_bars=section.end_bar - section.start_bar + 1,
         )
-        cues += compile_physical_template(
+        cues += compile_template(
             document.template, context, phase_map=phase_map, start_limit_ms=start, end_limit_ms=end
         ).segments
     result = plan_prepositions(
@@ -626,9 +621,9 @@ def test_an_entry_phase_1_plays_as_authored_is_kept_uncut(
     render is Phase 1's, cue for cue: no window, so no output changes under an unchanged
     fingerprint (review H4; the first case was cut by a dark first beat)."""
     grid = _grid()
-    with physical_test_templates():
+    with p1_templates():
         pipeline, segments = _render(*sections, grid=grid)
-        reference = _uncut(sections, grid, physical_rig())
+        reference = _uncut(sections, grid, p1_rig())
     assert segments == reference
     assert pipeline.render_record is not None
     assert {w["action"] for w in pipeline.render_record["entry_windows"]} == {"skipped"}
@@ -647,11 +642,11 @@ def test_a_cue_the_head_cannot_follow_is_refused_by_the_gate_and_the_compile() -
     while high - low > 1e-9:
         middle = (low + high) / 2
         low, high = (middle, high) if axis.dmx_word(middle) == axis.dmx_word(0.0) else (low, middle)
-    shake = physical_template_doc("p24a_shake", [_sine_step("s", low, 0.55, 0.16)])
-    job = physical_job()
+    shake = loop_template_doc("p24a_shake", [_sine_step("s", low, 0.55, 0.16)])
+    job = p1_job()
     with registered_templates(*_DOCS, shake):
         with pytest.raises(UnsupportedRenderModeError) as refused:
-            check_physical_templates(
+            admit_templates(
                 ["p24a_shake"],
                 beat_grid=_grid(),
                 fixture_group=rig,
@@ -660,7 +655,7 @@ def test_a_cue_the_head_cannot_follow_is_refused_by_the_gate_and_the_compile() -
             )
         with pytest.raises(PhysicalChannelError, match="trails its commands") as raised:
             RenderingPipeline(
-                choreography_plan=physical_sections(("p24a_shake", 1, 4), ("p24a_right", 5, 6)),
+                choreography_plan=sections_plan(("p24a_shake", 1, 4), ("p24a_right", 5, 6)),
                 beat_grid=_grid(),
                 fixture_group=rig,
                 job_config=job,
@@ -680,17 +675,17 @@ def test_the_gate_compiles_every_bar_so_an_isolated_fast_bar_is_refused() -> Non
             profile["axes"][a].update(travel_speed_per_s=45.0) for a in ("pan", "tilt")
         ]
     )
-    osc = physical_template_doc(
+    osc = loop_template_doc(
         "p24a_osc",
         [
             sweep_step("o", 0.0, 40.0, period_beats=2.0, duration=0.5),
             sweep_step("b", 40.0, -40.0, period_beats=2.0, start=0.5, duration=0.5),
         ],
     )
-    grid = physical_bars_grid(700, 400, 700, 700, 500, 500, 500, 500, 700, 700)
-    job = physical_job()
+    grid = bars_grid(700, 400, 700, 700, 500, 500, 500, 500, 700, 700)
+    job = p1_job()
     with registered_templates(osc), pytest.raises(UnsupportedRenderModeError, match="travels 50"):
-        check_physical_templates(
+        admit_templates(
             ["p24a_osc"],
             beat_grid=grid,
             fixture_group=rig,
@@ -709,15 +704,15 @@ def _pulse_rig(open_settle: int) -> FixtureGroup:
 def _pulse_doc() -> TemplateDoc:
     """At +90 degrees, the shutter open for half a beat across every odd beat."""
     step = hold_step("p", 90.0)
-    step.pop("physical_shutter_state")
-    step["physical_shutter"] = {
+    step.pop("shutter_state")
+    step["shutter"] = {
         "period_beats": 2.0,
         "duty_cycle": 0.25,
         "phase_cycles": -0.375,
         "low_state": "closed",
         "high_state": "open",
     }
-    return physical_template_doc("p24a_pulse", [step])
+    return loop_template_doc("p24a_pulse", [step])
 
 
 @pytest.mark.parametrize("open_settle", [0, 130, 150, 200])
@@ -726,7 +721,7 @@ def test_a_cut_never_leaves_a_shutter_state_too_short_to_take_effect(open_settle
     state 140 ms (review H3). The cut now moves on to the pulse's next change, so the
     gate and the render agree; every first state after a cut holds long enough."""
     rig = _pulse_rig(open_settle)
-    grid = physical_bars_grid(560, 560, 560, 500, 500, 500, 500, 500)
+    grid = bars_grid(560, 560, 560, 500, 500, 500, 500, 500)
     pipeline, segments = _render(
         ("p24a_left", 1, 2), ("p24a_pulse", 3, 8), grid=grid, rig=rig, docs=(_pulse_doc(),)
     )
@@ -751,7 +746,7 @@ def test_apply_entry_window_moves_a_cut_past_a_shutter_state_it_cannot_hold() ->
             for t, s in ((0, "closed"), (100, "open"), (140, "closed"), (300, "open"))
         )
     )
-    segment = physical_segment(
+    segment = fixture_segment(
         {ChannelName.PAN: line, ChannelName.TILT: line, ChannelName.SHUTTER: shutter},
         t0_ms=0,
         t1_ms=400,
@@ -785,7 +780,7 @@ def test_the_first_cue_after_the_window_also_begins_where_its_shutter_takes_effe
             for t, s in ((140, "open"), (180, "closed"), (360, "open"))
         )
     )
-    segment = physical_segment(
+    segment = fixture_segment(
         {ChannelName.PAN: line, ChannelName.TILT: line, ChannelName.SHUTTER: shutter},
         t0_ms=140,
         t1_ms=400,
@@ -806,12 +801,12 @@ def test_a_wheel_state_the_predecessor_already_holds_needs_no_settle() -> None:
         profile["discrete"]["color"]["states"]["blue"]["settle_ms"] = None
 
     state = dict(
-        PHYSICAL_INITIAL_STATE,
+        INITIAL_STATE,
         discrete_states={"shutter": "closed", "color": "blue", "gobo": "open"},
     )
-    job = physical_job(initial_states={"MH1": state, "MH2": state})
-    left = physical_template_doc("p24a_left_blue", [hold_step("h", -90.0, physical_color="blue")])
-    right = physical_template_doc("p24a_right_blue", [hold_step("h", 90.0, physical_color="blue")])
+    job = p1_job(initial_states={"MH1": state, "MH2": state})
+    left = loop_template_doc("p24a_left_blue", [hold_step("h", -90.0, color="blue")])
+    right = loop_template_doc("p24a_right_blue", [hold_step("h", 90.0, color="blue")])
     pipeline, _ = _render(
         ("p24a_left_blue", 1, 2),
         ("p24a_right_blue", 3, 4),
@@ -836,7 +831,7 @@ def test_the_window_covers_every_cue_of_the_section_not_only_the_first() -> None
     """The section's first beat holds -60 degrees, 30 from the predecessor; the rest of
     the bar sweeps out to -37.5 and back at 32 degrees/s. The window drops the first beat
     and cuts into the sweep, so it must fit an entry 52.5 degrees away, not 30."""
-    near_out_back = physical_template_doc(
+    near_out_back = loop_template_doc(
         "p24a_near_out_back",
         [
             hold_step("near", -60.0, duration=0.25),
@@ -861,7 +856,7 @@ def test_the_window_settles_every_wheel_state_the_section_selects() -> None:
     def slow_blue(profile: dict[str, Any]) -> None:
         profile["discrete"]["color"]["states"]["blue"]["settle_ms"] = 1500
 
-    blue = physical_template_doc("p24a_right_blue", [hold_step("h", 90.0, physical_color="blue")])
+    blue = loop_template_doc("p24a_right_blue", [hold_step("h", 90.0, color="blue")])
     pipeline, _ = _render(
         ("p24a_left", 1, 2), ("p24a_right_blue", 3, 4), rig=_rig(slow_blue), docs=(blue,)
     )
@@ -873,7 +868,7 @@ def test_after_a_cue_that_may_be_substituted_the_entry_is_sized_from_every_kept_
     """Under `drop_accent` the jump's +90 cues are dropped, so the head waits at -90 while
     the plan's last kept cue reads +90. The next section at +90 can neither continue
     that cue nor be sized from its aim alone: at 45 degrees/s it needs four seconds."""
-    job = physical_job(reposition_fallback="drop_accent")
+    job = p1_job(reposition_fallback="drop_accent")
     pipeline, _ = _render(
         ("p24a_jump", 1, 2),
         ("p24a_right", 3, 8),
@@ -942,13 +937,13 @@ def _whole_song_verdict(
 
     policy = job.moving_heads
     pipeline = RenderingPipeline(
-        choreography_plan=physical_sections((template_id, 1, 1)),
+        choreography_plan=sections_plan((template_id, 1, 1)),
         beat_grid=grid,
         fixture_group=rig,
         job_config=job,
     )
     phase_map = build_musical_phase_map(grid)
-    start, end = physical_cue_limits(phase_map, int(grid.duration_ms))
+    start, end = cue_limits(phase_map, int(grid.duration_ms))
     profiles = {f.fixture_id: f.config.physical_profile for f in rig.expand_fixtures()}
     document = get_template(template_id)
     bars = sum(1 for bar in grid.bar_boundaries if bar < grid.duration_ms)
@@ -963,7 +958,7 @@ def _whole_song_verdict(
             duration_bars=bars,
         )
         try:
-            compiled = compile_physical_template(
+            compiled = compile_template(
                 document.template,
                 context,
                 preset,
@@ -1009,14 +1004,14 @@ _DIFFERENTIAL_TEMPLATES = (
 
 
 def _differential_docs() -> tuple[TemplateDoc, ...]:
-    osc = physical_template_doc(
+    osc = loop_template_doc(
         "p24a_osc",
         [
             sweep_step("o", 0.0, 40.0, period_beats=2.0, duration=0.5),
             sweep_step("b", 40.0, -40.0, period_beats=2.0, start=0.5, duration=0.5),
         ],
     )
-    sine = physical_template_doc("p24a_sine", [_sine_step("s", 0.0, 30.0, 2.0)])
+    sine = loop_template_doc("p24a_sine", [_sine_step("s", 0.0, 30.0, 2.0)])
     return (*_DOCS, osc, sine, _pulse_doc())
 
 
@@ -1024,7 +1019,7 @@ def _check_gate_agrees(seed: int) -> set[bool]:
     """Gate three templates on one random grid, rig and policy against the reference;
     return the verdicts seen. Templates must be registered."""
     rigs = {
-        "base": physical_rig,
+        "base": p1_rig,
         "slow": lambda: _rig(_slow()),
         "coarse": lambda: _rig(_coarse(90.0)),
     }
@@ -1032,11 +1027,11 @@ def _check_gate_agrees(seed: int) -> set[bool]:
     grid = _random_grid(rng)
     rig = rigs[rng.choice(sorted(rigs))]()
     policy = rng.choice(["error", "drop_accent"])
-    job = physical_job() if policy == "error" else physical_job(reposition_fallback=policy)
+    job = p1_job() if policy == "error" else p1_job(reposition_fallback=policy)
     verdicts: set[bool] = set()
     for template_id in rng.sample(_DIFFERENTIAL_TEMPLATES, 3):
         try:
-            check_physical_templates(
+            admit_templates(
                 [template_id],
                 beat_grid=grid,
                 fixture_group=rig,
@@ -1058,7 +1053,7 @@ def test_the_gate_agrees_with_a_whole_song_reference_on_variable_tempo() -> None
     A gate that checks less of the song than the render can reach fails here: the known
     grids catch one compiling only the first four bars; then a random sweep."""
     verdicts: set[bool] = set()
-    with physical_test_templates(), registered_templates(*_differential_docs()):
+    with p1_templates(), registered_templates(*_differential_docs()):
         for seed in (*_DIFFERENTIAL_KNOWN, *range(_DIFFERENTIAL_GRIDS)):
             verdicts |= _check_gate_agrees(seed)
     assert verdicts == {True, False}
@@ -1076,8 +1071,8 @@ def test_an_uncut_entry_carries_motion_into_the_sections_first_gap() -> None:
         for name in ("pan", "tilt"):
             profile["axes"][name]["settle_ms"] = 80
 
-    sine = physical_template_doc("p24a_sine_fast", [_sine_step("s", 0.0, 40.0, 1.0)])
-    gap = physical_template_doc(
+    sine = loop_template_doc("p24a_sine_fast", [_sine_step("s", 0.0, 40.0, 1.0)])
+    gap = loop_template_doc(
         "p24a_gap",
         [
             hold_step("first", 0.0, duration=0.01, target="LEFT"),
@@ -1113,7 +1108,7 @@ def test_a_cut_waits_for_the_open_latency_too() -> None:
             for t, s in ((0, "closed"), (100, "open"), (140, "closed"), (360, "open"))
         )
     )
-    segment = physical_segment(
+    segment = fixture_segment(
         {ChannelName.PAN: line, ChannelName.TILT: line, ChannelName.SHUTTER: shutter},
         t0_ms=0,
         t1_ms=400,
@@ -1126,7 +1121,7 @@ def test_a_cut_waits_for_the_open_latency_too() -> None:
 
 
 def _same_heads(edit: Callable[[dict[str, Any]], None] | None = None) -> FixtureGroup:
-    """`physical_rig` with both heads on one, uninverted profile."""
+    """`p1_rig` with both heads on one, uninverted profile."""
 
     def same(profile: dict[str, Any]) -> None:
         for name in ("pan", "tilt"):
@@ -1141,7 +1136,7 @@ def _gate(template_id: str, rig: FixtureGroup, job: JobConfig, *docs: TemplateDo
     """The gate's refusal message, or "" when it admits the template."""
     with registered_templates(*_DOCS, *docs):
         try:
-            check_physical_templates(
+            admit_templates(
                 [template_id],
                 beat_grid=_grid(),
                 fixture_group=rig,
@@ -1155,20 +1150,20 @@ def _gate(template_id: str, rig: FixtureGroup, job: JobConfig, *docs: TemplateDo
 
 def test_the_gate_names_every_head_that_shares_a_refused_plan() -> None:
     """Identical heads are planned once; a refusal names all of them."""
-    message = _gate("p24a_jump_plain", _same_heads(), physical_job())
+    message = _gate("p24a_jump_plain", _same_heads(), p1_job())
     assert "MH1/MH2 cue at" in message
 
 
 def test_the_gate_plans_heads_with_different_initial_states_apart() -> None:
     """Only the centre head has cues; MH1 and MH3 only park, from their initial states.
     MH3 starts unsettled, so its park fails while MH1's passes: they are not one."""
-    centre = physical_template_doc("p24a_centre", [hold_step("h", 0.0, target="INNER")])
-    unsettled = dict(PHYSICAL_INITIAL_STATE, settled=False)
-    states = {"MH1": PHYSICAL_INITIAL_STATE, "MH2": PHYSICAL_INITIAL_STATE, "MH3": unsettled}
+    centre = loop_template_doc("p24a_centre", [hold_step("h", 0.0, target="INNER")])
+    unsettled = dict(INITIAL_STATE, settled=False)
+    states = {"MH1": INITIAL_STATE, "MH2": INITIAL_STATE, "MH3": unsettled}
     message = _gate(
         "p24a_centre",
         topology_rig(("MH1", "MH2", "MH3")),
-        physical_job(initial_states=states),
+        p1_job(initial_states=states),
         centre,
     )
     assert "MH3 cue at" in message
@@ -1179,26 +1174,24 @@ def test_the_gate_plans_heads_with_different_cue_metadata_apart() -> None:
     """The left head's steps declare `drop_accent` and the right head's do not: under
     that policy only the right head's jump is refused, though both heads' cues hold the
     same values at the same times."""
-    split = physical_template_doc(
+    split = loop_template_doc(
         "p24a_jump_split",
         [
-            hold_step(
-                "l1", -90.0, duration=0.5, target="LEFT", physical_reposition_fallback="drop_accent"
-            ),
+            hold_step("l1", -90.0, duration=0.5, target="LEFT", reposition_fallback="drop_accent"),
             hold_step(
                 "l2",
                 90.0,
                 start=0.5,
                 duration=0.5,
                 target="LEFT",
-                physical_reposition_fallback="drop_accent",
+                reposition_fallback="drop_accent",
             ),
             hold_step("r1", -90.0, duration=0.5, target="RIGHT"),
             hold_step("r2", 90.0, start=0.5, duration=0.5, target="RIGHT"),
         ],
     )
     message = _gate(
-        "p24a_jump_split", _same_heads(), physical_job(reposition_fallback="drop_accent"), split
+        "p24a_jump_split", _same_heads(), p1_job(reposition_fallback="drop_accent"), split
     )
     assert "MH2 cue at" in message and "MH1 cue at" not in message and "MH1/" not in message
 
@@ -1209,9 +1202,9 @@ def test_the_gate_plans_heads_with_different_cue_metadata_apart() -> None:
 def _subset_docs() -> tuple[TemplateDoc, ...]:
     """Distributed and mirrored families that leave each head at its own aim, so the heads'
     entry windows differ."""
-    pulse = {"physical": {"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0}}
+    pulse = {"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0}
     return (
-        physical_template_doc(
+        loop_template_doc(
             "ss_wings",
             [
                 sine_step(
@@ -1224,7 +1217,7 @@ def _subset_docs() -> tuple[TemplateDoc, ...]:
                 )
             ],
         ),
-        physical_template_doc(
+        loop_template_doc(
             "ss_reverse",
             [
                 sine_step(
@@ -1237,7 +1230,7 @@ def _subset_docs() -> tuple[TemplateDoc, ...]:
                 )
             ],
         ),
-        physical_template_doc(
+        loop_template_doc(
             "ss_fan",
             [
                 sweep_step(
@@ -1246,12 +1239,12 @@ def _subset_docs() -> tuple[TemplateDoc, ...]:
                     120.0,
                     period_beats=8.0,
                     duration=4.0,
-                    physical_distribution=[{"domains": ["pan"], "spread_cycles": 0.4, "wings": 2}],
+                    distribution=[{"domains": ["pan"], "spread_cycles": 0.4, "wings": 2}],
                 )
             ],
             cycle_bars=4.0,
         ),
-        physical_template_doc(
+        loop_template_doc(
             "ss_fan_line",
             [
                 sweep_step(
@@ -1260,13 +1253,13 @@ def _subset_docs() -> tuple[TemplateDoc, ...]:
                     120.0,
                     period_beats=16.0,
                     duration=4.0,
-                    physical_distribution=[{"domains": ["pan"], "spread_cycles": 0.4}],
+                    distribution=[{"domains": ["pan"], "spread_cycles": 0.4}],
                 )
             ],
             cycle_bars=4.0,
         ),
-        physical_template_doc("ss_hold", [hold_step("d", 120.0)]),
-        physical_template_doc("ss_left", [hold_step("d", -90.0)]),
+        loop_template_doc("ss_hold", [hold_step("d", 120.0)]),
+        loop_template_doc("ss_left", [hold_step("d", -90.0)]),
     )
 
 
@@ -1287,9 +1280,9 @@ def _head_frames(
     for fixture in payload["fixtures"]:
         at_speed(fixture["config"]["physical_profile"])
     rig = FixtureGroup.model_validate(payload)
-    job = physical_job(initial_states=dict.fromkeys(fixture_ids, PHYSICAL_INITIAL_STATE))
+    job = p1_job(initial_states=dict.fromkeys(fixture_ids, INITIAL_STATE))
     pipeline = RenderingPipeline(
-        choreography_plan=physical_sections(*sections),
+        choreography_plan=sections_plan(*sections),
         beat_grid=grid,
         fixture_group=rig,
         job_config=job,
@@ -1378,7 +1371,7 @@ def _subset_case(seed: int) -> bool:
         _assert_subset_stable(tuple(sections), grid, heads=heads, missing=missing, speed=speed)
     except AssertionError as error:
         raise AssertionError(f"seed {seed}: {error}") from error
-    except (PhysicalChannelError, PhysicalRenderError):
+    except (PhysicalChannelError, RenderRefusedError):
         return False  # the full rig cannot render it either: nothing to compare
     return True
 
@@ -1404,19 +1397,17 @@ def test_an_uncut_entry_must_also_give_its_first_shutter_state_time() -> None:
         profile["visibility"]["open_latency_ms"] = 60
         profile["discrete"]["shutter"]["states"]["open"]["settle_ms"] = 60
 
-    closed = physical_template_doc(
-        "p24a_closed", [hold_step("h", -90.0, physical_shutter_state="closed")]
-    )
+    closed = loop_template_doc("p24a_closed", [hold_step("h", -90.0, shutter_state="closed")])
     step = hold_step("p", -90.0)
-    step.pop("physical_shutter_state")
-    step["physical_shutter"] = {
+    step.pop("shutter_state")
+    step["shutter"] = {
         "period_beats": 4.0,
         "duty_cycle": 0.25,
         "phase_cycles": 0.23,
         "low_state": "closed",
         "high_state": "open",
     }
-    pulse = physical_template_doc("p24a_short_open", [step])
+    pulse = loop_template_doc("p24a_short_open", [step])
     pipeline, segments = _render(
         ("p24a_closed", 1, 2), ("p24a_short_open", 3, 4), rig=_rig(slow_open), docs=(closed, pulse)
     )
@@ -1431,15 +1422,15 @@ def test_an_uncut_entry_must_also_give_its_first_shutter_state_time() -> None:
 def _straddling_pulse(pan: float) -> TemplateDoc:
     """A pulse open for the first 0.05 beat of each cue (then every other half beat)."""
     step = hold_step("p", pan)
-    step.pop("physical_shutter_state")
-    step["physical_shutter"] = {
+    step.pop("shutter_state")
+    step["shutter"] = {
         "period_beats": 1.0,
         "duty_cycle": 0.5,
         "phase_cycles": 0.45,
         "low_state": "closed",
         "high_state": "open",
     }
-    return physical_template_doc(f"ha_pulse_{pan:g}", [step])
+    return loop_template_doc(f"ha_pulse_{pan:g}", [step])
 
 
 @pytest.mark.parametrize("open_settle", [60, 100, 150])
@@ -1450,7 +1441,7 @@ def test_an_entry_without_a_window_still_begins_where_its_shutter_takes_effect(
     section starts and it needs no dark window; but its first, 40 ms open state cannot
     take its settle, so its entry is not played as authored. It still begins where the
     shutter takes effect: the gate admitted this and the render then failed."""
-    right_only = physical_template_doc("ha_right_only", [hold_step("h", 90.0, target="RIGHT")])
+    right_only = loop_template_doc("ha_right_only", [hold_step("h", 90.0, target="RIGHT")])
     pipeline, segments = _render(
         ("ha_right_only", 1, 2),
         ("ha_pulse_0", 3, 6),
@@ -1479,9 +1470,7 @@ def _unknown_white_settle(profile: dict[str, Any]) -> None:
         pytest.param(
             _unknown_tilt_latency,
             (
-                physical_template_doc(
-                    "ha_closed_0", [hold_step("h", 0.0, physical_shutter_state="closed")]
-                ),
+                loop_template_doc("ha_closed_0", [hold_step("h", 0.0, shutter_state="closed")]),
                 _straddling_pulse(0.0),
             ),
             ["ha_closed_0", "ha_pulse_0"],
@@ -1492,10 +1481,10 @@ def _unknown_white_settle(profile: dict[str, Any]) -> None:
         pytest.param(
             _unknown_white_settle,
             (
-                physical_template_doc(
-                    "u_red", [hold_step("r", 0.0, start=0.5, duration=0.5, physical_color="red")]
+                loop_template_doc(
+                    "u_red", [hold_step("r", 0.0, start=0.5, duration=0.5, color="red")]
                 ),
-                physical_template_doc("u_white", [hold_step("w", 0.0, physical_color="white")]),
+                loop_template_doc("u_white", [hold_step("w", 0.0, color="white")]),
             ),
             ["u_red", "u_white"],
             "u_white",
@@ -1519,11 +1508,11 @@ def test_a_user_template_without_an_entry_bound_is_refused_before_planning(
         registered_templates(*docs),
         pytest.raises(UnsupportedRenderModeError) as error,
     ):
-        check_physical_templates(
+        admit_templates(
             template_ids,
             beat_grid=_grid(*[500.0] * 8),
             fixture_group=_rig(edit),
-            initial_states=physical_job().moving_heads.initial_states,
+            initial_states=p1_job().moving_heads.initial_states,
             failure_mode="error",
         )
     message = str(error.value)

@@ -379,8 +379,8 @@ class RenderPreflightStage:
     job is checked against the fixtures the render stage will load (`preflight_render_policy`), the templates
     the planner will be offered (each must dry-compile on this rig and plan the dark repositioning between
     its own cues under the job's `reposition_fallback`, at the placements its
-    `on_unplayable` leaves to the gate: `check_physical_templates`; a template of the
-    shipped physical catalog passes through the first of its base and declared presets
+    `on_unplayable` leaves to the gate: `admit_templates`; a template of the
+    shipped family catalog passes through the first of its base and declared presets
     that does, its effective variant, and one none of whose variants passes is left out
     of the offer instead of refusing the run, unless none remains; the result is stored
     in state as `template_admission`, which the planner offers and the render applies
@@ -388,7 +388,7 @@ class RenderPreflightStage:
     song's musical phase map, built from the detected BeatGrid, which the renderer
     never infers (it holds every fixture dark outside the map's covered span, which
     is logged), and, when the run supplies an xLights layout (`layout_models` in
-    state), every fixture's model (`check_physical_models`).
+    state), every fixture's model (`check_models`).
 
     Input and output: the audio stage's SongBundle, unchanged.
     """
@@ -416,11 +416,11 @@ class RenderPreflightStage:
             preflight_render_policy,
         )
         from twinklr.core.pipeline.result import failure_result, success_result
-        from twinklr.core.sequencer.moving_heads.export.frame_encoder import PhysicalOutputError
-        from twinklr.core.sequencer.moving_heads.export.xsq_adapter import check_physical_models
-        from twinklr.core.sequencer.moving_heads.pipeline import check_physical_templates
+        from twinklr.core.sequencer.moving_heads.export.frame_encoder import OutputError
+        from twinklr.core.sequencer.moving_heads.export.xsq_adapter import check_models
+        from twinklr.core.sequencer.moving_heads.pipeline import admit_templates
         from twinklr.core.sequencer.moving_heads.templates.data_loader import (
-            in_physical_catalog,
+            in_template_catalog,
         )
         from twinklr.core.sequencer.timing.musical_phase import (
             MusicalPhaseError,
@@ -453,19 +453,19 @@ class RenderPreflightStage:
                 phase_map.covered_end_ms,
                 phase_map.duration_ms,
             )
-            admission = check_physical_templates(
+            admission = admit_templates(
                 self.available_templates,
                 beat_grid=beat_grid,
                 fixture_group=fixture_group,
                 initial_states=job_config.moving_heads.initial_states,
                 failure_mode=job_config.moving_heads.reposition_fallback,
                 on_unplayable=job_config.moving_heads.on_unplayable,
-                excludable=[t for t in self.available_templates if in_physical_catalog(t)],
+                excludable=[t for t in self.available_templates if in_template_catalog(t)],
             )
             layout_models = context.get_state("layout_models")
             if layout_models is not None:
-                check_physical_models(fixture_group.expand_fixtures(), layout_models)
-        except (UnsupportedRenderModeError, PhysicalOutputError) as error:
+                check_models(fixture_group.expand_fixtures(), layout_models)
+        except (UnsupportedRenderModeError, OutputError) as error:
             logger.error("Render preflight refused the job: %s", error)
             return failure_result(str(error), stage_name=self.name)
         base = context.get_state("regeneration_base_plan")

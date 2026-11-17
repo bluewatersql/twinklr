@@ -1,7 +1,7 @@
 """Stable topology and separate phase domains (P2.2).
 
-A fixture group's topology describes the canonical full rig. A physical step's
-`physical_distribution` spreads phase over it per domain (pan, tilt, dimmer, shutter):
+A fixture group's topology describes the canonical full rig. A step's
+`distribution` spreads phase over it per domain (pan, tilt, dimmer, shutter):
 rank comes from the canonical `(row, column, ordinal, fixture_id)` order of the whole
 rig, so rendering a subset of heads, or a rig with a head missing, never rephases the
 others. Slot 0 leads; a fixture's phase in a domain is the step phase minus its offset.
@@ -22,16 +22,16 @@ from pydantic import ValidationError
 import pytest
 
 from tests.config_effects_registry import CONFIG_EFFECTS, ConfigDispositionKind
-from tests.support.mh_physical import (
-    PHYSICAL_INITIAL_STATE,
+from tests.support.moving_heads import (
+    INITIAL_STATE,
     hold_step,
-    physical_grid,
-    physical_job,
-    physical_rig,
-    physical_sections,
-    physical_template_doc,
+    loop_template_doc,
+    p1_grid,
+    p1_job,
+    p1_rig,
     preset_library_payload,
     registered_templates,
+    sections_plan,
     sine_step,
     sweep_step,
     topology_payload,
@@ -57,22 +57,22 @@ from twinklr.core.sequencer.models.moving_heads.topology import (
 from twinklr.core.sequencer.models.template import Template, TemplateStep
 from twinklr.core.sequencer.moving_heads import pipeline as pipeline_module
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile.physical import PhysicalCompileError
+from twinklr.core.sequencer.moving_heads.compile.step import CompileError
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
-    compile_physical_template,
+    compile_template,
 )
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
 from twinklr.core.sequencer.moving_heads.pipeline import (
     RenderingPipeline,
-    check_physical_templates,
-    physical_cue_limits,
+    admit_templates,
+    cue_limits,
 )
 from twinklr.core.sequencer.timing.musical_phase import (
     build_musical_phase_map,
     musical_phase_fraction,
 )
 
-_GRID = physical_grid()
+_GRID = p1_grid()
 _PHASE_MAP = build_musical_phase_map(_GRID)
 _PAN, _TILT, _DIMMER, _SHUTTER = (
     ChannelName.PAN,
@@ -105,7 +105,7 @@ def _resolve(
 
 
 def _template(*steps: dict[str, Any], cycle_bars: float = 1.0) -> Template:
-    return physical_template_doc("p22_probe", steps, cycle_bars=cycle_bars).template
+    return loop_template_doc("p22_probe", steps, cycle_bars=cycle_bars).template
 
 
 def _compile(
@@ -122,8 +122,8 @@ def _compile(
         topology=rig_topology(rig),
         fixture_group_id=rig.group_id,
     )
-    start_limit, end_limit = physical_cue_limits(_PHASE_MAP, int(_GRID.duration_ms))
-    return compile_physical_template(
+    start_limit, end_limit = cue_limits(_PHASE_MAP, int(_GRID.duration_ms))
+    return compile_template(
         template, context, phase_map=_PHASE_MAP, start_limit_ms=start_limit, end_limit_ms=end_limit
     ).segments
 
@@ -278,7 +278,7 @@ def test_missing_middle_head_leaves_a_hole_in_the_compiled_rig() -> None:
             0.0,
             20.0,
             distribution=[{"domains": ["pan", "dimmer"], "wings": 2, "spread_cycles": 0.5}],
-            dimmer={"physical": {"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0}},
+            dimmer={"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0},
         )
     )
     full = _compile(template, topology_rig(ids, topology=topology_payload(ids)))
@@ -305,12 +305,12 @@ def test_dimmer_spread_shifts_only_the_dimmer() -> None:
             0.0,
             20.0,
             distribution=[{"domains": ["dimmer"], "spread_cycles": 0.5}],
-            dimmer={"physical": {"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0}},
+            dimmer={"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0},
         )
     )
     rig = _rig(2)
     resolved = resolve_distribution(
-        rig_topology(rig), template.steps[0].physical_distribution, ("MH1", "MH2")
+        rig_topology(rig), template.steps[0].distribution, ("MH1", "MH2")
     )
     assert resolved["MH2"].phase_by_channel == {
         _PAN: 0,
@@ -342,7 +342,7 @@ def test_overlapping_or_unphased_domains_are_rejected() -> None:
         [{"domains": ["pan"], "wings": 3}],
     ):
         with pytest.raises(ValidationError):
-            TemplateStep.model_validate({**step, "physical_distribution": distribution})
+            TemplateStep.model_validate({**step, "distribution": distribution})
     with pytest.raises(ValueError, match="tilt"):
         resolve_distribution(
             _topology(_ids(2)),
@@ -366,7 +366,7 @@ def test_lagging_linear_head_holds_at_start_until_its_phase_begins() -> None:
             -30.0,
             60.0,
             period_beats=1.6,
-            physical_distribution=[{"domains": ["pan"], "spread_cycles": 0.25}],
+            distribution=[{"domains": ["pan"], "spread_cycles": 0.25}],
         )
     )
     heads = _by_fixture(_compile(template, _rig(2)))
@@ -394,7 +394,7 @@ def test_step_ending_before_a_lagging_heads_phase_reaches_one_cuts_it_midway() -
             -30.0,
             60.0,
             period_beats=4.0,
-            physical_distribution=[{"domains": ["pan"], "spread_cycles": 0.5}],
+            distribution=[{"domains": ["pan"], "spread_cycles": 0.5}],
         )
     )
     heads = _by_fixture(_compile(template, _rig(2)))
@@ -414,12 +414,12 @@ def test_mirror_sign_flips_pan_displacement_not_the_referenced_aim() -> None:
 
     def step(distribution: list[dict[str, Any]]) -> dict[str, Any]:
         payload = sweep_step("sweep", 0.0, 15.0, period_beats=2.0)
-        payload["movement"]["physical"]["tilt_extent_deg"] = 10.0
+        payload["movement"]["tilt_extent_deg"] = 10.0
         for name in ("start_pan_deg", "start_tilt_deg"):
-            payload["movement"]["physical"].pop(name)
+            payload["movement"].pop(name)
         payload["component_refs"] = {"position_id": "side"}
         if distribution:
-            payload["physical_distribution"] = distribution
+            payload["distribution"] = distribution
         return payload
 
     rig = topology_rig(ids, topology=topology_payload(ids), presets=preset_library_payload())
@@ -459,10 +459,10 @@ def test_bounds_check_sees_each_heads_mirrored_path() -> None:
         260.0,
         -15.0,
         period_beats=2.0,
-        physical_distribution=[{"domains": ["pan"], "wings": 2}],
+        distribution=[{"domains": ["pan"], "wings": 2}],
     )
     plain = copy.deepcopy(step)
-    plain.pop("physical_distribution")
+    plain.pop("distribution")
     _compile(_template(plain), _rig(2))
 
     with pytest.raises(PhysicalChannelError, match="pan") as error:
@@ -478,16 +478,16 @@ def _shutter_step(phase_cycles: float, spread: float, *, duration: float = 1.0) 
         "strobe",
         0.0,
         duration=duration,
-        physical_shutter={
+        shutter={
             "period_beats": 1.0,
             "duty_cycle": 0.5,
             "phase_cycles": phase_cycles,
             "low_state": "closed",
             "high_state": "open",
         },
-        physical_distribution=[{"domains": ["shutter"], "spread_cycles": spread}],
+        distribution=[{"domains": ["shutter"], "spread_cycles": spread}],
     )
-    step.pop("physical_shutter_state")
+    step.pop("shutter_state")
     return step
 
 
@@ -516,10 +516,10 @@ def test_pulse_width_check_runs_at_each_heads_own_phase() -> None:
     """A 15 ms high interval straddles the unshifted head's step start and end (cut,
     exempt), but sits inside the lagging head's step, which is refused."""
     step = _shutter_step(0.02, 0.5, duration=0.25)
-    step["physical_shutter"]["duty_cycle"] = 0.03
+    step["shutter"]["duty_cycle"] = 0.03
     template = _template(step, cycle_bars=0.25)
     unshifted = copy.deepcopy(step)
-    unshifted.pop("physical_distribution")
+    unshifted.pop("distribution")
     _compile(_template(unshifted, cycle_bars=0.25), _rig(2))
 
     with pytest.raises(PhysicalChannelError, match="shorter than one 20 ms frame") as error:
@@ -544,7 +544,7 @@ def test_rig_without_topology_derives_one_row_from_position_index() -> None:
             -30.0,
             60.0,
             period_beats=2.0,
-            physical_distribution=[{"domains": ["pan"], "spread_cycles": 0.5}],
+            distribution=[{"domains": ["pan"], "spread_cycles": 0.5}],
         )
     )
     heads = _by_fixture(_compile(template, rig))
@@ -601,7 +601,7 @@ def test_derived_row_refuses_a_distribution_over_shared_position_indexes() -> No
     distributed = _template(
         sine_step("wave", 0.0, 20.0, distribution=[{"domains": ["pan"], "spread_cycles": 0.5}])
     )
-    with pytest.raises(PhysicalCompileError, match=r"\['MH2', 'MH3'\] share a position_index"):
+    with pytest.raises(CompileError, match=r"\['MH2', 'MH3'\] share a position_index"):
         _compile(distributed, rig)
     _compile(_template(sine_step("wave", 0.0, 20.0)), rig)  # no distribution: fine
 
@@ -610,22 +610,22 @@ def test_rig_without_topology_or_positions_refuses_a_distribution_at_compile_and
     template = _template(
         sine_step("wave", 0.0, 20.0, distribution=[{"domains": ["pan"], "spread_cycles": 0.5}])
     )
-    for rig in (physical_rig(), topology_rig(("MH1", "MH2"), position_indexes=None)):
+    for rig in (p1_rig(), topology_rig(("MH1", "MH2"), position_indexes=None)):
         assert rig_topology(rig) is None
-        with pytest.raises(PhysicalCompileError, match="fixture group 'MOVING_HEADS'"):
+        with pytest.raises(CompileError, match="fixture group 'MOVING_HEADS'"):
             _compile(template, rig)
         _compile(_template(sine_step("wave", 0.0, 20.0)), rig)  # no distribution: fine
 
-    document = physical_template_doc("p22_probe", template.model_dump()["steps"])
+    document = loop_template_doc("p22_probe", template.model_dump()["steps"])
     with (
         registered_templates(document),
         pytest.raises(UnsupportedRenderModeError, match="fixture group 'MOVING_HEADS'"),
     ):
-        check_physical_templates(
+        admit_templates(
             ["p22_probe"],
             beat_grid=_GRID,
-            fixture_group=physical_rig(),
-            initial_states=physical_job().moving_heads.initial_states,
+            fixture_group=p1_rig(),
+            initial_states=p1_job().moving_heads.initial_states,
             failure_mode="error",
         )
 
@@ -646,11 +646,11 @@ def test_topology_must_place_every_fixture_of_the_group_once() -> None:
     topology_rig(ids[:2], topology=topology_payload(ids))
 
 
-# --- Legacy, dumps and identity --------------------------------------------------------
+# --- Dumps and identity ----------------------------------------------------------------
 
 
 def test_absent_topology_and_distribution_are_left_out_of_dumps() -> None:
-    rig = physical_rig()
+    rig = p1_rig()
     assert rig.topology is None
     assert "topology" not in rig.model_dump(mode="json")
     assert "topology" in _rig(2).model_dump(mode="json")
@@ -659,27 +659,24 @@ def test_absent_topology_and_distribution_are_left_out_of_dumps() -> None:
         "step_id": "plain",
         "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
         "movement": {
-            "physical": {
-                "shape": "hold",
-                "mode": "periodic",
-                "start_pan_deg": 0,
-                "start_tilt_deg": 0,
-            }
+            "shape": "hold",
+            "mode": "periodic",
+            "start_pan_deg": 0,
+            "start_tilt_deg": 0,
         },
-        "dimmer": {},
     }
-    assert "physical_distribution" not in TemplateStep.model_validate(plain).model_dump(mode="json")
+    assert "distribution" not in TemplateStep.model_validate(plain).model_dump(mode="json")
 
 
 def _job(ids: tuple[str, ...]) -> JobConfig:
-    return physical_job(initial_states=dict.fromkeys(ids, PHYSICAL_INITIAL_STATE))
+    return p1_job(initial_states=dict.fromkeys(ids, INITIAL_STATE))
 
 
 def test_topology_changes_render_identity_but_not_planning_identity() -> None:
     """Topology is rig data, like presets: it enters the render fingerprint (the group's
     dump) but not the job the session id hashes, nor the fixtures the planner sees."""
     ids = _ids(3)
-    document = physical_template_doc("p22_probe", [sine_step("wave", 0.0, 20.0)])
+    document = loop_template_doc("p22_probe", [sine_step("wave", 0.0, 20.0)])
     reordered = topology_payload(ids[::-1])
     rigs = (
         topology_rig(ids, position_indexes=(1, 2, 3)),
@@ -689,7 +686,7 @@ def test_topology_changes_render_identity_but_not_planning_identity() -> None:
     with registered_templates(document):
         fingerprints = {
             RenderingPipeline(
-                choreography_plan=physical_sections(("p22_probe", 1, 1)),
+                choreography_plan=sections_plan(("p22_probe", 1, 1)),
                 beat_grid=_GRID,
                 fixture_group=rig,
                 job_config=_job(ids),
@@ -724,7 +721,7 @@ def test_plan_key_follows_trajectories_not_rank() -> None:
     assert swing_keys["MH1"] != swing_keys["MH2"]  # same sign, different phase
     assert len(set(swing_keys.values())) == 4
 
-    holding, hold_keys = keys(hold_step("look", 0.0, physical_distribution=distribution))
+    holding, hold_keys = keys(hold_step("look", 0.0, distribution=distribution))
     assert len({s.metadata["phase_distribution"] for s in holding.values()}) == 4
     assert len(set(hold_keys.values())) == 1
 
@@ -742,16 +739,12 @@ def test_gate_plans_heads_once_unless_their_cues_differ(monkeypatch: pytest.Monk
     monkeypatch.setattr(pipeline_module, "plan_prepositions", recording)
     distribution = [{"domains": ["pan"], "spread_cycles": 0.5}]
     documents = (
-        physical_template_doc("p22_plain", [hold_step("look", 0.0)]),
-        physical_template_doc(
-            "p22_hold", [hold_step("look", 0.0, physical_distribution=distribution)]
-        ),
-        physical_template_doc(
-            "p22_wave", [sine_step("wave", 0.0, 20.0, distribution=distribution)]
-        ),
+        loop_template_doc("p22_plain", [hold_step("look", 0.0)]),
+        loop_template_doc("p22_hold", [hold_step("look", 0.0, distribution=distribution)]),
+        loop_template_doc("p22_wave", [sine_step("wave", 0.0, 20.0, distribution=distribution)]),
     )
     with registered_templates(*documents):
-        check_physical_templates(
+        admit_templates(
             ["p22_plain", "p22_hold", "p22_wave"],
             beat_grid=_GRID,
             fixture_group=_rig(4),
@@ -767,7 +760,7 @@ def test_mirrored_odd_rig_renders_with_a_still_center_and_records_canonical_orde
     yet it gets a valid cue; the render plans every head's own phase through the entry
     window and the transaction pass, and the trace keeps canonical order and phases."""
     ids = _ids(3)
-    wave = physical_template_doc(
+    wave = loop_template_doc(
         "p22_wave",
         [
             sine_step(
@@ -778,7 +771,7 @@ def test_mirrored_odd_rig_renders_with_a_still_center_and_records_canonical_orde
             )
         ],
     )
-    reverse = physical_template_doc(
+    reverse = loop_template_doc(
         "p22_reverse",
         [
             sine_step(
@@ -791,7 +784,7 @@ def test_mirrored_odd_rig_renders_with_a_still_center_and_records_canonical_orde
     )
     rig = topology_rig(ids, topology=topology_payload(ids[::-1]))
     with registered_templates(wave, reverse):
-        check_physical_templates(
+        admit_templates(
             ["p22_wave", "p22_reverse"],
             beat_grid=_GRID,
             fixture_group=rig,
@@ -799,7 +792,7 @@ def test_mirrored_odd_rig_renders_with_a_still_center_and_records_canonical_orde
             failure_mode="error",
         )
         pipeline = RenderingPipeline(
-            choreography_plan=physical_sections(("p22_wave", 1, 1), ("p22_reverse", 2, 2)),
+            choreography_plan=sections_plan(("p22_wave", 1, 1), ("p22_reverse", 2, 2)),
             beat_grid=_GRID,
             fixture_group=rig,
             job_config=_job(ids),
@@ -824,15 +817,15 @@ def test_mirrored_odd_rig_renders_with_a_still_center_and_records_canonical_orde
 Component = Literal["rejected", "compiled"]
 
 _COMPONENT_NOTES: dict[Component, str] = {
-    "rejected": "exact path's alternative is rejected by physical validation or compile",
-    "compiled": "exact path changes the physical compile result",
+    "rejected": "exact path's alternative is rejected by validation or compile",
+    "compiled": "exact path changes the compile result",
 }
 
 Mutation = Callable[[dict[str, Any], dict[str, Any]], Any]
 """Mutates (topology payload holder, step payload) in place."""
 
 _MEMBERS = "fixture.topology.members"
-_DISTRIBUTION = "template.template.steps.physical_distribution"
+_DISTRIBUTION = "template.template.steps.distribution"
 
 
 def _member(holder: dict[str, Any], fixture_id: str) -> dict[str, Any]:
@@ -856,30 +849,30 @@ _MUTATIONS: dict[str, tuple[Component, Mutation]] = {
     f"{_MEMBERS}.row": ("compiled", lambda h, s: _member(h, "MH1").update(row=1)),
     f"{_MEMBERS}.column": ("compiled", lambda h, s: _member(h, "MH1").update(column=5)),
     f"{_MEMBERS}.ordinal": ("compiled", lambda h, s: _member(h, "MH2").update(ordinal=5)),
-    _DISTRIBUTION: ("compiled", lambda h, s: s.pop("physical_distribution")),
+    _DISTRIBUTION: ("compiled", lambda h, s: s.pop("distribution")),
     f"{_DISTRIBUTION}.domains": (
         "compiled",
-        lambda h, s: s["physical_distribution"][0].update(domains=["dimmer"]),
+        lambda h, s: s["distribution"][0].update(domains=["dimmer"]),
     ),
     f"{_DISTRIBUTION}.block_size": (
         "compiled",
-        lambda h, s: s["physical_distribution"][0].update(block_size=2),
+        lambda h, s: s["distribution"][0].update(block_size=2),
     ),
     f"{_DISTRIBUTION}.group_count": (
         "compiled",
-        lambda h, s: s["physical_distribution"][0].update(group_count=2),
+        lambda h, s: s["distribution"][0].update(group_count=2),
     ),
     f"{_DISTRIBUTION}.wings": (
         "compiled",
-        lambda h, s: s["physical_distribution"][0].update(wings=2),
+        lambda h, s: s["distribution"][0].update(wings=2),
     ),
     f"{_DISTRIBUTION}.spread_cycles": (
         "compiled",
-        lambda h, s: s["physical_distribution"][0].update(spread_cycles=0.25),
+        lambda h, s: s["distribution"][0].update(spread_cycles=0.25),
     ),
     f"{_DISTRIBUTION}.direction": (
         "compiled",
-        lambda h, s: s["physical_distribution"][0].update(direction="reverse"),
+        lambda h, s: s["distribution"][0].update(direction="reverse"),
     ),
 }
 """Per config path: the one component its alternative must change."""
@@ -903,7 +896,7 @@ def _evidence_inputs() -> tuple[dict[str, Any], dict[str, Any]]:
         0.0,
         20.0,
         distribution=[{"domains": ["pan"], "spread_cycles": 0.5}],
-        dimmer={"physical": {"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0}},
+        dimmer={"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0},
     )
     return {"topology": topology}, step
 
@@ -912,7 +905,7 @@ def _compile_snapshot(holder: dict[str, Any], step: dict[str, Any]) -> dict[str,
     try:
         rig = topology_rig(_ids(3), topology=holder.get("topology"))
         segments = _compile(_template(step), rig)
-    except (ValidationError, PhysicalCompileError, PhysicalChannelError) as error:
+    except (ValidationError, CompileError, PhysicalChannelError) as error:
         return {"rejected": f"{type(error).__name__}: {error}"}
     return {"compiled": [segment.model_dump(mode="json") for segment in segments]}
 

@@ -90,7 +90,7 @@ class CombinedShowRenderStage:
                 )
                 for section in macro_plan.sections
             ]
-            sequence, moving_heads = self._render_physical(
+            sequence, moving_heads = self._render_moving_heads(
                 mh_plan,
                 macro_plan,
                 beat_grid,
@@ -127,7 +127,7 @@ class CombinedShowRenderStage:
         except Exception as error:
             return failure_result(str(error), stage_name=self.name)
 
-    def _render_physical(
+    def _render_moving_heads(
         self,
         mh_plan: ChoreographyPlan,
         macro_plan: MacroPlan,
@@ -140,14 +140,14 @@ class CombinedShowRenderStage:
         artist: str,
         timeline_tracks: list[TimingTrack],
     ) -> tuple[XSequence, dict[str, Any]]:
-        """Render the moving heads physically, resting them dark where the schedule does.
+        """Render the moving heads, resting them dark where the schedule does.
 
         Returns:
             The sequence holding the moving-head frame runs, and the stage output's
             moving-head entries: the plan as rendered, its planned segments, the render
             record, the frame runs and the render's checkpoint record.
         """
-        from twinklr.core.sequencer.moving_heads.delivery import build_physical_sequence
+        from twinklr.core.sequencer.moving_heads.delivery import build_sequence
         from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
         from twinklr.core.sequencer.moving_heads.pipeline import (
             RenderingPipeline,
@@ -177,7 +177,7 @@ class CombinedShowRenderStage:
         )
         segments = pipeline.render()
         assert pipeline.render_record is not None  # set by every render
-        sequence = build_physical_sequence(
+        sequence = build_sequence(
             pipeline.requests,
             markers,
             media_file=media_file,

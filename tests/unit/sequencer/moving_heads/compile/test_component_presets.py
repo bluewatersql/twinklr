@@ -1,4 +1,4 @@
-"""Named rig components (P2.1): a physical step names position and attribute presets the
+"""Named rig components (P2.1): a step names position and attribute presets the
 fixture group declares, instead of hard-coding angles and profile state names.
 
 Resolution is per fixture, per axis and per channel: a value set on the (preset-patched)
@@ -19,16 +19,16 @@ from pydantic import ValidationError
 import pytest
 
 from tests.config_effects_registry import CONFIG_EFFECTS, ConfigDispositionKind
-from tests.support.mh_physical import (
-    physical_grid,
-    physical_job,
-    physical_preset_rig,
-    physical_rig,
-    physical_sections,
-    physical_template_doc,
+from tests.support.moving_heads import (
+    loop_template_doc,
+    p1_grid,
+    p1_job,
+    p1_rig,
     preset_library_payload,
+    preset_rig,
     referencing_step,
     registered_templates,
+    sections_plan,
 )
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.fixtures.presets import RigPresetLibrary
@@ -44,26 +44,26 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
 from twinklr.core.sequencer.models.template import Template, TemplatePreset, TemplateStep
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile.physical import (
-    PhysicalCompileError,
+from twinklr.core.sequencer.moving_heads.compile.step import (
+    CompileError,
 )
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
-    compile_physical_template,
+    compile_template,
 )
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
 from twinklr.core.sequencer.moving_heads.pipeline import (
     RenderingPipeline,
-    check_physical_templates,
-    physical_cue_limits,
+    admit_templates,
+    cue_limits,
 )
 from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map
 
-_GRID = physical_grid()
+_GRID = p1_grid()
 _PHASE_MAP = build_musical_phase_map(_GRID)
 
 
 def _template(*steps: dict[str, Any], template_id: str = "p21_probe") -> Template:
-    return physical_template_doc(template_id, steps).template
+    return loop_template_doc(template_id, steps).template
 
 
 def _compile(
@@ -73,7 +73,7 @@ def _compile(
     duration_bars: int = 2,
     preset: TemplatePreset | None = None,
 ) -> list[FixtureSegment]:
-    rig = rig or physical_preset_rig()
+    rig = rig or preset_rig()
     context = TemplateCompileContext(
         section_id="verse",
         template_id=template.template_id,
@@ -83,8 +83,8 @@ def _compile(
         duration_bars=duration_bars,
         presets=rig.presets,
     )
-    start_limit, end_limit = physical_cue_limits(_PHASE_MAP, int(_GRID.duration_ms))
-    return compile_physical_template(
+    start_limit, end_limit = cue_limits(_PHASE_MAP, int(_GRID.duration_ms))
+    return compile_template(
         template,
         context,
         preset,
@@ -173,18 +173,18 @@ def test_missing_fixture_preset_is_not_centered() -> None:
     is ever compiled at a centered default."""
     presets = preset_library_payload()
     presets["positions"]["front"].pop("fallback")
-    rig = physical_preset_rig(presets)
+    rig = preset_rig(presets)
 
-    with pytest.raises(PhysicalCompileError) as missing:
+    with pytest.raises(CompileError) as missing:
         _compile(_template(referencing_step()), rig)
     message = str(missing.value)
     for name in ("'p21_probe'", "'look'", "'front'", "'MH2'"):
         assert name in message, message
     assert missing.value.diagnostic.fixture_id == "MH2"
 
-    with pytest.raises(PhysicalCompileError, match=r"'p21_probe'.*'look'.*'nowhere'"):
+    with pytest.raises(CompileError, match=r"'p21_probe'.*'look'.*'nowhere'"):
         _compile(_template(referencing_step(position_id="nowhere")))
-    with pytest.raises(PhysicalCompileError, match=r"'p21_probe'.*'look'.*'nothing'.*'MH1'"):
+    with pytest.raises(CompileError, match=r"'p21_probe'.*'look'.*'nothing'.*'MH1'"):
         _compile(_template(referencing_step(attribute_preset_ids=("nothing",))))
 
 
@@ -196,15 +196,15 @@ def test_unset_axis_without_a_position_reference_is_refused() -> None:
 
     template = _template(referencing_step())
     template.steps[0] = template.steps[0].model_copy(update={"component_refs": None})
-    with pytest.raises(PhysicalCompileError, match=r"'look'.*'p21_probe'.*start_pan_deg"):
+    with pytest.raises(CompileError, match=r"'look'.*'p21_probe'.*start_pan_deg"):
         _compile(template)
 
 
 def test_step_axis_overrides_reference_only_for_that_axis() -> None:
     """Tilt and color set on the step win for that axis and channel alone; pan and the
     other channels still come from the references."""
-    step = referencing_step(physical_color="white")
-    step["movement"]["physical"]["start_tilt_deg"] = 45.0
+    step = referencing_step(color="white")
+    step["movement"]["start_tilt_deg"] = 45.0
     heads = _by_fixture(_compile(_template(step)))
 
     assert _pose(heads["MH1"]) == (-30.0, 45.0)
@@ -227,7 +227,7 @@ def test_template_preset_patch_counts_as_set_on_the_step() -> None:
     preset = TemplatePreset.model_validate(
         {
             "preset_id": "high",
-            "step_patches": {"look": {"movement": {"physical": {"start_tilt_deg": 44.0}}}},
+            "step_patches": {"look": {"movement": {"start_tilt_deg": 44.0}}},
         }
     )
     heads = _by_fixture(_compile(_template(referencing_step()), preset=preset))
@@ -243,14 +243,14 @@ def test_step_pulses_replace_referenced_shutter_and_dimmer() -> None:
     """A step's own dimmer or shutter pulse drives that channel; the preset's static
     level or state for it is not applied."""
     step = referencing_step(
-        physical_shutter={
+        shutter={
             "period_beats": 1.0,
             "duty_cycle": 0.5,
             "low_state": "closed",
             "high_state": "open",
         }
     )
-    step["dimmer"] = {"physical": {"period_beats": 1.0, "duty_cycle": 1.0, "low": 0.0, "high": 0.3}}
+    step["dimmer"] = {"period_beats": 1.0, "duty_cycle": 1.0, "low": 0.0, "high": 0.3}
     head = _by_fixture(_compile(_template(step)))["MH1"]
 
     dimmer = head.channels[ChannelName.DIMMER].physical
@@ -263,9 +263,7 @@ def test_step_pulses_replace_referenced_shutter_and_dimmer() -> None:
 
 def test_conflicting_attribute_presets_fail_instead_of_last_write_wins() -> None:
     """`wash` and `cool` both set MH1's color at the same level: refused, naming both."""
-    with pytest.raises(
-        PhysicalCompileError, match="'wash' and 'cool' both set color for fixture 'MH1'"
-    ):
+    with pytest.raises(CompileError, match="'wash' and 'cool' both set color for fixture 'MH1'"):
         _compile(_template(referencing_step(attribute_preset_ids=("wash", "cool"))))
 
 
@@ -275,16 +273,16 @@ def test_preset_poses_are_unwrapped_and_still_checked() -> None:
     presets = preset_library_payload()
     presets["positions"]["side"]["fixtures"]["MH1"]["pan_deg"] = 200.0
     heads = _by_fixture(
-        _compile(_template(referencing_step(position_id="side")), physical_preset_rig(presets))
+        _compile(_template(referencing_step(position_id="side")), preset_rig(presets))
     )
     assert _pose(heads["MH1"])[0] == 200.0
 
     presets["positions"]["side"]["fixtures"]["MH1"]["pan_deg"] = 300.0
     with pytest.raises(PhysicalChannelError, match="pan"):
-        _compile(_template(referencing_step(position_id="side")), physical_preset_rig(presets))
+        _compile(_template(referencing_step(position_id="side")), preset_rig(presets))
 
     sweep = referencing_step(position_id="side")
-    sweep["movement"]["physical"] = {
+    sweep["movement"] = {
         "shape": "linear",
         "mode": "finite",
         "pan_extent_deg": 100.0,
@@ -297,7 +295,7 @@ def test_preset_poses_are_unwrapped_and_still_checked() -> None:
 def test_attribute_preset_maps_one_name_to_each_profiles_state() -> None:
     """One preset name, `warm`, selects MH1's `red` and MH2's `rot`: each profile's own
     state name, so each head emits its own declared byte."""
-    payload = physical_rig().model_dump(mode="python")
+    payload = p1_rig().model_dump(mode="python")
     colors = payload["fixtures"][1]["config"]["physical_profile"]["discrete"]["color"]
     colors["states"]["rot"] = colors["states"].pop("red")
     presets = preset_library_payload()
@@ -369,7 +367,7 @@ def test_attribute_preset_is_validated_against_each_profile(
 ) -> None:
     presets = preset_library_payload()
     mutate(presets)
-    payload = physical_rig().model_dump(mode="python")
+    payload = p1_rig().model_dump(mode="python")
     payload["fixtures"][1]["config"]["physical_profile"]["axes"]["dimmer"]["allowed_max"] = 0.7
     payload["presets"] = presets
     with pytest.raises(ValidationError, match=match):
@@ -379,7 +377,7 @@ def test_attribute_preset_is_validated_against_each_profile(
 def test_attribute_preset_needs_a_profile_on_the_fixture() -> None:
     """`check_rig` itself refuses an attribute entry for a fixture with no profile."""
     library = RigPresetLibrary.model_validate(preset_library_payload())
-    profiles = {f.fixture_id: f.config.physical_profile for f in physical_rig().expand_fixtures()}
+    profiles = {f.fixture_id: f.config.physical_profile for f in p1_rig().expand_fixtures()}
     with pytest.raises(
         ValueError, match="'wash_all', fixture 'MH2': the fixture has no physical_profile"
     ):
@@ -387,7 +385,7 @@ def test_attribute_preset_needs_a_profile_on_the_fixture() -> None:
 
 
 def test_attribute_preset_needs_the_channel_on_the_profile() -> None:
-    payload = physical_rig().model_dump(mode="python")
+    payload = p1_rig().model_dump(mode="python")
     profile = payload["fixtures"][1]["config"]["physical_profile"]
     profile["discrete"].pop("gobo")
     payload["presets"] = preset_library_payload()
@@ -397,23 +395,23 @@ def test_attribute_preset_needs_the_channel_on_the_profile() -> None:
         FixtureGroup.model_validate(payload)
 
 
-# --- Legacy and identity --------------------------------------------------------------
+# --- Validity and identity ------------------------------------------------------------
 
 
-def test_component_refs_are_physical_data() -> None:
+def test_a_position_reference_alone_sets_a_valid_aim() -> None:
     """A step whose aim comes from a position reference alone is a valid step."""
     step = _template(referencing_step()).steps[0]
     assert step.component_refs is not None and step.component_refs.position_id == "front"
-    assert step.movement.physical.start_pan_deg is None
+    assert step.movement.start_pan_deg is None
 
 
 def test_empty_preset_library_is_left_out_of_the_group_dump() -> None:
-    rig = physical_rig()
+    rig = p1_rig()
     assert rig.presets == RigPresetLibrary()
     assert "presets" not in rig.model_dump(mode="json")
     assert FixtureGroup.model_validate(rig.model_dump(mode="json")) == rig
 
-    with_presets = physical_preset_rig()
+    with_presets = preset_rig()
     assert with_presets.model_dump(mode="json")["presets"] == RigPresetLibrary.model_validate(
         preset_library_payload()
     ).model_dump(mode="json")
@@ -423,14 +421,11 @@ def test_empty_preset_library_is_left_out_of_the_group_dump() -> None:
             "step_id": "aimed",
             "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 1}},
             "movement": {
-                "physical": {
-                    "shape": "hold",
-                    "mode": "periodic",
-                    "start_pan_deg": 0.0,
-                    "start_tilt_deg": 0.0,
-                }
+                "shape": "hold",
+                "mode": "periodic",
+                "start_pan_deg": 0.0,
+                "start_tilt_deg": 0.0,
             },
-            "dimmer": {},
         }
     )
     assert "component_refs" not in unreferencing.model_dump(mode="json")
@@ -453,7 +448,7 @@ def test_preset_change_only_changes_dependent_segments() -> None:
     presets["positions"]["front"]["fixtures"]["MH1"]["pan_deg"] = -35.0
 
     before = _compile(template)
-    after = _compile(template, physical_preset_rig(presets))
+    after = _compile(template, preset_rig(presets))
 
     assert len(before) == len(after) == 8
     changed = [
@@ -474,26 +469,26 @@ def test_preset_edit_changes_render_identity_but_not_planning_identity() -> None
     derives from the app and job configs alone (the job names its fixture file only by
     path), nor the rig the planner is shown (`expand_fixtures`, from which the planner's
     fixture count and groups come; it carries no group-level presets)."""
-    document = physical_template_doc("p21_probe", [referencing_step(start=0.5, duration=0.5)])
+    document = loop_template_doc("p21_probe", [referencing_step(start=0.5, duration=0.5)])
     presets = preset_library_payload()
     presets["positions"]["front"]["fixtures"]["MH1"]["pan_deg"] = -35.0
-    rigs = (physical_preset_rig(), physical_preset_rig(presets))
+    rigs = (preset_rig(), preset_rig(presets))
     with registered_templates(document):
         fingerprints = {
             RenderingPipeline(
-                choreography_plan=physical_sections(("p21_probe", 1, 2)),
+                choreography_plan=sections_plan(("p21_probe", 1, 2)),
                 beat_grid=_GRID,
                 fixture_group=rig,
-                job_config=physical_job(),
+                job_config=p1_job(),
             ).fingerprint()
             for rig in rigs
         }
     assert len(fingerprints) == 2
 
     assert JobConfig.model_fields["fixture_config_path"].annotation is str
-    assert "presets" not in json.dumps(physical_job().model_dump(mode="json"))
+    assert "presets" not in json.dumps(p1_job().model_dump(mode="json"))
     assert rigs[0].expand_fixtures() == rigs[1].expand_fixtures()
-    assert physical_rig().expand_fixtures() == rigs[0].expand_fixtures()
+    assert p1_rig().expand_fixtures() == rigs[0].expand_fixtures()
 
 
 # --- Gate and render ------------------------------------------------------------------
@@ -503,32 +498,32 @@ def test_gate_and_render_resolve_references_alike() -> None:
     """The gate dry-compiles with the rig's presets, so a reference this rig cannot
     resolve is refused before planning; on a rig that resolves it, the render's cues
     carry the same resolved values the gate compiled."""
-    document = physical_template_doc("p21_probe", [referencing_step(start=0.5, duration=0.5)])
+    document = loop_template_doc("p21_probe", [referencing_step(start=0.5, duration=0.5)])
     presets = preset_library_payload()
     presets["attributes"]["wash"].pop("fallback")
     with registered_templates(document):
         with pytest.raises(UnsupportedRenderModeError, match=r"'p21_probe'.*'look'.*'wash'.*'MH2'"):
-            check_physical_templates(
+            admit_templates(
                 ["p21_probe"],
                 beat_grid=_GRID,
-                fixture_group=physical_preset_rig(presets),
-                initial_states=physical_job().moving_heads.initial_states,
+                fixture_group=preset_rig(presets),
+                initial_states=p1_job().moving_heads.initial_states,
                 failure_mode="error",
             )
 
-        rig = physical_preset_rig()
-        check_physical_templates(
+        rig = preset_rig()
+        admit_templates(
             ["p21_probe"],
             beat_grid=_GRID,
             fixture_group=rig,
-            initial_states=physical_job().moving_heads.initial_states,
+            initial_states=p1_job().moving_heads.initial_states,
             failure_mode="error",
         )
         rendered = RenderingPipeline(
-            choreography_plan=physical_sections(("p21_probe", 1, 2)),
+            choreography_plan=sections_plan(("p21_probe", 1, 2)),
             beat_grid=_GRID,
             fixture_group=rig,
-            job_config=physical_job(),
+            job_config=p1_job(),
         ).render()
 
     cues = [s for s in rendered if "component_provenance" in s.metadata]
@@ -544,8 +539,8 @@ def test_gate_and_render_resolve_references_alike() -> None:
 Component = Literal["rejected", "compiled"]
 
 _COMPONENT_NOTES: dict[Component, str] = {
-    "rejected": "exact path's alternative is rejected by physical validation or compile",
-    "compiled": "exact path changes the physical compile result",
+    "rejected": "exact path's alternative is rejected by validation or compile",
+    "compiled": "exact path changes the compile result",
 }
 
 Mutation = Callable[[dict[str, Any], dict[str, Any]], Any]
@@ -624,9 +619,9 @@ COMPONENT_PRESET_PATHS = tuple(
 
 def _compile_snapshot(presets: dict[str, Any], step: dict[str, Any]) -> dict[str, Any]:
     try:
-        rig = physical_preset_rig(presets)
+        rig = preset_rig(presets)
         segments = _compile(_template(step), rig, duration_bars=1)
-    except (ValidationError, PhysicalCompileError, PhysicalChannelError) as error:
+    except (ValidationError, CompileError, PhysicalChannelError) as error:
         return {"rejected": f"{type(error).__name__}: {error}"}
     return {"compiled": [segment.model_dump(mode="json") for segment in segments]}
 

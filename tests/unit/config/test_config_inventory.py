@@ -16,15 +16,16 @@ from tests.config_effects_registry import (
     PROTECTED_EXACT_EFFECT_PATHS,
     ConfigDispositionKind,
 )
-from tests.support.mh_physical import hold_step, physical_template_doc
+from tests.support.moving_heads import hold_step, loop_template_doc
 from twinklr.core.audio.energy.profiling import _get_profile_parameters
 from twinklr.core.audio.structure.models import SectioningPreset
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.sequencer.models.enum import QuantizeMode, TimingMode
 from twinklr.core.sequencer.models.template import (
+    RENAMED_STEP_FIELDS,
     BaseTiming,
-    Dimmer,
+    DimmerPulse,
     Movement,
     RepeatContract,
     StepPatch,
@@ -118,9 +119,6 @@ REMOVED_CONFIG_PATHS = (
     "fixture.xlights_semantic_groups",
     "template.template.defaults",
     "template.template.steps.geometry",
-    "template.template.steps.color",
-    "template.template.steps.shutter",
-    "template.template.steps.gobo",
     "template.template.steps.timing.phase_offset",
     "template.template.steps.movement.movement_type",
     "template.template.steps.movement.intensity",
@@ -137,6 +135,12 @@ REMOVED_CONFIG_PATHS = (
     "template.presets.step_patches.color",
     "template.presets.step_patches.shutter",
     "template.presets.step_patches.gobo",
+    # Renamed in C1.4 when the moving-head renderer became the only one; each old key is
+    # refused by name with its new key.
+    *(f"template.template.steps.{key}" for key in RENAMED_STEP_FIELDS),
+    "template.template.steps.movement.physical",
+    "template.template.steps.dimmer.physical",
+    "template.template.physical_overlays",
 )
 
 
@@ -365,7 +369,116 @@ def test_a_step_patch_naming_a_removed_field_is_refused_when_the_document_loads(
 ) -> None:
     """A preset's step patch is refused when its document loads (as `--template-dir`
     and `template-validate` load it), naming the preset and the step."""
-    document = physical_template_doc("patched", [hold_step("reveal", 0.0)]).model_dump(mode="json")
+    document = loop_template_doc("patched", [hold_step("reveal", 0.0)]).model_dump(mode="json")
+    document["presets"] = [{"preset_id": "SNAPPY", "step_patches": {"reveal": patch}}]
+    path = tmp_path / "patched.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(
+        TemplateDataError, match=rf"preset 'SNAPPY', step patch 'reveal': {message}"
+    ):
+        load_template_document(path)
+
+
+_FLAT_STEP = hold_step("reveal", 0.0)
+
+
+@pytest.mark.parametrize(
+    ("step", "message"),
+    (
+        *(
+            (
+                {**_FLAT_STEP, old: _FLAT_STEP.get(new, "open")},
+                rf"template-step fields were renamed: '{old}' is now '{new}'",
+            )
+            for old, new in RENAMED_STEP_FIELDS.items()
+        ),
+        (
+            {**_FLAT_STEP, "movement": {"physical": _FLAT_STEP["movement"]}},
+            r"movement field 'physical' was flattened into movement",
+        ),
+        (
+            {**_FLAT_STEP, "dimmer": {"physical": _FLAT_STEP["dimmer"]}},
+            r"dimmer field 'physical' was flattened into dimmer",
+        ),
+        (
+            {**_FLAT_STEP, "dimmer": {"physical": None}},
+            r"dimmer field 'physical' was flattened into dimmer, and a null pulse is no "
+            r"pulse: leave dimmer out",
+        ),
+        (
+            {**_FLAT_STEP, "dimmer": {}},
+            r"an empty dimmer object no longer means no pulse: leave dimmer out instead",
+        ),
+    ),
+)
+def test_a_renamed_template_key_is_refused_by_name_when_the_document_loads(
+    tmp_path: Path, step: dict[str, object], message: str
+) -> None:
+    """A document written with a key C1.4 renamed (as `--template-dir` loads it) is
+    refused, naming the old key and the one that replaced it."""
+    document = loop_template_doc("renamed", [_FLAT_STEP]).model_dump(mode="json")
+    document["template"]["steps"] = [step]
+    path = tmp_path / "renamed.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(TemplateDataError, match=message):
+        load_template_document(path)
+
+
+@pytest.mark.parametrize("key", ["color", "shutter", "gobo"])
+def test_an_old_renderer_wheel_object_on_a_reused_key_is_refused(key: str) -> None:
+    """C1.4 reuses `color`, `shutter` and `gobo` for the flattened step keys, so the old
+    renderer's objects under them are refused by the new keys' shape, not by name."""
+    with pytest.raises(ValidationError, match=key):
+        TemplateStep.model_validate({**_FLAT_STEP, key: {"pattern": "prism"}})
+
+
+@pytest.mark.parametrize("key", ["color", "shutter", "gobo"])
+def test_a_step_patch_naming_a_step_wheel_key_is_told_to_set_it_on_the_step(key: str) -> None:
+    """`color`, `shutter` and `gobo` are step keys; a step patch sets only movement,
+    dimmer or timing."""
+    with pytest.raises(
+        ValidationError,
+        match=rf"a step patch sets only movement, dimmer or timing; set \['{key}'\] on the step",
+    ):
+        StepPatch.model_validate({key: {}})
+
+
+def test_renamed_overlays_are_refused_by_name_when_the_document_loads(tmp_path: Path) -> None:
+    document = loop_template_doc("renamed", [_FLAT_STEP]).model_dump(mode="json")
+    document["template"]["physical_overlays"] = []
+    path = tmp_path / "renamed.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(
+        TemplateDataError, match=r"template field 'physical_overlays' was renamed: it is now"
+    ):
+        load_template_document(path)
+
+
+@pytest.mark.parametrize(
+    ("patch", "message"),
+    (
+        (
+            {"movement": {"physical": {"pan_extent_deg": 10.0}}},
+            r"movement field 'physical' was flattened into movement",
+        ),
+        (
+            {"dimmer": {"physical": {"duty_cycle": 0.5}}},
+            r"dimmer field 'physical' was flattened into dimmer",
+        ),
+        (
+            {"dimmer": {"physical": None}},
+            r"dimmer field 'physical' was flattened into dimmer, and a null pulse is no "
+            r"pulse: leave dimmer out",
+        ),
+    ),
+)
+def test_a_step_patch_naming_a_flattened_key_is_refused_when_the_document_loads(
+    tmp_path: Path, patch: dict[str, object], message: str
+) -> None:
+    document = loop_template_doc("patched", [_FLAT_STEP]).model_dump(mode="json")
     document["presets"] = [{"preset_id": "SNAPPY", "step_patches": {"reveal": patch}}]
     path = tmp_path / "patched.json"
     path.write_text(json.dumps(document), encoding="utf-8")
@@ -404,9 +517,10 @@ def test_retired_channel_config_wrapper_loads_with_a_warning(
         (Movement, {"amplitude_override": 0.5}, "amplitude_override"),
         (TemplateDoc, {"template": {"roles": ["OUTER_LEFT"]}}, "roles"),
         (RepeatContract, {"repeatable": False}, "repeatable"),
-        (Dimmer, {"cycles": 2.0}, "cycles"),
-        # Removed in C1.3 with the old moving-head renderer, their only reader.
-        *((TemplateStep, {key: {}}, key) for key in ("geometry", "color", "shutter", "gobo")),
+        (DimmerPulse, {"cycles": 2.0}, "cycles"),
+        # Removed in C1.3 with the old moving-head renderer, their only reader. Its
+        # `color`, `shutter` and `gobo` step keys are the flattened keys since C1.4.
+        (TemplateStep, {"geometry": {}}, "geometry"),
         (StepTiming, {"phase_offset": {}}, "phase_offset"),
         *(
             (Movement, {key: value}, key)
@@ -418,7 +532,7 @@ def test_retired_channel_config_wrapper_loads_with_a_warning(
             )
         ),
         *(
-            (Dimmer, {key: value}, key)
+            (DimmerPulse, {key: value}, key)
             for key, value in (
                 ("dimmer_type", "PULSE"),
                 ("intensity", "SMOOTH"),
@@ -430,7 +544,7 @@ def test_retired_channel_config_wrapper_loads_with_a_warning(
         (Template, {"defaults": {}}, "defaults"),
         (TemplatePreset, {"preset_id": "p", "name": "P"}, "name"),
         (TemplatePreset, {"preset_id": "p", "defaults": {}}, "defaults"),
-        *((StepPatch, {key: {}}, key) for key in ("geometry", "color", "shutter", "gobo")),
+        (StepPatch, {"geometry": {}}, "geometry"),
     ),
 )
 def test_retired_template_config_fails_loudly_with_migration_message(

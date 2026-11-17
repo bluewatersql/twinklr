@@ -28,10 +28,10 @@ Twinklr currently supports:
   physical data onto fixtures that declare a `physical_profile`: complete 20 ms frames
   as constant DMX effects over model-relative channels 1-48 (the xLights DMX effect's
   limit), 16-bit pan/tilt as coarse/fine byte pairs, and dark repositioning planned
-  between cues. Every run loads seven physical families from
-  `catalog/templates/moving_heads_physical` (one of them, `zoom_wave`, a synthetic
+  between cues. Every run loads seven families from
+  `catalog/templates/moving_heads` (one of them, `zoom_wave`, a synthetic
   pilot of a zoom axis) and offers the planner those the rig can render. Planner intent is not applied on that path. See
-  `packages/twinklr/core/sequencer/moving_heads/compile/physical.py` and
+  `packages/twinklr/core/sequencer/moving_heads/compile/step.py` and
   `packages/twinklr/core/sequencer/moving_heads/compile/preposition.py`.
 - **Display sequencer** — RGB/pixel effects for outline, tree, and other display elements (`packages/twinklr/core/sequencer/display/`).
 - **Feature engineering pipeline** — audio profiling, feature extraction, and feature store for offline analysis (`packages/twinklr/core/feature_engineering/`, `packages/twinklr/core/feature_store/`).
@@ -152,7 +152,7 @@ The validating registry loads the data-form `TemplateDoc` JSON family catalog an
 
 _Source: `packages/twinklr/core/sequencer/`_
 
-- **Moving heads** (`sequencer/moving_heads/`) — physical template compiler, pre-planning gate, dark repositioning, frame encoder, XSQ export.
+- **Moving heads** (`sequencer/moving_heads/`) — template compiler, pre-planning gate, dark repositioning, frame encoder, XSQ export.
 - **Display** (`sequencer/display/`) — 24 effect handlers for RGB/pixel elements, composition engine.
 - **Curves** (`packages/twinklr/core/curves/`) — curve generation library (native + custom easing functions) used for smooth DMX value transitions.
 - **XSQ format** (`packages/twinklr/core/formats/xlights/`) — native xLights `.xsq` file reader/writer with custom value curve support.

@@ -829,7 +829,7 @@ def _call_response_macro(response: str) -> MacroPlan:
 def test_moving_head_dark_spans_are_where_the_schedule_rests_them(
     macro: MacroPlan, expected: tuple[tuple[int, int], ...]
 ) -> None:
-    """The physical show's yield windows: the time of each section that no window
+    """The show's yield windows: the time of each section that no window
     activates the moving heads in, merged and in time order."""
     spans = moving_head_dark_spans(
         macro, _grid(), _graph(), moving_head_target_ids={"MOVING_HEADS"}

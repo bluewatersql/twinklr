@@ -78,7 +78,7 @@ class DeliveryArtifacts:
         return (self.xsq_path, *self.xtiming_paths, self.xmap_path, self.trace_path)
 
 
-def build_physical_sequence(
+def build_sequence(
     requests: Sequence[EmissionRequest],
     time_markers: list[TimeMarker],
     *,
@@ -88,7 +88,7 @@ def build_physical_sequence(
     artist: str = "",
     timeline_tracks: list[TimingTrack] | None = None,
 ) -> XSequence:
-    """Build the fresh sequence for physical frame-run requests, in request order.
+    """Build the fresh sequence for frame-run requests, in request order.
 
     The sequence keeps the song's duration; the last frame run may end past it, on the
     next frame boundary.
@@ -111,7 +111,7 @@ def build_physical_sequence(
     return xsq
 
 
-def export_physical_delivery(
+def export_delivery(
     xsq: XSequence,
     runs: Sequence[FrameRun],
     *,
@@ -119,7 +119,7 @@ def export_physical_delivery(
     policy: MHRenderPolicy,
     render: Mapping[str, Any],
 ) -> DeliveryArtifacts:
-    """Write a physical render's delivery only after its serialized size fits the budgets.
+    """Write a render's delivery only after its serialized size fits the budgets.
 
     Every file is written to a staging directory beside `output_path` first. The
     `.xsq` is serialized, measured (effect count and exact bytes) and checked against
@@ -130,7 +130,7 @@ def export_physical_delivery(
     output and serialization time.
 
     Raises:
-        PhysicalOutputError: If the output exceeds `policy.max_effects` or
+        OutputError: If the output exceeds `policy.max_effects` or
             `policy.max_xsq_bytes`.
         DeliveryRollbackError: If publishing failed and an earlier file could not be
             put back; the staging directory is then kept and named.

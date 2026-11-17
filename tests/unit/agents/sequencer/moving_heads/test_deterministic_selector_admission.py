@@ -9,7 +9,7 @@ import random
 
 import pytest
 
-from tests.support.mh_physical import CATALOG_IDS, physical_catalog
+from tests.support.moving_heads import CATALOG_IDS, family_catalog
 from twinklr.core.agents.sequencer.moving_heads.deterministic_selector import (
     AdmittedTemplate,
     ConstraintRelaxation,
@@ -30,7 +30,7 @@ the orbit too in 3/4 (inventory F7)."""
 
 @pytest.fixture(autouse=True)
 def _catalog() -> Iterator[None]:
-    with physical_catalog():
+    with family_catalog():
         yield
 
 
@@ -234,9 +234,9 @@ def test_a_family_yields_the_palette_role_intent_and_no_step_derived_events(
     template_id: str,
 ) -> None:
     """The step colour, shutter and gobo derivation has nothing to read on a family
-    (physical steps carry none of those fields), so a family's section always gets the
+    (family steps carry none of those fields), so a family's section always gets the
     role's palette colour and no events: removing that derivation with the old
-    templates (C1.2) cannot change a physical plan."""
+    templates (C1.2) cannot change a plan."""
     metadata = REGISTRY.get(template_id).template.metadata
     assert metadata is not None and metadata.energy_range is not None
     section = _section(metadata.recommended_sections[0], metadata.energy_range[0], 1)

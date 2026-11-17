@@ -3,7 +3,7 @@
 A profile may declare a `zoom` axis, a beam angle in degrees, mapped over a DMX subrange
 (`dmx_min`/`dmx_max`): `dmx_min + round-half-up(normalized * (dmx_max - dmx_min))`, with
 inversion reflecting the word about `dmx_min + dmx_max`. At the default subrange every
-existing word and profile dump is unchanged. A step's `physical_zoom` holds or waves the
+existing word and profile dump is unchanged. A step's `zoom` holds or waves the
 beam angle on the step's movement phase; between cues the transaction pass holds the zoom,
 moves it only in the dark and lets it settle before a reveal. A rig without a zoom axis
 refuses a zoom step unless the step declares `omit_optional_zoom`, which the trace
@@ -26,24 +26,24 @@ from pydantic import ValidationError
 import pytest
 
 from tests.config_effects_registry import CONFIG_EFFECTS, ConfigDispositionKind
-from tests.support.mh_physical import (
-    PHYSICAL_INITIAL_STATE,
+from tests.support.moving_heads import (
+    INITIAL_STATE,
     ZOOM_FAMILY_ID,
     ZOOM_INITIAL_STATE,
     assert_honest_transactions,
+    bars_grid,
+    family_catalog,
     family_job,
     family_rig,
+    fixture_segment,
     hold_step,
-    physical_bars_grid,
-    physical_catalog,
+    loop_template_doc,
+    p1_job,
+    p1_rig,
     physical_head_profile,
-    physical_job,
-    physical_rig,
-    physical_sections,
-    physical_segment,
-    physical_template_doc,
     profile_payload,
     registered_templates,
+    sections_plan,
     sine_step,
     zoom_job,
     zoom_pilot_profile_payload,
@@ -65,7 +65,6 @@ from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixt
 from twinklr.core.sequencer.models.moving_heads.topology import rig_topology
 from twinklr.core.sequencer.models.template import Template, TemplateDoc, TemplateStep
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile.physical import PhysicalCompileError
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     FALLBACK_METADATA_KEY,
     TRANSACTION_METADATA_KEY,
@@ -73,8 +72,9 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
     plan_prepositions,
     worst_case_entry_ms,
 )
+from twinklr.core.sequencer.moving_heads.compile.step import CompileError
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
-    compile_physical_template,
+    compile_template,
 )
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     encode_fixture_frames,
@@ -83,8 +83,8 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
 from twinklr.core.sequencer.moving_heads.pipeline import (
     RenderingPipeline,
-    check_physical_templates,
-    physical_cue_limits,
+    admit_templates,
+    cue_limits,
 )
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map
@@ -219,8 +219,8 @@ def test_default_subrange_leaves_words_and_profile_dumps_unchanged() -> None:
         "profile": FixtureCapabilities(**profile_payload()).model_dump_json(),
         "head": FixtureCapabilities(**payloads[0]).model_dump_json(),
         "head_inverted": FixtureCapabilities(**payloads[1]).model_dump_json(),
-        "rig": physical_rig().model_dump_json(),
-        "initial": InitialFixtureState(**PHYSICAL_INITIAL_STATE).model_dump_json(),
+        "rig": p1_rig().model_dump_json(),
+        "initial": InitialFixtureState(**INITIAL_STATE).model_dump_json(),
     }
     assert {name: _sha256(dump) for name, dump in dumps.items()} == _DUMP_SHA256
     assert "dmx_min" not in dumps["head"] and "dmx_max" not in dumps["head"]
@@ -258,7 +258,7 @@ def test_a_zoomless_profile_refuses_a_zoom_value() -> None:
 def test_initial_zoom_is_required_on_a_zoom_axis_and_refused_without_one() -> None:
     zoom = FixtureCapabilities(**zoom_pilot_profile_payload())
     zoomless = FixtureCapabilities(**physical_head_profile(inverted=False))
-    without = InitialFixtureState(**PHYSICAL_INITIAL_STATE)
+    without = InitialFixtureState(**INITIAL_STATE)
     with_zoom = InitialFixtureState(**ZOOM_INITIAL_STATE)
 
     assert zoom.check_initial_state(with_zoom) == ()
@@ -275,7 +275,7 @@ def test_initial_zoom_is_required_on_a_zoom_axis_and_refused_without_one() -> No
 
 
 def _grid(bars: int = 4) -> BeatGrid:
-    return physical_bars_grid(*([500.0] * (bars + 1)))
+    return bars_grid(*([500.0] * (bars + 1)))
 
 
 def _compile(
@@ -283,7 +283,7 @@ def _compile(
 ) -> list[FixtureSegment]:
     grid = grid or _grid()
     phase_map = build_musical_phase_map(grid)
-    start, end = physical_cue_limits(phase_map, int(grid.duration_ms))
+    start, end = cue_limits(phase_map, int(grid.duration_ms))
     context = TemplateCompileContext(
         section_id="verse",
         template_id=template.template_id,
@@ -295,7 +295,7 @@ def _compile(
         topology=rig_topology(rig),
         fixture_group_id=rig.group_id,
     )
-    return compile_physical_template(
+    return compile_template(
         template, context, phase_map=phase_map, start_limit_ms=start, end_limit_ms=end
     ).segments
 
@@ -305,12 +305,12 @@ def _zoom_step(
 ) -> dict[str, Any]:
     """`sine_step` (pan ±20° over 4 beats) whose zoom waves on the movement phase."""
     step = sine_step("wave", 0.0, 20.0)
-    step["physical_zoom"] = {"shape": shape, "start_deg": start, "extent_deg": extent, **zoom}
+    step["zoom"] = {"shape": shape, "start_deg": start, "extent_deg": extent, **zoom}
     return step
 
 
 def _doc(step: dict[str, Any], template_id: str = "p25_zoom") -> TemplateDoc:
-    return physical_template_doc(template_id, [step])
+    return loop_template_doc(template_id, [step])
 
 
 def _zoom_values(segment: FixtureSegment) -> list[tuple[int, float]]:
@@ -339,7 +339,7 @@ def test_zoom_waves_on_the_movement_phase() -> None:
 def test_zoom_follows_the_heads_pan_distribution_offset() -> None:
     """Under a pan/tilt distribution a lagging head's zoom lags with its path."""
     step = _zoom_step()
-    step["physical_distribution"] = [{"domains": ["pan", "tilt"], "spread_cycles": 0.25}]
+    step["distribution"] = [{"domains": ["pan", "tilt"], "spread_cycles": 0.25}]
     segments = _compile(_doc(step).template, zoom_rig(["MH1", "MH2"]))
     first = {s.fixture_id: _zoom_values(s) for s in segments}
     assert first["MH1"][0][1] == pytest.approx(25.0)  # slot 0 leads at phase 0
@@ -393,11 +393,9 @@ def test_a_step_without_zoom_holds_the_default_byte_on_a_zoom_rig() -> None:
 def test_zoom_step_on_a_zoomless_rig_is_refused_unless_omit_optional_zoom() -> None:
     """Phase 1's rule stands: a missing capability fails. `omit_optional_zoom` is the
     one declared alternative: the step compiles without zoom and says so per cue."""
-    with pytest.raises(PhysicalCompileError, match="zoom"):
-        _compile(_doc(_zoom_step()).template, physical_rig())
-    segments = _compile(
-        _doc(_zoom_step(if_unsupported="omit_optional_zoom")).template, physical_rig()
-    )
+    with pytest.raises(CompileError, match="zoom"):
+        _compile(_doc(_zoom_step()).template, p1_rig())
+    segments = _compile(_doc(_zoom_step(if_unsupported="omit_optional_zoom")).template, p1_rig())
     assert segments
     for segment in segments:
         assert ChannelName.ZOOM not in segment.channels
@@ -419,10 +417,10 @@ def test_omitted_zoom_is_recorded_in_the_render_trace() -> None:
         records = {}
         for template_id in ("p25_optional", "p25_plain"):
             pipeline = RenderingPipeline(
-                choreography_plan=physical_sections((template_id, 1, 2)),
+                choreography_plan=sections_plan((template_id, 1, 2)),
                 beat_grid=_grid(),
-                fixture_group=physical_rig(),
-                job_config=physical_job(),
+                fixture_group=p1_rig(),
+                job_config=p1_job(),
             )
             pipeline.render()
             assert pipeline.render_record is not None
@@ -443,7 +441,7 @@ def test_omitted_zoom_is_recorded_in_the_render_trace() -> None:
         pytest.param(_zoom_step(shape="hold"), "hold takes no extent_deg", id="hold-extent"),
         pytest.param(_zoom_step(extent=0.0), "sine needs a nonzero extent_deg", id="flat-sine"),
         pytest.param(
-            {**hold_step("still", 0.0), "physical_zoom": _zoom_step()["physical_zoom"]},
+            {**hold_step("still", 0.0), "zoom": _zoom_step()["zoom"]},
             "periodic movement",
             id="sine-on-hold",
         ),
@@ -455,7 +453,7 @@ def test_invalid_zoom_spec_is_rejected(step: dict[str, Any], match: str) -> None
 
 
 def test_zoom_spec_is_left_out_of_dumps_when_absent() -> None:
-    assert "physical_zoom" not in TemplateStep.model_validate(hold_step("s", 0.0)).model_dump()
+    assert "zoom" not in TemplateStep.model_validate(hold_step("s", 0.0)).model_dump()
 
 
 # --- Transactions ----------------------------------------------------------------------
@@ -473,7 +471,7 @@ def _line(unit: str, value: float, t0: int, t1: int) -> ContinuousTrajectory:
 
 def _cue(name: str, t0: int, t1: int, zoom: float) -> FixtureSegment:
     state = DiscreteTrajectory.model_validate({"events": [{"t_ms": t0, "state": "open"}]})
-    return physical_segment(
+    return fixture_segment(
         {
             ChannelName.PAN: _line("degree", 0.0, t0, t1),
             ChannelName.TILT: _line("degree", 0.0, t0, t1),
@@ -568,7 +566,7 @@ def test_gate_treats_a_missing_initial_zoom_as_an_unknown_initial_state() -> Non
     """On a zoom rig a run whose initial states give no `zoom_deg` is refused through the
     unknown-initial-state path, naming it, never with a raw error."""
     with (
-        physical_catalog(),
+        family_catalog(),
         pytest.raises(UnsupportedRenderModeError, match="no initial zoom"),
     ):
         _gate(["target_orbit"], zoom_rig(HEADS), family_job(HEADS))
@@ -601,7 +599,7 @@ def test_the_oracle_catches_a_zoom_left_to_its_default_between_cues() -> None:
 
 
 def _gate(template_ids: list[str], rig: FixtureGroup, job: JobConfig) -> Any:
-    return check_physical_templates(
+    return admit_templates(
         template_ids,
         beat_grid=_grid(6),
         fixture_group=rig,
@@ -615,7 +613,7 @@ def _gate(template_ids: list[str], rig: FixtureGroup, job: JobConfig) -> Any:
 def test_zoom_wave_is_left_out_on_a_zoomless_rig_and_offered_on_a_zoom_rig() -> None:
     """Admission is P2.4c's: the dry compile's capability failure excludes the family on
     a rig without a zoom axis, naming it, while the rig keeps the others."""
-    with physical_catalog():
+    with family_catalog():
         zoomless = _gate([ZOOM_FAMILY_ID, "target_orbit"], family_rig(HEADS), family_job(HEADS))
         zoomed = _gate([ZOOM_FAMILY_ID, "target_orbit"], zoom_rig(HEADS), zoom_job(HEADS))
 
@@ -630,8 +628,8 @@ def _render(
     sections: list[tuple[str, int, int]], rig: FixtureGroup, job: JobConfig
 ) -> tuple[RenderingPipeline, list[FixtureSegment]]:
     pipeline = RenderingPipeline(
-        choreography_plan=physical_sections(*sections),
-        beat_grid=physical_bars_grid(500.0, 500.0, 430.0, 430.0, 500.0, 500.0, 500.0),
+        choreography_plan=sections_plan(*sections),
+        beat_grid=bars_grid(500.0, 500.0, 430.0, 430.0, 500.0, 500.0, 500.0),
         fixture_group=rig,
         job_config=job,
     )
@@ -653,7 +651,7 @@ def test_zoom_wave_renders_honestly_repeatably_and_without_a_head() -> None:
     sections = [(ZOOM_FAMILY_ID, 1, 2), ("target_orbit", 3, 4), (ZOOM_FAMILY_ID, 5, 6)]
     rig, job = zoom_rig(HEADS), zoom_job(HEADS)
     present = tuple(h for h in HEADS if h != "MH2")
-    with physical_catalog():
+    with family_catalog():
         pipeline, segments = _render(sections, rig, job)
         again, _ = _render(sections, rig, job)
         subset, _ = _render(sections, _without(rig, "MH2"), zoom_job(present))
@@ -701,19 +699,19 @@ def _frames(pipeline: RenderingPipeline, fixture_id: str) -> list[dict[int, int]
 
 # --- Registry evidence -----------------------------------------------------------------
 
-_STEP = "template.template.steps.physical_zoom"
+_STEP = "template.template.steps.zoom"
 _COMPONENT_NOTES = {
-    "compiled": "exact path changes the physical compile result",
-    "rejected": "exact path's alternative is rejected by physical validation or compile",
+    "compiled": "exact path changes the compile result",
+    "rejected": "exact path's alternative is rejected by validation or compile",
 }
 
 
 def _zoom_spec(change: Callable[[dict[str, Any]], Any]) -> Callable[[dict[str, Any]], Any]:
-    return lambda doc: change(doc["template"]["steps"][0]["physical_zoom"])
+    return lambda doc: change(doc["template"]["steps"][0]["zoom"])
 
 
 _MUTATIONS: dict[str, tuple[str, Callable[[dict[str, Any]], Any]]] = {
-    _STEP: ("compiled", lambda doc: doc["template"]["steps"][0].pop("physical_zoom")),
+    _STEP: ("compiled", lambda doc: doc["template"]["steps"][0].pop("zoom")),
     f"{_STEP}.shape": ("rejected", _zoom_spec(lambda z: z.update(shape="hold"))),
     f"{_STEP}.start_deg": ("compiled", _zoom_spec(lambda z: z.update(start_deg=20.0))),
     f"{_STEP}.extent_deg": ("compiled", _zoom_spec(lambda z: z.update(extent_deg=5.0))),
@@ -739,9 +737,9 @@ def _evidence_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
     try:
         template = TemplateDoc.model_validate(payload).template
         compiled = [
-            _compile(template, rig) for rig in (zoom_rig(["MH1"], topology=False), physical_rig())
+            _compile(template, rig) for rig in (zoom_rig(["MH1"], topology=False), p1_rig())
         ]
-    except (ValidationError, PhysicalCompileError, PhysicalChannelError) as error:
+    except (ValidationError, CompileError, PhysicalChannelError) as error:
         return {"rejected": f"{type(error).__name__}: {error}"}
     return {"compiled": [[s.model_dump(mode="json") for s in segments] for segments in compiled]}
 
@@ -769,7 +767,7 @@ def test_zoom_field_changes_compile(config_path: str) -> None:
 
 def test_zoom_wave_presets_only_slow_or_narrow_it() -> None:
     """The family's variants ask for less reach or rate than its base, never more."""
-    with physical_catalog():
+    with family_catalog():
         segments = {preset: _compile_family(preset) for preset in (None, "narrow", "slow")}
 
     def peak(preset: str | None, channel: ChannelName) -> float:

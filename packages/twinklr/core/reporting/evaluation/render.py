@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 from twinklr.core.reporting.evaluation.models import (
     EvaluationReport,
-    PhysicalRenderSummary,
+    RenderSummary,
     SectionReport,
 )
 
@@ -118,7 +118,7 @@ def write_report_markdown(report: EvaluationReport, output_path: Path) -> None:
 
     lines.append("")
 
-    lines.extend(_render_physical_markdown(report.physical))
+    lines.extend(_render_summary_markdown(report.render))
 
     # Song metadata
     lines.append("## Song Metadata")
@@ -145,37 +145,37 @@ def write_report_markdown(report: EvaluationReport, output_path: Path) -> None:
     logger.debug(f"Wrote report Markdown: {output_path}")
 
 
-def _render_physical_markdown(physical: PhysicalRenderSummary) -> list[str]:
-    """The physical render block: identity and the gate's facts."""
-    lines = ["## Physical render", ""]
-    if physical.fingerprint_matches:
-        lines.append(f"- **Render fingerprint**: `{physical.rerender_fingerprint}` (the run's) ✓")
+def _render_summary_markdown(summary: RenderSummary) -> list[str]:
+    """The render block: identity and the gate's facts."""
+    lines = ["## Render", ""]
+    if summary.fingerprint_matches:
+        lines.append(f"- **Render fingerprint**: `{summary.rerender_fingerprint}` (the run's) ✓")
     else:
         lines.append(
-            f"- **Render fingerprint**: ❌ the re-render's `{physical.rerender_fingerprint}` "
-            f"does not match the run's `{physical.run_fingerprint}`; the metrics describe the "
+            f"- **Render fingerprint**: ❌ the re-render's `{summary.rerender_fingerprint}` "
+            f"does not match the run's `{summary.run_fingerprint}`; the metrics describe the "
             "re-render, not the delivered sequence"
         )
-        for input_name in physical.mismatched_inputs:
+        for input_name in summary.mismatched_inputs:
             lines.append(f"  - differs: {input_name}")
-    if physical.dark_spans:
+    if summary.dark_spans:
         lines.append(
-            f"- **Dark spans**: {len(physical.dark_spans)}, {physical.dark_span_ms} ms in all: "
+            f"- **Dark spans**: {len(summary.dark_spans)}, {summary.dark_span_ms} ms in all: "
             "the show's coordination rests the heads there while another target plays; "
             "they keep moving on their authored paths, commanded dark, so `lit` figures "
             "leave those frames out and the others count them"
         )
-    for exclusion in physical.admission_exclusions:
+    for exclusion in summary.admission_exclusions:
         lines.append(f"- **Not offered**: `{exclusion['template_id']}`: {exclusion['reason']}")
-    for exclusion in physical.admission_preset_exclusions:
+    for exclusion in summary.admission_preset_exclusions:
         variant = exclusion["preset_id"] or "base"
         lines.append(
             f"- **Variant not admitted**: `{exclusion['template_id']}` {variant}: "
             f"{exclusion['reason']}"
         )
-    for template_id, preset_id in physical.admission_effective_presets.items():
+    for template_id, preset_id in summary.admission_effective_presets.items():
         lines.append(f"- **Effective variant**: `{template_id}` plays preset `{preset_id}`")
-    for code, total in physical.unplayable_totals.items():
+    for code, total in summary.unplayable_totals.items():
         lines.append(
             f"- **Kept dark as unplayable** ({code}): {total['cues']} cue(s), "
             f"{total['frames']} frame(s)"

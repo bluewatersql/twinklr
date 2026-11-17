@@ -1,4 +1,4 @@
-"""Render-wide dark spans (C1.1a): spans in which every head of a physical render is held
+"""Render-wide dark spans (C1.1a): spans in which every head of a render is held
 dark, as the combined show's coordination windows rest the moving heads.
 
 A span darkens the cues it covers before section entry and repositioning are planned:
@@ -16,15 +16,15 @@ from typing import Any
 
 import pytest
 
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
     assert_honest_transactions,
+    bars_grid,
     hold_step,
-    physical_bars_grid,
-    physical_job,
-    physical_rig,
-    physical_sections,
-    physical_template_doc,
+    loop_template_doc,
+    p1_job,
+    p1_rig,
     registered_templates,
+    sections_plan,
     sine_step,
 )
 from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup
@@ -38,21 +38,21 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import frame_times
 from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
 
-_SWING = physical_template_doc("dark_span_swing", [sine_step("swing", 0.0, 30.0)])
+_SWING = loop_template_doc("dark_span_swing", [sine_step("swing", 0.0, 30.0)])
 """Pan swings 30 degrees either side of centre once a bar, lit throughout: every head is
 always moving, so any span lands mid-move."""
-_LEFT = physical_template_doc("dark_span_left", [hold_step("hold", -60.0)])
-_RIGHT = physical_template_doc("dark_span_right", [hold_step("hold", 60.0)])
+_LEFT = loop_template_doc("dark_span_left", [hold_step("hold", -60.0)])
+_RIGHT = loop_template_doc("dark_span_right", [hold_step("hold", 60.0)])
 """Holds at -60 and +60 degrees: a section of the one after a section of the other
 must be reached by a transaction."""
 _FALLBACKS = {
-    mode: physical_template_doc(
+    mode: loop_template_doc(
         f"dark_span_swing_{mode}",
-        [sine_step("swing", 0.0, 30.0, physical_reposition_fallback=mode)],
+        [sine_step("swing", 0.0, 30.0, reposition_fallback=mode)],
     )
     for mode in ("drop_accent", "preserve_aim")
 }
-_GRID = physical_bars_grid(500.0, 500.0, 500.0, 500.0)
+_GRID = bars_grid(500.0, 500.0, 500.0, 500.0)
 """Four bars of 500 ms beats, starting 15 ms off the frame grid."""
 _CALLS = [(15 + 1_000 * beat, 515 + 1_000 * beat) for beat in range(8)]
 """Every other beat, as a one-beat call/response rests the heads on each call."""
@@ -67,8 +67,8 @@ def _templates() -> Iterator[None]:
 
 
 def _rig(**visibility: Any) -> FixtureGroup:
-    """`physical_rig`, with its profiles' visibility declaration changed by `visibility`."""
-    payload = physical_rig().model_dump(mode="python")
+    """`p1_rig`, with its profiles' visibility declaration changed by `visibility`."""
+    payload = p1_rig().model_dump(mode="python")
     for fixture in payload["fixtures"]:
         fixture["config"]["physical_profile"]["visibility"].update(visibility)
     return FixtureGroup.model_validate(payload)
@@ -83,10 +83,10 @@ def _render(
     rig: FixtureGroup | None = None,
 ) -> tuple[RenderingPipeline, Frames]:
     pipeline = RenderingPipeline(
-        choreography_plan=physical_sections(*(sections or [(template, 1, 4)])),
+        choreography_plan=sections_plan(*(sections or [(template, 1, 4)])),
         beat_grid=_GRID,
-        fixture_group=rig or physical_rig(),
-        job_config=job or physical_job(),
+        fixture_group=rig or p1_rig(),
+        job_config=job or p1_job(),
         dark_spans=dark_spans,
     )
     segments = pipeline.render()
@@ -223,7 +223,7 @@ def test_a_different_cue_after_a_span_is_reached_in_the_dark() -> None:
 def test_spans_under_a_reposition_fallback_lose_no_lit_frame(mode: str) -> None:
     """A fallback the cues and the job both declare changes nothing about a span: the
     cues around it are the same cues, played on through it dark."""
-    job = physical_job(reposition_fallback=mode)
+    job = p1_job(reposition_fallback=mode)
     plain_pipeline, plain = _render(template=f"dark_span_swing_{mode}", job=job)
     pipeline, frames = _render(_CALLS, template=f"dark_span_swing_{mode}", job=job)
 
@@ -246,7 +246,7 @@ def test_a_rig_dark_only_through_its_shutter_closes_it_over_a_span() -> None:
 def _shutter_rig(
     *, close: int = 0, closed_settle: int = 0, open_: int = 0, open_settle: int = 0
 ) -> FixtureGroup:
-    """`physical_rig` dark only through its shutter, with the given latencies and the
+    """`p1_rig` dark only through its shutter, with the given latencies and the
     closed and open states' settle times."""
     payload = _rig(
         dimmer_zero_extinguishes=False, close_latency_ms=close, open_latency_ms=open_
@@ -265,7 +265,7 @@ def test_a_span_shorter_than_the_shutter_takes_to_close_is_widened(on_unplayable
     cue through it plays lit on either side under either setting, rather than being
     kept dark whole or refusing the render after planning."""
     rig = _shutter_rig(close=60, closed_settle=30, open_=40)
-    job = physical_job(on_unplayable=on_unplayable)
+    job = p1_job(on_unplayable=on_unplayable)
     _, plain = _render(rig=rig, job=job)
     pipeline, frames = _render([(1_000, 1_015)], rig=rig, job=job)
 
@@ -327,7 +327,7 @@ def test_a_shutter_rig_keeps_a_cue_dark_to_its_end_after_a_span_ending_just_befo
     section still enters as without the span, and no cue is lost or refused."""
     rig = _shutter_rig(open_=40, open_settle=20)
     plain_pipeline, plain = _render(rig=rig)
-    for job in (physical_job(), physical_job(on_unplayable="error")):
+    for job in (p1_job(), p1_job(on_unplayable="error")):
         pipeline, frames = _render([(1_000, 2_000)], rig=rig, job=job)
         assert pipeline.render_record is not None and plain_pipeline.render_record is not None
         assert pipeline.render_record["dropped_cues"] == []

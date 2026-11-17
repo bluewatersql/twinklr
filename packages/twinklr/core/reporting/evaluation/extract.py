@@ -35,7 +35,7 @@ def physical_channel_values(
     Channels are keyed by `ChannelName` value.
 
     Args:
-        frames: A physical render's encoded frames (`RenderingPipeline.frames`).
+        frames: A render's encoded frames (`RenderingPipeline.frames`).
         profiles: Each fixture's physical profile.
         window_ms: `(start_ms, end_ms)`; frames starting in `[start_ms, end_ms)` are read.
 

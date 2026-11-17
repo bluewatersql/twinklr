@@ -20,20 +20,20 @@ from typing import Any
 
 import pytest
 
-from tests.support.mh_physical import (
-    PHYSICAL_INITIAL_STATE,
+from tests.support.moving_heads import (
+    INITIAL_STATE,
     assert_honest_transactions,
+    bars_grid,
+    fixture_segment,
     hold_step,
     initial_state_payload,
+    loop_template_doc,
+    p1_job,
+    p1_rig,
     path_step,
-    physical_bars_grid,
-    physical_job,
-    physical_rig,
-    physical_sections,
-    physical_segment,
-    physical_template_doc,
     preposition_profile_payload,
     registered_templates,
+    sections_plan,
     topology_rig,
 )
 from twinklr.core.caching.identity import RENDER_ONLY_CONFIG_KEYS
@@ -54,16 +54,16 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
 )
 from twinklr.core.sequencer.models.template import TemplateDoc
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
-from twinklr.core.sequencer.moving_heads.compile.physical import PhysicalCompileError
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     TRANSACTION_METADATA_KEY,
     plan_prepositions,
 )
+from twinklr.core.sequencer.moving_heads.compile.step import CompileError
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import frame_times
 from twinklr.core.sequencer.moving_heads.pipeline import (
-    PhysicalRenderError,
     RenderingPipeline,
-    check_physical_templates,
+    RenderRefusedError,
+    admit_templates,
 )
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
@@ -71,7 +71,7 @@ _LOGGER = "twinklr.core.sequencer.moving_heads.pipeline"
 
 # Back to back: a hold at -90 degrees for half a bar, then one at 90. The second cue can
 # never follow the first (180 degrees in one frame), in every bar.
-_JUMP = physical_template_doc(
+_JUMP = loop_template_doc(
     "un_jump",
     [hold_step("left", -90.0, duration=0.5), hold_step("right", 90.0, start=0.5, duration=0.5)],
 )
@@ -86,10 +86,10 @@ def _render(
     job: JobConfig | None = None,
 ) -> RenderingPipeline:
     pipeline = RenderingPipeline(
-        choreography_plan=physical_sections(*sections),
-        beat_grid=grid or physical_bars_grid(*[500.0] * 4),
-        fixture_group=rig or physical_rig(),
-        job_config=job or physical_job(),
+        choreography_plan=sections_plan(*sections),
+        beat_grid=grid or bars_grid(*[500.0] * 4),
+        fixture_group=rig or p1_rig(),
+        job_config=job or p1_job(),
         output_path=None,
     )
     with registered_templates(*docs):
@@ -181,41 +181,41 @@ def test_on_unplayable_field_changes_the_render(caplog: pytest.LogCaptureFixture
     assert len(kept_dark) == len(records)
     assert {d["status"] for d in kept_dark} == {"drop_accent"}
 
-    with registered_templates(_JUMP), pytest.raises(PhysicalRenderError, match="jumps across"):
+    with registered_templates(_JUMP), pytest.raises(RenderRefusedError, match="jumps across"):
         RenderingPipeline(
-            choreography_plan=physical_sections(("un_jump", 1, 4)),
-            beat_grid=physical_bars_grid(*[500.0] * 4),
-            fixture_group=physical_rig(),
-            job_config=physical_job(on_unplayable="error"),
+            choreography_plan=sections_plan(("un_jump", 1, 4)),
+            beat_grid=bars_grid(*[500.0] * 4),
+            fixture_group=p1_rig(),
+            job_config=p1_job(on_unplayable="error"),
             output_path=None,
         ).render()
 
 
 def test_on_unplayable_is_render_only_and_out_of_dumps_at_its_default() -> None:
     assert "moving_heads.on_unplayable" in RENDER_ONLY_CONFIG_KEYS
-    assert "on_unplayable" not in physical_job().model_dump(mode="json")["moving_heads"]
-    error = physical_job(on_unplayable="error")
+    assert "on_unplayable" not in p1_job().model_dump(mode="json")["moving_heads"]
+    error = p1_job(on_unplayable="error")
     assert error.model_dump(mode="json")["moving_heads"]["on_unplayable"] == "error"
 
     def fingerprint(job: JobConfig) -> str:
         with registered_templates(_JUMP):
             return RenderingPipeline(
-                choreography_plan=physical_sections(("un_jump", 1, 4)),
-                beat_grid=physical_bars_grid(*[500.0] * 4),
-                fixture_group=physical_rig(),
+                choreography_plan=sections_plan(("un_jump", 1, 4)),
+                beat_grid=bars_grid(*[500.0] * 4),
+                fixture_group=p1_rig(),
                 job_config=job,
                 output_path=None,
             ).fingerprint()
 
-    assert fingerprint(physical_job()) == fingerprint(physical_job(on_unplayable="dark"))
-    assert fingerprint(physical_job()) != fingerprint(error)
+    assert fingerprint(p1_job()) == fingerprint(p1_job(on_unplayable="dark"))
+    assert fingerprint(p1_job()) != fingerprint(error)
 
 
 def test_a_render_with_nothing_unplayable_is_unchanged() -> None:
     """No cue kept dark: the same frames, transactions and no warning under both modes."""
-    doc = physical_template_doc("un_hold", [hold_step("h", 10.0)])
+    doc = loop_template_doc("un_hold", [hold_step("h", 10.0)])
     dark = _render((doc,), (("un_hold", 1, 4),))
-    error = _render((doc,), (("un_hold", 1, 4),), job=physical_job(on_unplayable="error"))
+    error = _render((doc,), (("un_hold", 1, 4),), job=p1_job(on_unplayable="error"))
     assert dark.frames == error.frames
     assert dark.unplayable_warning is None
     assert dark.render_record is not None and error.render_record is not None
@@ -246,7 +246,7 @@ def _cue(
         points=(PhysicalPoint(t_ms=t0, value=0.0), PhysicalPoint(t_ms=t1, value=0.0)),
         interpolation="linear",
     )
-    return physical_segment(
+    return fixture_segment(
         {
             ChannelName.PAN: pose,
             ChannelName.TILT: tilt,
@@ -349,7 +349,7 @@ def _once_fast() -> TemplateDoc:
     """A ONCE finite sweep peaking at 0.75 of a 90 degrees/s head at 500 ms beats: 1.5
     times it in a 250 ms-beat bar."""
     extent = 0.75 * 90.0 * 2.0 / math.pi
-    return physical_template_doc(
+    return loop_template_doc(
         "un_once_fast",
         [path_step("f", "sweep", mode="finite", pan_extent=extent)],
         mode="ONCE",
@@ -359,10 +359,10 @@ def _once_fast() -> TemplateDoc:
 def test_a_compile_refusal_only_this_placement_shows_is_kept_dark() -> None:
     """On the fast third bar the sweep outruns the head, which bar 1 never shows: the
     section's cues are kept dark per fixture; `error` refuses it."""
-    grid = physical_bars_grid(500.0, 500.0, 250.0, 500.0)
+    grid = bars_grid(500.0, 500.0, 250.0, 500.0)
     rig = _speed_rig(90.0)
-    states = dict.fromkeys(("MH1", "MH2"), PHYSICAL_INITIAL_STATE)
-    job = physical_job(initial_states=states)
+    states = dict.fromkeys(("MH1", "MH2"), INITIAL_STATE)
+    job = p1_job(initial_states=states)
     pipeline = _render(
         (_once_fast(),),
         (("un_once_fast", 1, 2), ("un_once_fast", 3, 3)),
@@ -379,10 +379,10 @@ def test_a_compile_refusal_only_this_placement_shows_is_kept_dark() -> None:
 
     with registered_templates(_once_fast()), pytest.raises(PhysicalChannelError, match="travels"):
         RenderingPipeline(
-            choreography_plan=physical_sections(("un_once_fast", 1, 2), ("un_once_fast", 3, 3)),
+            choreography_plan=sections_plan(("un_once_fast", 1, 2), ("un_once_fast", 3, 3)),
             beat_grid=grid,
             fixture_group=rig,
-            job_config=physical_job(initial_states=states, on_unplayable="error"),
+            job_config=p1_job(initial_states=states, on_unplayable="error"),
             output_path=None,
         ).render()
 
@@ -391,13 +391,13 @@ def test_a_refusal_the_basic_placement_shows_still_raises() -> None:
     """At 30 degrees/s the sweep outruns the head from bar 1 too: that is the gate's to
     refuse, and a dark render never stands in for it."""
     rig = _speed_rig(30.0)
-    states = dict.fromkeys(("MH1", "MH2"), PHYSICAL_INITIAL_STATE)
+    states = dict.fromkeys(("MH1", "MH2"), INITIAL_STATE)
     with registered_templates(_once_fast()), pytest.raises(PhysicalChannelError, match="travels"):
         RenderingPipeline(
-            choreography_plan=physical_sections(("un_once_fast", 1, 1), ("un_once_fast", 2, 4)),
-            beat_grid=physical_bars_grid(*[500.0] * 4),
+            choreography_plan=sections_plan(("un_once_fast", 1, 1), ("un_once_fast", 2, 4)),
+            beat_grid=bars_grid(*[500.0] * 4),
             fixture_group=rig,
-            job_config=physical_job(initial_states=states),
+            job_config=p1_job(initial_states=states),
             output_path=None,
         ).render()
 
@@ -405,7 +405,7 @@ def test_a_refusal_the_basic_placement_shows_still_raises() -> None:
 def test_a_compile_refusal_on_one_head_leaves_the_others_unchanged() -> None:
     """Only MH2 is slow: its cues of the fast bar are kept dark, and MH1's frames are those
     of a rig without MH2 (a head missing from the rig changes no other head)."""
-    grid = physical_bars_grid(500.0, 500.0, 250.0, 500.0)
+    grid = bars_grid(500.0, 500.0, 250.0, 500.0)
     payload = _speed_rig(180.0).model_dump(mode="json")
     for fixture in payload["fixtures"]:
         if fixture["fixture_id"] == "MH2":
@@ -414,16 +414,16 @@ def test_a_compile_refusal_on_one_head_leaves_the_others_unchanged() -> None:
     both = FixtureGroup.model_validate(payload)
     alone = _speed_rig(180.0, ("MH1",))
     sections = (("un_once_fast", 1, 2), ("un_once_fast", 3, 3))
-    states = dict.fromkeys(("MH1", "MH2"), PHYSICAL_INITIAL_STATE)
+    states = dict.fromkeys(("MH1", "MH2"), INITIAL_STATE)
     pair = _render(
-        (_once_fast(),), sections, grid=grid, rig=both, job=physical_job(initial_states=states)
+        (_once_fast(),), sections, grid=grid, rig=both, job=p1_job(initial_states=states)
     )
     single = _render(
         (_once_fast(),),
         sections,
         grid=grid,
         rig=alone,
-        job=physical_job(initial_states={"MH1": PHYSICAL_INITIAL_STATE}),
+        job=p1_job(initial_states={"MH1": INITIAL_STATE}),
     )
     assert {r["fixture_id"] for r in _unplayable(pair)} == {"MH2"}
     assert [f for f in pair.frames if f.fixture_id == "MH1"] == list(single.frames)
@@ -432,14 +432,14 @@ def test_a_compile_refusal_on_one_head_leaves_the_others_unchanged() -> None:
 def test_a_once_cycle_a_section_is_too_short_for_is_kept_dark() -> None:
     """A 2-bar ONCE cycle in a 1-bar section: that section's cues are kept dark (review
     class (i)); `error` refuses it at compile."""
-    doc = physical_template_doc(
+    doc = loop_template_doc(
         "un_once_long",
         [path_step("f", "sweep", mode="finite", pan_extent=20.0, period_beats=8.0, duration=2.0)],
         mode="ONCE",
         cycle_bars=2.0,
     )
     sections = (("un_once_long", 1, 3), ("un_once_long", 4, 4))
-    grid = physical_bars_grid(*[500.0] * 4)
+    grid = bars_grid(*[500.0] * 4)
     pipeline = _render((doc,), sections, grid=grid)
     records = _unplayable(pipeline)
     assert {(r["fixture_id"], r["section_id"], r["code"]) for r in records} == {
@@ -447,12 +447,12 @@ def test_a_once_cycle_a_section_is_too_short_for_is_kept_dark() -> None:
         ("MH2", "s2", "once_section_too_short"),
     }
     assert all("may not cut it short" in r["detail"] for r in records)
-    with registered_templates(doc), pytest.raises(PhysicalCompileError, match="cut it short"):
+    with registered_templates(doc), pytest.raises(CompileError, match="cut it short"):
         RenderingPipeline(
-            choreography_plan=physical_sections(*sections),
+            choreography_plan=sections_plan(*sections),
             beat_grid=grid,
-            fixture_group=physical_rig(),
-            job_config=physical_job(on_unplayable="error"),
+            fixture_group=p1_rig(),
+            job_config=p1_job(on_unplayable="error"),
             output_path=None,
         ).render()
 
@@ -478,30 +478,30 @@ _G1_TEMPLATE = {
                "remainder_policy": "TRUNCATE"},
     "steps": [
         {"step_id": "a", "timing": {"base_timing": {"start_offset_bars": 0.0, "duration_bars": 0.25}},
-         "movement": {"physical": {
+         "movement": {
              "shape": "linear", "mode": "finite", "start_pan_deg": 8.1, "start_tilt_deg": 9.6,
-             "pan_extent_deg": -35.2, "period_beats": 2.0}},
-         "dimmer": {"physical": {"period_beats": 2.0, "duty_cycle": 0.25, "low": 0.0, "high": 1.0}},
-         "physical_shutter_state": "open", "physical_color": "blue",
-         "physical_reposition_fallback": "drop_accent"},
+             "pan_extent_deg": -35.2, "period_beats": 2.0},
+         "dimmer": {"period_beats": 2.0, "duty_cycle": 0.25, "low": 0.0, "high": 1.0},
+         "shutter_state": "open", "color": "blue",
+         "reposition_fallback": "drop_accent"},
         {"step_id": "b", "timing": {"base_timing": {"start_offset_bars": 0.25, "duration_bars": 0.5}},
-         "movement": {"physical": {
-             "shape": "hold", "mode": "periodic", "start_pan_deg": -33.6, "start_tilt_deg": 7.5}},
-         "dimmer": {"physical": {"period_beats": 0.5, "duty_cycle": 0.75, "low": 0.0, "high": 1.0}},
-         "physical_shutter_state": "open", "physical_color": "blue",
-         "physical_reposition_fallback": "preserve_aim"},
+         "movement": {
+             "shape": "hold", "mode": "periodic", "start_pan_deg": -33.6, "start_tilt_deg": 7.5},
+         "dimmer": {"period_beats": 0.5, "duty_cycle": 0.75, "low": 0.0, "high": 1.0},
+         "shutter_state": "open", "color": "blue",
+         "reposition_fallback": "preserve_aim"},
         {"step_id": "c", "timing": {"base_timing": {"start_offset_bars": 0.75, "duration_bars": 0.25}},
-         "movement": {"physical": {
+         "movement": {
              "shape": "circle", "mode": "periodic", "start_pan_deg": -6.4, "start_tilt_deg": 19.2,
-             "pan_extent_deg": 45.4, "tilt_extent_deg": 10.0, "period_beats": 2.0}},
-         "dimmer": {}, "physical_shutter_state": "open",
-         "physical_reposition_fallback": "preserve_aim",
-         "physical_visibility": {"visible_phase_start": 0.5, "visible_phase_end": 1.0}},
+             "pan_extent_deg": 45.4, "tilt_extent_deg": 10.0, "period_beats": 2.0},
+         "shutter_state": "open",
+         "reposition_fallback": "preserve_aim",
+         "visibility": {"visible_phase_start": 0.5, "visible_phase_end": 1.0}},
     ],
-    "metadata": {"tags": ["test_only", "physical_v2"], "recommended_sections": ["verse"],
+    "metadata": {"tags": ["test_only"], "recommended_sections": ["verse"],
                  "energy_range": [0, 100], "description": "Review G1, fuzz seed 3942."},
-    "physical_overlays": [{"start_beats": 1.0, "end_beats": 2.25, "mask_beats": 0.5,
-                           "channel": "gobo", "state": "star"}],
+    "overlays": [{"start_beats": 1.0, "end_beats": 2.25, "mask_beats": 0.5,
+                  "channel": "gobo", "state": "star"}],
 }  # fmt: skip
 
 
@@ -525,13 +525,13 @@ def test_a_window_cut_into_a_cues_dark_tail_drops_the_slice() -> None:
         state["settle_ms"] = 0
     rig = FixtureGroup.model_validate(payload)
     doc = TemplateDoc.model_validate({"template": _G1_TEMPLATE})
-    job = physical_job(
-        initial_states={"MH1": PHYSICAL_INITIAL_STATE},
+    job = p1_job(
+        initial_states={"MH1": INITIAL_STATE},
         reposition_fallback="drop_accent",
         on_unplayable="error",
     )
     with registered_templates(doc):
-        check_physical_templates(
+        admit_templates(
             ["un_g1"],
             beat_grid=grid,
             fixture_group=rig,
@@ -560,10 +560,10 @@ def test_a_window_cut_into_a_cues_dark_tail_drops_the_slice() -> None:
 def test_the_trace_lists_unplayable_cues_in_the_written_file(tmp_path: Path) -> None:
     with registered_templates(_JUMP):
         pipeline = RenderingPipeline(
-            choreography_plan=physical_sections(("un_jump", 1, 4)),
-            beat_grid=physical_bars_grid(*[500.0] * 4),
-            fixture_group=physical_rig(),
-            job_config=physical_job(),
+            choreography_plan=sections_plan(("un_jump", 1, 4)),
+            beat_grid=bars_grid(*[500.0] * 4),
+            fixture_group=p1_rig(),
+            job_config=p1_job(),
             output_path=tmp_path / "jump.xsq",
         )
         pipeline.render()
@@ -612,23 +612,23 @@ def test_a_defect_at_a_sections_own_placement_is_never_kept_dark(
     bar 1 over the song still compiles) is a defect and propagates under `dark`."""
     from twinklr.core.sequencer.moving_heads.compile import template_compiler
 
-    compile_step = template_compiler.compile_physical_step
+    real_compile_step = template_compiler.compile_step
 
     def broken(step: Any, context: Any, **kwargs: Any) -> FixtureSegment:
         if context.section_id == "s2":
             if defect == "ValueError":
                 raise ValueError("injected defect")
             InitialFixtureState.model_validate({})  # raises a pydantic ValidationError
-        return compile_step(step, context, **kwargs)
+        return real_compile_step(step, context, **kwargs)
 
-    monkeypatch.setattr(template_compiler, "compile_physical_step", broken)
-    doc = physical_template_doc("un_defect", [hold_step("h", 10.0)])
+    monkeypatch.setattr(template_compiler, "compile_step", broken)
+    doc = loop_template_doc("un_defect", [hold_step("h", 10.0)])
     with registered_templates(doc), pytest.raises(ValueError) as raised:
         RenderingPipeline(
-            choreography_plan=physical_sections(("un_defect", 1, 2), ("un_defect", 3, 4)),
-            beat_grid=physical_bars_grid(*[500.0] * 4),
-            fixture_group=physical_rig(),
-            job_config=physical_job(),
+            choreography_plan=sections_plan(("un_defect", 1, 2), ("un_defect", 3, 4)),
+            beat_grid=bars_grid(*[500.0] * 4),
+            fixture_group=p1_rig(),
+            job_config=p1_job(),
             output_path=None,
         ).render()
     assert type(raised.value).__name__ == defect

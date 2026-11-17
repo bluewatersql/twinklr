@@ -32,7 +32,7 @@ from twinklr.core.reporting.evaluation.models import (
     CurveAnalysis,
     EvaluationReport,
     LitStep,
-    PhysicalRenderSummary,
+    RenderSummary,
     ReportFlag,
     ReportFlagLevel,
     ReportSummary,
@@ -46,7 +46,7 @@ from twinklr.core.reporting.evaluation.models import (
 from twinklr.core.reporting.evaluation.plot import plot_curve
 from twinklr.core.reporting.evaluation.render import write_report_json, write_report_markdown
 from twinklr.core.reporting.evaluation.rerender import (
-    PhysicalRerender,
+    RerenderOutput,
     admit_plan_templates,
     rerender_plan,
 )
@@ -181,9 +181,9 @@ async def generate_evaluation_report(
         fixture_config_path=fixture_config_path,
         recorded=recorded,
     )
-    physical = render_data.physical
+    output = render_data.output
     # Every fixture's values over the whole song, read once (index: frame start / 20 ms).
-    song_values = physical_channel_values(physical.frames, physical.profiles, (0, sys.maxsize))
+    song_values = physical_channel_values(output.frames, output.profiles, (0, sys.maxsize))
 
     logger.debug(f"Re-rendered {len(render_data.segments)} segments")
 
@@ -243,15 +243,15 @@ async def generate_evaluation_report(
                 update={"flags": updated_flags, "validation_issues": plan_validation.errors}
             )
 
-    physical_summary = _physical_summary(physical)
-    if not physical_summary.fingerprint_matches:
+    summary = _render_summary(output)
+    if not summary.fingerprint_matches:
         # Reported, not hidden: every metric below describes the re-render.
         total_errors += 1
         mismatch = ReportFlag(
             level=ReportFlagLevel.ERROR,
             code="RENDER_FINGERPRINT_MISMATCH",
-            message=mismatch_message(physical_summary),
-            details={"mismatched_inputs": physical_summary.mismatched_inputs},
+            message=mismatch_message(summary),
+            details={"mismatched_inputs": summary.mismatched_inputs},
         )
         if section_reports:
             first_section = section_reports[0]
@@ -273,7 +273,7 @@ async def generate_evaluation_report(
             validation_errors=validation_errors_count,
         ),
         sections=section_reports,
-        physical=physical_summary,
+        render=summary,
     )
 
     # Write outputs
@@ -315,7 +315,7 @@ def _process_section(
         section_id = plan_section.section_name
         segment_id = None
 
-    physical = render_data.physical
+    output = render_data.output
 
     # Calculate time window: a section spans its bars on the detected grid, as the
     # renderer places it.
@@ -341,12 +341,12 @@ def _process_section(
     # Analyze curves and generate plots
     curve_analyses = []
     section_flags = []
-    render_facts = _section_facts(physical.render_record, plan_section.section_name, frames_ms)
+    render_facts = _section_facts(output.render_record, plan_section.section_name, frames_ms)
     render_facts = render_facts.model_copy(
         update={
-            "lit_steps": _lit_steps(curves_by_fixture, physical.profiles, frames_ms[0]),
+            "lit_steps": _lit_steps(curves_by_fixture, output.profiles, frames_ms[0]),
             "boundary_steps": _boundary_steps(
-                song_values or {}, physical.profiles, render_facts.entry_windows, frames_ms[0]
+                song_values or {}, output.profiles, render_facts.entry_windows, frames_ms[0]
             ),
         }
     )
@@ -440,17 +440,17 @@ def _process_section(
     )
 
 
-def _physical_summary(physical: PhysicalRerender) -> PhysicalRenderSummary:
+def _render_summary(output: RerenderOutput) -> RenderSummary:
     """The re-render's identity against the run's, and the gate's facts it traced."""
-    record = physical.render_record
-    matches = physical.fingerprint == physical.run_fingerprint
+    record = output.render_record
+    matches = output.fingerprint == output.run_fingerprint
     dark_spans = record.get("dark_spans", [])
-    return PhysicalRenderSummary(
-        run_fingerprint=physical.run_fingerprint,
-        rerender_fingerprint=physical.fingerprint,
+    return RenderSummary(
+        run_fingerprint=output.run_fingerprint,
+        rerender_fingerprint=output.fingerprint,
         fingerprint_matches=matches,
         mismatched_inputs=(
-            [] if matches else _mismatched_inputs(physical.run_inputs, physical.rerender_inputs)
+            [] if matches else _mismatched_inputs(output.run_inputs, output.rerender_inputs)
         ),
         dark_spans=dark_spans,
         dark_span_ms=sum(end - start for start, end in dark_spans),
@@ -461,18 +461,18 @@ def _physical_summary(physical: PhysicalRerender) -> PhysicalRenderSummary:
     )
 
 
-def mismatch_message(physical: PhysicalRenderSummary) -> str:
+def mismatch_message(summary: RenderSummary) -> str:
     """What a fingerprint mismatch means, naming the recorded inputs that differ."""
     differs = (
-        "it differs in " + "; ".join(physical.mismatched_inputs)
-        if physical.mismatched_inputs
+        "it differs in " + "; ".join(summary.mismatched_inputs)
+        if summary.mismatched_inputs
         else "no recorded input differs (fixture profiles and model names, the rig, "
         "templates, beat grid, dark spans, revisions), so the checkpoint's plan or "
         "recorded policy, or the recorded identity itself differ"
     )
     return (
-        f"the re-render's fingerprint {physical.rerender_fingerprint} does not match the "
-        f"run's {physical.run_fingerprint}: this report describes a different render than "
+        f"the re-render's fingerprint {summary.rerender_fingerprint} does not match the "
+        f"run's {summary.run_fingerprint}: this report describes a different render than "
         f"the run delivered; {differs}"
     )
 
@@ -659,7 +659,7 @@ def _boundary_steps(
 def _section_facts(
     record: dict[str, Any], section_name: str, window_ms: tuple[int, int]
 ) -> SectionRenderFacts:
-    """A section's records from a physical render's trace: its entry windows, dropped
+    """A section's records from a render's trace: its entry windows, dropped
     cues and diagnostics by section id, and the transactions of cues starting in it."""
     start_ms, end_ms = window_ms
     statuses = Counter(

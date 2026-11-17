@@ -47,7 +47,7 @@ class PhaseKnot(BaseModel):
 class _PhaseCache:
     """Exact values derived from one tuple of knots, filled as they are evaluated.
 
-    Every head and channel of a physical compile evaluates the same frame times. The
+    Every head and channel of a template compile evaluates the same frame times. The
     cache is not part of a map's value: it compares equal to any other, and a map whose
     knots are not the ones it was built from (a `model_copy` with new knots shares the
     original's private attributes) gets a fresh one.

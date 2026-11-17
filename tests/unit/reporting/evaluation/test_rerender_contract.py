@@ -15,12 +15,12 @@ from unittest.mock import patch
 
 import pytest
 
-from tests.support.mh_physical import (
-    physical_catalog,
-    physical_grid,
-    physical_job,
-    physical_rig,
-    physical_sections,
+from tests.support.moving_heads import (
+    family_catalog,
+    p1_grid,
+    p1_job,
+    p1_rig,
+    sections_plan,
 )
 from twinklr.core.reporting.evaluation.cli import eval_report_cli
 from twinklr.core.reporting.evaluation.collect import RecordedRender
@@ -56,12 +56,12 @@ async def test_rerender_passes_the_recorded_policy_to_the_pipeline(tmp_path: Pat
     audio = tmp_path / "song.wav"
     audio.write_bytes(b"audio")
     fixtures = tmp_path / "fixtures.json"
-    fixtures.write_text(physical_rig().model_dump_json())
-    policy = physical_job(reposition_fallback="drop_accent").moving_heads
+    fixtures.write_text(p1_rig().model_dump_json())
+    policy = p1_job(reposition_fallback="drop_accent").moving_heads
     recorded = RecordedRender(
         fingerprint="0" * 64,
         policy=policy,
-        beat_grid=physical_grid(),
+        beat_grid=p1_grid(),
         admission=None,
         dark_spans=(),
         inputs={},
@@ -81,13 +81,13 @@ async def test_rerender_passes_the_recorded_policy_to_the_pipeline(tmp_path: Pat
             return SimpleNamespace(features={})
 
     with (
-        physical_catalog(),
+        family_catalog(),
         patch("twinklr.core.audio.analyzer.AudioAnalyzer", FakeAnalyzer),
         patch("twinklr.core.reporting.evaluation.rerender.RenderingPipeline") as pipeline,
     ):
         pipeline.return_value.render.return_value = []
         await rerender_plan(
-            plan=physical_sections(("mirror_wings", 1, 2)),
+            plan=sections_plan(("mirror_wings", 1, 2)),
             audio_path=audio,
             fixture_config_path=fixtures,
             recorded=recorded,

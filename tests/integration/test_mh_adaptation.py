@@ -1,4 +1,4 @@
-"""Physical families adapt to the rig and the song instead of being left out.
+"""Families adapt to the rig and the song instead of being left out.
 
 A family is admitted through the first of its variants (base, then its declared presets
 in order) that the rig can play on this song: its effective variant, which a section
@@ -17,18 +17,18 @@ import random
 
 import pytest
 
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
     FAMILY_IDS,
     envelope_step,
+    family_catalog,
     family_job,
     family_rig,
     hold_step,
-    physical_catalog,
-    physical_job,
-    physical_rig,
-    physical_sections,
-    physical_template_doc,
+    loop_template_doc,
+    p1_job,
+    p1_rig,
     registered_templates,
+    sections_plan,
     sine_step,
     sweep_step,
 )
@@ -42,7 +42,7 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import TRANSACTION_
 from twinklr.core.sequencer.moving_heads.pipeline import (
     RenderingPipeline,
     TemplateAdmission,
-    check_physical_templates,
+    admit_templates,
 )
 from twinklr.core.sequencer.moving_heads.templates.library import get_template
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
@@ -96,7 +96,7 @@ def _tempo_grid(beats_per_bar: int, bpm: float, seconds: float) -> BeatGrid:
 
 
 def _gate(grid: BeatGrid, rig: FixtureGroup, job: JobConfig) -> TemplateAdmission:
-    return check_physical_templates(
+    return admit_templates(
         list(FAMILY_IDS),
         beat_grid=grid,
         fixture_group=rig,
@@ -108,8 +108,8 @@ def _gate(grid: BeatGrid, rig: FixtureGroup, job: JobConfig) -> TemplateAdmissio
 
 
 def _plan(*sections: tuple[str, str | None, int, int]) -> ChoreographyPlan:
-    """`physical_sections` of `(template_id, preset_id, start_bar, end_bar)`."""
-    plan = physical_sections(*((t, start, end) for t, _, start, end in sections))
+    """`sections_plan` of `(template_id, preset_id, start_bar, end_bar)`."""
+    plan = sections_plan(*((t, start, end) for t, _, start, end in sections))
     return plan.model_copy(
         update={
             "sections": [
@@ -174,7 +174,7 @@ def test_near_157_bpm_a_family_too_fast_for_the_rig_plays_a_declared_variant() -
     section naming no preset renders exactly what naming that variant does."""
     grid = _grid(4, 340.0, 420.0, seconds=30.0)
     rig, job = _rig(150.0), family_job(HEADS)
-    with physical_catalog():
+    with family_catalog():
         admission = _gate(grid, rig, job)
         runs = {
             (template_id, preset_id): _render(
@@ -234,7 +234,7 @@ def test_a_render_playing_another_preset_than_named_has_its_own_fingerprint() ->
             admission=admission if gated else None,
         ).fingerprint()
 
-    with physical_catalog():
+    with family_catalog():
         admission = _gate(grid, rig, job)
         assert admission.effective_preset["fly_out_cascade"] == "narrow"
         for preset_id in (None, "undeclared"):
@@ -269,7 +269,7 @@ def test_in_other_meters_the_continuous_families_play_on_across_each_cycle(
     rig, job = _rig(150.0), family_job(HEADS)
     profile = _profile(rig)
     pan, tilt = profile.axes["pan"], profile.axes["tilt"]
-    with physical_catalog():
+    with family_catalog():
         admission = _gate(grid, rig, job)
         assert set(_CONTINUOUS) <= set(admission.admitted)
         runs = {
@@ -325,15 +325,15 @@ def _waltz_with_a_short_beat(short_beat: int) -> BeatGrid:
 
 
 def _gate_blink(blink: TemplateDoc, grid: BeatGrid) -> TemplateAdmission:
-    """The gate over `blink` and a still template on `physical_rig`."""
-    still = physical_template_doc("p3_still", [hold_step("still", 0.0)])
-    job = physical_job()
+    """The gate over `blink` and a still template on `p1_rig`."""
+    still = loop_template_doc("p3_still", [hold_step("still", 0.0)])
+    job = p1_job()
     ids = [blink.template.template_id, "p3_still"]
     with registered_templates(blink, still):
-        return check_physical_templates(
+        return admit_templates(
             ids,
             beat_grid=grid,
-            fixture_group=physical_rig(),
+            fixture_group=p1_rig(),
             initial_states=job.moving_heads.initial_states,
             failure_mode=job.moving_heads.reposition_fallback,
             on_unplayable=job.moving_heads.on_unplayable,
@@ -351,7 +351,7 @@ def test_the_gate_places_a_grown_cycle_at_each_of_its_alignments_to_the_bars(
     15 ms beat at index 7 or 10 is a lit window shorter than a frame only where a section
     starting on bar 3 or 4 lights it, so the gate must place the grown cycle at all four
     alignments, not the authored cycle's two, to leave the template out."""
-    blink = physical_template_doc(
+    blink = loop_template_doc(
         "p3_blink",
         [envelope_step("blink", 0.0, 0.5, lit=(0.25, 0.5), duration=2.0)],
         cycle_bars=2.0,
@@ -371,7 +371,7 @@ def test_the_gate_places_each_preset_at_the_alignments_of_its_own_grown_cycle() 
     8 and 11 and every 8 after. A 15 ms beat 14 therefore leaves `slow` out only if the
     gate places it at its own cycle's eight alignments, not the base's four. (The base,
     lighting half of beat 14 placed from bar 4, is out too.)"""
-    blink = physical_template_doc(
+    blink = loop_template_doc(
         "p3_blink",
         [envelope_step("blink", 0.0, 0.5, lit=(0.25, 0.375), duration=2.0)],
         cycle_bars=2.0,
@@ -379,7 +379,7 @@ def test_the_gate_places_each_preset_at_the_alignments_of_its_own_grown_cycle() 
     slow = TemplatePreset.model_validate(
         {
             "preset_id": "slow",
-            "step_patches": {"blink": {"movement": {"physical": {"period_beats": 8.0}}}},
+            "step_patches": {"blink": {"movement": {"period_beats": 8.0}}},
         }
     )
     admission = _gate_blink(
@@ -404,7 +404,7 @@ def test_consecutive_cycles_join_without_a_quantization_step(
     where one cue ends and the next begins the commanded pose is the same."""
     grid = _grid(beats_per_bar, 340.0, 420.0, seconds=30.0)
     rig, job = _rig(720.0), family_job(HEADS)
-    with physical_catalog():
+    with family_catalog():
         _, segments = _render([(template_id, None, 1, 12)], grid, rig, job, None)
     joins = 0
     for fixture_id in HEADS:
@@ -439,8 +439,8 @@ def test_a_finite_move_restarts_on_its_own_frame_every_cycle() -> None:
     no phase carries over."""
     grid = _grid(4, 340.0, 420.0, seconds=20.0)
     phase_map = build_musical_phase_map(grid)
-    sweep = physical_template_doc("p3_sweep", [sweep_step("go", 0.0, 30.0, period_beats=4.0)])
-    rig, job = physical_rig(), physical_job()
+    sweep = loop_template_doc("p3_sweep", [sweep_step("go", 0.0, 30.0, period_beats=4.0)])
+    rig, job = p1_rig(), p1_job()
     with registered_templates(sweep):
         _, segments = _render([("p3_sweep", None, 1, 10)], grid, rig, job, None)
     cues = [
@@ -463,16 +463,16 @@ def test_a_pulse_continues_its_phase_on_a_step_whose_move_restarts() -> None:
     whole periods the cycle holds, continues one phase across cycles like any pulse:
     its levels are those of the same pulse on a periodic step."""
     grid = _grid(4, 340.0, 420.0, seconds=20.0)
-    pulse = {"physical": {"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0}}
+    pulse = {"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0}
     finite = sweep_step("go", 0.0, 0.0, period_beats=4.0)
     periodic = sine_step("go", 0.0, 0.0, period_beats=4.0)
     for step in (finite, periodic):
         step["dimmer"] = pulse
     docs = [
-        physical_template_doc("p3_pulse_finite", [finite]),
-        physical_template_doc("p3_pulse_periodic", [periodic]),
+        loop_template_doc("p3_pulse_finite", [finite]),
+        loop_template_doc("p3_pulse_periodic", [periodic]),
     ]
-    rig, job = physical_rig(), physical_job()
+    rig, job = p1_rig(), p1_job()
     levels = []
     with registered_templates(*docs):
         for doc in docs:
@@ -518,7 +518,7 @@ def test_a_four_head_rig_is_offered_a_floor_of_families(
     orbit, the flick and the wings play at 150 BPM, every energy, and the snap and the
     orbit at 200 BPM. No variant is declared slower than these."""
     grid = _tempo_grid(beats_per_bar, bpm, seconds=30.0)
-    with physical_catalog():
+    with family_catalog():
         admission = _gate(grid, _rig(speed), family_job(HEADS))
         energies = {get_template(t).template.category.value for t in admission.admitted}
 

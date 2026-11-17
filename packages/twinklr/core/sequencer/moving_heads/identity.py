@@ -24,11 +24,11 @@ from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
-LEGACY_BACKEND_ID = "xlights_dmx"
+BACKEND_ID = "xlights_dmx"
 """The backend the renderer writes: xLights DMX effects in an `.xsq`."""
 
-PHYSICAL_RENDERER_REVISION = "2"
-"""Bumped by hand in the commit that intentionally changes physical rendering; the
+RENDERER_REVISION = "2"
+"""Bumped by hand in the commit that intentionally changes the renderer's output; the
 render identity also carries the frame encoder's own version."""
 
 
@@ -55,8 +55,8 @@ def render_fingerprint(
         fixtures: The rig; fixture order counts.
         templates: Template documents, presets included; their order does not count.
         policy: The moving-head render policy.
-        backend_id: Output backend identity, e.g. `LEGACY_BACKEND_ID`.
-        renderer_revision: Renderer revision, from `PHYSICAL_RENDERER_REVISION`.
+        backend_id: Output backend identity, e.g. `BACKEND_ID`.
+        renderer_revision: Renderer revision, from `RENDERER_REVISION`.
         seed: Seed of any seeded choice the render depends on.
         phase_map: A typed boundary map, when the renderer takes one.
         locks: Render locks the output must honor; hashed only when there are any, so

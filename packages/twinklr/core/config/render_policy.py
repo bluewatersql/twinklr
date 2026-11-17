@@ -25,7 +25,7 @@ def preflight_render_policy(
     pass fails every profiled fixture whose initial state is unknown, unsettled or
     contradicts its profile, whenever its first cue is); an initial state must also
     name a fixture of the rig, and every fixture needs its own, non-blank xLights model
-    name, because physical frames are written per fixture. Profiles the DMX backend cannot address are already
+    name, because frames are written per fixture. Profiles the DMX backend cannot address are already
     rejected when the fixture file loads. Without a fixture group nothing about the
     rig is known, so a job passes this check until its fixtures are loaded.
 
@@ -65,7 +65,7 @@ def preflight_render_policy(
             f"{fixture.fixture_id}: moving_heads.initial_states[{fixture.fixture_id!r}]: {reason}"
             for reason in reasons
         )
-    # Physical frames go to each fixture's own model, never a shared one.
+    # Frames go to each fixture's own model, never a shared one.
     by_model: dict[str, list[str]] = {}
     for fixture in fixtures:
         if not fixture.xlights_model_name.strip():

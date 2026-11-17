@@ -17,7 +17,7 @@ class FixtureContext(BaseModel):
     Attributes:
         fixture_id: Unique identifier for the fixture.
         role: Role assigned to this fixture (e.g., "FRONT_LEFT").
-        physical_profile: Explicit capabilities for the physical renderer, if declared.
+        physical_profile: Explicit capabilities for the moving-head renderer, if declared.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -58,18 +58,17 @@ class StepCompileContext(BaseModel):
         start_ms: Start time in milliseconds.
         duration_ms: Duration in milliseconds.
         beat_grid: Beat grid for timing conversions (needed for period_bars → cycles).
-        physical_profile: The fixture's physical profile; physical compile only.
-        phase_map: The song's musical phase map; physical compile only.
+        physical_profile: The fixture's physical profile.
+        phase_map: The song's musical phase map.
         resolved_components: The step's component references resolved for this
             fixture: its start aim, and held channels that replace the step's own;
-            physical compile only, None for a step without references.
+            None for a step without references.
         phase_offset_by_channel: Cycles each phase domain lags the step phase: from
             the step's distribution over the rig topology, plus the shift by which an
             instance continuing the phase of the step's earlier instances in its
-            section corrects its own frame-grid start (`_phase_shift`); physical
-            compile only.
+            section corrects its own frame-grid start (`_phase_shift`).
         pan_sign: Multiplies the pan displacement (not the start aim): -1 or +1 for a
-            mirrored wing, 0 at an odd center; physical compile only.
+            mirrored wing, 0 at an odd center.
     """
 
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
@@ -109,10 +108,10 @@ class TemplateCompileContext(BaseModel):
     start_bar: int = Field(default=0, ge=0)
     duration_bars: int = Field(default=0, ge=0)
 
-    # The fixture group's named components; physical compile only.
+    # The fixture group's named components.
     presets: RigPresetLibrary = Field(default_factory=RigPresetLibrary)
     # The rig's canonical topology (declared or derived), and the fixture group a
-    # distribution that finds none is reported against; physical compile only.
+    # distribution that finds none is reported against.
     topology: FixtureTopology | None = None
     fixture_group_id: str | None = None
 

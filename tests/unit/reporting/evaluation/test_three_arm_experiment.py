@@ -12,13 +12,13 @@ from pathlib import Path
 
 import pytest
 
-from tests.support.mh_physical import (
+from tests.support.moving_heads import (
     CATALOG_IDS,
     FAMILY_IDS,
+    bars_grid,
+    family_catalog,
     family_job,
     family_rig,
-    physical_bars_grid,
-    physical_catalog,
 )
 from twinklr.core.agents.sequencer.moving_heads.deterministic_selector import (
     AdmittedTemplate,
@@ -83,13 +83,13 @@ from twinklr.core.reporting.evaluation.vision_judge import (
     VisionRubricResponse,
     VisionTokenUsage,
 )
-from twinklr.core.sequencer.moving_heads.pipeline import check_physical_templates
+from twinklr.core.sequencer.moving_heads.pipeline import admit_templates
 
 
 @pytest.fixture(autouse=True)
 def _catalog() -> Iterator[None]:
     """The runner's process holds the family catalog the admissions name."""
-    with physical_catalog():
+    with family_catalog():
         yield
 
 
@@ -1687,10 +1687,10 @@ def test_report_rejects_nonce_cache_key_and_blind_track_recommitment(
         ComparisonReport.model_validate(raw)
 
 
-# --- Arms over the admitted physical families (cutover C1.1d) ---------------------------
+# --- Arms over the admitted families (cutover C1.1d) ---------------------------
 
 HEADS = ("MH1", "MH2", "MH3", "MH4")
-PHYSICAL_SECTIONS = [
+FAMILY_SECTIONS = [
     SelectorSection(section_id="intro_1", role="intro", start_bar=1, end_bar=1, energy=30),
     SelectorSection(section_id="verse_1", role="verse", start_bar=2, end_bar=2, energy=45),
     SelectorSection(section_id="chorus_1", role="chorus", start_bar=3, end_bar=4, energy=85),
@@ -1700,7 +1700,7 @@ PHYSICAL_SECTIONS = [
 ]
 
 
-def _physical_llm_plan(
+def _family_llm_plan(
     template_id: str | None,
     *,
     preset_id: str | None = None,
@@ -1751,8 +1751,8 @@ def _physical_llm_plan(
     )
 
 
-class _PhysicalBackend(_Backend):
-    """`_Backend` whose analysis records a physical admission, whose LLM arms plan
+class _FamilyBackend(_Backend):
+    """`_Backend` whose analysis records a gate admission, whose LLM arms plan
     `llm_plan`, and whose arm A returns `arm_a_plan` instead of its request's plan
     when one is given."""
 
@@ -1767,7 +1767,7 @@ class _PhysicalBackend(_Backend):
         super().__init__()
         self.admission = admission
         self.sections = sections
-        self.llm_plan = llm_plan or _physical_llm_plan("mirror_wings")
+        self.llm_plan = llm_plan or _family_llm_plan("mirror_wings")
         self.song_sections = song_sections or {}
         self.arm_a_plan = arm_a_plan
 
@@ -1806,8 +1806,8 @@ def _hand_admission(
     )
 
 
-async def _run_physical(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, backend: _PhysicalBackend
+async def _run_family_arms(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, backend: _FamilyBackend
 ) -> list[ArmRunResult]:
     runner = ComparisonExperimentRunner(manifest=_calibrated_manifest(tmp_path), backend=backend)
     monkeypatch.setattr(runner, "_assert_calibrated", lambda: None)
@@ -1815,7 +1815,7 @@ async def _run_physical(
 
 
 @pytest.mark.asyncio
-async def test_physical_run_plans_arm_a_over_the_gate_admission_and_records_it(
+async def test_family_run_plans_arm_a_over_the_gate_admission_and_records_it(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """End to end offline on a synthetic four-head rig without a zoom axis: the real gate
@@ -1823,9 +1823,9 @@ async def test_physical_run_plans_arm_a_over_the_gate_admission_and_records_it(
     among the admitted families, and every arm's held-constant identity binds the
     same admission."""
     rig, job = family_rig(HEADS), family_job(HEADS)
-    gate = check_physical_templates(
+    gate = admit_templates(
         list(CATALOG_IDS),
-        beat_grid=physical_bars_grid(*[500.0] * 8),
+        beat_grid=bars_grid(*[500.0] * 8),
         fixture_group=rig,
         initial_states=job.moving_heads.initial_states,
         failure_mode=job.moving_heads.reposition_fallback,
@@ -1833,11 +1833,11 @@ async def test_physical_run_plans_arm_a_over_the_gate_admission_and_records_it(
         excludable=list(CATALOG_IDS),
     )
     admission = SelectorAdmission.from_gate(gate)
-    backend = _PhysicalBackend(admission, PHYSICAL_SECTIONS)
+    backend = _FamilyBackend(admission, FAMILY_SECTIONS)
     runner = ComparisonExperimentRunner(manifest=_calibrated_manifest(tmp_path), backend=backend)
     monkeypatch.setattr(runner, "_assert_calibrated", lambda: None)
     results = await runner.run(owner_opt_in=True)
-    expected = DeterministicSelector(seed=44, admission=admission).select(PHYSICAL_SECTIONS)
+    expected = DeterministicSelector(seed=44, admission=admission).select(FAMILY_SECTIONS)
 
     assert admission.template_ids == FAMILY_IDS
     assert [exclusion.template_id for exclusion in admission.exclusions] == ["zoom_wave"]
@@ -1860,19 +1860,19 @@ async def test_physical_run_plans_arm_a_over_the_gate_admission_and_records_it(
 @pytest.mark.parametrize(
     "llm_plan",
     [
-        pytest.param(_physical_llm_plan("zoom_wave"), id="section"),
+        pytest.param(_family_llm_plan("zoom_wave"), id="section"),
         pytest.param(
-            _physical_llm_plan(None, segments=[("mirror_wings", None), ("zoom_wave", None)]),
+            _family_llm_plan(None, segments=[("mirror_wings", None), ("zoom_wave", None)]),
             id="segment",
         ),
     ],
 )
-async def test_physical_run_rejects_an_arm_planning_an_unadmitted_template(
+async def test_family_run_rejects_an_arm_planning_an_unadmitted_template(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, llm_plan: ChoreographyPlan
 ) -> None:
-    backend = _PhysicalBackend(_hand_admission(FAMILY_IDS), PHYSICAL_SECTIONS, llm_plan=llm_plan)
+    backend = _FamilyBackend(_hand_admission(FAMILY_IDS), FAMILY_SECTIONS, llm_plan=llm_plan)
     with pytest.raises(ExperimentBlockedError, match=r"zoom_wave.*not admitted"):
-        await _run_physical(tmp_path, monkeypatch, backend)
+        await _run_family_arms(tmp_path, monkeypatch, backend)
 
 
 _WINGS_SLOW_ONLY = {"mirror_wings": ("slow",)}
@@ -1883,43 +1883,41 @@ _WINGS_SLOW_ONLY = {"mirror_wings": ("slow",)}
 @pytest.mark.parametrize(
     "llm_plan",
     [
-        pytest.param(_physical_llm_plan("mirror_wings", preset_id="narrow"), id="section"),
+        pytest.param(_family_llm_plan("mirror_wings", preset_id="narrow"), id="section"),
         pytest.param(
-            _physical_llm_plan(
-                None, segments=[("mirror_wings", "slow"), ("mirror_wings", "narrow")]
-            ),
+            _family_llm_plan(None, segments=[("mirror_wings", "slow"), ("mirror_wings", "narrow")]),
             id="segment",
         ),
     ],
 )
-async def test_physical_run_rejects_an_arm_planning_an_unadmitted_preset(
+async def test_family_run_rejects_an_arm_planning_an_unadmitted_preset(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, llm_plan: ChoreographyPlan
 ) -> None:
-    backend = _PhysicalBackend(
-        _hand_admission(FAMILY_IDS, _WINGS_SLOW_ONLY), PHYSICAL_SECTIONS, llm_plan=llm_plan
+    backend = _FamilyBackend(
+        _hand_admission(FAMILY_IDS, _WINGS_SLOW_ONLY), FAMILY_SECTIONS, llm_plan=llm_plan
     )
     with pytest.raises(ExperimentBlockedError, match=r"mirror_wings.*'narrow'.*not admitted"):
-        await _run_physical(tmp_path, monkeypatch, backend)
+        await _run_family_arms(tmp_path, monkeypatch, backend)
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "llm_plan",
     [
-        pytest.param(_physical_llm_plan("mirror_wings", preset_id="slow"), id="section"),
+        pytest.param(_family_llm_plan("mirror_wings", preset_id="slow"), id="section"),
         pytest.param(
-            _physical_llm_plan(None, segments=[("mirror_wings", "slow"), ("mirror_wings", None)]),
+            _family_llm_plan(None, segments=[("mirror_wings", "slow"), ("mirror_wings", None)]),
             id="segment",
         ),
     ],
 )
-async def test_physical_run_accepts_admitted_presets_and_the_base(
+async def test_family_run_accepts_admitted_presets_and_the_base(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, llm_plan: ChoreographyPlan
 ) -> None:
-    backend = _PhysicalBackend(
-        _hand_admission(FAMILY_IDS, _WINGS_SLOW_ONLY), PHYSICAL_SECTIONS, llm_plan=llm_plan
+    backend = _FamilyBackend(
+        _hand_admission(FAMILY_IDS, _WINGS_SLOW_ONLY), FAMILY_SECTIONS, llm_plan=llm_plan
     )
-    results = await _run_physical(tmp_path, monkeypatch, backend)
+    results = await _run_family_arms(tmp_path, monkeypatch, backend)
     assert len(results) == 40
 
 
@@ -1929,13 +1927,13 @@ async def test_arm_a_result_must_carry_the_plan_it_was_given(
 ) -> None:
     """An admitted, valid plan is still rejected for arm A when it is not the
     deterministic selector's plan the run requested."""
-    backend = _PhysicalBackend(
+    backend = _FamilyBackend(
         _hand_admission(FAMILY_IDS),
-        PHYSICAL_SECTIONS,
-        arm_a_plan=_physical_llm_plan("mirror_wings"),
+        FAMILY_SECTIONS,
+        arm_a_plan=_family_llm_plan("mirror_wings"),
     )
     with pytest.raises(ExperimentBlockedError, match="arm A"):
-        await _run_physical(tmp_path, monkeypatch, backend)
+        await _run_family_arms(tmp_path, monkeypatch, backend)
 
 
 @pytest.mark.asyncio
@@ -1947,8 +1945,8 @@ async def test_arm_a_without_a_candidate_stops_before_any_run(
     any arm of any song is executed (no planning call, no render)."""
     admitted = tuple(t for t in FAMILY_IDS if t != "target_orbit")
     quiet = [SelectorSection(section_id="intro_1", role="intro", start_bar=1, end_bar=4, energy=10)]
-    backend = _PhysicalBackend(
-        _hand_admission(admitted), PHYSICAL_SECTIONS, song_sections={"s5": quiet}
+    backend = _FamilyBackend(
+        _hand_admission(admitted), FAMILY_SECTIONS, song_sections={"s5": quiet}
     )
     runner = ComparisonExperimentRunner(manifest=_calibrated_manifest(tmp_path), backend=backend)
     monkeypatch.setattr(runner, "_assert_calibrated", lambda: None)

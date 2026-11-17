@@ -8,13 +8,13 @@ import shutil
 from twinklr.cli.main import build_arg_parser
 from twinklr.cli.template_cmd import run_template_validate_command
 from twinklr.core.sequencer.moving_heads.templates.data_loader import (
-    PHYSICAL_TEMPLATE_DIR,
+    TEMPLATE_CATALOG_DIR,
     load_template_document,
 )
 
 
 def test_template_validate_command(tmp_path: Path) -> None:
-    shutil.copy(PHYSICAL_TEMPLATE_DIR / "mirror_wings.json", tmp_path / "mirror_wings.json")
+    shutil.copy(TEMPLATE_CATALOG_DIR / "mirror_wings.json", tmp_path / "mirror_wings.json")
     document = load_template_document(tmp_path / "mirror_wings.json")
     assert document.template.template_id == "mirror_wings"
 

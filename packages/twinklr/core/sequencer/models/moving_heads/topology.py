@@ -1,7 +1,7 @@
-"""Stable rig topology and phase distribution for the physical renderer (P2.2).
+"""Stable rig topology and phase distribution for the moving-head renderer (P2.2).
 
 A `FixtureTopology` describes the canonical full rig: where each head sits, by row,
-column and a unique ordinal. A physical template step's `PhaseDistribution`s spread
+column and a unique ordinal. A template step's `PhaseDistribution`s spread
 phase over it, each over its own domains (pan, tilt, dimmer, shutter). A head's rank is
 its place in the canonical `(row, column, ordinal, fixture_id)` order of the whole rig,
 fixed before any head is selected, so rendering a subset of heads, or a rig with a head

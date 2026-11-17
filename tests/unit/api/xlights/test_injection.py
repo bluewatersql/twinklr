@@ -12,12 +12,12 @@ import httpx
 import pytest
 
 from tests.support.live_xlights import SCRATCH_SEQUENCE, FakeLiveXLights
-from tests.support.mh_physical import (
-    physical_grid,
-    physical_job,
-    physical_plan,
-    physical_rig,
-    physical_test_templates,
+from tests.support.moving_heads import (
+    p1_grid,
+    p1_job,
+    p1_plan,
+    p1_rig,
+    p1_templates,
 )
 from twinklr.core.api.xlights import XLightsAutomationClient, injection
 from twinklr.core.api.xlights.errors import XLightsTimeoutError
@@ -296,7 +296,7 @@ def test_json_ownership_manifest_preserves_actual_reserved_layer(tmp_path) -> No
     assert store.load(sequence) == (effect,)
 
 
-# --- Physical output (cutover C1.1c) -----------------------------------------------------
+# --- Moving-head output (cutover C1.1c) -----------------------------------------------------
 
 
 def _xsq_effects(path: Path) -> list[tuple[str, int, str, str, str, int, int]]:
@@ -335,16 +335,16 @@ def _live_form(
     )
 
 
-def test_physical_live_effects_equal_the_written_xsq_element_by_element(tmp_path: Path) -> None:
-    """A physical render's live effects are the `.xsq`'s effects: the same models, layer,
+def test_live_effects_equal_the_written_xsq_element_by_element(tmp_path: Path) -> None:
+    """A render's live effects are the `.xsq`'s effects: the same models, layer,
     DMX settings and frame-aligned times, one for one, and section provenance on each."""
     output = tmp_path / "show.xsq"
-    with physical_test_templates():
+    with p1_templates():
         pipeline = RenderingPipeline(
-            choreography_plan=physical_plan(),
-            beat_grid=physical_grid(),
-            fixture_group=physical_rig(),
-            job_config=physical_job(),
+            choreography_plan=p1_plan(),
+            beat_grid=p1_grid(),
+            fixture_group=p1_rig(),
+            job_config=p1_job(),
             output_path=output,
             media_file="song.wav",
         )
@@ -367,7 +367,7 @@ def test_physical_live_effects_equal_the_written_xsq_element_by_element(tmp_path
 def _runs(
     count: int, *, targets: int = 4, settings: str = "E_SLIDER_DMX1=1"
 ) -> tuple[LiveEffect, ...]:
-    """`count` back-to-back 20 ms DMX runs spread over `targets` models, as a physical
+    """`count` back-to-back 20 ms DMX runs spread over `targets` models, as a
     render emits them."""
     return tuple(
         LiveEffect(
@@ -387,7 +387,7 @@ def _runs(
 async def test_thirty_thousand_effects_inject_reinject_and_replace_in_linear_time(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The volume of a physical render (about 30,000 effects on four heads for a
+    """The volume of a render (about 30,000 effects on four heads for a
     three-minute song) goes through the per-effect API in one request per effect and
     write, with no quadratic work before or between requests: interval comparisons and
     effect equality tests stay within a small multiple of the effect count."""
