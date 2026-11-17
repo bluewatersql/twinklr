@@ -9,16 +9,21 @@ existing effect on those layers may be replaced.
 The upstream API is not transactional and ``addEffect`` returns no effect ID. Therefore
 an ambiguous timeout/read failure is never replayed: the result reports the confirmed
 prefix and tells the operator to inspect and idempotently re-run.
+
+The API also has no batch command: every effect read, deleted or added is one request.
+A physical moving-head render emits tens of thousands of effects, so a command is
+bounded by ``MAX_LIVE_EFFECTS`` and refused before any write beyond it.
 """
 
 from __future__ import annotations
 
-from collections import Counter
+from bisect import bisect_left
+from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from twinklr.core.api.xlights.client import XLightsAutomationClient
 from twinklr.core.api.xlights.errors import XLightsAutomationError
@@ -34,11 +39,28 @@ from twinklr.core.formats.xlights.sequence.fresh import build_fresh_sequence
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
 from twinklr.core.sequencer.moving_heads.export.xsq_adapter import XsqAdapter
 
+if TYPE_CHECKING:
+    from twinklr.core.formats.xlights.sequence.models.xsq import XSequence
+
 TWINKLR_LAYER_BASE = 99
 """First xLights layer in Twinklr's identifiable live-injection namespace."""
 
 # Compatibility name for callers that only need the namespace's first layer.
 TWINKLR_LAYER = TWINKLR_LAYER_BASE
+
+MAX_LIVE_EFFECTS = 50_000
+"""Most effects one live command may add, and most owned effects it may replace.
+
+xLights takes one request per effect read, deleted or added, so a command that
+replaces everything costs about three requests per effect. A physical render of four
+heads over a three-minute song emits roughly 20,000-30,000 effects; this bound admits
+that with headroom and refuses, before any write, the far larger renders the output
+budget (`moving_heads.max_effects`) still allows. Chosen, not measured: how long xLights
+takes per request is unverified."""
+
+NO_SECTION_ID = "_unsectioned"
+"""Section provenance of an effect no planned section produced (a physical render's
+park after the last section); live effects require a non-empty section id."""
 
 
 class InjectionError(RuntimeError):
@@ -47,6 +69,10 @@ class InjectionError(RuntimeError):
 
 class InjectionCollisionError(InjectionError):
     """A non-owned effect occupies Twinklr's reserved target range."""
+
+
+class InjectionVolumeError(InjectionError):
+    """A command would exceed `MAX_LIVE_EFFECTS`; nothing was written."""
 
 
 class InjectionPartialError(InjectionError):
@@ -283,10 +309,34 @@ class LiveInjectionWorkflow:
         dry_run: bool = False,
         replace_sections: frozenset[str] | None = None,
         raise_on_partial: bool = True,
+        expected_sequence: Path | None = None,
     ) -> InjectionResult:
+        """Replace Twinklr's owned effects in the replaced sections with `effects`.
+
+        Manifest rows on a target layer that was read but not observed there are absent
+        from the sequence and are dropped. Before the first write the manifest is saved
+        owning everything the command may place (the owned effects observed, those on
+        layers not read, and the effects to add), and an interruption of any kind saves
+        the exact confirmed state before it propagates, so running the same command
+        again always converges, even after a kill that ran no handler.
+
+        `MAX_LIVE_EFFECTS` bounds the effects to add and the owned effects to delete.
+        Recorded rows are only capped at twice that before reading, which a manifest
+        saved before a killed run's first write can never exceed.
+
+        Args:
+            expected_sequence: When given, the open sequence must be this one; otherwise
+                nothing past its identity is read.
+        """
         desired = tuple(sorted(effects))
+        _check_volume(len(desired), "effects")
         _validate_desired_no_overlap(desired)
         sequence = await self.client.get_open_sequence()
+        if expected_sequence is not None and sequence.sequence_path != expected_sequence:
+            raise InjectionError(
+                f"The open sequence changed to {sequence.sequence_path} from "
+                f"{expected_sequence}; nothing was read or written. Run the command again."
+            )
         owned = self.ownership.load(sequence.sequence_path)
         sections = (
             replace_sections
@@ -295,6 +345,14 @@ class LiveInjectionWorkflow:
         )
         if any(effect.section_id not in sections for effect in desired):
             raise ValueError("Every desired effect must belong to a replaced section")
+        # Sanity cap on recorded rows: a pre-write manifest holds at most the owned
+        # effects present (no more than the bound, as at most that many were added) and
+        # the effects to add (no more than the bound).
+        _check_volume(
+            sum(effect.section_id in sections for effect in owned),
+            "owned effects recorded for this sequence",
+            limit=2 * MAX_LIVE_EFFECTS,
+        )
 
         target_layers = tuple(
             sorted(
@@ -320,13 +378,17 @@ class LiveInjectionWorkflow:
             else:
                 unowned.append(item)
 
+        # Per target and layer the desired effects do not overlap (checked above), so in
+        # start order their ends rise too: an unowned effect overlaps one exactly when
+        # the last desired effect starting before its end ends after its start.
+        lanes: dict[tuple[str, int], list[LiveEffect]] = defaultdict(list)
+        for effect in sorted(desired, key=_start):
+            lanes[(effect.target, effect.layer)].append(effect)
+        starts = {lane: [e.start_ms for e in items] for lane, items in lanes.items()}
         for item in unowned:
-            if any(
-                item.model == effect.target
-                and item.layer == effect.layer
-                and _overlaps(item.start_ms, item.end_ms, effect.start_ms, effect.end_ms)
-                for effect in desired
-            ):
+            lane = (item.model, item.layer)
+            before = bisect_left(starts.get(lane, []), item.end_ms)
+            if before and lanes[lane][before - 1].end_ms > item.start_ms:
                 raise InjectionCollisionError(
                     f"User-owned effect collision on {item.model!r}, layer {item.layer}, "
                     f"{item.start_ms}-{item.end_ms}ms. No writes were issued."
@@ -351,6 +413,7 @@ class LiveInjectionWorkflow:
                 keep_counts[item.signature] -= 1
             else:
                 to_delete.append((item, effect))
+        _check_volume(len(to_delete), "owned effects to delete", after_reading=True)
         commands = tuple(
             [
                 DeleteEffectRequest(item.model, item.layer, item.effect_id).to_wire()
@@ -370,34 +433,46 @@ class LiveInjectionWorkflow:
                 recovery="Dry run only; the open sequence was not modified.",
             )
 
-        retained = [effect for effect in owned if effect.section_id not in sections]
+        # The rows still describing the sequence: owned effects observed, and rows on
+        # layers this command did not read. A row on a layer read but not observed there
+        # (never added before a kill, or removed by hand) is absent and dropped.
+        read_layers = set(target_layers)
+        present = [
+            *(effect for _, effect in classified_owned),
+            *(effect for effect in owned if (effect.target, effect.layer) not in read_layers),
+        ]
+        retained = [effect for effect in present if effect.section_id not in sections]
         deleted: list[LiveEffect] = []
         injected: list[LiveEffect] = []
         failed_command: dict[str, str] | None = None
-        manifest_state = list(owned)
+        manifest_state = Counter(present)
         uncertain_add: LiveEffect | None = None
+        # A process killed between writes runs no handler: own everything it may place.
+        self.ownership.save(
+            sequence.sequence_path, tuple(sorted((manifest_state + Counter(to_add)).elements()))
+        )
         try:
             for item, effect in to_delete:
                 delete_request = DeleteEffectRequest(item.model, item.layer, item.effect_id)
                 failed_command = delete_request.to_wire()
                 await self.client.delete_effect(delete_request)
                 deleted.append(effect)
-                manifest_state.remove(effect)
+                manifest_state[effect] -= 1
             for effect in to_add:
                 add_request = effect.request()
                 failed_command = add_request.to_wire()
                 uncertain_add = effect
                 await self.client.add_effect(add_request)
                 injected.append(effect)
-                manifest_state.append(effect)
+                manifest_state[effect] += 1
                 uncertain_add = None
         except XLightsAutomationError as error:
             # A read timeout can arrive after xLights applied addEffect. Preserve that
             # exact attempted signature as uncertain ownership so the next preflight
             # can safely recognize either outcome without replaying this POST now.
             if uncertain_add is not None:
-                manifest_state.append(uncertain_add)
-            resulting = tuple(sorted(manifest_state))
+                manifest_state[uncertain_add] += 1
+            resulting = tuple(sorted(manifest_state.elements()))
             self.ownership.save(sequence.sequence_path, resulting)
             result = InjectionResult(
                 complete=False,
@@ -419,6 +494,13 @@ class LiveInjectionWorkflow:
             if raise_on_partial:
                 raise InjectionPartialError(result) from error
             return result
+        except BaseException:
+            # Ctrl-C, cancellation or any other failure mid-write: record what is
+            # confirmed, the interrupted add included, before it propagates.
+            if uncertain_add is not None:
+                manifest_state[uncertain_add] += 1
+            self.ownership.save(sequence.sequence_path, tuple(sorted(manifest_state.elements())))
+            raise
 
         resulting = tuple(sorted((*retained, *desired)))
         self.ownership.save(sequence.sequence_path, resulting)
@@ -480,33 +562,66 @@ def live_effects_from_segments(
         duration_ms=duration_ms,
     )
     placements = XsqAdapter().convert(segments, fixture_group, sequence)
-    traces = sequence.emission_trace_entries
-    if len(traces) != len(placements):
+    if len(sequence.emission_trace_entries) != len(placements):
         raise InjectionError("MH trace count diverged from injection placements")
+    return live_effects_from_sequence(sequence)
+
+
+def live_effects_from_sequence(sequence: XSequence) -> tuple[LiveEffect, ...]:
+    """Every effect a fresh sequence's emission placed, in its live form.
+
+    Read from the emission trace, which records for each placement the target, effect,
+    EffectDB and palette references, frame-aligned times, live layer and section: the
+    values the `.xsq` serializes, with the file layer moved to the reserved live layer.
+    A physical render's sequence is the one its `.xsq` is written from.
+
+    Raises:
+        InjectionError: If a trace entry lacks its settings, palette or provenance.
+    """
     effects: list[LiveEffect] = []
-    for placement, trace in zip(placements, traces, strict=True):
-        if placement.ref is None:
-            raise InjectionError("xLights placement omitted its EffectDB settings reference")
-        settings = sequence.effect_db.get(placement.ref)
+    for trace in sequence.emission_trace_entries:
+        ref = trace.get("effectdb_ref")
+        settings = sequence.effect_db.get(ref) if isinstance(ref, int) else None
         if settings is None:
-            raise InjectionError(f"Missing EffectDB entry {placement.ref}")
+            raise InjectionError(f"Missing EffectDB entry {ref}")
+        palette_ref = trace.get("palette_ref")
+        if palette_ref is not None and not (
+            isinstance(palette_ref, int) and 0 <= palette_ref < len(sequence.color_palettes)
+        ):
+            raise InjectionError(f"Missing color palette {palette_ref}")
         section_id = trace.get("section_id")
         live_layer = trace.get("live_layer")
         if not isinstance(section_id, str) or not isinstance(live_layer, int):
             raise InjectionError("MH trace omitted section or live-layer provenance")
         effects.append(
             LiveEffect(
-                target=placement.element_name,
-                effect=placement.effect_name,
+                target=trace["element_name"],
+                effect=trace["effect_name"],
                 settings=settings,
-                palette="",
-                start_ms=placement.start_ms,
-                end_ms=placement.end_ms,
-                section_id=section_id,
+                palette=(
+                    sequence.color_palettes[palette_ref].settings
+                    if isinstance(palette_ref, int)
+                    else ""
+                ),
+                start_ms=trace["start_ms"],
+                end_ms=trace["end_ms"],
+                section_id=section_id or NO_SECTION_ID,
                 layer=live_layer,
             )
         )
     return tuple(sorted(effects))
+
+
+def _check_volume(
+    count: int, what: str, *, limit: int = MAX_LIVE_EFFECTS, after_reading: bool = False
+) -> None:
+    if count > limit:
+        raise InjectionVolumeError(
+            f"{count} {what} exceed the live-injection bound of {limit}: xLights takes one "
+            "request per effect and has no batch command. No xLights effect was "
+            + ("written" if after_reading else "read or written")
+            + ". Import the `.xsq` that `twinklr run` writes instead."
+        )
 
 
 def _observed(settings: EffectSettingsResult) -> _ObservedEffect:
@@ -538,21 +653,27 @@ def _overlaps(start_a: int, end_a: int, start_b: int, end_b: int) -> bool:
     return start_a < end_b and start_b < end_a
 
 
+def _start(effect: LiveEffect) -> tuple[int, int]:
+    return effect.start_ms, effect.end_ms
+
+
 def _validate_desired_no_overlap(effects: tuple[LiveEffect, ...]) -> None:
-    for index, effect in enumerate(effects):
-        for other in effects[index + 1 :]:
-            if (
-                effect.target == other.target
-                and effect.layer == other.layer
-                and _overlaps(
-                    effect.start_ms,
-                    effect.end_ms,
-                    other.start_ms,
-                    other.end_ms,
-                )
-            ):
+    """Refuse two desired effects that overlap on one target and layer.
+
+    Each lane is swept in start order: until an overlap is found every effect ends
+    after the ones before it, so comparing neighbours finds any overlap.
+    """
+    lanes: dict[tuple[str, int], list[LiveEffect]] = defaultdict(list)
+    for effect in effects:
+        lanes[(effect.target, effect.layer)].append(effect)
+    for lane in lanes.values():
+        lane.sort(key=_start)
+        effect = lane[0]
+        for other in lane[1:]:
+            if _overlaps(effect.start_ms, effect.end_ms, other.start_ms, other.end_ms):
                 raise InjectionCollisionError(
                     f"Twinklr planned effects overlap on {effect.target!r}, layer "
                     f"{effect.layer}: {effect.start_ms}-{effect.end_ms}ms and "
                     f"{other.start_ms}-{other.end_ms}ms. No xLights requests were issued."
                 )
+            effect = other  # it does not overlap, so it ends later

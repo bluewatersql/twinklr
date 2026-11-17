@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
     from twinklr.core.pipeline.context import PipelineContext
     from twinklr.core.pipeline.result import StageResult
+    from twinklr.core.sequencer.moving_heads.pipeline import TemplateAdmission
     from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 logger = logging.getLogger(__name__)
@@ -255,7 +256,7 @@ class MovingHeadStage:
                 if plan is None:
                     raise ValueError("IterationResult.plan is None")
 
-                return ChoreographyPlan.model_validate(plan)
+                return self._with_base_plan(ChoreographyPlan.model_validate(plan), context)
 
             # Execute with caching and automatic metrics/state handling
             return await execute_step(
@@ -394,9 +395,76 @@ class MovingHeadStage:
 
         plan = result.get("plan") if isinstance(result, dict) else getattr(result, "plan", None)
         if plan:
-            validated_plan = ChoreographyPlan.model_validate(plan)
+            validated_plan = self._with_base_plan(ChoreographyPlan.model_validate(plan), context)
             context.set_state("choreography_plan", validated_plan)
             self._write_checkpoint(validated_plan, context)
+
+    def _with_base_plan(self, plan: ChoreographyPlan, context: PipelineContext) -> ChoreographyPlan:
+        """The plan the render receives: `plan`, or, when this stage re-plans one section
+        and state holds a `regeneration_base_plan`, that base with `plan` in the
+        section's place.
+
+        A physical render plans dark repositioning across section edges, so `twinklr
+        regenerate` on a physical job renders the whole song: from the plan of the
+        effects already injected, with only the named section re-planned. The section
+        keeps its position; one the base lacks goes before the first later section.
+
+        Raises:
+            ValueError: If the re-plan is not exactly one section, the named one, over
+                the bars the base gives it, or (when the base lacks it) over bars no
+                kept section covers.
+        """
+        base = self._base_plan(context)
+        if self.section_id is None or base is None:
+            return plan
+        others = sorted({s.section_name for s in plan.sections} - {self.section_id})
+        if others:
+            raise ValueError(
+                f"the re-plan of section {self.section_id!r} also names {others}; "
+                "the rest of the song keeps its injected plan"
+            )
+        if len(plan.sections) != 1:
+            raise ValueError(
+                f"the re-plan of section {self.section_id!r} has {len(plan.sections)} "
+                "sections; a regenerated section is one section of the injected plan"
+            )
+        (replanned,) = plan.sections
+        bars = f"bars {replanned.start_bar}-{replanned.end_bar}"
+        names = [section.section_name for section in base.sections]
+        if self.section_id in names:
+            at = names.index(self.section_id)
+            recorded = base.sections[at]
+            if (recorded.start_bar, recorded.end_bar) != (replanned.start_bar, replanned.end_bar):
+                raise ValueError(
+                    f"the re-plan of section {self.section_id!r} covers {bars}, but the "
+                    f"injected plan gives it bars {recorded.start_bar}-{recorded.end_bar}"
+                )
+        else:
+            at = next(
+                (i for i, s in enumerate(base.sections) if s.start_bar > replanned.start_bar),
+                len(base.sections),
+            )
+        kept = [s for s in base.sections if s.section_name != self.section_id]
+        for section in kept:
+            if section.start_bar <= replanned.end_bar and replanned.start_bar <= section.end_bar:
+                raise ValueError(
+                    f"the re-plan of section {self.section_id!r} ({bars}) overlaps "
+                    f"{section.section_name!r} (bars {section.start_bar}-{section.end_bar}) "
+                    "of the injected plan"
+                )
+        before = [s for s in base.sections[:at] if s.section_name != self.section_id]
+        after = [s for s in base.sections[at:] if s.section_name != self.section_id]
+        return base.model_copy(update={"sections": [*before, replanned, *after]})
+
+    @staticmethod
+    def _base_plan(context: PipelineContext) -> ChoreographyPlan | None:
+        """The `regeneration_base_plan` in state, if any."""
+        from twinklr.core.agents.sequencer.moving_heads.models import (
+            ChoreographyPlan as _ChoreographyPlan,
+        )
+
+        base = context.get_state("regeneration_base_plan")
+        return base if isinstance(base, _ChoreographyPlan) else None
 
     def _write_checkpoint(self, plan: ChoreographyPlan, context: PipelineContext) -> None:
         """Serialize today's plan for `twinklr eval-report` (P1P-T10).
@@ -459,3 +527,60 @@ class MovingHeadStage:
                     score = getattr(final_verdict, "score", None)
                 if score is not None:
                     context.add_metric("mh_score", score)
+
+
+def check_regeneration_base(
+    base: ChoreographyPlan, section_id: str, admission: TemplateAdmission
+) -> None:
+    """Refuse a regeneration whose base plan this run would not render as injected.
+
+    Every section of `base` but `section_id` (which is re-planned) must name templates
+    the pre-planning gate admitted on this rig and song, and only presets it admitted.
+    A template the gate left out would render its base anyway (the render does not
+    consult the gate's exclusions), possibly unplayable or refused mid-render; a preset
+    it left out would render the effective variant instead. Either differs from what
+    was injected. `RenderPreflightStage` runs this right after the gate, before any
+    planner.
+
+    Raises:
+        ValueError: Naming each such section, template and preset.
+    """
+    from twinklr.core.sequencer.moving_heads.templates.library import get_template
+
+    def canonical(template_id: str) -> str:
+        try:
+            return get_template(template_id).template.template_id
+        except Exception:
+            return template_id
+
+    problems: list[str] = []
+    for section in base.sections:
+        if section.section_name == section_id:
+            continue
+        choices: list[tuple[str | None, str | None]] = (
+            [(segment.template_id, segment.preset_id) for segment in section.segments]
+            if section.segments
+            else [(section.template_id, section.preset_id)]
+        )
+        for template_id, preset_id in choices:
+            if template_id is None:
+                continue
+            resolved = canonical(template_id)
+            if resolved not in admission.admitted:
+                problems.append(
+                    f"section {section.section_name!r} names template {template_id!r}, "
+                    "which this run's pre-planning check did not admit on this rig and song"
+                )
+            elif preset_id and preset_id not in admission.admitted_presets.get(resolved, ()):
+                problems.append(
+                    f"section {section.section_name!r} names preset {preset_id!r} of "
+                    f"template {template_id!r}, which this run's pre-planning check did "
+                    "not admit"
+                )
+    if problems:
+        raise ValueError(
+            "The injected plan cannot be rendered as it was injected: "
+            + "; ".join(problems)
+            + ". The rig, job or templates changed since; run `twinklr inject` to "
+            "re-plan the whole song."
+        )

@@ -7,13 +7,20 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from collections import Counter
+from dataclasses import asdict
+import hashlib
 import json
 import logging
 from pathlib import Path
 import sys
+from tempfile import NamedTemporaryFile
+from typing import Any
 from uuid import uuid4
 
+from pydantic import ValidationError
 from rich.console import Console
+from rich.markup import escape
 
 from twinklr.cli.catalog_coverage_cmd import (
     add_catalog_coverage_subparser,
@@ -36,13 +43,16 @@ from twinklr.cli.template_cmd import (
     run_template_validate_command,
 )
 from twinklr.core.agents.providers.factory import validate_llm_provider_config
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.api.xlights import (
     GetModelsRequest,
     InjectionPartialError,
     JsonOwnershipStore,
+    LiveEffect,
     LiveInjectionWorkflow,
     XLightsAutomationClient,
     live_effects_from_segments,
+    live_effects_from_sequence,
     reconcile_live_layout,
 )
 from twinklr.core.caching import derive_session_id
@@ -53,7 +63,6 @@ from twinklr.core.config.models import JobConfig
 from twinklr.core.config.render_policy import (
     UnsupportedRenderModeError,
     preflight_render_policy,
-    require_legacy_render,
 )
 from twinklr.core.formats.xlights.layout.models.rgb_effects import Model
 from twinklr.core.formats.xlights.layout.parser import load_layout
@@ -132,6 +141,99 @@ def _print_live_injection_partial(error: InjectionPartialError) -> None:
 
 
 logger = logging.getLogger(__name__)
+
+LIVE_PLANS_FILENAME = ".twinklr-live-plans.json"
+"""Beside the ownership manifest in the song's artifact directory: per open sequence,
+the plan of the physical moving-head effects last injected and what it was injected
+from (`LIVE_PLAN_IDENTITY`)."""
+
+LIVE_PLAN_IDENTITY = {
+    "effects_sha256": "Twinklr's effects in the open sequence changed since (a partial, "
+    "interrupted or other inject)",
+    "audio_sha256": "the audio differs from the injected song's",
+    "job_sha256": "the job config differs",
+    "rig_sha256": "the rig differs (fixture config or live layout)",
+}
+"""What a recorded plan is valid for, and why `regenerate` refuses when one differs."""
+
+LIVE_DRY_RUN_FILENAME = "live-dry-run.jsonl"
+"""Where a physical dry run writes its planned xLights writes, one JSON object a line."""
+
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _live_plan_identity(
+    audio_path: Path, job_config: JobConfig, rig: FixtureGroup, owned: tuple[LiveEffect, ...]
+) -> dict[str, str]:
+    """Digests of the owned effects, audio, job and rig a recorded plan describes."""
+    return {
+        "effects_sha256": _sha256(json.dumps([asdict(e) for e in sorted(owned)], sort_keys=True)),
+        "audio_sha256": hash_file_content(audio_path),
+        "job_sha256": _sha256(job_config.model_dump_json()),
+        "rig_sha256": _sha256(rig.model_dump_json()),
+    }
+
+
+def _unreadable_live_plans(path: Path, reason: object) -> ValueError:
+    return ValueError(
+        f"{path} is not a readable Twinklr live-plans file ({reason}); delete it, then run "
+        "`twinklr inject` to record the plan again"
+    )
+
+
+def _read_live_plans(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise _unreadable_live_plans(path, error) from error
+    if not isinstance(payload, dict):
+        raise _unreadable_live_plans(path, "not a JSON object")
+    return payload
+
+
+def _load_live_plan(
+    path: Path, sequence_path: Path
+) -> tuple[ChoreographyPlan, dict[str, str]] | None:
+    """The plan behind the physical effects last injected into `sequence_path` and its
+    recorded identity, if any.
+
+    Raises:
+        ValueError: If the file or the sequence's record is unreadable, naming the file.
+    """
+    record = _read_live_plans(path).get(str(sequence_path))
+    if record is None:
+        return None
+    try:
+        return ChoreographyPlan.model_validate(record["plan"]), {
+            key: str(record[key]) for key in LIVE_PLAN_IDENTITY
+        }
+    except (KeyError, TypeError, ValidationError) as error:
+        raise _unreadable_live_plans(
+            path, f"invalid record for {sequence_path}: {error}"
+        ) from error
+
+
+def _save_live_plan(
+    path: Path, sequence_path: Path, plan: ChoreographyPlan, identity: dict[str, str]
+) -> None:
+    """Record, atomically, the plan now injected into `sequence_path` and its identity.
+
+    Raises:
+        ValueError: If the existing file is unreadable, naming it.
+        OSError: If the file cannot be written.
+    """
+    payload = _read_live_plans(path)
+    payload[str(sequence_path)] = {"plan": plan.model_dump(mode="json"), **identity}
+    with NamedTemporaryFile(
+        "w", encoding="utf-8", dir=path.parent, prefix=f"{path.name}.", delete=False
+    ) as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+    Path(handle.name).replace(path)
 
 
 def _resolve_fixture_config_path(job_config_path: Path, fixture_config_path: str) -> Path:
@@ -337,12 +439,6 @@ async def _run_pipeline_async(
         app_config = load_app_config(app_config_path)
         validate_llm_provider_config(app_config)
         job_config = load_job_config(job_config_path)
-        if live_client is not None:
-            # Live injection serializes through the legacy exporter only.
-            require_legacy_render(
-                job_config.moving_heads,
-                command="regenerate" if section_id is not None else "inject",
-            )
         console.print("[green]✅ Configuration loaded[/green]")
         console.print(f"   Provider: {app_config.llm_provider}")
         console.print(f"   Model: {job_config.agent.plan_agent.model}")
@@ -423,6 +519,25 @@ async def _run_pipeline_async(
             model_names=models.models,
             group_names=groups.models,
         )
+        unplaced = (
+            [
+                fixture
+                for fixture in fixture_group.expand_fixtures()
+                if fixture.xlights_model_name in reconciliation.report.configured_only_models
+                and fixture.fixture_id in job_config.moving_heads.initial_states
+            ]
+            if job_config.moving_heads.mode == "physical_v2"
+            else []
+        )
+        if unplaced:
+            console.print(
+                "[red]ERROR: The open sequence's xLights layout has no model for "
+                + ", ".join(f"{f.fixture_id} ({f.xlights_model_name!r})" for f in unplaced)
+                + ", which moving_heads.initial_states names. Add the model to the layout, "
+                "or remove the fixture from the fixture config and its entry from "
+                "moving_heads.initial_states.[/red]"
+            )
+            return 1
         fixture_group = reconciliation.rig
         if reconciliation.report.has_divergence:
             console.print(
@@ -435,6 +550,49 @@ async def _run_pipeline_async(
             console.print(
                 "[red]ERROR: No configured moving-head model names exist in the live layout; "
                 "Twinklr will not guess DMX channel mappings.[/red]"
+            )
+            return 1
+
+    physical = job_config.moving_heads.mode == "physical_v2"
+    live_plans_path = artifact_dir / LIVE_PLANS_FILENAME
+    ownership_path = artifact_dir / ".twinklr-live-ownership.json"
+    base_plan: ChoreographyPlan | None = None
+    regenerated_sequence: Path | None = None
+    if live_client is not None and physical and section_id is not None:
+        # A physical render plans each head's dark repositioning across section edges,
+        # so one section cannot be swapped in alone: the whole song is re-rendered from
+        # the plan of the effects already injected, with only this section re-planned.
+        try:
+            opened = await live_client.get_open_sequence()
+            regenerated_sequence = opened.sequence_path
+            recorded = _load_live_plan(live_plans_path, regenerated_sequence)
+            current = _live_plan_identity(
+                audio_path,
+                job_config,
+                fixture_group,
+                JsonOwnershipStore(ownership_path).load(regenerated_sequence),
+            )
+        except Exception as error:
+            console.print(
+                f"[red]ERROR: Could not read the injected plan: {escape(str(error))}[/red]"
+            )
+            return 1
+        if recorded is None:
+            console.print(
+                "[red]ERROR: `twinklr regenerate` on a physical job re-renders the moving "
+                "heads for the whole song from the plan of the effects already injected, "
+                f"and none is recorded for {regenerated_sequence} in {live_plans_path}; "
+                "run `twinklr inject` first.[/red]"
+            )
+            return 1
+        base_plan, identity = recorded
+        stale = [why for key, why in LIVE_PLAN_IDENTITY.items() if identity[key] != current[key]]
+        if stale:
+            console.print(
+                f"[red]ERROR: The plan recorded for {regenerated_sequence} no longer "
+                f"describes it: {'; '.join(stale)}. `twinklr regenerate` re-renders the whole "
+                "song from that plan and would replace every Twinklr moving-head effect with "
+                "it; run `twinklr inject` first.[/red]"
             )
             return 1
 
@@ -524,6 +682,9 @@ async def _run_pipeline_async(
     pipeline_context.set_state("xlights_mapping", xlights_mapping)
     if live_client is not None:
         pipeline_context.set_state("live_fixture_group", fixture_group)
+    if base_plan is not None:
+        pipeline_context.set_state("regeneration_base_plan", base_plan)
+        pipeline_context.set_state("regeneration_section_id", section_id)
     if layout_models is not None and layout_path is not None:
         pipeline_context.set_state("layout_models", layout_models)
         pipeline_context.set_state("layout_sha256", hash_file_content(layout_path))
@@ -540,25 +701,67 @@ async def _run_pipeline_async(
     )
 
     if result.success and live_client is not None:
-        segments = list(pipeline_context.get_state("rendered_segments", ()))
         try:
-            live_effects = live_effects_from_segments(segments, fixture_group)
             workflow = LiveInjectionWorkflow(
-                live_client,
-                ownership=JsonOwnershipStore(artifact_dir / ".twinklr-live-ownership.json"),
+                live_client, ownership=JsonOwnershipStore(ownership_path)
             )
-            injection = (
-                await workflow.regenerate_section(section_id, live_effects, dry_run=dry_run)
-                if section_id is not None
-                else await workflow.inject(live_effects, dry_run=dry_run)
-            )
+            if physical:
+                # The effects the .xsq is written from; every Twinklr-owned effect in
+                # the sequence is replaced, for `regenerate` too (it rendered the song),
+                # into the sequence its plan was loaded for.
+                live_effects = live_effects_from_sequence(
+                    pipeline_context.get_state("rendered_sequence")
+                )
+                console.print(
+                    f"[dim]{len(live_effects)} moving-head effects; xLights takes one "
+                    "request per effect read, replaced or added[/dim]"
+                )
+                injection = await workflow.inject(
+                    live_effects, dry_run=dry_run, expected_sequence=regenerated_sequence
+                )
+            else:
+                segments = list(pipeline_context.get_state("rendered_segments", ()))
+                live_effects = live_effects_from_segments(segments, fixture_group)
+                injection = (
+                    await workflow.regenerate_section(section_id, live_effects, dry_run=dry_run)
+                    if section_id is not None
+                    else await workflow.inject(live_effects, dry_run=dry_run)
+                )
         except InjectionPartialError as error:
             _print_live_injection_partial(error)
             return 1
         except Exception as error:
-            console.print(f"[red]ERROR: Live injection stopped safely: {error}[/red]")
+            console.print(f"[red]ERROR: Live injection stopped safely: {escape(str(error))}[/red]")
             return 1
-        if injection.dry_run:
+        if physical:
+            if section_id is not None:
+                console.print(
+                    f"Re-planned section {section_id} only, then re-rendered the moving "
+                    "heads for the whole song: a physical render plans each head's dark "
+                    "repositioning across section edges, so one section cannot be swapped "
+                    "in alone. Every Twinklr moving-head effect in the sequence is replaced; "
+                    "identical ones are left in place."
+                )
+            console.print(f"Render fingerprint: {pipeline_context.get_state('render_fingerprint')}")
+        if injection.dry_run and physical:
+            dry_run_path = artifact_dir / LIVE_DRY_RUN_FILENAME
+            dry_run_path.write_text(
+                "".join(
+                    json.dumps(command, sort_keys=True) + "\n" for command in injection.commands
+                ),
+                encoding="utf-8",
+            )
+            console.print(
+                f"[yellow]Dry run; {len(injection.commands)} planned xLights writes, every one "
+                f"in {dry_run_path}:[/yellow]"
+            )
+            counts = Counter(
+                (command["cmd"], command.get("target") or command.get("model", ""))
+                for command in injection.commands
+            )
+            for (command_name, model), count in sorted(counts.items()):
+                console.print(f"   {command_name} {model}: {count}", markup=False)
+        elif injection.dry_run:
             console.print("[yellow]Dry run; exact planned xLights writes:[/yellow]")
             for command in injection.commands:
                 console.print(json.dumps(command, sort_keys=True))
@@ -568,6 +771,25 @@ async def _run_pipeline_async(
                 f"{len(injection.deleted)} replaced, {len(injection.unchanged)} unchanged. "
                 "Twinklr did not save the sequence."
             )
+            if physical:
+                try:
+                    _save_live_plan(
+                        live_plans_path,
+                        injection.sequence_path,
+                        result.outputs["moving_heads"],
+                        _live_plan_identity(
+                            audio_path,
+                            job_config,
+                            fixture_group,
+                            JsonOwnershipStore(ownership_path).load(injection.sequence_path),
+                        ),
+                    )
+                except (OSError, ValueError) as error:
+                    console.print(
+                        f"[yellow]The injected effects are in place, but the plan was not "
+                        f"recorded: {escape(str(error))}. `twinklr regenerate` refuses until an "
+                        "inject records it.[/yellow]"
+                    )
 
     # Report results
     console.print("\n" + "=" * 50)

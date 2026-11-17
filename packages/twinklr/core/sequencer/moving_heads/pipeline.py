@@ -36,6 +36,7 @@ from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS, resolve_
 from twinklr.core.formats.xlights.sequence.models.xsq import (
     TimeMarker,
     TimingTrack,
+    XSequence,
 )
 from twinklr.core.sequencer.models.context import (
     SectionRenderIntent,
@@ -251,7 +252,7 @@ def offered_template_ids(job_config: JobConfig, template_ids: Sequence[str]) -> 
             f"moving_heads.mode 'physical_v2' has no template with physical data to offer the "
             f"planner: none of the {len(template_ids)} loaded templates carries "
             "movement.physical, without legacy data, on every step. Load physical templates "
-            "(--template-dir) or set moving_heads.mode to 'legacy_v1'"
+            "(--template-dir)"
         )
     return offered
 
@@ -1505,6 +1506,9 @@ class RenderingPipeline:
         self.admission = admission
         self.artifacts: DeliveryArtifacts | None = None
         """Set by `render()` when `output_path` is given."""
+        self.sequence: XSequence | None = None
+        """Set by a `physical_v2` `render()` when `output_path` is given: the sequence its
+        `.xsq` is written from, which live injection reads (`live_effects_from_sequence`)."""
         self.frames: tuple[EncodedFixtureFrame, ...] = ()
         """Set by a `physical_v2` `render()`: every fixture's encoded frames, rig order."""
         self.render_record: dict[str, Any] | None = None
@@ -2080,6 +2084,7 @@ class RenderingPipeline:
             self.artifacts = export_physical_delivery(
                 xsq, runs, output_path=self.output_path, policy=policy, render=self.render_record
             )
+            self.sequence = xsq
         return list(result.segments)
 
     def _plan_templates(self) -> list[TemplateDoc]:

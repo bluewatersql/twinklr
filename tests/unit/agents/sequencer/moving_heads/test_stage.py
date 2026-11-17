@@ -1,6 +1,7 @@
 """Tests for MovingHeadStage."""
 
 import json
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -27,6 +28,7 @@ from twinklr.core.agents.sequencer.moving_heads.models import (
 from twinklr.core.agents.sequencer.moving_heads.stage import (
     MOVING_HEAD_CACHE_VERSION,
     MovingHeadStage,
+    check_regeneration_base,
 )
 from twinklr.core.config.models import AgentConfig
 
@@ -122,6 +124,122 @@ def test_regenerate_rejects_ambiguous_display_name() -> None:
 
     with pytest.raises(ValueError, match="canonical unique ID"):
         MovingHeadStage._select_section_inputs(profile, None, None, "chorus")
+
+
+def _section(name: str, start: int, end: int, template_id: str = "t") -> PlanSection:
+    return PlanSection(section_name=name, start_bar=start, end_bar=end, template_id=template_id)
+
+
+def test_regenerate_with_a_base_plan_replaces_only_the_named_section_in_place() -> None:
+    """A physical regeneration renders the whole song: the stage returns the plan of the
+    effects already injected (the base) with the re-planned section in its place."""
+    base = ChoreographyPlan(
+        sections=[_section("intro", 1, 8), _section("chorus_1", 9, 16), _section("outro", 21, 24)],
+        overall_strategy="base",
+    )
+    replan = ChoreographyPlan(sections=[_section("chorus_1", 9, 16, "new")], overall_strategy="x")
+    context = MagicMock()
+    context.get_state.side_effect = lambda key, default=None: (
+        base if key == "regeneration_base_plan" else default
+    )
+    stage = MovingHeadStage(fixture_count=4, available_templates=["t"], section_id="chorus_1")
+
+    plan = stage._with_base_plan(replan, context)
+
+    assert plan.sections == [base.sections[0], replan.sections[0], base.sections[2]]
+    assert plan.overall_strategy == "base"
+    assert (
+        MovingHeadStage(fixture_count=4, available_templates=["t"])._with_base_plan(replan, context)
+        is replan
+    )
+    # A section the injected plan left out goes in bar order.
+    bridge = ChoreographyPlan(sections=[_section("bridge", 17, 20)])
+    regenerated = MovingHeadStage(
+        fixture_count=4, available_templates=["t"], section_id="bridge"
+    )._with_base_plan(bridge, context)
+    assert [s.section_name for s in regenerated.sections] == [
+        "intro",
+        "chorus_1",
+        "bridge",
+        "outro",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("section_id", "replan", "message"),
+    [
+        ("chorus_1", [_section("intro", 1, 8)], "also names \\['intro'\\]"),
+        ("chorus_1", [_section("chorus_1", 9, 12), _section("chorus_1", 13, 16)], "2 sections"),
+        ("chorus_1", [_section("chorus_1", 9, 17)], "bars 9-17.*bars 9-16"),
+        ("bridge", [_section("bridge", 15, 22)], "overlaps 'chorus_1' \\(bars 9-16\\)"),
+    ],
+)
+def test_regenerate_with_a_base_plan_refuses_a_replan_that_breaks_the_song(
+    section_id: str, replan: list[PlanSection], message: str
+) -> None:
+    """A re-plan merged into the injected plan must be one section, the named one, over
+    the bars it had; a section the base lacks must fit between the kept ones."""
+    base = ChoreographyPlan(
+        sections=[_section("intro", 1, 8), _section("chorus_1", 9, 16), _section("outro", 21, 24)]
+    )
+    context = MagicMock()
+    context.get_state.side_effect = lambda key, default=None: (
+        base if key == "regeneration_base_plan" else default
+    )
+    stage = MovingHeadStage(fixture_count=4, available_templates=["t"], section_id=section_id)
+
+    with pytest.raises(ValueError, match=message):
+        stage._with_base_plan(ChoreographyPlan(sections=replan), context)
+
+
+def _admission(**presets: tuple[str, ...]) -> Any:
+    from twinklr.core.sequencer.moving_heads.pipeline import TemplateAdmission
+
+    return TemplateAdmission(
+        admitted=tuple(presets),
+        admitted_presets=dict(presets),
+        effective_preset=dict.fromkeys(presets),
+        exclusions=(),
+        preset_exclusions=(),
+        entry_dips={},
+    )
+
+
+@pytest.mark.parametrize(
+    ("kept", "admission", "message"),
+    [
+        (
+            _section("intro", 1, 8, "sweep_lr_fan_pulse"),
+            _admission(circle_fan_hold=()),
+            "names template 'sweep_lr_fan_pulse', which this run's pre-planning check",
+        ),
+        (
+            PlanSection(
+                section_name="intro",
+                start_bar=1,
+                end_bar=8,
+                template_id="circle_fan_hold",
+                preset_id="narrow",
+            ),
+            _admission(circle_fan_hold=("wide",)),
+            "names preset 'narrow' of template 'circle_fan_hold'",
+        ),
+    ],
+)
+def test_regenerate_refuses_a_base_plan_this_run_cannot_render_as_recorded(
+    kept: PlanSection, admission: Any, message: str
+) -> None:
+    """A kept section whose template or named preset this run's gate did not admit (the
+    rig, job or templates changed) would render differently from what was injected. The
+    regenerated section's own choice does not matter: it is re-planned."""
+    base = ChoreographyPlan(sections=[kept, _section("chorus_1", 9, 16, "gone")])
+
+    with pytest.raises(ValueError, match="run `twinklr inject`") as refused:
+        check_regeneration_base(base, "chorus_1", admission)
+
+    assert message in str(refused.value)
+    # Admitted with its preset, the kept section passes; "gone" is never consulted.
+    check_regeneration_base(base, "chorus_1", _admission(**{kept.template_id or "": ("narrow",)}))
 
 
 def create_mock_beat_grid() -> MagicMock:

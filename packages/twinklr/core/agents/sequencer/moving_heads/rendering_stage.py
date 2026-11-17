@@ -44,6 +44,8 @@ class MovingHeadRenderingStage:
         - "xsq_output_path": Path to generated XSQ file
         - "delivery_artifacts": DeliveryArtifacts (.xsq, .xtiming files, .xmap)
         - "rendered_segment_count": Number of segments rendered
+        - "rendered_sequence", "render_fingerprint": a physical render's sequence, the
+          one its .xsq is written from and live injection reads, and its render identity
         - "unplayable_warning": a physical render's warning about the cues it kept
           dark under `on_unplayable`, when it kept any
 
@@ -171,6 +173,11 @@ class MovingHeadRenderingStage:
             context.set_state("delivery_artifacts", pipeline.artifacts)
             context.set_state("rendered_segment_count", len(segments))
             context.set_state("rendered_segments", tuple(segments))
+            if pipeline.sequence is not None and pipeline.render_record is not None:
+                context.set_state("rendered_sequence", pipeline.sequence)
+                context.set_state(
+                    "render_fingerprint", pipeline.render_record["render_fingerprint"]
+                )
             if pipeline.unplayable_warning is not None:
                 context.set_state("unplayable_warning", pipeline.unplayable_warning)
 
@@ -348,7 +355,11 @@ class RenderPreflightStage:
 
     async def execute(self, input: Any, context: PipelineContext) -> StageResult[Any]:
         """Pass the audio through, or fail with the reason the job cannot render."""
-        from twinklr.core.agents.sequencer.moving_heads.stage import resolve_beat_grid
+        from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+        from twinklr.core.agents.sequencer.moving_heads.stage import (
+            check_regeneration_base,
+            resolve_beat_grid,
+        )
         from twinklr.core.config.render_policy import (
             UnsupportedRenderModeError,
             preflight_render_policy,
@@ -418,5 +429,17 @@ class RenderPreflightStage:
         except (UnsupportedRenderModeError, PhysicalOutputError) as error:
             logger.error("Render preflight refused the job: %s", error)
             return failure_result(str(error), stage_name=self.name)
+        base = context.get_state("regeneration_base_plan")
+        if isinstance(base, ChoreographyPlan):
+            # A physical regeneration re-renders the whole song from the injected plan;
+            # one this gate would not render as injected is refused here, before any
+            # planner.
+            try:
+                check_regeneration_base(
+                    base, str(context.get_state("regeneration_section_id")), admission
+                )
+            except ValueError as error:
+                logger.error("Render preflight refused the regeneration: %s", error)
+                return failure_result(str(error), stage_name=self.name)
         context.set_state("template_admission", admission)
         return success_result(input, stage_name=self.name)

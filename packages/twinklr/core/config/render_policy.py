@@ -98,7 +98,7 @@ def preflight_render_policy(
             f"moving_heads.mode {policy.mode!r} cannot render this rig: "
             + "; ".join(problems)
             + "".join(f". {line}" for line in guidance)
-            + ". Add the missing items, or set moving_heads.mode to 'legacy_v1'"
+            + ". Add the missing items"
         )
 
 
