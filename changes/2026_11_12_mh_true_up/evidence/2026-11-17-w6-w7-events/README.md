@@ -701,3 +701,126 @@ render above did). The suite below ran after both.
 | `git apply --check w67/headroom_variant.patch` | clean |
 
 `make validate` not run (the integrator's; the tree is uncommitted).
+
+## Fix round 2 (second review of `0e02e969`; 2026-11-17)
+
+Same worktree, no commits; handed back together with W8 (its own record:
+[W8 transitions](../2026-11-17-w8-transitions/README.md)), so one renderer revision bump
+covers both: 9 → **10**. Reviewer scripts: scratch `w67rev2/tools/` (`repro_darklate.py`,
+`repro_moved.py`, `repro_m2.py`, `repro_hit_strobe.py`); this round's probes: scratch
+`w8/a1_agree.py`, `w8/a2_agree.py`, outputs in `w8/partA_probes.txt`.
+
+### A1 (MEDIUM): a colour or gobo change no head shows in time
+
+Integrator decision, as built (`events._play_wheel_events`, `rig_repair._wheel_plays`):
+
+- **Per head:** a head dark on the event's beat (or dark from a frame or two after it:
+  the change must show lit for `HIT_MIN_LIT_FRAMES` frames running to count) turns in
+  that darkness and shows the change from its next reveal, however late, traced `late`.
+- **Per event:** it plays on its beat where some head shows it lit within
+  `WHEEL_LATE_BEATS` (1 beat, a frame of grid tolerance). Where no head would, it moves, on
+  every head, to the beat within `WHEEL_MOVE_BARS` (1 bar) inside the part and between
+  this wheel's neighbouring events where the most heads show it in time, a later beat
+  first (the nearest of equals), an earlier one only where nothing later serves; traced
+  `moved` with the beat, the direction, the offset and how many heads show it in time.
+  Where no beat serves, it does not play (each head's own reason first).
+- **A head never lit again before the section's end** does not play it (`not_played`);
+  in a section with more parts, one the part's later frames do not show plays from the
+  next part (`late`, "from the section's next part").
+- **Repair** predicts all of it from the published steady dark phases and each head's
+  wheel change into the event's own state (A4): on its beat with late heads named and
+  their lateness, moved (to which beat, which way, the offset, how many heads), or not
+  played; a head that never shows it; a `closed` before it shows it at the `open`.
+- **Prompt:** per admitted template with dark phases, the beats of its cycle on which an
+  event shows on every head, on some (the rest from their next reveal), on none but within
+  a beat, or moves (`song_intent.wheel_event_beats`).
+
+Frame tests on both cascades (`test_a_colour_event_no_head_shows_within_a_beat_moves_to_
+where_the_most_heads_do`: `fly_in_cascade` 3.1 → 3.3 and `fly_out_cascade` 3.4 → 4.2, later,
+every head shows blue lit within a beat of the new beat and none before it, read from the
+bytes; the repair names the same beat), the late-head case (3.3), the never-shown case (a
+`closed` to the section's end). The review's repro (`fly_in_cascade` 120 BPM blue @3.1, MH1
+and MH4 two beats late, MH2 and MH3 three) now moves to 3.3, where all four show it within
+a beat.
+
+**Render against repair** (`w8/a1_agree.py`: blue on every beat of bars 2–6, six families
+× 78.3, 120, 170 BPM, 3/4 at 120, two pickup beats at 129): 562 of 570 agree on what plays (on the beat,
+moved to which beat, or not played) and on which heads are late. The 8 that do not are
+all on the cascades at 78.3 and 170 BPM, where a head's next reveal lies within one frame
+of exactly one beat: the published phases are frame-quantized in their own cycle, half a
+frame off the occurrence the render plays, so the repair can call a reveal of one beat and
+a frame "in time" that the render calls late, or the reverse; the event then moves on one
+side and plays on its beat with late heads on the other. Recorded, not fixed (closing it
+needs the render's own frames, which the planner never has).
+
+### A2 (LOW): moved cue-bound hits
+
+A hit bound to a lyric cue that moves now goes to the lit beat nearest the lyric (the later
+of equals); an unbound one keeps the most heads, later first. The trace's `moved` carries
+the offset and the rule; the lyric cue's line names the beat it played on and its signed
+offset ("hit planned at bar 3 beat 1, played at bar 2 beat 4 at … (−530 ms from the lyric
+…)"); repair names the beat, the direction and the offset (from the lyric for a cue-bound
+hit, from its beat otherwise). Test
+`test_a_cue_bound_hit_moves_to_the_beat_nearest_its_lyric_and_says_where` (the review's
+`fly_in_cascade` 3.1 with the lyric 30 ms after: unbound → 3.3, bound → 2.4). Render against
+repair on moved hits (`w8/a2_agree.py`, three families × four grids × unbound / lyric
+before / lyric after): 675 of 675 agree on the beat (282 moved).
+
+### A3 (LOW): 3/4 dark phases
+
+In 3/4 `fly_in_cascade`'s cycle is twelve beats, so an 8-bar song holds exactly two and the
+second cycle's last window (MH1, MH4 from beat 11) ran into the song's end, where nothing
+after the last cue counted as a window: it was not published. `_dark_phases` now counts a
+head's darkness from its last cue to the compile's end as a window, and one the end cuts off
+is as long as the window a cycle earlier. Reviewer's `repro_m2.py`: 225 of 225 agree (was 222 / 3).
+Test `test_in_three_four_the_cycle_that_ends_with_the_song_keeps_its_last_window`.
+
+### A4 (LOW): one wheel test
+
+`HeadWheels.changes` carries each head's wheel change into each offered state (that state's
+settle), and the repair judges an event on its own target state, with the darkness the
+published phases already give it counted, against `dip_fits` (the render's test). Test
+`test_a_colour_events_dip_is_judged_on_its_own_states_change_as_the_render_does` (blue's
+40 ms lead fits 150 ms, red's 180 ms does not; the slowest-state rule recorded both).
+`RigOffer.dip_fits` (the median-beat summary for the prompt) is renamed
+`change_fits_median_beat`.
+
+### A5 (LOW): a hit inside a strobe or pulse
+
+Kept (the owner judges), traced on both: the hit's outcome lists `lights_flash_dark`
+("N frame(s) the strobe_slow at bar 3 beat 1 holds dark"), the strobe's per head
+`lit_by_hits` ("a hit at … (bar 3 beat 3) lights N of its dark frames"); both read in
+`describe_events`. Test `test_a_hit_inside_a_strobe_is_traced_on_both` (78.3 BPM, the
+review's case; the count read from the bytes).
+
+### A6 (LOW): the played rule per frame
+
+`HIT_VISIBLE_CAP` is gone. A frame counts toward a hit's visibility where it differs from
+the level the head plays without the hit by `min(contrast, (L − HIT_FLOOR)/top)` of the top
+(L that frame's level) and by at least one word; the hit is played where at least
+`visible_frames` frames do. Strict wherever the full depth is possible; a HIGH hit on
+INTENSE's sag counts against the room it has. The visibility test's independent reader
+uses the same rule (4 families × 4 grids × as authored and DRAMATIC, all pass).
+
+### A7: nits
+
+The duplicate `_BEAT_TOLERANCE_MS` is gone; `context/current-state.md` says what A1
+plays (the late head, the move, not played).
+
+### Revision, pins
+
+Renderer revision 10 (with W8). Every pin re-recorded fingerprint only; every frame and
+`.xsq` hash, the event pins' included, is unchanged by Part A (no pinned plan has a colour
+event no head shows within a beat, a moved cue-bound hit or a hit inside a strobe). The
+byte matrix's Part A comparison is in the W8 record (§ Byte matrix: base `0e02e969` against
+the Part A tree).
+
+### Byte matrix and verification (Part A)
+
+Base `0e02e969` against the tree after Part A alone (scratch `w8/compare_partA.txt`, 567
+configurations, the two pickup grids among them): the gate, plans A and B and every
+event-free plan identical in all 567; the event plans different in 63, all on
+`fam4_tagged` (the only rig whose tagged wheels let colour events play), identical in the
+other 504; no render errored; every wheel turn dark. The suite, pins, parity, ruff and
+mypy ran once for Part A and W8 together, after the last code edit (the W8 record's
+§ Verification).

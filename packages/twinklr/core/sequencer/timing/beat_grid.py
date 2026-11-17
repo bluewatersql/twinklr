@@ -21,10 +21,6 @@ _BEAT_TOLERANCE_MS = 1.0
 """A detected beat within this of a downbeat is that downbeat (both are detected times,
 which may differ by rounding)."""
 
-_BEAT_TOLERANCE_MS = 1.0
-"""A detected beat within this of a downbeat is that downbeat (both are detected times,
-which may differ by rounding)."""
-
 
 class BeatGrid(BaseModel):
     """Musical timing grid with pre-calculated bar and beat boundaries.

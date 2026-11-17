@@ -35,7 +35,7 @@ from twinklr.core.agents.sequencer.moving_heads.rig_repair import repair_rig_int
 from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.moving_heads.events import (
-    HIT_VISIBLE_CAP,
+    HIT_FLOOR,
     HITS,
     STROBE_FLASHES_PER_BEAT,
     describe_lyric_cue,
@@ -380,11 +380,16 @@ def hit_window(beat_grid: BeatGrid, bar: int, beat: int, emphasis: str = "MED") 
 
 def visible_frames(frames: Frames, plain: Frames, head: str, at: int, emphasis: str) -> int:
     """How many frames around a hit at frame `at` differ from the render without it by at
-    least the emphasis' contrast (at most `HIT_VISIBLE_CAP`) of full, read from the bytes."""
-    words = round(min(HITS[emphasis].contrast, HIT_VISIBLE_CAP) * 255)
+    least the emphasis' contrast of full, or by all the room the level without it leaves
+    above the floor where that is less, read from the bytes."""
+    contrast, floor = HITS[emphasis].contrast, HIT_FLOOR * 255
     a, b = frames.dimmer(head), plain.dimmer(head)
+
+    def needed(level: int) -> float:
+        return max(1, min(contrast * 255, max(0.0, level - floor)) - 1)
+
     return sum(
-        1 for i in range(max(0, at - 30), min(len(a), at + 60)) if abs(a[i] - b[i]) >= words - 1
+        1 for i in range(max(0, at - 30), min(len(a), at + 60)) if abs(a[i] - b[i]) >= needed(b[i])
     )
 
 
@@ -1089,9 +1094,10 @@ def test_a_colour_event_whose_gap_is_too_short_for_the_turn_does_not_play_and_ne
 
 
 def test_a_colour_event_the_part_never_shows_lit_is_recorded_and_the_render_goes_on() -> None:
-    """In 3/4, a colour change on the last beat of a `finite_snap_hold` part whose head is
-    not lit again before the part ends: recorded as never shown in the part (the next part
-    holds it), and the events after it still play (the byte matrix's waltz case)."""
+    """In 3/4, a gobo change on the first beat of a `fly_in_cascade` part where every head
+    is dark: moved a beat later, where two heads show it within a beat; the two heads that
+    never show it before the section ends do not play it; the events after it still play
+    (the byte matrix's waltz case)."""
     beat_grid = BeatGrid(
         bar_boundaries=[15.0 + 1500.0 * i for i in range(11)],
         beat_boundaries=[15.0 + 500.0 * i for i in range(31)],
@@ -1132,12 +1138,12 @@ def test_a_colour_event_the_part_never_shows_lit_is_recorded_and_the_render_goes
     assert_wheels_turn_dark(Frames(pipeline))
     events_ = [e for look in looks(pipeline).values() for e in look["events"]]
     assert len(events_) == 8
+    (gobo,) = [e for e in events_ if e["action"] == "gobo"]
+    assert {o["moved"]["direction"] for o in gobo["heads"].values()} == {"later"}
     assert any(
-        o.get("late", {}).get("reason") == "the head never shows it lit before the section's end"
-        for e in events_
-        if e["action"] in ("color", "gobo")
-        for o in e["heads"].values()
-    ), [e["heads"] for e in events_ if e["action"] in ("color", "gobo")]
+        o.get("not_played") == "the head never shows it lit before the section's end"
+        for o in gobo["heads"].values()
+    ), gobo["heads"]
 
 
 # --- fix round 1: the bar grid, crashes, bounds, records ---------------------------------------
@@ -1341,3 +1347,162 @@ def test_closed_and_open_on_one_beat_and_an_open_with_nothing_to_end_are_traced(
     assert closed["heads"]["MH1"] == {"not_played": "another shutter event on its beat replaces it"}
     assert opened["heads"]["MH1"]["plays"] == "the template's own shutter and level"
     assert extra["heads"]["MH1"]["not_played"].startswith("nothing to open")
+
+
+# --- fix round 2 --------------------------------------------------------------------------
+
+
+def first_lit_with(
+    frames: Frames, head: str, wheel: str, state: str, from_frame: int
+) -> int | None:
+    """The first frame from `from_frame` the head shows `state` lit for three frames running,
+    read from the bytes."""
+    dark, states = frames.dark(head), frames.state(head, wheel)
+    for i in range(from_frame, len(dark) - 2):
+        if all(not dark[i + k] and states[i + k] == state for k in range(3)):
+            return i
+    return None
+
+
+def cascade_repair(plan: list[PlanSection], template_id: str, beat_grid: BeatGrid) -> list[str]:
+    from twinklr.core.sequencer.moving_heads.pipeline import admit_templates
+
+    offer = admit_templates(
+        [template_id],
+        beat_grid=beat_grid,
+        fixture_group=rig(close=20, settle=150),
+        initial_states=m.family_job(HEADS).moving_heads.initial_states,
+        failure_mode="strict",
+    ).offer
+    repaired = repair_rig_intent(
+        ChoreographyPlan(sections=plan, overall_strategy=""), offer, {}, beat_grid
+    )
+    return [r.reason for r in repaired.repairs]
+
+
+@pytest.mark.parametrize(
+    ("template_id", "planned", "moved"),
+    [("fly_in_cascade", (3, 1), (3, 3)), ("fly_out_cascade", (3, 4), (4, 2))],
+)
+def test_a_colour_event_no_head_shows_within_a_beat_moves_to_where_the_most_heads_do(
+    template_id: str, planned: tuple[int, int], moved: tuple[int, int]
+) -> None:
+    """The review's case (120 BPM): every head is dark on the planned beat and its next
+    reveal is two or three beats away. The event moves later, on every head, to the beat
+    within a bar where the most heads show it within a beat; read from the bytes, no head
+    shows blue before that beat and every head shows it lit within a beat of it. The
+    repair predicts the same beat."""
+    beat_grid = grid(120)
+    plan = [section([event(*planned, "color", color="blue")], template_id=template_id)]
+    pipeline = render(plan, fixture_group=rig(close=20, settle=150))
+    frames = Frames(pipeline)
+    (entry,) = looks(pipeline)["s1"]["events"]
+    at = beat_frame(beat_grid, *moved)
+
+    for head, outcome in entry["heads"].items():
+        assert (outcome["moved"]["bar"], outcome["moved"]["beat"]) == moved
+        assert outcome["moved"]["direction"] == "later"
+        shown = first_lit_with(frames, head, "color", "blue", 0)
+        assert shown is not None and at - 2 <= shown <= at + 26, (head, shown, at)
+    assert_wheels_turn_dark(frames)
+    assert any(
+        f"it moves later to bar {moved[0]} beat {moved[1]}" in reason
+        for reason in cascade_repair(plan, template_id, beat_grid)
+    )
+
+
+def test_a_colour_event_some_head_shows_on_time_plays_and_the_dark_heads_show_it_later() -> None:
+    """`fly_in_cascade` 3.3: MH1 and MH4 lit on the beat show blue on it; MH2 and MH3,
+    dark there, show it from their next reveal (traced late, read from the bytes); the
+    repair names the late heads."""
+    beat_grid = grid(120)
+    plan = [section([event(3, 3, "color", color="blue")], template_id="fly_in_cascade")]
+    pipeline = render(plan, fixture_group=rig(close=20, settle=150))
+    frames = Frames(pipeline)
+    (entry,) = looks(pipeline)["s1"]["events"]
+    at = beat_frame(beat_grid, 3, 3)
+
+    for head in ("MH1", "MH4"):
+        assert "moved" not in entry["heads"][head] and "late" not in entry["heads"][head]
+        assert first_lit_with(frames, head, "color", "blue", 0) == at
+    for head in ("MH2", "MH3"):
+        late = entry["heads"][head]["late"]["late_ms"]
+        assert first_lit_with(frames, head, "color", "blue", 0) == at + late // FRAME
+    reasons = cascade_repair(plan, "fly_in_cascade", beat_grid)
+    assert any(r.startswith("it shows after its beat on MH2") and "MH3" in r for r in reasons)
+
+
+def test_a_colour_event_no_head_shows_before_the_section_ends_does_not_play() -> None:
+    """A `closed` from 3.1 to the section's end: a colour on 4.1 is never shown, nor on any
+    beat within a bar: not played on every head (traced, and predicted by the repair), and
+    the bytes never show it lit."""
+    plan = [section([event(3, 1, "closed"), event(4, 1, "color", color="blue")])]
+    pipeline = render(plan, fixture_group=rig(close=20, settle=150))
+    frames = Frames(pipeline)
+    colour = looks(pipeline)["s1"]["events"][1]
+
+    assert all("not_played" in o for o in colour["heads"].values())
+    assert all(first_lit_with(frames, h, "color", "blue", 0) is None for h in HEADS)
+    assert any("it does not play" in r for r in cascade_repair(plan, "mirror_wings", grid(120)))
+
+
+def test_a_cue_bound_hit_moves_to_the_beat_nearest_its_lyric_and_says_where() -> None:
+    """`fly_in_cascade` 3.1 is dark on every head; the lyric is 30 ms after it. A cue-bound
+    hit moves to the lit beat nearest the lyric (an unbound one to the beat the most heads
+    show, a later one first); the lyric cue's line names the beat it played on and its
+    signed offset from the lyric; the repair predicts the same beat."""
+    beat_grid = grid(120)
+    cue_ms = int(beat_grid.beat_time_ms(3, 1) or 0) + 30
+    hit = event(3, 1, "hit", moment_cue_id="c", cue_ms=cue_ms, cue_emphasis="HIGH")
+    plan = [section([hit], template_id="fly_in_cascade", moment_cues=["c"])]
+    pipeline = render(plan)
+    (entry,) = looks(pipeline)["s1"]["events"]
+    moved = {
+        (o["moved"]["bar"], o["moved"]["beat"]) for o in entry["heads"].values() if "moved" in o
+    }
+    unbound = looks(render([section([event(3, 1, "hit")], template_id="fly_in_cascade")]))
+    unbound_moved = {
+        (o["moved"]["bar"], o["moved"]["beat"])
+        for o in unbound["s1"]["events"][0]["heads"].values()
+        if "moved" in o
+    }
+
+    # 3.2 is dark on every head; the lit beats nearest are 2.4 (530 ms before the lyric)
+    # and 3.3 (970 ms after), which an unbound hit takes (two heads, a later one first).
+    ((bar, beat),) = moved
+    assert (bar, beat) == (2, 4) and unbound_moved == {(3, 3)}
+    assert {o["moved"]["direction"] for o in entry["heads"].values() if "moved" in o} == {"earlier"}
+    assert pipeline.render_record is not None
+    (cue,) = pipeline.render_record["lyric_cues"]
+    line = describe_lyric_cue(cue)
+    assert f"hit planned at bar 3 beat 1, played at bar {bar} beat {beat}" in line
+    offset = cue["events"][0]["offset_ms"]["MH2"]
+    assert f"({offset:+d} ms from the lyric" in line and offset < 0
+    reasons = cascade_repair(plan, "fly_in_cascade", beat_grid)
+    assert any(f"to bar {bar} beat {beat}" in r and "nearest its lyric" in r for r in reasons)
+
+
+def test_a_hit_inside_a_strobe_is_traced_on_both() -> None:
+    """78.3 BPM, `strobe_slow` from 3.1, a HIGH hit on 3.3: the hit lights frames the strobe
+    holds dark (kept for the owner's view); the hit's trace says how many, and the strobe's
+    says which hit lights them; the bytes agree."""
+    beat_grid = grid(78.3)
+    strobe = [event(3, 1, "strobe_slow"), event(4, 1, "open")]
+    hit = event(3, 3, "hit", cue_emphasis="HIGH")
+    pipeline = render([section([*strobe, hit])], beat_grid=beat_grid)
+    plain = Frames(render([section(strobe)], beat_grid=beat_grid))
+    frames = Frames(pipeline)
+    entries = looks(pipeline)["s1"]["events"]
+    (strobe_entry,) = [e for e in entries if e["action"] == "strobe_slow"]
+    (hit_entry,) = [e for e in entries if e["action"] == "hit"]
+
+    relit = sum(
+        1
+        for i, (a, b) in enumerate(zip(frames.dark("MH1"), plain.dark("MH1"), strict=True))
+        if b and not a
+    )
+    said = hit_entry["heads"]["MH1"]["lights_flash_dark"]
+    assert said == [f"{relit} frame(s) the strobe_slow at bar 3 beat 1 holds dark"]
+    assert strobe_entry["heads"]["MH1"]["lit_by_hits"][0].endswith(
+        f"(bar 3 beat 3) lights {relit} of its dark frames"
+    )

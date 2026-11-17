@@ -53,13 +53,14 @@ xfails**, each failing on its own target assertion today:
 | W5 | 4 (DRAMATIC, INTENSE; each also on a template that authors its own pulse) | **green** (W5, 2026-11-17; xfails removed) |
 | W6 | 6 (CLOSED/OPEN, three strobes, PULSE, the cue-bound shutter event) | **green** (W6, 2026-11-17; xfails removed) |
 | W7 | 3 (gobo event, two successive gobo events, the cue-bound gobo event) | **green** (W7, 2026-11-17; xfails removed; the parity rig's gobo states carry W1's `pattern` tags) |
-| W8 | 4 (entry CROSSFADE, MORPH, SWEEP, FADE_VIA_BLACK; MORPH and SWEEP must differ) | strict xfail |
+| W8 | 4 (entry CROSSFADE, MORPH, SWEEP, FADE_VIA_BLACK; MORPH and SWEEP must differ) | **green** (W8, 2026-11-17; xfails removed) |
 | W9 | 2 (show palette colour from a palette whose answer differs from the old fixed table; a LEAD section renders hotter than SUPPORT, REST no hotter) | show palette colour **green** (W4: `show` resolves palette roles through the macro palette, the resolver `run` uses); focal role **green** (W5: the show render moves the section's intensity a step by the heads' focal role) |
 
 After W3/W4: 18 strict xfails remain (W5 4, W6 6, W7 3, W8 4, W9 1)
 ([record](../evidence/2026-11-17-w3-w4-offer-colour/README.md)). After W5: 13 (W6 6, W7 3,
 W8 4) ([record](../evidence/2026-11-17-w5-intensity/README.md)). After W6/W7: 4 (W8 4)
-([record](../evidence/2026-11-17-w6-w7-events/README.md)).
+([record](../evidence/2026-11-17-w6-w7-events/README.md)). After W8: none
+([record](../evidence/2026-11-17-w8-transitions/README.md)).
 
 Findings that change the tasks:
 

@@ -515,9 +515,9 @@ def test_the_prompt_says_whether_a_wheel_change_fits_half_a_beat_and_where_it_ca
 
     shown = offer_for_prompt(fast, {}, ["s"])
 
-    assert (shown["dip_fits"], shown["half_beat_ms"]) == (False, 150)
+    assert (shown["change_fits_median_beat"], shown["half_beat_ms"]) == (False, 150)
     assert shown["dark_windows"] == ["masked_wheel_flick (from beat 2 of its cycle)"]
-    assert offer_for_prompt(slow, {}, ["s"])["dip_fits"] is True
+    assert offer_for_prompt(slow, {}, ["s"])["change_fits_median_beat"] is True
 
 
 def test_the_prompt_counts_the_boundaries_a_dip_fits_before() -> None:
@@ -625,3 +625,21 @@ def test_the_offer_says_how_fast_the_heads_can_flash_and_what_each_strobe_plays(
         4,
         4,
     ]
+
+
+def test_the_prompt_says_how_long_each_transition_length_is_and_how_fast_the_aim_travels() -> None:
+    """3/4 at 120 BPM on the family rig (720°/s over a 540° pan and a 270° tilt): a BAR is
+    three beats, 1500 ms; the slowest head crosses the whole pan range in 750 ms and the
+    tilt in 375 ms (a lit move faster than that dips dark)."""
+    beats = [15.0 + 500.0 * i for i in range(25)]
+    waltz = m.bars_grid(*([500.0] * 8))
+    waltz = waltz.model_copy(
+        update={"bar_boundaries": beats[::3][:8], "beat_boundaries": beats, "beats_per_bar": 3}
+    )
+    offer = rig_offer(m.family_rig(("MH1", "MH2")), waltz)
+    shown = offer_for_prompt(offer, {}, ["s"])["transitions"]
+
+    lengths = {entry["length"]: entry["ms"] for entry in shown["lengths"]}
+    assert (lengths["BEAT"], lengths["HALF_BAR"], lengths["BAR"]) == (500, 750, 1500)
+    assert lengths["EIGHT_BARS"] == 12000
+    assert shown["full_travel_ms"] == {"pan": 750, "tilt": 375}

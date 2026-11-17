@@ -39,9 +39,9 @@ states; the planner is told what the rig can show, and what it cannot is repaire
 its intensity on the dimmer (DRAMATIC and INTENSE a beat-locked pulse; under `twinklr
 show` the heads' macro focal role moves it a step), and its timed events (closed/open,
 strobes, pulse, hits, colour and gobo changes) with the lyric moment cues they land on
-(a hit scaled by the cue's emphasis). It does not yet render the rest of the plan's song
-intent (transitions, motif, variation, density, modifiers); the renderer deleted in the
-single-renderer cutover rendered entry transitions. The owner has ruled that
+(a hit scaled by the cue's emphasis), and its entry and exit transitions. It does not
+yet render the rest of the plan's song intent (motif, variation, density, modifiers),
+which no renderer has rendered. The owner has ruled that
 all of it is rendered on the single path and that nothing leaves the planner contract
 without the owner's word ([song-intent rendering](../../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md),
 [decision](../../memories/decisions/mh-single-renderer.md)). The dated history of that

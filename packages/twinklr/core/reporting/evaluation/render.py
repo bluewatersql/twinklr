@@ -222,8 +222,9 @@ def _song_intent_markdown(intent: SongIntentReport) -> list[str]:
     lines.extend(f"- played: {line}" for line in intent.played)
     if intent.not_rendered:
         lines.append(
-            f"- not rendered yet ({', '.join(intent.not_rendered)}): a known regression, "
-            "being fixed under `changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md`"
+            f"- not rendered yet ({', '.join(intent.not_rendered)}): no renderer has rendered "
+            "them yet; being built under "
+            "`changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md`"
         )
     lines.append("")
     return lines

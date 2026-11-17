@@ -253,8 +253,9 @@ Factory: `TwinklrSession.from_directory(config_dir)` discovers `config.json` and
   (`song_intent.py`: resolved per head to the tagged wheel states, held in place of the
   authored ones, turned only in the dark), its intensity on the dimmer (`intensity.py`)
   and its timed events (`events.py`: closed/open, strobes, pulse, hits scaled by their
-  lyric cue's emphasis, colour and gobo changes revealed on the beat); the rest of the
-  section's song intent is not rendered yet (a known regression, [plan](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)),
+  lyric cue's emphasis, colour and gobo changes revealed on the beat) and transitions
+  (`transitions.py`: entry and exit, each mode on its window at the boundary); motif
+  variation, density and modifiers are not rendered yet (no renderer has, [plan](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)),
   and each section that sets any says which fields in the trace's diagnostics
 - The template compiler turns the sections' parts into cues with
   typed physical trajectories; the transaction pass plans dark repositioning between

@@ -768,8 +768,11 @@ uv run twinklr run \
    Its intensity plays on the dimmer, locked to the beat (`DRAMATIC` and `INTENSE` a
    pulse, the other levels as authored; under `twinklr show` the heads' macro focal role
    moves it a step: [user guide](user-guide.md#how-a-sections-intensity-reaches-the-lights)).
-   It does not yet render the rest of the planner's song intent (timed accents and lyric
-   moment cues, entry and exit transitions, motif variation, density, modifiers): a known regression from the single-renderer cutover, being fixed
+   Its timed accents play on the beat with the lyric moment cues they land on
+   ([user guide](user-guide.md#how-a-sections-events-reach-the-lights)), and its entry and
+   exit transitions at its boundaries
+   ([user guide](user-guide.md#how-a-sections-transitions-reach-the-lights)). It does not
+   yet render motif variation, density or modifiers, which no renderer has rendered
    ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 
 ### Demo Scripts

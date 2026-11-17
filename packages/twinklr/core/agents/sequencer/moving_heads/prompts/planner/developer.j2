@@ -173,23 +173,48 @@ or slows.
 - `BUSY`: dense movement (choruses, peaks)
 
 **`transitions`**: how a section enters (`ENTRY`) and leaves (`EXIT`), at most one of
-each, chosen for the musical boundary:
-- `snap`: a hard cut, into a drop or on a downbeat hit
-- `blackout`: a cut to or from dark, into a drop after a stop, or a dead stop at the end
-- `fade_via_black`: fade out, change in the dark, fade up, into a quiet bridge or outro
-- `crossfade`: one look hands over to the next, between related sections (verse to
-  chorus of one mood)
-- `morph`: every channel eases from the old look to the new, between related sections
-  that flow on
-- `sweep`: the heads travel, lit, to their new aim, on builds and lifts
-- `length`: how long the change lasts, from one beat to eight bars; measure it against
-  the phrase: a beat or half a bar for a cut-like change, one or two bars between
-  phrases, four to eight bars to dissolve across a long phrase
-- `curve`: the easing of the change
-- `split`: how much of a crossfade the outgoing look takes to fade out before the
-  incoming one takes over, from a quarter to three quarters of it
-- `channels`: per-channel strategies overriding the mode (each channel at most once);
-  empty when the mode suits every channel
+each, chosen for the musical boundary. Both edges name the change at one boundary: where
+a section's `EXIT` meets the next section's `ENTRY`, the `ENTRY` plays. The first
+section's `ENTRY` and the last section's `EXIT` play against the heads at rest (dark, at
+their home aim). Deterministic code places and plays each:
+- `snap`: a cut on the boundary, into a drop or on a downbeat hit: where the heads must
+  move or turn a wheel for the new look they go dark just before the boundary (at most
+  `length` before it) and are in place, lit, on its first beat; where nothing changes it
+  is the plain cut
+- `crossfade`: one look hands over to the next, between related sections: the light eases
+  down to half the lower of the two looks' levels at the boundary and up to the new
+  look's, the aim easing across; the window starts `split` of `length` before the boundary
+- `morph`: every continuous channel (aim, zoom, level) eases from the old look to the new
+  over a window centred on the boundary, halfway at `split` of it, between related
+  sections that flow on
+- `sweep`: the old look (aim and level) holds until `split` of a centred window, then the
+  heads travel lit to the new aim, on builds and lifts
+- `fade_via_black`: the light fades to dark by the boundary (the fade-out takes `split`
+  of `length`), the heads change in the dark, and it fades up, into a quiet bridge or
+  outro
+- `blackout`: the heads are dark over the window (`split` of it before the boundary),
+  changing in the dark, into a drop after a stop, or a dead stop at the end
+- A colour or gobo wheel never turns lit: across a colour or gobo change a `crossfade`,
+  `morph` or `sweep` dips dark at its split point for the turn and plays lit around it,
+  as does a lit move faster than the heads travel; where the dip does not fit the window
+  the heads enter as without a transition. An event inside the window (but a hit) plays
+  and the window yields to it; a hit plays on the transition's level. A section's
+  intensity resumes after the transition with an accent.
+- `length`: how long the change lasts, from one beat to eight bars, on the song's beats;
+  measure it against the phrase: a beat or half a bar for a cut-like change, one or two
+  bars between phrases, four to eight bars to dissolve across a long phrase; it stays
+  inside the two parts it joins (a longer one is shortened and reported)
+- `curve`: the easing of the change; a curve that neither rises nor falls over its
+  cycle (a wave, a hold, a decay) plays as `linear`
+- `split`: where in the window the change turns (above), from a quarter to three
+  quarters of it
+- `channels`: per-channel strategies overriding the mode (each channel at most once;
+  empty when the mode suits every channel): `smooth` eases the channel, `crossfade`
+  hands the level over (an aim eases as `smooth`), `snap` changes it at the split point
+  (an aim or a wheel in a dark cut there), `fade_via_black` the same with the light
+  fading into and out of the cut, `sequence` with the cut made by the shutter; a wheel or
+  the shutter cannot blend (`smooth` and `crossfade` play as `snap`), and a channel the
+  rig does not have is dropped
 
 **What the rig and the song can hold.** Availability depends on the rig (whether it has a
 colour wheel, which gobos, a shutter that strobes); the prompt's What This Rig Can Show

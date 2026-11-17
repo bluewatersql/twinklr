@@ -109,21 +109,36 @@ See [product/overview.md](product/overview.md).
     darkness cannot follow); `pulse` lit the first half of each beat; `hit` a dip and
     snap to full where the head is lit before the beat, a flash and duck where it is
     revealed on it, scaled by the bound lyric cue's emphasis, counted played only where
-    visible, lit from a dimmer dark phase, moved only where every head is dark (later
-    first); colour and gobo changes revealed on the beat after a dark lead of at most
-    half a beat, else up to a beat late, else not played. The trace records every event
+    visible, lit from a dimmer dark phase, moved only where every head is dark (a
+    cue-bound hit to the beat nearest its lyric, another later first); colour and gobo
+    changes revealed on the beat after a dark lead of at most half a beat (a head dark on
+    the beat shows it from its next reveal), moved within a bar where no head would show
+    it within a beat, else not played. The trace records every event
     per head (unplaceable ones too) and every lyric cue with its offset from the lyric;
     the offer says what each event plays at the song's tempo; repair records, with the
-    render's tests, what will play otherwise. Renderer revision 9.
+    render's tests, what will play otherwise. Renderer revision 10.
     ([user guide](../docs/user-guide.md#how-a-sections-events-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w6-w7-events/README.md))
-  - **Known regression: the rest of the song intent is not rendered yet.** The planner's
-    section transitions, motif variation, density and modifiers are accepted and
-    ignored (a per-section trace diagnostic says so). The renderer deleted in the
-    cutover rendered entry transitions. The owner has directed that all of it be
-    rendered on this renderer, with nothing cut from the planner contract; the remaining
-    work is W8–W9 and motif, variation and density ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)). The renderer is not
-    complete until then.
+  - **Transitions** (W8, 2026-11-17, not yet seen by the owner). Each boundary plays its
+    ENTRY (or the previous section's EXIT; an ENTRY replaces an EXIT it meets) on a
+    window placed by its mode, length (beats from the bar's downbeat) and split:
+    `snap` dark just before the boundary and in place lit on it, `crossfade` the light
+    handing over at half the lower level with the aim easing, `morph` every continuous
+    channel easing, `sweep` the old look holding to the split point then travelling lit,
+    `fade_via_black` out, change in the dark, up, `blackout` dark over the window;
+    per-channel strategies override. A wheel never turns lit (a lit transition across a
+    colour change dips dark at its split point, in place of the boundary's dip); a lit
+    move too fast for the head moves dark; events in the window play (it yields), hits
+    play on it; intensity resumes after it on an accent. The song's first ENTRY and last
+    EXIT play against the heads at rest. Repair shortens one longer than its parts and
+    records what plays otherwise; the trace lists each per head. Renderer revision 10.
+    ([user guide](../docs/user-guide.md#how-a-sections-transitions-reach-the-lights),
+    [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w8-transitions/README.md))
+  - **Not rendered yet: motif variation, density and modifiers.** Accepted and ignored (a
+    per-section trace diagnostic says so); no renderer has rendered them. The owner has
+    directed that all of the song intent be rendered on this renderer, with nothing cut
+    from the planner contract; the remaining work is motif, variation and density
+    ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 
   `twinklr run`, `show`, `eval-report`, `inject` and `regenerate` all use it;
   `regenerate` re-renders the whole song. Gate time on eight heads and a four-minute

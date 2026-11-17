@@ -18,6 +18,7 @@ from twinklr.core.agents.sequencer.moving_heads.models import (
 )
 from twinklr.core.agents.sequencer.moving_heads.rig_repair import repair_rig_intent
 from twinklr.core.config.fixtures import FixtureCapabilities
+from twinklr.core.sequencer.models.transition import PlanTransition
 from twinklr.core.sequencer.moving_heads.libraries.gobo import GoboPattern
 from twinklr.core.sequencer.moving_heads.song_intent import (
     DarkPhases,
@@ -338,9 +339,10 @@ def test_intensity_a_rig_cannot_pulse_is_recorded_not_shaped() -> None:
 def test_events_the_render_plays_otherwise_are_recorded_and_kept() -> None:
     """At 120 BPM then 400 BPM on a rig whose darkness follows 40 ms phases a fast strobe
     plays at most sixteenths, and one flash on the fast beats, recorded with its beats; a
-    hit on a beat where the template is dark on every head is recorded as moving; a colour
-    change 150 ms after the previous one (a 180 ms wheel change) is recorded, and, as it
-    cannot dip there either, as not playing. The plan keeps every event."""
+    hit on a beat where the template is dark on every head is recorded as moving, and where
+    to; two colour changes 150 ms apart (a 180 ms wheel change) that cannot dip are recorded
+    as moving to beats where the template's darkness turns them in time, the second also as
+    too close. The plan keeps every event."""
     grid = m.bars_grid(*([500.0] * 4), *([150.0] * 4))
     templates = {
         "fly_out_cascade": TemplateOffer(
@@ -373,11 +375,16 @@ def test_events_the_render_plays_otherwise_are_recorded_and_kept() -> None:
     ]
     assert reasons["event at bar 3 beat 1: hit"] == [
         "template 'fly_out_cascade' is dark on this beat on every head (between its cues): "
-        "the hit moves to the beat within a bar the most heads show, a later one first"
+        "the hit moves later to bar 3 beat 2 (+500 ms from its beat; the beat the most heads "
+        "show, a later one first), where 1 head(s) show it"
     ]
+    # Neither change fits before its own beat and no dark moment shows it within a beat:
+    # each moves to the beat within a bar where the template's darkness turns it in time.
+    (red,) = reasons["event at bar 6 beat 1: color red"]
+    assert "it moves earlier to bar 5 beat 2 (-450 ms), where 1 head(s) show it in time" in red
     blue = reasons["event at bar 6 beat 2: color blue"]
     assert any("150 ms after the previous color change" in reason for reason in blue)
-    assert any("does not fit half the beat before it (75 ms)" in reason for reason in blue)
+    assert any("it moves later to bar 7 beat 1 (+450 ms)" in reason for reason in blue)
 
 
 def test_the_prompts_show_each_lyric_cue_at_its_bar_and_beat_on_the_bar_grid() -> None:
@@ -417,13 +424,18 @@ def test_the_prompts_show_each_lyric_cue_at_its_bar_and_beat_on_the_bar_grid() -
 def test_a_hit_inside_a_wheel_turns_dark_lead_is_recorded_only_where_the_turn_happens(
     closed: bool,
 ) -> None:
-    """At 400 BPM a 180 ms wheel change before 6.2 darkens 6.1 too: inside a `closed` the
-    change turns there and the hit on 6.1 moves (recorded); without it the change cannot
-    dip and does not play, so the hit is not recorded as moving."""
+    """At 400 BPM a 180 ms wheel change before 6.2 cannot dip (75 ms): inside a `closed`
+    (to 6.3) the change turns in its darkness and shows at the `open`, a beat late, so a
+    hit on 6.1 in that darkness moves (recorded, with where to); without it the change has
+    no dark moment within a beat and does not play, so the hit is not recorded."""
     grid = m.bars_grid(*([500.0] * 4), *([150.0] * 4))
     offer = _offer(_slow(), flash_ms=40, beat_ms=500.0)
     events = [
-        *([_event(EventAction.CLOSED, bar=5, beat=1)] if closed else []),
+        *(
+            [_event(EventAction.CLOSED, bar=5, beat=1), _event(EventAction.OPEN, bar=6, beat=3)]
+            if closed
+            else []
+        ),
         _event(EventAction.HIT, bar=6, beat=1),
         _event(EventAction.COLOR, bar=6, beat=2, color=PlanColor.RED),
     ]
@@ -434,4 +446,108 @@ def test_a_hit_inside_a_wheel_turns_dark_lead_is_recorded_only_where_the_turn_ha
 
     items = {r.item: r.reason for r in repaired.repairs}
     assert ("event at bar 6 beat 1: hit" in items) is closed
-    assert ("event at bar 6 beat 2: color red" in items) is not closed
+    colour = items["event at bar 6 beat 2: color red"]
+    if closed:
+        assert colour.startswith("it shows after its beat on MH1 (160 ms)")
+        assert "moves later to bar 6 beat 3" in items["event at bar 6 beat 1: hit"]
+    else:
+        assert colour.startswith("no head shows it lit within 1 beat") and "does not play" in colour
+
+
+def test_a_colour_events_dip_is_judged_on_its_own_states_change_as_the_render_does() -> None:
+    """A wheel whose red settles in 150 ms and blue in 20 ms (close latency 20 ms): at
+    200 BPM half a beat is 150 ms, so blue's 40 ms dark lead fits before its beat and red's
+    180 ms does not. The repair judges each event on its own target state's change (as the
+    render times the dip), not on the head's slowest change into any state."""
+    payload = _profile(TAGGED).model_dump(mode="json")
+    payload["visibility"]["close_latency_ms"] = 20
+    for name, state in payload["discrete"]["color"]["states"].items():
+        state["settle_ms"] = 150 if name == "red" else 20
+    profile = FixtureCapabilities.model_validate(payload)
+    grid = m.bars_grid(*([300.0] * 8))
+    offer = _offer(profile, beat_ms=300.0)
+    events = [
+        _event(EventAction.COLOR, bar=3, beat=2, color=PlanColor.BLUE),
+        _event(EventAction.COLOR, bar=5, beat=2, color=PlanColor.RED),
+    ]
+    plan = ChoreographyPlan(sections=[_section("s1", (1, 8), events=events)], overall_strategy="")
+
+    with m.family_catalog():
+        repaired = repair_rig_intent(plan, offer, {}, grid)
+
+    assert offer.heads[0].changes["color"] == {"blue": 40, "red": 180, "white": 40}
+    items = {r.item for r in repaired.repairs}
+    assert "event at bar 5 beat 2: color red" in items
+    assert "event at bar 3 beat 2: color blue" not in items
+
+
+def _transition(edge: str, mode: str, length: str = "BAR", **fields: Any) -> dict[str, Any]:
+    return {
+        "edge": edge,
+        "mode": mode,
+        "length": length,
+        "curve": "linear",
+        "split": "QUARTER",
+        "channels": [],
+        **fields,
+    }
+
+
+def test_transition_repairs_record_what_plays_at_each_boundary() -> None:
+    """An EXIT the next ENTRY replaces is recorded; a gobo strategy on a rig without a gobo
+    wheel is dropped; a colour strategy that blends is recorded as a snap; a morph across a
+    colour change is recorded with its dark cut."""
+    profile = _profile(TAGGED)
+    payload = profile.model_dump(mode="json")
+    del payload["discrete"]["gobo"]
+    no_gobo = FixtureCapabilities.model_validate(payload)
+    offer = _offer(no_gobo, beat_ms=500.0)
+    sections = [
+        _section("s1", (1, 4), color=PlanColor.RED).model_copy(
+            update={"transitions": [PlanTransition.model_validate(_transition("EXIT", "blackout"))]}
+        ),
+        _section("s2", (5, 8), color=PlanColor.BLUE).model_copy(
+            update={
+                "transitions": [
+                    PlanTransition.model_validate(
+                        _transition(
+                            "ENTRY",
+                            "morph",
+                            channels=[
+                                {"channel": "gobo", "strategy": "snap"},
+                                {"channel": "color", "strategy": "smooth"},
+                            ],
+                        )
+                    )
+                ]
+            }
+        ),
+    ]
+    grid = m.bars_grid(*([500.0] * 8))
+
+    with m.family_catalog():
+        repaired = repair_rig_intent(
+            ChoreographyPlan(sections=sections, overall_strategy=""), offer, {}, grid
+        )
+
+    said = {(r.section_id, r.action.value, r.reason) for r in repaired.repairs}
+    assert (
+        "s1",
+        "recorded",
+        "section 's2''s ENTRY plays at this boundary, so this EXIT does not",
+    ) in said
+    assert any(
+        r[0] == "s2"
+        and r[1] == "adjusted"
+        and r[2].startswith("gobo snap: no head of this rig has")
+        for r in said
+    )
+    assert ("s2", "recorded", "color smooth: a wheel cannot blend; it plays as snap") in said
+    assert any(
+        r[0] == "s2"
+        and "the colour changes on MH1" in r[2]
+        and "cuts dark at its split point" in r[2]
+        for r in said
+    )
+    (entry,) = repaired.sections[1].transitions
+    assert [c.channel.value for c in entry.channels] == ["color"]

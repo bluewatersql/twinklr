@@ -53,6 +53,7 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
 from twinklr.core.sequencer.models.moving_heads.topology import rig_topology
 from twinklr.core.sequencer.models.template import RepeatMode
+from twinklr.core.sequencer.models.transition import TransitionEdge
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     FALLBACK_METADATA_KEY,
@@ -132,6 +133,14 @@ from twinklr.core.sequencer.moving_heads.song_intent import (
     wheel_change_ms,
 )
 from twinklr.core.sequencer.moving_heads.templates import get_template
+from twinklr.core.sequencer.moving_heads.transitions import (
+    TRANSITION_METADATA_KEY,
+    HeadContext,
+    HeadTransition,
+    Window,
+    play_head,
+    window_for,
+)
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.timing.musical_phase import (
     MusicalPhaseError,
@@ -312,8 +321,13 @@ def _enter_section(
     phase_map: MusicalPhaseMap,
     failure_mode: FailureMode,
     locks: Sequence[RenderLock] = (),
+    played: Collection[str] = (),
 ) -> tuple[list[FixtureSegment], list[dict[str, Any]], list[dict[str, Any]]]:
     """Keep a section's uncut entry where it plays as authored, else open it with a window.
+
+    A fixture in `played` enters through its section's transition, which already
+    checked that the transaction pass plays it (`transitions.play_head`): it keeps its
+    cues (`skipped`).
 
     `kept` holds, per fixture, the cues kept so far as `follow_cues` followed them. A
     fixture whose cues `plan_prepositions` would play as authored after its last kept
@@ -349,8 +363,9 @@ def _enter_section(
         initial = initial_states.get(fixture_id)
         last = before[-1] if before else None
         bounds[fixture_id] = windows[fixture_id] = None
-        if (last is None or not _substitutable(last.segment, failure_mode)) and _plays_as_authored(
-            own, profile, last, initial, locks
+        if fixture_id in played or (
+            (last is None or not _substitutable(last.segment, failure_mode))
+            and _plays_as_authored(own, profile, last, initial, locks)
         ):
             skipped.add(fixture_id)
             continue
@@ -401,6 +416,144 @@ def _enter_section(
             }
         )
     return entered, dropped, records
+
+
+def _cue_level(cue: FixtureSegment, profile: FixtureCapabilities, time_ms: int) -> float:
+    """A cue's dimmer level at one of its frames, as the encoder writes it (1 without a
+    dimmer)."""
+    axis = profile.axes.get("dimmer")
+    value = cue.channels.get(ChannelName.DIMMER)
+    if axis is None:
+        return 1.0
+    if value is None or not isinstance(value.physical, ContinuousTrajectory):
+        return float(axis.word_center(axis.default_word(profile.defaults)))
+    return float(
+        dict(frame_values(value.physical, time_ms, time_ms + EFFECT_GRID_MS, EFFECT_GRID_MS))[
+            time_ms
+        ]
+    )
+
+
+def _event_spans(
+    events: SectionEvents,
+    records: Mapping[int, Mapping[str, Any]],
+    window: tuple[int, int],
+    half_beat_ms: float,
+) -> list[tuple[str, int, int]]:
+    """Where a part's events (but hits) command darkness or a wheel, `(label, start,
+    end)`: a closed, strobe or pulse event over its span, an `open` on its frame, a colour
+    or gobo event from its dark lead (or half the beat before it) to its reveal. A
+    transition yields to them."""
+    spans: list[tuple[str, int, int]] = []
+    lo, hi = window
+    for event, start, end in events.shutter_spans():
+        if start < hi and end > lo:
+            spans.append((f"{event.action} at bar {event.bar} beat {event.beat}", start, end))
+    for event in events.events:
+        if not lo <= event.frame_ms < hi:
+            continue
+        label = f"{event.action} at bar {event.bar} beat {event.beat}"
+        if event.action == "open":
+            spans.append((label, event.frame_ms, event.frame_ms + EFFECT_GRID_MS))
+        elif event.action in WHEEL_ACTIONS:
+            heads = records.get(event.index, {}).get("heads", {}).values()
+            starts = [h["dark_dip"]["from_ms"] for h in heads if "dark_dip" in h]
+            reveals = [h["reveal_ms"] for h in heads if h.get("reveal_ms") is not None]
+            spans.append(
+                (
+                    label,
+                    min([*starts, event.frame_ms - round(half_beat_ms)]),
+                    max([*reveals, event.frame_ms + EFFECT_GRID_MS]),
+                )
+            )
+    return spans
+
+
+def _play_boundary(
+    window: Window,
+    *,
+    cues: list[FixtureSegment],
+    kept: dict[str, list[HeadFollow]],
+    outgoing_part: tuple[str, str] | None,
+    incoming: Sequence[FixtureSegment],
+    profiles: Mapping[str, FixtureCapabilities],
+    initial_states: Mapping[str, InitialFixtureState],
+    locks: Sequence[RenderLock],
+    darken: Callable[[Sequence[FixtureSegment]], list[FixtureSegment]],
+) -> tuple[list[FixtureSegment], dict[str, HeadTransition], dict[str, Any]]:
+    """`window`'s transition on every head (`transitions.play_head`, its own cues then
+    `darken`ed over the show's rests): each head's outgoing
+    cues (`outgoing_part`: their section and segment ids; None where the heads rest
+    before) are cut in `cues` and `kept` is followed again over them; returns the
+    incoming cues with the transition's own cues before them, what played per head, and
+    the transition's trace entry."""
+    record = window.record()
+    edge = "entry" if window.edge is TransitionEdge.ENTRY else "exit"
+    heads_record: dict[str, Any] = {}
+    played: dict[str, HeadTransition] = {}
+    new_incoming: list[FixtureSegment] = []
+    by_head_in: dict[str, list[FixtureSegment]] = defaultdict(list)
+    for cue in sorted(incoming, key=lambda cue: cue.t0_ms):
+        by_head_in[cue.fixture_id].append(cue)
+    out_index: dict[str, list[int]] = defaultdict(list)
+    if outgoing_part is not None:
+        for i, cue in enumerate(cues):
+            if (cue.section_id, cue.segment_id) == outgoing_part:
+                out_index[cue.fixture_id].append(i)
+    for fixture_id in sorted(by_head_in.keys() | out_index.keys()):
+        own_out = sorted((cues[i] for i in out_index[fixture_id]), key=lambda c: c.t0_ms)
+        own_in = by_head_in[fixture_id]
+        identity = own_in[0] if own_in else own_out[-1]
+        history = kept.get(fixture_id, [])
+        first_out = next(
+            (j for j, follow in enumerate(history) if own_out and follow.segment is own_out[0]),
+            len(history),
+        )
+        prefix = history[:first_out]
+        result = play_head(
+            window,
+            own_out,
+            own_in,
+            HeadContext(
+                profile=profiles[fixture_id],
+                initial=initial_states.get(fixture_id),
+                locks=locks,
+                before=prefix[-1] if prefix else None,
+            ),
+            identity=identity,
+            edge_label=edge,
+        )
+        if result is None or (
+            not result.own and result.outgoing == own_out and result.incoming == own_in
+        ):
+            if result is not None:
+                heads_record[fixture_id] = result.record
+            new_incoming += own_in
+            continue
+        result.own = darken(result.own)
+        if result.own or result.outgoing != own_out:
+            played[fixture_id] = result
+        heads_record[fixture_id] = result.record
+        if result.outgoing != own_out:
+            removed = set(out_index[fixture_id])
+            at = min(removed)
+            rest = [cue for i, cue in enumerate(cues) if i not in removed]
+            cues[:] = rest[:at] + result.outgoing + rest[at:]
+            kept[fixture_id] = prefix + follow_cues(
+                result.outgoing,
+                profiles[fixture_id],
+                frame_ms=EFFECT_GRID_MS,
+                after=prefix[-1] if prefix else None,
+            )
+            # Indices after the cut moved: find the other heads' outgoing cues again.
+            if outgoing_part is not None:
+                out_index = defaultdict(list)
+                for i, cue in enumerate(cues):
+                    if (cue.section_id, cue.segment_id) == outgoing_part:
+                        out_index[cue.fixture_id].append(i)
+        new_incoming += result.own + result.incoming
+    record["heads"] = heads_record
+    return new_incoming, played, record
 
 
 def _plays_as_authored(
@@ -1699,7 +1852,10 @@ def _dark_phases(
     fixture, each dark window (`_dark_windows`) that opens inside the second cycle, in
     beats from that cycle's start, so the darkness a cycle begins with (the previous
     cycle's tail) is in them and the first cycle's entry is not; from the first cycle
-    where the song holds only one."""
+    where the song holds only one. A head dark from its last cue to the compile's end has
+    a window there too; one the compile's end cuts off (a cycle that ends with the song,
+    as in 3/4, where a cycle is a whole number of bars) is as long as the window that
+    opens a cycle earlier."""
     segments, context, _, cycle_bars = compile
     first_end = context.bar_offset_to_ms(cycle_bars)
     second_end = context.bar_offset_to_ms(2 * cycle_bars)
@@ -1718,17 +1874,31 @@ def _dark_phases(
     by_fixture: dict[str, list[FixtureSegment]] = defaultdict(list)
     for segment in segments:
         by_fixture[segment.fixture_id].append(segment)
-    return DarkPhases(
-        cycle_beats=beats(cycle_end),
-        heads={
-            fixture_id: tuple(
-                (beats(a), beats(b))
-                for a, b in _dark_windows(own, profiles[fixture_id])
-                if start <= a < cycle_end
-            )
-            for fixture_id, own in sorted(by_fixture.items())
-        },
-    )
+    cycle = beats(cycle_end)
+    heads: dict[str, tuple[tuple[float, float], ...]] = {}
+    for fixture_id, own in sorted(by_fixture.items()):
+        windows = _dark_windows(own, profiles[fixture_id])
+        last = max(cue.t1_ms for cue in own)
+        if last < covered:
+            if windows and windows[-1][1] >= last:
+                windows[-1] = (windows[-1][0], covered)
+            else:
+                windows.append((last, covered))
+        published = []
+        for a, b in windows:
+            if not start <= a < cycle_end:
+                continue
+            opens, length = beats(a), beats(b) - beats(a)
+            if b >= covered and start != context.start_ms:
+                earlier = [
+                    beats(b2) - beats(a2)
+                    for a2, b2 in windows
+                    if abs(beats(a2) - (opens - cycle)) < 0.05
+                ]
+                length = max(earlier, default=length)
+            published.append((opens, round(opens + length, 3)))
+        heads[fixture_id] = tuple(published)
+    return DarkPhases(cycle_beats=cycle, heads=heads)
 
 
 def _reach(
@@ -2208,38 +2378,26 @@ def _section_preset(
 
 
 def _unrendered_intent_message(section: PlanSection) -> str | None:
-    """What of the section's song intent the renderer does not render yet, split into
-    what the renderer before the cutover rendered (a regression) and what no renderer
-    has rendered yet; None for a section that sets none of it. Its colour and gobo
+    """What of the section's song intent the renderer does not render yet (no renderer
+    has); None for a section that sets none of it. Its colour and gobo
     (`song_intent.resolve_section_look`), its intensity (`intensity.shape_section`), its
-    events and their lyric cues (`events`) render, so they are never listed."""
-    regressed: list[str] = []
-    new: list[str] = []
-    if section.entry is not None:
-        regressed.append("entry transition")
-    for name, is_set in (
-        ("exit transition", section.exit is not None),
-        ("motif", section.motif_id is not None),
-        ("variation", section.variation.value != "NONE"),
-        ("density", section.density.value != "BALANCED"),
-        ("modifiers", any(part.modifiers for part in section.parts)),
-    ):
-        if is_set:
-            new.append(name)
-    if not regressed and not new:
-        return None
-    said = []
-    if regressed:
-        said.append(
-            f"{', '.join(regressed)}: a known regression (the renderer before the "
-            "single-renderer cutover rendered them)"
+    events and their lyric cues (`events`) and its transitions (`transitions`) render, so
+    they are never listed."""
+    names = [
+        name
+        for name, is_set in (
+            ("motif", section.motif_id is not None),
+            ("variation", section.variation.value != "NONE"),
+            ("density", section.density.value != "BALANCED"),
+            ("modifiers", any(part.modifiers for part in section.parts)),
         )
-    if new:
-        said.append(f"{', '.join(new)}: not rendered by any renderer yet")
+        if is_set
+    ]
+    if not names:
+        return None
     return (
         f"section {section.section_id!r}: the planner's song intent is not rendered yet; "
-        + "; ".join(said)
-        + ". Both are being fixed under "
+        f"{', '.join(names)}: not rendered by any renderer yet, being built under "
         "changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md; for these the "
         "template renders as authored"
     )
@@ -2646,6 +2804,22 @@ class RenderingPipeline:
         """Per part with hits: its id, frame window, its plan section's events, trace entry."""
         event_records: dict[tuple[str, int], dict[str, Any]] = {}
         """Per plan section and event index, the event's trace entry."""
+        plan_order = {s.section_id: i for i, s in enumerate(self.choreography_plan.sections)}
+        last_part: dict[str, tuple[str, tuple[int, int], tuple[str, str]]] = {}
+        """Per plan section, its last part placed so far: its id, frames, cue identity."""
+        part_records: dict[str, dict[str, Any]] = {}
+        """Per placed part, its trace entry (listed only where it says something)."""
+        transition_end: dict[str, int] = {}
+        """Per plan section, where the transition it was entered by ends."""
+        transition_heads: list[HeadTransition] = []
+        """What each transition played on each head, to light again after intensity."""
+
+        def rested(own: Sequence[FixtureSegment]) -> list[FixtureSegment]:
+            """A transition's own cues dark over the show's rests, as every cue is."""
+            return _dark_over_spans(
+                own, self.dark_spans, profiles, shortest_lit_ms=self._shortest_lit_ms
+            )
+
         for section in self.iterate_plan_sections(self.choreography_plan):
             (part,) = section.parts
             try:
@@ -2948,7 +3122,86 @@ class RenderingPipeline:
                         own if deferral is None else deferral.apply(own, profiles[fixture_id])
                     )
                 section_cues = deferred_cues
+            first_part = section.start_bar == plan_sections[base_id].start_bar
+            entered_by: dict[str, HeadTransition] = {}
+            transition_record: dict[str, Any] | None = None
+            if first_part:
+                order = plan_order[base_id]
+                previous = self.choreography_plan.sections[order - 1] if order else None
+                entry = plan_sections[base_id].entry
+                leaving = None if previous is None else previous.exit
+                chosen = entry if entry is not None else leaving
+                left = None if previous is None else last_part.get(previous.section_id)
+                if chosen is not None and (previous is None or left is not None):
+                    bars = self.beat_grid.bar_boundaries
+                    downbeat = (
+                        bars[section.start_bar - 1]
+                        if section.start_bar - 1 < len(bars)
+                        else context.start_ms
+                    )
+                    half = _half_beat_before(self.beat_grid, downbeat)
+                    not_before: list[tuple[str, int]] = []
+                    if left is not None and previous is not None:
+                        prior = previous.section_id
+                        not_before += [
+                            (f"it starts after the part it leaves plays its {label}", end)
+                            for label, _, end in _event_spans(
+                                timed[prior],
+                                {
+                                    i: event_records.get((prior, i), {})
+                                    for i in range(len(previous.events))
+                                },
+                                left[1],
+                                half,
+                            )
+                        ]
+                        if prior in transition_end:
+                            not_before.append(
+                                (
+                                    "it starts after the transition into the part it leaves",
+                                    transition_end[prior],
+                                )
+                            )
+                    not_after = [
+                        (f"it ends before the part it enters plays its {label}", start)
+                        for label, start, _ in _event_spans(
+                            events, played_box[0].records, window, half
+                        )
+                    ]
+                    boundary_window = window_for(
+                        chosen,
+                        TransitionEdge.ENTRY if entry is not None else TransitionEdge.EXIT,
+                        boundary_ms=downbeat,
+                        phase_map=phase_map,
+                        beats_per_bar=self.beat_grid.beats_per_bar,
+                        earliest_ms=window[0] if left is None else left[1][0],
+                        latest_ms=window[1],
+                        rest="before" if previous is None else None,
+                        not_before=not_before,
+                        not_after=not_after,
+                    )
+                    section_cues, entered_by, transition_record = _play_boundary(
+                        boundary_window,
+                        cues=cues,
+                        kept=kept,
+                        outgoing_part=None if left is None else left[2],
+                        incoming=section_cues,
+                        profiles=profiles,
+                        initial_states=policy.initial_states,
+                        locks=self.locks,
+                        darken=rested,
+                    )
+                    transition_end[base_id] = boundary_window.end_ms
+                    transition_heads += entered_by.values()
+                    if entry is not None and leaving is not None and previous is not None:
+                        transition_record["replaces"] = (
+                            f"section {previous.section_id!r}'s EXIT ({leaving.describe()}): "
+                            "the ENTRY of the section it leads into plays at a boundary"
+                        )
             for fixture_id, (dipped, follow) in dips.items():
+                if fixture_id in entered_by:
+                    # The transition's darkness turns the wheel, in place of the dip.
+                    continue
                 replaced = kept[fixture_id][-1].segment
                 cues[next(i for i, cue in enumerate(cues) if cue is replaced)] = dipped
                 kept[fixture_id][-1] = follow
@@ -2959,8 +3212,20 @@ class RenderingPipeline:
                 }
             record = _played_record(look.record(), outcomes)
             if boundaries:
+                for boundary in boundaries:
+                    if boundary["fixture_id"] in entered_by and "dark_dip" in boundary:
+                        del boundary["dark_dip"]
+                        boundary["in_transition"] = (
+                            "the transition's dark cut turns the wheel, in place of the dip"
+                        )
                 record["boundaries"] = boundaries
-            first_part = section.start_bar == plan_sections[base_id].start_bar
+            if transition_record is not None:
+                if transition_record["edge"] == TransitionEdge.EXIT.value and previous is not None:
+                    left_record = part_records.get(last_part[previous.section_id][0])
+                    if left_record is not None:
+                        left_record.setdefault("transitions", []).append(transition_record)
+                else:
+                    record["transitions"] = [transition_record]
             if part_events or (events.unplaced and first_part):
                 entries = [played_box[0].records.get(e.index, e.record()) for e in part_events]
                 for event, event_entry in zip(part_events, entries, strict=True):
@@ -2990,8 +3255,12 @@ class RenderingPipeline:
                             record,
                         )
                     )
-            if len(record) > 1:
-                section_looks.append(record)
+            part_records[section.section_id] = record
+            last_part[base_id] = (
+                section.section_id,
+                window,
+                (base_id, section.section_id.partition("|")[2] or "A"),
+            )
             message = _unplayed_message(section.section_id, outcomes)
             if message is not None:
                 diagnostics.append(
@@ -3013,6 +3282,7 @@ class RenderingPipeline:
                 phase_map=phase_map,
                 failure_mode=policy.reposition_fallback,
                 locks=self.locks,
+                played=entered_by.keys(),
             )
             for fixture_id in sorted({cue.fixture_id for cue in entered}):
                 before = kept[fixture_id]
@@ -3038,6 +3308,51 @@ class RenderingPipeline:
                     context.end_ms,
                     window_end,
                 )
+        last_section = self.choreography_plan.sections[-1]
+        if last_section.exit is not None and last_section.section_id in last_part:
+            # The song's last EXIT: the heads come to rest (their initial pose, dark)
+            # inside the section's last part.
+            part_id, (part_start, part_end), identity = last_part[last_section.section_id]
+            ends = [c.t1_ms for c in cues if (c.section_id, c.segment_id) == identity]
+            end = min(part_end, max(ends, default=part_end))
+            bars = self.beat_grid.bar_boundaries
+            closing = window_for(
+                last_section.exit,
+                TransitionEdge.EXIT,
+                boundary_ms=end,
+                phase_map=phase_map,
+                beats_per_bar=self.beat_grid.beats_per_bar,
+                earliest_ms=max(part_start, transition_end.get(last_section.section_id, 0)),
+                latest_ms=end,
+                rest="after",
+                not_before=[
+                    (f"it starts after the part plays its {label}", span_end)
+                    for label, _, span_end in _event_spans(
+                        timed[last_section.section_id],
+                        {
+                            i: event_records.get((last_section.section_id, i), {})
+                            for i in range(len(last_section.events))
+                        },
+                        (part_start, part_end),
+                        _half_beat_before(self.beat_grid, bars[-1] if bars else end),
+                    )
+                ],
+            )
+            own, closed_heads, closing_record = _play_boundary(
+                closing,
+                cues=cues,
+                kept=kept,
+                outgoing_part=identity,
+                incoming=[],
+                profiles=profiles,
+                initial_states=policy.initial_states,
+                locks=self.locks,
+                darken=rested,
+            )
+            cues.extend(own)
+            transition_heads += closed_heads.values()
+            part_records[part_id].setdefault("transitions", []).append(closing_record)
+        section_looks.extend(record for record in part_records.values() if len(record) > 1)
         if dropped:
             logger.warning(
                 "moving heads: %d cue(s) start outside the frames %s-%s ms that the covered "
@@ -3060,6 +3375,23 @@ class RenderingPipeline:
                 len(self.dark_spans),
             )
 
+        # Where each transition's outgoing look ends and its own cues are, before intensity
+        # replaces them, so its light can be played again on the outgoing look as shaped.
+        relight: list[tuple[HeadTransition, int, list[int]]] = []
+        position = {id(cue): i for i, cue in enumerate(cues)}
+        for played_head in transition_heads:
+            if not played_head.outgoing or not played_head.own:
+                continue
+            last = played_head.outgoing[-1]
+            if last.t1_ms != played_head.own[0].t0_ms or id(last) not in position:
+                continue
+            relight.append(
+                (
+                    played_head,
+                    position[id(last)],
+                    [position[id(cue)] for cue in played_head.own if id(cue) in position],
+                )
+            )
         for section_id, level, start_ms, end_ms, record in shaping:
             # Intensity plays on the cues as they will play: after the dark spans, the
             # boundary dips, deferred turns and entry windows of every section, so a head
@@ -3068,7 +3400,9 @@ class RenderingPipeline:
             index = [
                 i
                 for i, cue in enumerate(cues)
-                if cue.section_id == base and cue.segment_id == (segment or "A")
+                if cue.section_id == base
+                and cue.segment_id == (segment or "A")
+                and TRANSITION_METADATA_KEY not in cue.metadata
             ]
             shaped, record["intensity"]["shape"] = shape_section(
                 [cues[i] for i in index],
@@ -3096,17 +3430,42 @@ class RenderingPipeline:
                     )
                 )
 
+        for played_head, last_at, own_at in relight:
+            last = played_head.outgoing[-1]
+            frame = last.t1_ms - EFFECT_GRID_MS
+            profile = profiles[last.fixture_id]
+            authored = _cue_level(last, profile, frame)
+            as_shaped = _cue_level(cues[last_at], profile, frame)
+            if authored and as_shaped != authored and len(own_at) == len(played_head.own):
+                relit = rested(played_head.relit(as_shaped / authored))
+                for i, cue in zip(own_at, relit, strict=True):
+                    cues[i] = cue
         for section_id, window, events, record in hitting:
             # Hits play on the level the section plays, after intensity: one accent where
             # an intensity accent lands on the hit's beat, a rise above a level below full.
             base, _, segment = section_id.partition("|")
+            # A hit plays on the part's cues and on a transition's over its frames.
             index = [
                 i
                 for i, cue in enumerate(cues)
-                if cue.section_id == base and cue.segment_id == (segment or "A")
+                if (
+                    cue.section_id == base
+                    and cue.segment_id == (segment or "A")
+                    and TRANSITION_METADATA_KEY not in cue.metadata
+                )
+                or (
+                    TRANSITION_METADATA_KEY in cue.metadata
+                    and cue.t0_ms < window[1]
+                    and cue.t1_ms > window[0]
+                )
             ]
             hits = [e for e in events.hits() if window[0] <= e.frame_ms < window[1]]
-            struck, hit_outcomes = apply_hits(
+            flashing = [
+                (event, lo, hi)
+                for event, lo, hi in events.shutter_spans()
+                if event.action != "closed" and lo < window[1] and hi > window[0]
+            ]
+            struck, hit_outcomes, lit_flashes = apply_hits(
                 [cues[i] for i in index],
                 hits,
                 window=window,
@@ -3114,6 +3473,7 @@ class RenderingPipeline:
                 phase_map=phase_map,
                 beat_grid=self.beat_grid,
                 dark_spans=self.dark_spans,
+                flashing=flashing,
             )
             for i, cue in zip(index, struck, strict=True):
                 cues[i] = cue
@@ -3121,6 +3481,12 @@ class RenderingPipeline:
                 for event in hits:
                     if event_entry is event_records.get((base, event.index)):
                         event_entry.update(hit_outcomes.get(event.index, {}))
+            for flash_index, by_fixture in lit_flashes.items():
+                flash_entry = event_records.get((base, flash_index))
+                for fixture_id, said in by_fixture.items():
+                    outcome = (flash_entry or {}).get("heads", {}).get(fixture_id)
+                    if outcome is not None:
+                        outcome.setdefault("lit_by_hits", []).extend(said)
 
         lyric_cues: list[dict[str, Any]] = []
         """Per lyric moment cue a plan section references, what played it, or why not."""

@@ -37,13 +37,16 @@ not.
   ducks `contrast` below `L` for that many frames, recovering over `decay_beats`. Never
   below `HIT_FLOOR`. Contrast, held frames and decay come from the bound lyric cue's
   emphasis (`HITS`; an unbound hit uses `UNBOUND_EMPHASIS`). A head counts it played only
-  where `visible_frames` frames differ from `L` by `contrast` (at most `HIT_VISIBLE_CAP`);
+  where `visible_frames` frames differ from `L` by `contrast`, or by the room `L` leaves
+  above the floor where that is less (`(L - HIT_FLOOR)`, per frame);
   else "no visible change". A hit on a dark beat lights the head for it where the
   darkness is the dimmer's inside a cue (a template's dimmer dark phase, a closed event)
   with no wheel moving; a head dark between its template's cues does not play it; where
   every head is dark on the beat (a show's rest, a repositioning, a wheel change) it
-  moves to the beat within `HIT_MOVE_BARS` the most heads show, a later one first,
-  recorded.
+  moves within `HIT_MOVE_BARS`: a hit bound to a lyric cue to the beat nearest the lyric,
+  another to the beat the most heads show, a later one first; recorded with the beat, the
+  direction and the offset. A hit that lights a strobe's or pulse's dark frames is traced
+  on both.
 - **color / gobo**: the held colour (pattern) changes at the beat to the event's, resolved
   as the section's (`song_intent`: palette role or named colour → nearest offered state;
   pattern → tagged state), and holds until the next such event or the section's end. The
@@ -51,8 +54,14 @@ not.
   lead that rides darkness already there or adds at most half the beat before it
   (`song_intent.dip_fits`, the test the plan repair uses too); else in the first dark
   window after the beat long enough that reveals it within `WHEEL_LATE_BEATS` (recorded,
-  late); else it does not play (recorded). Inside a template overlay the event takes over
-  the overlay's state from the beat.
+  late); else it does not play on that head (recorded). A head dark on the beat (or a
+  frame or two after it) turns in that darkness and shows the change from its next
+  reveal, lit for `HIT_MIN_LIT_FRAMES` frames running. The event plays on its beat where
+  some head shows it within `WHEEL_LATE_BEATS`; a head never lit again before the
+  section's end does not play it; where no head would, it moves, on every head, to the
+  beat within `WHEEL_MOVE_BARS` where the most heads do, a later one first, else does not
+  play (`_play_wheel_events`). Inside a template overlay the event takes over the
+  overlay's state from the beat.
 
 Every bar and beat is counted from the bar's downbeat (`BeatGrid.beat_index`), as the
 planner, the cue binder and the plan repair count it.
@@ -62,7 +71,7 @@ from __future__ import annotations
 
 import bisect
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from fractions import Fraction
 import functools
 from itertools import pairwise
@@ -88,6 +97,7 @@ from twinklr.core.sequencer.moving_heads.song_intent import (
     PULSE_PERIODS_BEATS,
     STROBE_FLASHES_PER_BEAT,
     WHEEL_LATE_BEATS,
+    WHEEL_MOVE_BARS,
     HeadWheels,
     SectionPalette,
     color_offer,
@@ -146,12 +156,6 @@ a flash and a duck below the section's level."""
 
 HIT_FLOOR = 0.10
 """A hit's pre-dip or duck never goes below this share of the dimmer's top: never dark."""
-
-HIT_VISIBLE_CAP = 0.40
-"""A hit counts as played on a head where at least its `visible_frames` frames differ from
-the level played without it by its `contrast` of the top, at most this share: between the
-floor and the top a level of 0.5 to 0.6 leaves no more room either way (a HIGH hit under
-INTENSE's sag). Proposed (W6/W7 fix round)."""
 
 HIT_MIN_LIT_FRAMES = 3
 """A hit plays on a lit head only where at least this many lit frames follow it (60 ms):
@@ -787,6 +791,29 @@ def _turn(
                 record["turned_in_the_dark_before_ms"] = gap_cue.t0_ms
             return changed, record, True
     holder = None if gap_cue is not None else previous or inside
+    if holder is not None:
+        for start, end in ctx.dark_windows(own, profile):
+            if not t < start <= t + HIT_MIN_LIT_FRAMES * FRAME:
+                continue
+            if end - start < lead or start >= until_ms:
+                break
+            # The head goes dark within the frames a reveal must stay lit (a template's dark
+            # phase opening a frame after the beat): dark on the beat, it turns in that
+            # darkness and shows the change from its next reveal.
+            turn = start + frames_ms(darkness)
+            if next((c for c in own if c.t0_ms <= turn < c.t1_ms), None) is not None:
+                record["reveal_ms"] = record["turned_in_the_dark_before_ms"] = end
+                return _replace_from(own, channel, old, new, turn, profile), record, True
+            following = next((c for c in own if c.t0_ms >= end), None)
+            changed = (
+                None
+                if following is None or following.t0_ms >= until_ms
+                else ctx.turned_in_gap(own, channel, old, new, following)
+            )
+            if changed is not None and following is not None:
+                record["reveal_ms"] = record["turned_in_the_dark_before_ms"] = following.t0_ms
+                return changed, record, True
+            break
     half = _beat_ms(ctx.beat_grid, t - 1) / 2
     dip = (
         None
@@ -876,22 +903,26 @@ def _note_reveal(
     frame_ms: int,
     profile: FixtureCapabilities,
 ) -> None:
-    """Record when the head first shows `state` lit at or after the event's frame, and how
-    late that is where the head is dark on the beat (a template's dark phase) or a
-    template overlay holds its own state there."""
+    """Record when the head first shows `state` lit at or after the event's frame, for at
+    least `HIT_MIN_LIT_FRAMES` frames running (a frame or two of the new colour before the
+    head goes dark is not showing it), and how late that is where the head is dark on the
+    beat (a template's dark phase) or a template overlay holds its own state there."""
+    shows: dict[int, bool] = {}
     for cue in own:
         levels = _levels(cue, profile)
         for t in range(max(cue.t0_ms, frame_ms), cue.t1_ms, FRAME):
-            if _lit(cue, profile, levels, t) and _state(cue, channel, profile, t) == state:
-                record["reveal_ms"] = t
-                if t > frame_ms + HIT_LATE_FRAMES * FRAME and "deferred" not in record:
-                    record["late"] = {
-                        "late_ms": t - frame_ms,
-                        "reason": "the head is dark on the beat (its template's dark phase) "
-                        "or its template's overlay holds its own state there; it shows the "
-                        "change from its next reveal",
-                    }
-                return
+            shows[t] = _lit(cue, profile, levels, t) and _state(cue, channel, profile, t) == state
+    for t in sorted(shows):
+        if all(shows.get(t + k * FRAME, False) for k in range(HIT_MIN_LIT_FRAMES)):
+            record["reveal_ms"] = t
+            if t > frame_ms + HIT_LATE_FRAMES * FRAME and "deferred" not in record:
+                record["late"] = {
+                    "late_ms": t - frame_ms,
+                    "reason": "the head is dark on the beat (its template's dark phase) "
+                    "or its template's overlay holds its own state there; it shows the "
+                    "change from its next reveal",
+                }
+            return
     record["reveal_ms"] = None
     record["late"] = {"reason": "the head never shows it lit before the section's end"}
 
@@ -1026,68 +1057,209 @@ def apply_section_events(
                         "before it in the section"
                     },
                 )
-    wheel_events = [e for e in events.wheel_events() if start <= e.frame_ms < end]
-    for fixture_id, own in by_head.items():
-        profile = profiles[fixture_id]
-        ctx = _WheelContext(
-            profile,
-            beat_grid,
-            darken,
-            dip_span,
-            dark_runs,
-            dark_windows,
-            start,
-            functools.partial(gap_ok, fixture_id),
-        )
-        # The base each wheel holds at the part's start (the section's colour, a carried
-        # event's, or the template's own): what an event turns from; overlay states stay.
-        base: dict[ChannelName, str] = {
-            channel: _state(own[0], channel, profile, own[0].t0_ms)
+    _play_wheel_events(
+        by_head,
+        [e for e in events.wheel_events() if start <= e.frame_ms < end],
+        played,
+        window=window,
+        section_end=events.end_ms,
+        profiles=profiles,
+        heads=heads,
+        palette=palette,
+        beat_grid=beat_grid,
+        contexts={
+            fixture_id: _WheelContext(
+                profiles[fixture_id],
+                beat_grid,
+                darken,
+                dip_span,
+                dark_runs,
+                dark_windows,
+                start,
+                functools.partial(gap_ok, fixture_id),
+            )
+            for fixture_id in by_head
+        },
+    )
+    return _in_order(cues, by_head), played
+
+
+def _shown_in_time(record: Mapping[str, Any], event: TimedEvent, beat_grid: BeatGrid) -> bool:
+    """Whether a head's outcome for a wheel event shows the change lit within
+    `WHEEL_LATE_BEATS` of the event's frame (a frame of grid tolerance)."""
+    reveal = record.get("reveal_ms")
+    latest = event.frame_ms + WHEEL_LATE_BEATS * _beat_ms(beat_grid, event.frame_ms) + FRAME
+    return "not_played" not in record and reveal is not None and reveal <= latest
+
+
+def _play_wheel_events(
+    by_head: dict[str, list[FixtureSegment]],
+    wheel_events: Sequence[TimedEvent],
+    played: EventsPlayed,
+    *,
+    window: tuple[int, int],
+    section_end: int,
+    profiles: Mapping[str, FixtureCapabilities],
+    heads: Sequence[HeadWheels],
+    palette: SectionPalette | None,
+    beat_grid: BeatGrid,
+    contexts: Mapping[str, _WheelContext],
+) -> None:
+    """A part's colour and gobo events, in time order, on every head (`by_head` changed in
+    place). Each head turns as `_turn` says and shows the change from its first lit frame
+    after (`_note_reveal`): late where it is dark on the beat. The event plays on its beat
+    where some head shows it within `WHEEL_LATE_BEATS`; a head that never shows it before
+    the section's end does not play it (one the part's later frames do not show plays from
+    the section's next part, which holds it). Where no head would, the event moves, on every head,
+    to the beat within `WHEEL_MOVE_BARS` (later first, inside the part and between this
+    wheel's neighbouring events) on which the most heads show it in time, the nearest of
+    equals; else it does not play."""
+    start, end = window
+    beats = beat_grid.beat_boundaries
+    reach = WHEEL_MOVE_BARS * beat_grid.beats_per_bar
+    # The base each wheel holds at the part's start (the section's colour, a carried
+    # event's, or the template's own): what an event turns from; overlay states stay.
+    base: dict[str, dict[ChannelName, str]] = {
+        fixture_id: {
+            channel: _state(own[0], channel, profiles[fixture_id], own[0].t0_ms)
             for channel in WHEEL_ACTIONS.values()
-            if own and DISCRETE_KEYS[channel] in profile.discrete
+            if own and DISCRETE_KEYS[channel] in profiles[fixture_id].discrete
         }
-        floor = start
-        for index, event in enumerate(wheel_events):
-            channel = WHEEL_ACTIONS[event.action]
-            if DISCRETE_KEYS[channel] not in profile.discrete:
+        for fixture_id, own in by_head.items()
+    }
+    floor = dict.fromkeys(by_head, start)
+    for event in wheel_events:
+        channel = WHEEL_ACTIONS[event.action]
+        states = event_states(event, heads, palette)
+        turning: dict[str, tuple[str, str]] = {}
+        for fixture_id in by_head:
+            if DISCRETE_KEYS[channel] not in profiles[fixture_id].discrete:
                 played.head(
                     event, fixture_id, {"not_played": f"the head has no {channel.value} wheel"}
                 )
-                continue
-            new = event_states(event, heads, palette).get(fixture_id)
-            if new is None:
+            elif (new := states.get(fixture_id)) is None:
                 played.head(
                     event,
                     fixture_id,
                     {"not_played": f"the head's {channel.value} wheel offers nothing for it"},
                 )
-                continue
-            if channel not in base:
+            elif channel not in base[fixture_id]:
                 continue  # the head has no cue in the part
-            old = base[channel]
-            if old == new:
+            elif base[fixture_id][channel] == new:
                 played.head(
                     event, fixture_id, {"state": new, "unchanged": "the head already holds it"}
                 )
-                continue
-            until = next(
-                (
-                    e.frame_ms
-                    for e in wheel_events[index + 1 :]
-                    if WHEEL_ACTIONS[e.action] == channel
-                ),
-                end,
+            else:
+                turning[fixture_id] = (base[fixture_id][channel], new)
+        if not turning:
+            continue
+        same = [e.frame_ms for e in wheel_events if WHEEL_ACTIONS[e.action] == channel]
+        until = next((t for t in same if t > event.frame_ms), end)
+        since = max((t for t in same if t < event.frame_ms), default=start - FRAME)
+
+        def trial(
+            at: TimedEvent,
+            turning: Mapping[str, tuple[str, str]] = turning,
+            channel: ChannelName = channel,
+            until: int = until,
+        ) -> dict[str, tuple[list[FixtureSegment], dict[str, Any], bool]]:
+            out = {}
+            for fixture_id, (old, new) in turning.items():
+                own, record, turned = _turn(
+                    by_head[fixture_id],
+                    channel,
+                    old,
+                    new,
+                    at,
+                    floor[fixture_id],
+                    until,
+                    contexts[fixture_id],
+                )
+                if turned:
+                    _note_reveal(record, own, channel, new, at.frame_ms, profiles[fixture_id])
+                out[fixture_id] = (own, record, turned)
+            return out
+
+        def in_time(
+            outcomes: Mapping[str, tuple[list[FixtureSegment], dict[str, Any], bool]],
+            at: TimedEvent,
+        ) -> int:
+            return sum(
+                1 for _, record, _ in outcomes.values() if _shown_in_time(record, at, beat_grid)
             )
-            own, record, turned = _turn(own, channel, old, new, event, floor, until, ctx)
-            if turned:
-                _note_reveal(record, own, channel, new, event.frame_ms, profile)
+
+        first = outcomes = trial(event)
+        chosen, direction, shown = event, None, in_time(outcomes, event)
+        if not shown:
+            for side, offsets in (
+                ("later", range(1, reach + 1)),
+                ("earlier", range(-1, -reach - 1, -1)),
+            ):
+                candidates = []
+                for offset in offsets:
+                    i = event.beat_index + offset
+                    if not 0 <= i < len(beats):
+                        continue
+                    frame = quantize_cue(round(beats[i])).actual_ms
+                    if not (since < frame < until and start <= frame < end):
+                        continue
+                    moved = replace(event, beat_index=i, beat_ms=beats[i], frame_ms=frame)
+                    found = trial(moved)
+                    if count := in_time(found, moved):
+                        candidates.append((count, -abs(offset), moved, found))
+                if candidates:
+                    shown, _, chosen, outcomes = max(candidates, key=lambda c: (c[0], c[1]))
+                    direction = side
+                    break
+        position = beat_grid.bar_and_beat(chosen.beat_index)
+        for fixture_id, (_, new) in turning.items():
+            own, record, turned = outcomes[fixture_id]
+            if not shown:
+                on_beat = first[fixture_id][1]
+                why = on_beat.get("not_played") or (
+                    "it shows only from its next reveal, "
+                    f"{on_beat['reveal_ms'] - event.frame_ms} ms after its beat"
+                    if on_beat.get("reveal_ms") is not None
+                    else "the head never shows it lit before the section's end"
+                )
+                record, turned = (
+                    {
+                        "state": new,
+                        "not_played": f"{why}; no head shows it lit within "
+                        f"{WHEEL_LATE_BEATS:g} beat of its beat, nor of any beat within "
+                        f"{WHEEL_MOVE_BARS} bar(s) of it in the section",
+                    },
+                    False,
+                )
+            elif turned and record.get("reveal_ms") is None and end < section_end:
+                record["late"] = {"reason": "the head shows it from the section's next part"}
+            elif turned and record.get("reveal_ms") is None:
+                record, turned = (
+                    {
+                        "state": new,
+                        "not_played": "the head never shows it lit before the section's end",
+                    },
+                    False,
+                )
+            if direction is not None and shown:
+                record["moved"] = {
+                    "from_ms": event.frame_ms,
+                    "direction": direction,
+                    "bar": None if position is None else position[0],
+                    "beat": None if position is None else position[1],
+                    "offset_ms": chosen.frame_ms - event.frame_ms,
+                    "heads_in_time": shown,
+                    "reason": f"no head shows it within {WHEEL_LATE_BEATS:g} beat of its own "
+                    "beat (dark there, or the wheel change does not fit)",
+                }
             played.head(event, fixture_id, record)
             if turned:
-                base[channel] = new
+                by_head[fixture_id] = own
+                base[fixture_id][channel] = new
                 played.final.setdefault(fixture_id, {})[channel] = new
-                floor = max(floor, record.get("reveal_ms") or event.frame_ms)
-        by_head[fixture_id] = own
-    return _in_order(cues, by_head), played
+                floor[fixture_id] = max(
+                    floor[fixture_id], record.get("reveal_ms") or chosen.frame_ms
+                )
 
 
 def _in_order(
@@ -1168,18 +1340,24 @@ def apply_hits(
     phase_map: MusicalPhaseMap,
     beat_grid: BeatGrid,
     dark_spans: Sequence[tuple[int, int]],
-) -> tuple[list[FixtureSegment], dict[int, dict[str, Any]]]:
+    flashing: Sequence[tuple[TimedEvent, int, int]] = (),
+) -> tuple[list[FixtureSegment], dict[int, dict[str, Any]], dict[int, dict[str, list[str]]]]:
     """A part's cues as they will play (after every darkness and intensity) with its hits
     played (see the module docstring). A hit is one moment for the rig: it plays on its
     beat's frame on every head that can show it there (lit, or lit for the hit where its
     darkness allows, `_forced_frames`); a head dark there between its template's cues
     does not play it. Only where no head can show it on its beat does the hit move, on
-    every head, to the beat inside the part where the most heads can: a later beat within
-    `HIT_MOVE_BARS` first, an earlier one only where no later one serves; else it does
-    not play. A head counts it played only where its frames differ visibly from the
-    render without it (`_play_hit`). Returns the cues and the trace entry per event."""
+    every head, to a beat within `HIT_MOVE_BARS` inside the part where some head can: for
+    a hit bound to a lyric cue, the one nearest the lyric (the later of equals); for
+    another, the one the most heads show, a later beat first, an earlier one only where no
+    later one serves; else it does not play. A head counts it played only where its frames
+    differ visibly from the render without it (`_play_hit`). A hit that lights frames a
+    strobe or pulse (`flashing`, each with the frames it plays over) holds dark is traced
+    on both. Returns the cues, the trace entry per hit, and per flashing event and head
+    the hits that light its dark frames."""
     start, end = window
     records: dict[int, dict[str, Any]] = {}
+    notes: dict[int, dict[str, list[str]]] = {}
     by_head = {f: _own(cues, f) for f in sorted({c.fixture_id for c in cues})}
     beats = beat_grid.beat_boundaries
     reach = HIT_MOVE_BARS * beat_grid.beats_per_bar
@@ -1217,7 +1395,17 @@ def apply_hits(
 
         home = event.beat_index
         chosen, able, direction = home, able_on(home), None
-        if not able:
+        if not able and event.cue_ms is not None:
+            # A cue-bound hit moves to the beat nearest its lyric, the later of equals.
+            near = [
+                (abs(beats[home + offset] - event.cue_ms), -offset, home + offset, found)
+                for offset in (*range(1, reach + 1), *range(-1, -reach - 1, -1))
+                if 0 <= home + offset < len(beats) and (found := able_on(home + offset))
+            ]
+            if near:
+                _, _, chosen, able = min(near, key=lambda c: (c[0], c[1]))
+                direction = "later" if chosen > home else "earlier"
+        elif not able:
             for side, offsets in (
                 ("later", range(1, reach + 1)),
                 ("earlier", range(-1, -reach - 1, -1)),
@@ -1255,6 +1443,25 @@ def apply_hits(
             if played is None:
                 heads[fixture_id] = outcome
                 continue
+            after = _HeadFrames(played, frames[fixture_id].profile)
+            relit = [
+                u
+                for u, lit in frames[fixture_id].lit.items()
+                if not lit and after.lit.get(u, False)
+            ]
+            for flash, lo, hi in flashing:
+                inside = [u for u in relit if lo <= u < hi]
+                if not inside:
+                    continue
+                label = f"{flash.action} at bar {flash.bar} beat {flash.beat}"
+                outcome.setdefault("lights_flash_dark", []).append(
+                    f"{len(inside)} frame(s) the {label} holds dark"
+                )
+                notes.setdefault(flash.index, {}).setdefault(fixture_id, []).append(
+                    f"a hit at {t} ms"
+                    + ("" if position is None else f" (bar {position[0]} beat {position[1]})")
+                    + f" lights {len(inside)} of its dark frames"
+                )
             by_head[fixture_id] = played
             outcome["played_ms"] = t
             if lead := _lead(axis, beat_grid):
@@ -1265,12 +1472,16 @@ def apply_hits(
                     "direction": direction,
                     "bar": None if position is None else position[0],
                     "beat": None if position is None else position[1],
+                    "offset_ms": t - event.frame_ms,
                     "heads_lit": len(able),
+                    "rule": "the beat nearest its lyric cue"
+                    if event.cue_ms is not None
+                    else "the beat the most heads show, a later one first",
                     "reason": "every head is dark on the event's beat (a show's rest, a "
                     "repositioning or a wheel change)",
                 }
             heads[fixture_id] = outcome
-    return _in_order(cues, by_head), records
+    return _in_order(cues, by_head), records, notes
 
 
 def _lit_start(frames: _HeadFrames, t: int) -> int | None:
@@ -1327,8 +1538,9 @@ def _play_hit(
     on it), the flash is followed by a duck: `visible_frames` frames `contrast` below the
     level played, recovering over the decay (`flash_and_duck`). Lit from the dark, the
     flash eases back to dark over the decay. Neither dip goes below `HIT_FLOOR` of the top.
-    Visible: at least `visible_frames` frames differ from the level played by at least
-    `contrast` of the top (at most `HIT_VISIBLE_CAP`)."""
+    Visible: at least `visible_frames` frames differ from the level played without the hit
+    (`L`, per frame) by at least `contrast` of the top, or by `L - HIT_FLOOR` where that is
+    less (the deepest the hit may go there), and by at least one word."""
     top = float(axis.operable_range[1])
     zero = axis.dmx_word(0)
     floor = HIT_FLOOR * top
@@ -1425,18 +1637,24 @@ def _play_hit(
             previous = target
         if clipped:
             outcome["degraded"] = "the dimmer is too slow to jump to its top in a frame"
-    threshold = min(shape.contrast, HIT_VISIBLE_CAP)
-    words = abs(axis.dmx_word(threshold * top) - axis.dmx_word(0))
+
+    def needed(u: int) -> int:
+        """The words frame `u` must differ by: the contrast, or the room above the floor
+        where that is less, and at least one."""
+        share = min(shape.contrast, max(0.0, (base(u) - floor) / top))
+        return max(1, abs(axis.dmx_word(share * top) - zero) - 1)
+
     visible = sum(
         1
         for u, value in changed.items()
-        if abs(axis.dmx_word(value) - axis.dmx_word(base(u))) >= words - 1
+        if abs(axis.dmx_word(value) - axis.dmx_word(base(u))) >= needed(u)
     )
     outcome["visible_frames"] = visible
     if visible < hold:
         return None, {
             "not_played": f"no visible change: the hit would differ from the section's level "
-            f"by {threshold:.0%} of full on {visible} frame(s), fewer than {hold}",
+            f"by {shape.contrast:.0%} of full (or all the room above the floor) on {visible} "
+            f"frame(s), fewer than {hold}",
             "visible_frames": visible,
         }
     by_cue: dict[int, dict[int, float]] = {}
@@ -1481,6 +1699,9 @@ def cue_summary(entry: Mapping[str, Any]) -> dict[str, Any]:
             summary.setdefault("not_played", {})[fixture_id] = outcome["not_played"]
         if "moved" in outcome:
             summary.setdefault("moved", {})[fixture_id] = outcome["moved"]
+            # Where it played on the bar grid: the beat it moved to.
+            summary["played_bar"] = outcome["moved"]["bar"]
+            summary["played_beat"] = outcome["moved"]["beat"]
         if "deferred" in outcome:
             summary.setdefault("late", {})[fixture_id] = outcome["deferred"]["late_ms"]
         elif "late" in outcome and "late_ms" in outcome["late"]:
@@ -1554,16 +1775,28 @@ def _describe_outcome(outcome: Mapping[str, Any]) -> str:
         return f"{outcome['plays']} from {outcome['from_ms']} ms"
     if "plays" in outcome:
         said = f"{outcome['plays']} from {outcome['from_ms']} to {outcome['to_ms']} ms"
-        return said + (f" ({outcome['degraded']})" if "degraded" in outcome else "")
+        said += f" ({outcome['degraded']})" if "degraded" in outcome else ""
+        if outcome.get("lit_by_hits"):
+            said += f"; {'; '.join(outcome['lit_by_hits'])}"
+        return said
     if "state" in outcome:
         said = f"{outcome['state']} revealed at {outcome['reveal_ms']} ms"
         if "dark_dip" in outcome:
             said += f" after a {outcome['dark_dip']['added_ms']} ms dark dip"
         if "deferred" in outcome:
             said += f", {outcome['deferred']['late_ms']} ms late ({outcome['deferred']['reason']})"
+        elif "late" in outcome and "late_ms" in outcome["late"]:
+            said += f", {outcome['late']['late_ms']} ms after the beat (dark or in the "
+            "template's overlay there)"
         elif "late" in outcome:
-            said += f", {outcome['late'].get('late_ms', '?')} ms after the beat (dark or in "
-            "the template's overlay there)"
+            said += f" ({outcome['late']['reason']})"
+        if "moved" in outcome:
+            moved = outcome["moved"]
+            said += (
+                f" (moved {moved['direction']} to bar {moved['bar']} beat {moved['beat']}, "
+                f"{moved['offset_ms']:+d} ms, where {moved['heads_in_time']} head(s) show it "
+                "within a beat)"
+            )
         return said
     said = f"a hit at {outcome['played_ms']} ms"
     if outcome.get("how") == "lit_from_dark":
@@ -1573,12 +1806,16 @@ def _describe_outcome(outcome: Mapping[str, Any]) -> str:
     if outcome.get("shape") == "flash_and_duck":
         said += ", a flash and a duck below the section's level"
     if "moved" in outcome:
+        moved = outcome["moved"]
         said += (
-            f" (moved {outcome['moved']['direction']} to bar {outcome['moved']['bar']} beat "
-            f"{outcome['moved']['beat']}, where {outcome['moved']['heads_lit']} head(s) show it)"
+            f" (moved {moved['direction']} to bar {moved['bar']} beat {moved['beat']}, "
+            f"{moved['offset_ms']:+d} ms, {moved['rule']}, where {moved['heads_lit']} head(s) "
+            "show it)"
         )
     if "degraded" in outcome:
         said += f" ({outcome['degraded']})"
+    if outcome.get("lights_flash_dark"):
+        said += f" (lighting {'; '.join(outcome['lights_flash_dark'])})"
     return said
 
 
@@ -1593,6 +1830,11 @@ def describe_lyric_cue(entry: Mapping[str, Any]) -> str:
     parts = []
     for event in entry.get("events", []):
         line = f"{event['action']} at bar {event['bar']} beat {event['beat']}"
+        if event.get("played_bar") is not None:
+            line = (
+                f"{event['action']} planned at bar {event['bar']} beat {event['beat']}, played "
+                f"at bar {event['played_bar']} beat {event['played_beat']}"
+            )
         by_time: dict[int, list[str]] = {}
         for fixture_id, at in event.get("played", {}).items():
             by_time.setdefault(at, []).append(fixture_id)

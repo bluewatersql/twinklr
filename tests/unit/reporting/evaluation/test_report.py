@@ -359,7 +359,7 @@ async def test_the_report_carries_each_sections_song_intent_and_the_plan_repairs
     markdown = (tmp_path / "report" / "report.md").read_text(encoding="utf-8")
     assert "**Song intent** (as planned):" in markdown
     assert "- intensity: DRAMATIC" in markdown and "- intensity: as authored" in markdown
-    assert "not rendered yet (motif_id): a known regression" in markdown
+    assert "not rendered yet (motif_id): no renderer has rendered them yet" in markdown
     assert f"- played: {hit}" in markdown
     assert f"- played: {played}" in markdown and f"- played: {intensity}" in markdown
     assert "**Plan repair** (section `s1`): moment cue 'ghost' dropped" in markdown

@@ -102,12 +102,7 @@ PREFIXES = (
 )
 """Row-id prefix of each test below; together they cover every regression row."""
 
-PENDING: dict[str, tuple[str, str]] = {
-    "transition_in_crossfade": ("W8", "transition_in CROSSFADE"),
-    "transition_in_morph": ("W8", "transition_in MORPH"),
-    "transition_in_sweep": ("W8", "transition_in SWEEP"),
-    "transition_in_fade_via_black": ("W8", "transition_in FADE_VIA_BLACK"),
-}
+PENDING: dict[str, tuple[str, str]] = {}
 """Rows not rendered yet: (task that renders it, intent). A task deletes its entries."""
 
 _USED: set[str] = set()

@@ -20,6 +20,7 @@ from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.moving_heads.libraries.gobo import GoboPattern
 from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline, admit_templates
 from twinklr.core.sequencer.moving_heads.song_intent import SectionPalette, darkness_ms
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 HEADS = ("MH1", "MH2", "MH3", "MH4")
 GRID = m.bars_grid(*([500.0] * 8))
@@ -550,6 +551,37 @@ def test_the_published_dark_phases_are_a_steady_cycles_and_include_its_leading_d
         assert phases.heads[head][0][0] == pytest.approx(0.0, abs=0.05)
     for head in ("MH1", "MH4"):
         assert phases.heads[head][0][0] == pytest.approx(3.0, abs=0.05)
+
+
+def test_in_three_four_the_cycle_that_ends_with_the_song_keeps_its_last_window() -> None:
+    """3/4 at 120 BPM over 8 bars: `fly_in_cascade`'s cycle is 12 beats, so the song holds
+    exactly two and the second cycle's last window (MH1, MH4 dark from beat 11) runs into
+    the song's end; it is published as long as the first cycle's (to beat 14), as the
+    render plays it."""
+    beats = [15.0 + 500.0 * i for i in range(25)]
+    waltz = BeatGrid(
+        bar_boundaries=beats[::3][:8],
+        beat_boundaries=beats,
+        eighth_boundaries=BeatGrid._calculate_eighth_boundaries(beats),
+        sixteenth_boundaries=BeatGrid._calculate_sixteenth_boundaries(beats),
+        tempo_bpm=120.0,
+        beats_per_bar=3,
+        duration_ms=beats[-1] + 15.0,
+    )
+    job = m.family_job(HEADS)
+    admission = admit_templates(
+        ["fly_in_cascade"],
+        beat_grid=waltz,
+        fixture_group=rig(),
+        initial_states=job.moving_heads.initial_states,
+        failure_mode="error",
+    )
+
+    phases = admission.offer.templates["fly_in_cascade"].variants["base"]
+    assert phases.cycle_beats == 12.0
+    for head in ("MH1", "MH4"):
+        assert [round(a) for a, _ in phases.heads[head]] == [3, 7, 11]
+        assert all(round(b - a) == 3 for a, b in phases.heads[head])
 
 
 @pytest.mark.parametrize(

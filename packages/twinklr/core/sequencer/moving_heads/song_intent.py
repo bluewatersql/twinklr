@@ -61,7 +61,9 @@ if TYPE_CHECKING:
     from twinklr.core.sequencer.planning import MacroPlan
     from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
-RENDERED_INTENT_FIELDS = frozenset({"intensity", "color", "gobo", "events", "moment_cues"})
+RENDERED_INTENT_FIELDS = frozenset(
+    {"intensity", "color", "gobo", "events", "moment_cues", "entry", "exit"}
+)
 """The section song-intent fields (`PlanSection.set_intent_fields`) the renderer plays:
 colour and gobo here, intensity in `intensity.py`, events and the lyric cues they land on
 in `events.py`."""
@@ -228,6 +230,10 @@ class HeadWheels(BaseModel):
     change_ms: int | None = None
     """This head's longest wheel change into any of its offered states
     (`wheel_change_ms`); None when it offers none or a term is unknown."""
+    changes: dict[str, dict[str, int]] = {}
+    """Per wheel (`color`, `gobo`), the wheel change into each offered state
+    (`wheel_change_ms` with that state's settle), as the render times a colour or gobo
+    event's dark lead; left out where a term is unknown."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -255,12 +261,16 @@ class HeadWheels(BaseModel):
             "color": {} if "color" in unsettled else colors,
             "gobo": {} if "gobo" in unsettled else gobos,
         }
-        changes = [
-            wheel_change_ms(profile, settle)
-            for channel, wheel in (("color", color), ("gobo", gobo))
-            for name in offered[channel]
-            if wheel is not None and (settle := wheel.states[name].settle_ms) is not None
-        ]
+        per_state: dict[str, dict[str, int]] = {}
+        changes = []
+        for channel, wheel in (("color", color), ("gobo", gobo)):
+            for name in offered[channel]:
+                if wheel is None or (settle := wheel.states[name].settle_ms) is None:
+                    continue
+                change = wheel_change_ms(profile, settle)
+                changes.append(change)
+                if change is not None:
+                    per_state.setdefault(channel, {})[name] = change
         return cls(
             fixture_id=fixture_id,
             color_wheel=color is not None,
@@ -271,6 +281,7 @@ class HeadWheels(BaseModel):
             change_ms=None
             if not changes or None in changes
             else max(c for c in changes if c is not None),
+            changes=per_state,
         )
 
     def without(self, excluded: Mapping[str, Collection[str]]) -> HeadWheels:
@@ -452,6 +463,12 @@ play (`events._turn`; the plan repair predicts it, `rig_repair`). Proposed (W7 f
 round)."""
 
 
+WHEEL_MOVE_BARS = 1
+"""How far (in bars, either way, inside the part) a colour or gobo event no head would show
+within `WHEEL_LATE_BEATS` moves to a beat where the most heads do (`events`; the plan
+repair predicts it). Proposed (W6/W7 fix round 2)."""
+
+
 def dip_fits(added_ms: float, beat_ms: float) -> bool:
     """Whether a wheel change's dark lead adds at most half the beat before its reveal: the
     one test the render (`events._turn`, the darkness the dip adds) and the plan repair
@@ -559,6 +576,12 @@ class RigOffer(BaseModel):
     templates: dict[str, TemplateOffer]
     """Per admitted template id, its dark phases and the states it cannot hold (the gate
     fills it; empty for an offer made without one)."""
+    beats_per_bar: int = 4
+    """The song's meter, for transition lengths in bars."""
+    full_travel_ms: dict[str, int] = {}
+    """Per pose axis (`pan`, `tilt`), how long the slowest head takes to travel its whole
+    range, which bounds a transition's lit move; left out where a head's speed is
+    unknown."""
     dark_entries: dict[str, dict[str, tuple[str, ...]]] = {}
     """Per admitted template id and admitted predecessor template id, the heads that
     always enter it dark after that template (the gate's check, on every pair of their
@@ -575,9 +598,11 @@ class RigOffer(BaseModel):
         return self.wheel_change_ms / self.beat_ms
 
     @property
-    def dip_fits(self) -> bool:
-        """Whether a wheel change fits half the song's median beat, so a change at a
-        boundary the heads play lit through can dip dark just before it."""
+    def change_fits_median_beat(self) -> bool:
+        """Whether the slowest wheel change fits half the song's median beat, so a change
+        at a boundary the heads play lit through can usually dip dark just before it (the
+        prompt's summary; the render and the repair test each boundary and event with
+        `dip_fits`)."""
         return (
             self.wheel_change_ms is not None
             and self.beat_ms is not None
@@ -657,6 +682,16 @@ def rig_offer(
                 assert settle is not None  # offered states have one
                 changes.append(wheel_change_ms(profile, settle))
     intervals = sorted(b - a for a, b in pairwise(beat_grid.beat_boundaries))
+    travels: dict[str, list[int | None]] = {}
+    for profile in profiles.values():
+        for name, axis in profile.axes.items():
+            if name in ("pan", "tilt"):
+                speed = axis.travel_speed_per_s
+                travels.setdefault(name, []).append(
+                    None
+                    if not speed
+                    else math.ceil((axis.physical_max - axis.physical_min) / speed * 1000)
+                )
     return RigOffer(
         heads=heads,
         gobos={pattern.value: gobo_offer(heads, pattern) for pattern in GoboPattern},
@@ -669,6 +704,12 @@ def rig_offer(
         else max(change for change in changes if change is not None),
         beat_ms=intervals[len(intervals) // 2] if intervals else None,
         templates=dict(templates or {}),
+        beats_per_bar=beat_grid.beats_per_bar,
+        full_travel_ms={
+            name: max(v for v in values if v is not None)
+            for name, values in travels.items()
+            if values and None not in values
+        },
         dark_entries={
             t: {before: tuple(heads) for before, heads in after.items()}
             for t, after in (dark_entries or {}).items()
@@ -850,7 +891,8 @@ def offer_for_prompt(
     long enough for a wheel change; and the states a template cannot hold. Sections
     that share a palette share one entry. With `half_beats` (half the beat before each
     section boundary), how many boundaries a dip fits before (`dip_boundaries`), since
-    the render decides per boundary; without them, the median beat (`dip_fits`)."""
+    the render decides per boundary; without them, the median beat
+    (`change_fits_median_beat`)."""
     colors: dict[str, list[dict[str, str]]] = {
         "faithful": [],
         "approximate": [],
@@ -926,6 +968,13 @@ def offer_for_prompt(
         )
         if states:
             exclusions.append({"template_id": template_id, "states": states})
+    wheel_beats = []
+    for template_id, template in offer.templates.items():
+        phases = template.variants.get("base") or next(iter(template.variants.values()), None)
+        if phases is not None and any(phases.heads.values()) and offer.beat_ms:
+            wheel_beats.append(
+                {"template_id": template_id, **wheel_event_beats(phases, offer.beat_ms)}
+            )
     return {
         "colors": colors,
         "color_wheel": any(head.color_wheel for head in offer.heads),
@@ -944,7 +993,7 @@ def offer_for_prompt(
         "wheel_change_ms": offer.wheel_change_ms,
         "wheel_change_beats": round_beats(offer.wheel_change_beats),
         "half_beat_ms": None if offer.beat_ms is None else round(offer.beat_ms / 2),
-        "dip_fits": offer.dip_fits,
+        "change_fits_median_beat": offer.change_fits_median_beat,
         "dip_boundaries": None
         if offer.wheel_change_ms is None or half_beats is None
         else {
@@ -953,8 +1002,59 @@ def offer_for_prompt(
             "shortest_half_beat_ms": round(min(half_beats)) if half_beats else None,
         },
         "dark_windows": windows,
+        "wheel_beats": wheel_beats,
         "exclusions": exclusions,
         "events": _events_for_prompt(offer),
+        "transitions": _transitions_for_prompt(offer),
+    }
+
+
+def wheel_event_beats(phases: DarkPhases, beat_ms: float) -> dict[str, Any]:
+    """For the planner: on which beats of a template's cycle (1 = the part's first beat) a
+    colour or gobo event shows on the beat on every head (`every`), on some (`some`: the
+    others show it from their next reveal), on none but within `WHEEL_LATE_BEATS` on some
+    (`late`), or on none in time (`moves`: it moves to a beat within `WHEEL_MOVE_BARS` where
+    heads show it, or does not play), from its published dark phases (a head is dark on a
+    beat its window opens within three frames of, as the render counts a reveal)."""
+    frame = EFFECT_GRID_MS / beat_ms
+    cycle = max(1, round(phases.cycle_beats))
+    out: dict[str, Any] = {"cycle_beats": cycle, "every": [], "some": [], "late": [], "moves": []}
+    heads = list(phases.heads)
+    for k in range(cycle):
+        lit, soon = 0, 0
+        for fixture_id in heads:
+            windows = [
+                (a + shift, b + shift)
+                for a, b in phases.heads[fixture_id]
+                for shift in (-phases.cycle_beats, 0.0, phases.cycle_beats)
+            ]
+            dark = [(a, b) for a, b in windows if a - 3 * frame <= k < b - frame]
+            if not dark:
+                lit += 1
+            elif min(b for _, b in dark) - k <= WHEEL_LATE_BEATS + frame:
+                soon += 1
+        key = "every" if lit == len(heads) else "some" if lit else "late" if soon else "moves"
+        out[key].append(k + 1)
+    return out
+
+
+def _transitions_for_prompt(offer: RigOffer) -> dict[str, Any]:
+    """What a transition is at this song's median beat: each length in ms; how long the
+    slowest head takes to travel each pose axis' whole range (a lit move longer than the
+    window, or for `sweep` its share after the split point, dips dark); the wheel change
+    a colour or gobo change across a lit transition dips dark for."""
+    from twinklr.core.sequencer.models.transition import TransitionLength
+    from twinklr.core.sequencer.moving_heads.transitions import length_beats
+
+    lengths = []
+    if offer.beat_ms:
+        for length in TransitionLength:
+            ms = round(float(length_beats(length, offer.beats_per_bar)) * offer.beat_ms)
+            lengths.append({"length": length.value, "ms": ms})
+    return {
+        "lengths": lengths,
+        "full_travel_ms": dict(sorted(offer.full_travel_ms.items())),
+        "wheel_change_ms": offer.wheel_change_ms,
     }
 
 
@@ -997,7 +1097,8 @@ def describe_look(record: Mapping[str, Any]) -> list[str]:
     for a reader: what each asked colour and gobo plays on which heads from the
     section's start, where a head turns to it later or keeps the previous or authored
     state, each boundary's dark dip, what its intensity plays
-    (`intensity.describe_intensity`) and what each event played (`events.describe_events`)."""
+    (`intensity.describe_intensity`), what each event played (`events.describe_events`)
+    and what its transitions played (`transitions.describe_transitions`)."""
     lines = []
     for key, noun in (("color", "colour"), ("gobo", "gobo")):
         entry = record.get(key)
@@ -1041,6 +1142,8 @@ def describe_look(record: Mapping[str, Any]) -> list[str]:
                 if dip["added_ms"]
                 else "turned in the darkness already there before the section"
             )
+        elif "in_transition" in boundary:
+            what = boundary["in_transition"]
         elif "deferred" in boundary:
             what = f"turned in a dark window at {boundary['deferred']['turn_ms']} ms"
         else:
@@ -1051,4 +1154,7 @@ def describe_look(record: Mapping[str, Any]) -> list[str]:
     from twinklr.core.sequencer.moving_heads.events import describe_events
 
     lines += describe_events(record.get("events", []))
+    from twinklr.core.sequencer.moving_heads.transitions import describe_transitions
+
+    lines += describe_transitions(record.get("transitions", []))
     return lines
