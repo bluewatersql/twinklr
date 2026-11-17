@@ -83,3 +83,26 @@ def test_dmx_profile_reads_the_channel_count_xlights_writes(
     (model,) = LayoutProfiler().profile(_dmx_layout(tmp_path, **attributes)).models
     assert model.dmx_profile is not None
     assert model.dmx_profile.channel_count == expected
+
+
+def test_dmx_profile_reads_the_colour_wheel_slots_in_slot_order(tmp_path: Path) -> None:
+    """A slot missing its DMX value or its colour is skipped."""
+    layout = _dmx_layout(
+        tmp_path,
+        DmxColorWheelColor0="#FFFFFF",
+        DmxColorWheelDMX0="0",
+        DmxColorWheelColor1="#FF0000",
+        DmxColorWheelDMX1="14",
+        DmxColorWheelColor2="#0000FF",
+        DmxColorWheelDMX19="200",
+        DmxColorWheelColor19="#00FF00",
+    )
+
+    (model,) = LayoutProfiler().profile(layout).models
+
+    assert model.dmx_profile is not None
+    assert [(e.dmx_value, e.color) for e in model.dmx_profile.color_wheel] == [
+        ("0", "#FFFFFF"),
+        ("14", "#FF0000"),
+        ("200", "#00FF00"),
+    ]

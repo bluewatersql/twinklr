@@ -26,8 +26,8 @@ was not run (the brief forbids it).
 |---|---|
 | `scripts/extract_mh_intent_parity.py` | Extracts `git archive` of the tag into a temporary directory (recording the commit `git get-tar-commit-id` reads from the archive), imports `twinklr` from it instead of the editable install, renders each row's plan pair with the old renderer, serialises every fixture segment with the old exporter (`DmxSettingsBuilder`) and samples the slider and value-curve settings on the 20 ms frame grid, per xLights layer, before emission quantisation. Writes the facts with each row's annotation (status, task, parity target, citations, old behaviour not carried over) and the layer finding. Documented in `scripts/README.md`. |
 | `tests/regression/baselines/mh_intent_parity.json` | The output: provenance, the layer finding (`layer_playback`), setup, and 34 rows with plan inputs as data (`intent`, `neutral_intent`), facts, parity target, citations at the tag. Generated twice: byte-identical. |
-| `tests/regression/test_mh_intent_parity.py` | The standing test. Each regression row rendered on the current renderer through a public entry — `RenderingPipeline`; `twinklr run`'s `MovingHeadRenderingStage` with the macro plan in state, read back from the delivered `.xsq` (palette-role rows); the combined show stage's moving-head render (show rows) — and checked on encoded frames only: named wheel states per frame and commanded darkness. Everything that knows the planner contract or a stage's call shape is in one block ("Plans and calls"). `PENDING` holds the strict xfails; a guard asserts each prefix in `PREFIXES` is used by exactly one test and every regression row is covered once. |
-| `layer_playback.py` (beside this record) | The layer analysis below: decodes the `.fseq` (v2, zstd, sparse; the repository has only a byte comparer, `api/xlights/fseq.py`) and compares it with both layers of the `.xsq`. |
+| `tests/regression/test_mh_intent_parity.py` | The standing test. Each regression row rendered on the current renderer through `RenderingPipeline`; `twinklr run`'s `MovingHeadRenderingStage` with the macro plan in state, read back from the delivered `.xsq` (palette-role rows); and, for the show rows, the show stage's moving-head render method (`CombinedShowRenderStage._render_moving_heads`) — and checked on encoded frames only: named wheel states per frame and commanded darkness. Everything that knows the planner contract or a stage's call shape is in one block ("Plans and calls"). `PENDING` holds the strict xfails; a guard asserts each prefix in `PREFIXES` is used by exactly one test and every regression row is covered once. |
+| `layer_playback.py` (beside this record) | The layer analysis below: decodes the `.fseq` (v2, zstd, sparse; the repository has only a byte comparer, `api/xlights/fseq.py`), computes and asserts the head-to-range mapping, and compares the frames with both layers of the `.xsq`, resampling the unmatched ones. |
 
 Inputs, both sides: eight 4/4 bars of 500 ms beats with the first beat 15 ms off the
 frame grid (`m.bars_grid`, as `test_mh_pins.py`'s steady grid); one section over bars
@@ -68,25 +68,46 @@ against the omitted-intent plan (template as authored).
 ## What xLights played (the layer finding)
 
 The old exporter put each transition on a second xLights layer under the untrimmed
-section effects, with no `LayerMethod`. Whether the blend was ever visible was
-established from the project's own P3 verification output:
+section effects, with no `LayerMethod`. Whether the blend was visible was measured on
+**one song**: the owner's 2026-11-16 viewing render (Need A Favor, owner rig). Its
+old-renderer reference `.xsq` was produced by the code at commit `dcc14ddf`, and it is
+read under [implementation-brief.md](../../implementation-brief.md) row 139 ("Viewing
+render and old-renderer reference: inputs"):
 `~/xlights/_twinklr_verify/p3_view/out/legacy_need_a_favor.xsq` (sha256 `7d75ab25…`) and
 the `.fseq` xLights rendered from it (sha256 `b8070827…`, v2.2, zstd, 64 channels in 4
-sparse ranges of 16, 9870 frames of 20 ms). The ranges were matched to heads by
-agreement with the base layer away from transitions (0.97–0.98 against 0.58–0.69 for the
-others), which is file order. `layer_playback.py` compares every frame inside the 16
-transition effects (4 boundaries × 4 heads) with both layers:
+sparse ranges of 16, 9870 frames of 20 ms). Both were read only.
 
-| Frames inside a transition effect | Played the base | Either (equal) | Played the transition only | Neither |
+`layer_playback.py` (beside this record) does the measuring; the fixture's
+`layer_playback` block transcribes its output and is not measured by the extraction
+script. It first computes which sparse range is which head, by agreement with each head's
+section layer outside transitions, and asserts it: 0.972–0.980 on the head's own range,
+at most 0.686 on any other. Then it compares every frame inside the 16 transition
+effects (4 boundaries × 4 heads) with both layers:
+
+| Frames inside a transition effect | Played the section layer | Either (equal) | Played the transition only | Neither |
 |---|---|---|---|---|
-| a base effect covers the frame | 6351 | 4112 | 4 | 393 |
-| no base effect covers it | — | — | 1668 | 144 |
+| a section effect covers the frame | 6351 | 4112 | 4 | 393 |
+| no section effect covers it | — | — | 1668 | 144 |
 
-(channel-frames within ±1). The 393 "neither" are base value curves faster than this
-sampling (e.g. MH1 channel 2 at 30920 ms: played 114, base sampled 70, transition 0);
-none matches the transition. Example, MH2 across the 129625 ms boundary, channel 11:
+(channel-frames within ±1 of the value sampled at the frame's start).
 
-| ms | played | base layer | transition layer |
+- **The 393 "neither"**, resampling the section layer at t−20 ms, t+20 ms and the frame's
+  middle: 82 match a resample; 240 lie within the section curve's own swing over those
+  samples; 71 remain. Of those 71, 64 are channel 2, whose section curve moves up to ~75
+  bytes per frame while its transition byte is 0 (24 of them happen to sit nearer 0 than
+  the section sample); the other 7 (channels 3 and 11) are none of them nearer the
+  transition than the section: 3 lie within 3 bytes of a section sample a frame away and 4
+  are on the last frame before a section effect ends. No value tracks the transition
+  layer; none indicates a mix.
+- **The 144 "other"** (no section effect, not within ±1 of the transition at the frame's
+  start): all 144 match the transition layer resampled at t−20, t+20 or the middle — the
+  same fade, sampled a frame apart.
+- **A zero section byte under a non-zero transition byte** never occurs in this file, so
+  how xLights mixes that case is unobserved.
+
+Example, MH2 across the 129625 ms boundary, channel 11:
+
+| ms | played | section layer | transition layer |
 |---|---|---|---|
 | 129320 | 123 | 124 | 115 |
 | 129520 | 123 | 124 | 113 |
@@ -94,15 +115,14 @@ none matches the transition. Example, MH2 across the 129625 ms boundary, channel
 | 129920 | 42 | 42 | 109 |
 | 130320 | 46 | 47 | 104 |
 
-**Finding: the transition layer never played where a section effect existed. Every
-boundary between two sections played as a cut.** The transition showed only where a head
-had no section effect (MH1 and MH4, 129620–150900 ms, a section without them), as a fade
-to or from nothing. So the old renderer's "lit blend" was written but not seen, and the
-null-hint "default crossfade on every boundary" was not visible either. The W8 parity
-target is therefore the planner's intent (a smooth lit change between sections), not
-something the old renderer visibly did; the transition rows say so. Not established: what
-xLights does where the base byte is 0 under a non-zero transition byte — no such frame
-occurs in this file.
+**Finding, as measured: in the owner's 2026-11-16 viewing render of one song, wherever
+the section layer's byte was non-zero, the section layer played, so every boundary
+between two sections played as a cut.** The transition showed only where a head had no
+section effect (MH1 and MH4, 129620–150900 ms), as a fade to or from nothing. The old
+renderer's "lit blend", and the null-hint "default crossfade on every boundary", were
+written but not seen there. The W8 parity target is therefore the planner's intent (a
+smooth lit change between sections), not something the old renderer visibly did; the
+transition rows say so.
 
 ## Rows
 
@@ -216,7 +236,9 @@ a transition (`pipeline.py:1760-1763,2428-2513,2515-2563`) on a second xLights l
 (`export/xsq_adapter.py:272-292`), blended by the job's per-channel defaults
 (`compile/transition_planner.py:192-245`, `compile/channel_blender.py:38-80`). The mode
 was read only for SNAP and CROSSFADE's split (`compile/transition_planner.py:130-190`).
-Rows: `duration_bars` 1, `fade_out_ratio` 0.25, curve linear.
+Rows: `duration_bars` 1, `fade_out_ratio` 0.25, curve linear. The tests take each row's
+window from its old effect span: ±1000 ms, and for CROSSFADE −500…+1500 ms around the
+boundary (the old 25% early split). W8 keeps those windows or updates the rows.
 
 | Row | Old facts (MH1, as written; see the layer finding for what played) | Status |
 |---|---|---|
@@ -252,8 +274,10 @@ Targets: palette — with plan colour PRIMARY under the show, every lit frame sh
 state nearest the palette's first stop (`blue`, asserted not `red`). Focal role — with
 the same plan (intensity neutral, on `parity_partial_hold`), LEAD renders no lit frame
 dimmer and some lit frame brighter than SUPPORT; REST no lit frame brighter than SUPPORT;
-the same dark frames. The revised plan also makes the focal role a validator rule on the
-planner's intensity; W9 may meet this row either way.
+the same dark frames and every channel but the dimmer identical. Design (integrator
+decision, 2026-11-17): the show render applies the macro focal role deterministically,
+adjusting the section's effective intensity and recording it in the trace; it is not only
+a rule on the planner's choice. This row tests that render effect.
 
 ## Fix round (review of the first pass)
 
@@ -267,13 +291,27 @@ planner's intensity; W9 may meet this row either way.
 | 6 One block | Transition plans, macro plans and all stage calls in "Plans and calls" |
 | 7 Focal role | `show_focal_lead` is a W9 strict xfail on a render effect |
 | 8 Two gobo events | `gobo_two_events`, W7 |
-| 9 Layer composition | Established from the `.fseq`: the transition never played over a section effect (above) |
+| 9 Layer composition | Measured on one render (above): wherever the section layer's byte was non-zero it played |
 | 10 Low | Wording; `plan_color: null` recorded; prefix guard; the script archives the tag itself and records `get-tar-commit-id`; "turned lit" reworded and the two-section fact added; the pulse allowance documented |
+
+## Follow-up (second review, on `af504809`)
+
+1. Intensity peaks are local peaks (a rise, then after any plateau a fall) of the level
+   above the authored one; INTENSE needs one within one frame of every beat the head is
+   lit across. A synthetic check (an accent scaling a 0.3/0.8 alternating authored level)
+   finds a peak on all 14 lit beats this way, where peaks of the raw level find 7.
+2. The focal-role row stands as a render effect (design above), and also requires
+   identical dark frames and every channel but the dimmer identical.
+3. The layer finding is scoped to the one render measured, with its source commit and
+   authority, the computed head mapping and the resampling of the unmatched frames.
+4. The show rows go through the show stage's moving-head render method.
+5. The transition windows' dependence on the old CROSSFADE split is noted.
 
 ## Discrepancies with the plan's gap table
 
-1. **`transition_in` "byte blend over an overlap" was written but not played**: xLights
-   showed the section effects over it, so every boundary played as a cut (above). The
+1. **`transition_in` "byte blend over an overlap" was written but not played** in the
+   one render measured (the owner's 2026-11-16 viewing render): wherever the section
+   layer's byte was non-zero it played, so every boundary played as a cut (above). The
    regression for transitions is against the planner's intent, not against a look the
    owner saw.
 2. Only SNAP and CROSSFADE's split were read; MORPH, SWEEP and FADE_VIA_BLACK wrote one

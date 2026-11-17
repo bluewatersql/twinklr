@@ -5,10 +5,11 @@ the current renderer.
 `mh-last-with-legacy-renderer`, mode `legacy_v1`) did with it on synthetic inputs and the
 parity target the current renderer must meet, in renderer-independent terms; it is
 written by `scripts/extract_mh_intent_parity.py`. Each test renders the row's intent on
-the current renderer through a public entry (`RenderingPipeline`; `twinklr run`'s
-`MovingHeadRenderingStage` where the song's macro palette matters; the combined show
-stage for the show rows) and checks the target against the encoded frames alone: which
-channel holds which named state when, and whether the head is commanded dark.
+the current renderer (through `RenderingPipeline`; `twinklr run`'s
+`MovingHeadRenderingStage` where the song's macro palette matters; for the show rows, the
+show stage's moving-head render method, `CombinedShowRenderStage._render_moving_heads`)
+and checks the target against the encoded frames alone: which channel holds which named
+state when, and whether the head is commanded dark.
 
 Every row the current renderer does not meet yet is a strict xfail naming the task of
 `changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md` that renders it: the test
@@ -42,6 +43,7 @@ from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, 
 from twinklr.core.agents.sequencer.moving_heads.moment_cues import bind_lyric_moment_cues
 from twinklr.core.agents.sequencer.moving_heads.rendering_stage import MovingHeadRenderingStage
 from twinklr.core.config.fixtures import AxisCapability, FixtureCapabilities, FixtureGroup
+from twinklr.core.config.fixtures.state_tags import nearest_color_state
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.pipeline.show_stages import CombinedShowRenderStage
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import EncodedFixtureFrame
@@ -156,17 +158,16 @@ def _rows(prefix: str) -> list[Any]:
 # --- Plans and calls: the one block that knows the planner contract and stage calls -------
 
 
-STATE_HEX = {"white": "#FFFFFF", "red": "#FF0000", "blue": "#0000FF", "green": "#00FF00"}
-"""The colour each colour-wheel state of `parity_rig` shows: what W1's `hex` tags say."""
-
-
 def parity_rig() -> FixtureGroup:
     """`m.family_rig` with a green colour state added, so a palette's first two stops can
-    land on different states."""
+    land on different states, and every colour state tagged with the colour it is named
+    for (white, red, blue, green: W1's `hex` tags)."""
     payload = m.family_rig(HEADS).model_dump(mode="json")
     for fixture in payload["fixtures"]:
         states = fixture["config"]["physical_profile"]["discrete"]["color"]["states"]
         states["green"] = {"range_min": 30, "range_max": 39, "value": 34, "settle_ms": 120}
+        for name, state in states.items():
+            state["hex"] = name
     return FixtureGroup.model_validate(payload)
 
 
@@ -344,7 +345,7 @@ def render_run(plan: ChoreographyPlan, macro: MacroPlan, directory: Path) -> Fra
 
 
 def render_show(plan: ChoreographyPlan, macro: MacroPlan) -> Frames:
-    """The moving-head half of `twinklr show`'s combined render."""
+    """The show stage's moving-head render method (`twinklr show`'s moving-head half)."""
     rig = parity_rig()
     graph = ChoreographyGraph(
         graph_id="combined",
@@ -457,18 +458,11 @@ def _xsq_frames(path: Path) -> list[EncodedFixtureFrame]:
 
 
 def nearest_state(hex_color: str) -> str:
-    """The `parity_rig` colour state nearest `hex_color` (W1's tagged-state resolution)."""
-
-    def rgb(value: str) -> tuple[int, ...]:
-        return tuple(int(value[i : i + 2], 16) for i in (1, 3, 5))
-
-    target = rgb(hex_color)
-    return min(
-        STATE_HEX,
-        key=lambda name: sum(
-            (a - b) ** 2 for a, b in zip(rgb(STATE_HEX[name]), target, strict=True)
-        ),
-    )
+    """The `parity_rig` colour state nearest `hex_color`, by its `hex` tags."""
+    profile = parity_rig().expand_fixtures()[0].config.physical_profile
+    match = None if profile is None else nearest_color_state(profile, hex_color)
+    assert match is not None
+    return match.state
 
 
 def stops(palette_id: str) -> list[str]:
@@ -490,6 +484,22 @@ def beat_ms(bar: int, beat: int) -> float:
 def near_beat(time_ms: int) -> bool:
     """The frame at `time_ms` contains a beat or starts within one frame after one."""
     return any(-FRAME < time_ms - beat <= FRAME for beat in GRID.beat_boundaries)
+
+
+def local_peaks(values: Sequence[int], frames: Sequence[int]) -> list[int]:
+    """Start times of the local peaks among `frames` (consecutive lit frames): a rise
+    followed, after any plateau, by a fall, all inside `frames`."""
+    inside = set(frames)
+    peaks = []
+    for i in frames:
+        if i - 1 not in inside or values[i] <= values[i - 1]:
+            continue
+        j = i
+        while j + 1 in inside and values[j + 1] == values[i]:
+            j += 1
+        if j + 1 in inside and values[j + 1] < values[i]:
+            peaks.append(i * FRAME)
+    return peaks
 
 
 def lit_frames(frames: Frames, head: str, window: range) -> list[int]:
@@ -597,24 +607,31 @@ def test_intensity_raises_the_floor_and_pulses_on_the_beat(row_id: str) -> None:
         assert all(dimmer[i] >= authored[i] for i in lit), f"{head} dims below the authored look"
         assert min(dimmer[i] for i in lit) > min(authored[i] for i in lit), f"{head} floor"
         assert len({dimmer[i] for i in lit}) >= 2, f"{head} does not pulse"
-        peak = max(dimmer[i] for i in lit)
-        lit_set = set(lit)
-        onsets = [
-            i * FRAME
-            for i in lit
-            if i - 1 in lit_set and dimmer[i] == peak and dimmer[i - 1] < peak
-        ]
-        assert len(onsets) >= 2, f"{head} peaks {onsets}"
-        assert all(near_beat(onset) for onset in onsets), f"{head} peaks off the beat: {onsets}"
-        if template_id == PULSE_TEMPLATE and level == "DRAMATIC":
-            continue  # the authored pulse sets the period
-        gaps = {b - a for a, b in pairwise(onsets)}
-        beats = {round(gap / BEAT) for gap in gaps}
-        assert all(abs(gap - round(gap / BEAT) * BEAT) <= FRAME for gap in gaps), gaps
+        # Peaks of the level above the authored one, so an accent that scales with the
+        # template's own alternating level still shows as a peak on its beat.
+        peaks = local_peaks(
+            [value - base for value, base in zip(dimmer, authored, strict=True)], lit
+        )
+        assert len(peaks) >= 2, f"{head} peaks {peaks}"
+        assert all(near_beat(peak) for peak in peaks), f"{head} peaks off the beat: {peaks}"
         if level == "INTENSE":
-            assert beats == {1}, gaps
-        else:  # DRAMATIC: a whole-beat period longer than INTENSE's
-            assert len(beats) == 1 and min(beats) >= 2, gaps
+            # A peak on every beat the head is lit across, whatever level the template
+            # itself is at on that beat.
+            lit_set = set(lit)
+            beats = [
+                beat
+                for beat in GRID.beat_boundaries
+                if set(frames_in(beat - 2 * FRAME, beat + 3 * FRAME)) <= lit_set
+            ]
+            missing = [b for b in beats if not any(-FRAME < p - b <= FRAME for p in peaks)]
+            assert beats and not missing, f"{head} no peak on beats {missing}"
+            continue
+        if template_id == PULSE_TEMPLATE:
+            continue  # DRAMATIC on an authored pulse: the template sets the period
+        gaps = {b - a for a, b in pairwise(peaks)}
+        whole = {round(gap / BEAT) for gap in gaps}
+        assert all(abs(gap - round(gap / BEAT) * BEAT) <= FRAME for gap in gaps), gaps
+        assert len(whole) == 1 and min(whole) >= 2, gaps  # longer than INTENSE's beat
 
 
 @pytest.mark.parametrize("row_id", _rows("color"))
@@ -808,6 +825,10 @@ def test_transition_in_changes_smoothly_across_the_boundary(row_id: str) -> None
 
 @pytest.mark.parametrize("row_id", _rows("show_focal"))
 def test_show_focal_lead_renders_hotter(row_id: str) -> None:
+    """The show render applies the macro focal role to the section's intensity: with one
+    plan, LEAD is no dimmer anywhere and hotter somewhere than SUPPORT, REST no hotter than
+    SUPPORT, and nothing but the dimmer level differs (same dark frames, same other
+    channels)."""
     palette = ROWS[row_id]["intent"]["show"]["palette_id"]
     plan = single_plan({}, HOLD_TEMPLATE)
     lead, support, rest = (
@@ -818,6 +839,14 @@ def test_show_focal_lead_renders_hotter(row_id: str) -> None:
         lit = lit_frames(support, head, frames_in(*SECTION))
         hot, base, calm = lead.dimmer(head), support.dimmer(head), rest.dimmer(head)
         assert lead.dark(head) == support.dark(head) == rest.dark(head)
+        dimmer_offset = support.profile.axes["dimmer"].coarse_offset
+        for other in (lead, rest):
+            assert [
+                {k: v for k, v in frame.items() if k != dimmer_offset} for frame in other.raw(head)
+            ] == [
+                {k: v for k, v in frame.items() if k != dimmer_offset}
+                for frame in support.raw(head)
+            ], f"{head}: the focal role changed more than the dimmer level"
         assert all(hot[i] >= base[i] for i in lit)
         assert any(hot[i] > base[i] for i in lit), f"{head}: LEAD no hotter than SUPPORT"
         assert all(calm[i] <= base[i] for i in lit), f"{head}: REST hotter than as authored"

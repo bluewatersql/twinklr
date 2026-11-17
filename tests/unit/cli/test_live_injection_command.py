@@ -22,6 +22,7 @@ from tests.support.moving_heads import (
     p1_layout_xml,
     p1_rig,
     p1_templates,
+    tagged_p1_rig,
     unprofiled_rig,
 )
 from twinklr.cli import main as cli_main
@@ -1022,3 +1023,54 @@ async def test_run_refuses_unusable_model_names_before_planning(
         assert await _run_with(tmp_path, None) == 1
     assert captured["build_calls"] == 0
     assert message in " ".join(capsys.readouterr().out.split())
+
+
+@pytest.mark.anyio
+async def test_run_notes_untagged_wheel_states_once_and_writes_the_paste_ready_tags(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    """Before analysis, `twinklr run` says in one line which fixtures have wheel states
+    the planner's colour, gobo and strobe choices cannot use, and where the paste-ready
+    tags are; a colour the layout's model declares for a slot is suggested for MH1."""
+    layout = tmp_path / "xlights_rgbeffects.xml"
+    layout.write_text(
+        p1_layout_xml({"Dmx MH1": {"DmxColorWheelColor0": "#E01010", "DmxColorWheelDMX0": "14"}}),
+        encoding="utf-8",
+    )
+    _captured_run(monkeypatch, p1_job(), p1_rig())
+
+    with p1_templates():
+        await _run_with(tmp_path, layout)
+
+    output = capsys.readouterr().out
+    (note,) = [line for line in output.splitlines() if "NOTE:" in line]
+    (tags,) = (tmp_path / "out").rglob(cli_main.PROFILE_TAGS_FILENAME)
+    assert note.startswith("NOTE: MH1, MH2: wheel or shutter states without a meaning tag")
+    assert note.endswith(f"paste-ready tags to confirm: {tags}")
+    assert '"pattern": "stars"' not in output  # the snippet is in the file, not inline
+    text = tags.read_text(encoding="utf-8")
+    assert "MH1 (profile 'synthetic_spot'): 6 wheel or shutter states do not say" in text
+    assert "MH2 (profile 'synthetic_spot'): 6 wheel or shutter states do not say" in text
+    assert "  color.red: hex \"#E01010\" (suggested from xLights model 'Dmx MH1')" in text
+    assert (
+        '    "star": {"range_min": 16, "range_max": 23, "value": 20, "settle_ms": 160, "pattern": "stars"}'
+        in text
+    )
+
+
+@pytest.mark.anyio
+async def test_run_on_a_fully_tagged_rig_prints_no_note_and_removes_stale_tags(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    _captured_run(monkeypatch, p1_job(), p1_rig())
+    with p1_templates():
+        await _run_with(tmp_path, None)
+    (stale,) = (tmp_path / "out").rglob(cli_main.PROFILE_TAGS_FILENAME)
+    capsys.readouterr()
+
+    _captured_run(monkeypatch, p1_job(), tagged_p1_rig())
+    with p1_templates():
+        await _run_with(tmp_path, None)
+
+    assert "NOTE:" not in capsys.readouterr().out
+    assert not stale.exists()

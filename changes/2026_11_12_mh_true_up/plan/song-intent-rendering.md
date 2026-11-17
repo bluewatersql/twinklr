@@ -58,12 +58,15 @@ xfails**, each failing on its own target assertion today:
 
 Findings that change the tasks:
 
-- **The old section transitions never played.** The old renderer wrote its crossfades
-  on a second xLights layer under untrimmed section effects. The xLights-rendered
-  `.fseq` of the old renderer's output (the 2026-11-16 viewing-render reference) shows
-  the section layer played wherever a section effect existed: every boundary between
-  two sections played as a lit cut, including the default crossfade on a null hint.
-  Frame data is in the W0 record. W8's target is therefore the planner's intent — a
+- **The old section transitions did not play in the render measured.** The old
+  renderer wrote its crossfades on a second xLights layer under untrimmed section
+  effects. In the owner's 2026-11-16 viewing render of one song (the old-renderer
+  reference `.xsq` from the code at `dcc14ddf`, read under the implementation brief's
+  "viewing render and old-renderer reference: inputs" row), wherever the section layer's
+  byte was non-zero the section layer played: every boundary between two sections played
+  as a lit cut, including the default crossfade on a null hint. A zero section byte under
+  a non-zero transition byte did not occur, so that case is unobserved. Frame data is in
+  the W0 record. W8's target is therefore the planner's intent — a
   smooth lit change between sections — and is new visible behaviour, judged by the
   owner at the W8 view, not a restoration.
 - **Intensity has no headroom on the catalog families.** They hold the dimmer at full.
@@ -125,11 +128,23 @@ refinement iteration. The run never fails for it. W2 builds and tests that loop.
 - **Lyric moment cues.** Binding to the snapped beat is kept for every event action. A
   referenced cue that no event realises is repaired and fed back. A cue landing on a
   dark phase or a rest is moved or recorded (timing rules below).
-- **Transitions.** `entry`: DIP, FADE_IN, SWEEP (lit travel within speed, no wheel
-  change; falls back to DIP, recorded). `exit`: HOLD, FADE_OUT, BLACKOUT. Length as
-  BEAT, HALF_BAR or BAR. Code owns the curve.
+- **Transitions.** `entry` and `exit` are each a `Transition{mode: SNAP|CROSSFADE|MORPH|
+  SWEEP|FADE_VIA_BLACK|BLACKOUT, length, curve}` (contract below); `entry` shapes the
+  section's start, `exit` its end, over `length` (BEAT … EIGHT_BARS) eased by `curve`,
+  and code places it on the grid. SNAP: no blend; the new look starts at the boundary,
+  with a dark dip only where the head must reposition (today's entry). CROSSFADE: the
+  dimmer hands over from the outgoing to the incoming look while lit, the aim moving
+  within travel speed. MORPH: every continuous channel (pan, tilt, dimmer, zoom) eases
+  from the outgoing to the incoming value, lit. SWEEP: the head travels lit to the
+  incoming aim along a sweep at travel speed, distinct from MORPH's eased interpolation
+  (W8 defines the path). FADE_VIA_BLACK: the dimmer fades to dark, wheels and aim change
+  while dark, then it fades up. BLACKOUT: a cut to or from dark at the boundary. A
+  CROSSFADE, MORPH or SWEEP that needs a wheel change or travel faster than the profile
+  allows falls back to a dark dip, recorded in the trace.
 - **Show.** One resolver for `run` and `show`: palette roles resolve through the macro
-  palette in both. The macro focal role constrains intensity through a validator rule.
+  palette in both. The macro focal role is applied deterministically at render time in
+  `show`: code adjusts the section's effective intensity from the heads' focal role
+  (LEAD hotter, REST no hotter than authored) and records it in the trace.
 - **Motif, variation, density.** Planner-chosen fields, as the plan of record had them.
   `variation` stays a planner choice.
 
@@ -276,7 +291,7 @@ has the renderer that applies song intent.
 | W6 | Events without wheels, cue binding, emphasis — **view** | Accent on the snapped beat |
 | W7 | Colour and gobo events — **view** | Reveal on the beat; dark lead within half a beat; spacing repaired |
 | W8 | Entry and exit transitions — **view** | SWEEP→DIP fallback recorded |
-| W9 | Show: palette and focal role — **view** (combined show); its own check for the focal-role rule | — |
+| W9 | Show: palette and focal role — **view** (combined show); the focal role applied at render and traced | The two W9 parity rows |
 | then | Motif, variation, density (former T3–T5); T4's arrangement work | — |
 
 **Consequences to tell the owner before merge.** W2's contract change re-keys the

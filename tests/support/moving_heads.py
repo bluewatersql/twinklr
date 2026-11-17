@@ -754,6 +754,19 @@ def p1_rig(*, mh1_pan_max: float = 270.0) -> FixtureGroup:
     return FixtureGroup.model_validate(payload)
 
 
+def tagged_p1_rig() -> FixtureGroup:
+    """`p1_rig` with every colour and gobo state tagged (its shutter has only open and
+    closed states, which need none)."""
+    payload = p1_rig().model_dump(mode="json")
+    for fixture in payload["fixtures"]:
+        discrete = fixture["config"]["physical_profile"]["discrete"]
+        for name in ("white", "red", "blue"):
+            discrete["color"]["states"][name]["hex"] = name
+        for name, pattern in (("open", "open"), ("dots", "dots"), ("star", "stars")):
+            discrete["gobo"]["states"][name]["pattern"] = pattern
+    return FixtureGroup.model_validate(payload)
+
+
 def preset_library_payload() -> dict[str, Any]:
     """Rig presets for `p1_rig`'s two heads, in its profile's state names.
 

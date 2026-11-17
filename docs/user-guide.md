@@ -377,6 +377,32 @@ With it the group needs no `topology`. A fixture still needs a `dmx_mapping` (`p
 | `visibility.dimmer_zero_extinguishes` | `true` when the dimmer is calibrated from `0` and its allowed window admits `0`, else `false` |
 | `visibility.extinguishing_shutter_states` | The shutter's closed state, else none |
 | `travel_speed_per_s`, `latency_ms`, `settle_ms`, `close_latency_ms`, `open_latency_ms` | Never defaulted: every timing must be stated. Unknown stays `null`, and a template whose motion or reveal needs it is excluded or refused, naming the term. A guessed time that is too fast would let the renderer reveal a head that is still moving or not yet dark, so motion would be dishonest |
+| a state's `hex`, `pattern`, `strobe` | Never defaulted or guessed: an untagged state is not offered to the planner ([state meaning tags](#state-meaning-tags)) |
+
+#### State meaning tags
+
+A wheel or shutter state may also say what it means, so that the planner's song intent has something to resolve to: a section or event colour, a gobo pattern, a strobe speed. Tags are what make those planner choices available on a rig. **Nothing renders from them yet:** the profile accepts and validates them, but no planner offer or renderer reads them until song-intent rendering's W3 (the rig offer) and W4 (section colour and gobo) land ([known regression](#what-the-pipeline-does)). A tag is rig data: an edit changes the render fingerprint and, under `twinklr show`, the session (as for presets, below). A profile without tags loads, dumps and renders exactly as before.
+
+| Tag | On | Value |
+|---|---|---|
+| `hex` | `color` states | The colour the slot shows: `"#RRGGBB"`, or a colour name (`red`, `blue`, `green`, `yellow`, `magenta`, `cyan`, `orange`, `purple`, `amber`, `lime`, `white`, `warm_white`, `cool_white`, `uv`), stored and dumped as that name's `#RRGGBB` |
+| `pattern` | `gobo` states | The pattern it projects: `open`, `circles`, `triangles`, `stars`, `diamonds`, `clouds`, `prism`, `shatter`, `dots`, `flame`, `water`, `foliage` or `abstract` |
+| `strobe` | `shutter` states | How fast it strobes: `slow`, `medium` or `fast` |
+
+```json
+"color": {"offset": 1, "settle_ms": 150,
+          "states": {"white": {"value": 0, "hex": "white"}, "red": {"value": 10, "hex": "#E01010"},
+                     "amber": {"value": 40, "hex": "amber"}}},
+"gobo": {"offset": 4, "settle_ms": 150,
+         "states": {"open": {"value": 0, "pattern": "open"}, "star": {"value": 20, "pattern": "stars"}}},
+"shutter": {"offset": 2, "settle_ms": 0,
+            "states": {"closed": {"value": 0}, "open": {"value": 255},
+                       "strobe_fast": {"range_min": 200, "range_max": 250, "value": 230, "strobe": "fast"}}}
+```
+
+The shutter's open and closed states need no tag: `open_state`, `closed_state` and `visibility.extinguishing_shutter_states` already say what they do. Refused when the fixture file loads, naming the fixture, channel and state and what to write: a tag on another channel kind's state, a malformed `hex`, an unknown pattern or speed, two shutter states claiming one strobe speed, and a `strobe` tag on the open, closed or an extinguishing state. Two colour states may share a colour (a wheel can hold two slots of one colour, or an open slot and a white one), and two gobo states one pattern (a static and a shaking copy); a request then resolves to the first of them by state name. A requested colour resolves hue first, in OKLCh: a colour with a hue goes to the tagged slot whose hue is nearest (then chroma, then lightness), and never to a white slot while the wheel has a tagged slot with a hue, so cyan on a white/red/blue/green wheel shows green, not white; a white or tinted white (`warm_white`, `cool_white`) goes to the white slot nearest in lightness and tint. A colour counts as white below OKLCh chroma 0.04. The match records its Oklab colour difference and whether it is `exact`, `approximate` or `no_chromatic_match_used_neutral` (a colour with a hue on a wheel with only white slots), so an approximation can be recorded. Hue decides even where lightness disagrees: amber (`#FFBF00`, hue 84°) shows on a yellow slot (110°) before an orange one (53°), and on an orange one before red when there is no yellow.
+
+`twinklr run` (and `inject` and `regenerate`) prints, before analysis, one `NOTE:` line naming the fixtures whose profiles have untagged states and the file it wrote, `<output_dir>/<song_name>/profile_tags.txt` (removed again once the rig is fully tagged). The file holds, per profile, each such channel's `states` ready to paste in place of the profile's, with every missing tag either a `<...>` placeholder, which is refused if pasted unfilled, or a suggested value. A value is suggested where the state's name is a colour, pattern or strobe word (a state named `red`, `dark-blue`, `star` or `strobe_fast`; a colour wheel's `open` suggests white), or, with `--layout`, where the fixture's xLights model declares a colour-wheel slot (`DmxColorWheelColor<i>` at byte `DmxColorWheelDMX<i>`) inside the state's range; a layout slot wins over the name. Suggestions are listed under the snippet for you to confirm; nothing is applied.
 
 `moving_heads.initial_states` is never defaulted: a fixture without an entry has an unknown initial state and the run is refused before planning, because nothing establishes where a head is when the sequence starts (a previous sequence leaves it wherever it last aimed). The refusal lists every fixture without an entry and prints, as one object ready to paste into `moving_heads.initial_states`, the entry each profile's default bytes give: each axis at the value they encode, each discrete channel in its `default_state`, `settled`, and `dark` exactly when that dimmer level or shutter state extinguishes it. Pasting it asserts that each head really rests there, settled and dark as stated, when the sequence starts.
 
@@ -406,6 +432,7 @@ Heads are ranked in `(row, column, ordinal, fixture_id)` order over the whole to
 _Source: `packages/twinklr/cli/main.py` (`_resolve_fixture_config_path`),
 `packages/twinklr/core/config/fixtures/dmx.py` (`DmxMapping`),
 `packages/twinklr/core/config/fixtures/capabilities.py` (`FixtureCapabilities`),
+`packages/twinklr/core/config/fixtures/state_tags.py` (`nearest_color_state`, `tag_guidance`),
 `packages/twinklr/core/config/fixtures/presets.py` (`RigPresetLibrary`) and
 `packages/twinklr/core/sequencer/models/moving_heads/topology.py` (`FixtureTopology`)_
 
@@ -902,6 +929,9 @@ Artifacts are written to `<output_dir>/<song_name>/`:
   `twinklr display`.
 - **`<song_name>_twinklr_display.xsq.trace.json`** — deterministic placement-level
   display render trace used by validation tooling.
+- **`profile_tags.txt`** — paste-ready meaning tags for the rig's untagged wheel and
+  shutter states, written by `run`, `inject` and `regenerate` only while there are any
+  ([state meaning tags](#state-meaning-tags)).
 - Stage artifacts and intermediate results (audio analysis data, profiles, plans)
 - **`checkpoints/plans/final.json`** — the moving-head plan and its render record, which `twinklr eval-report` reads. `twinklr run`, `show` and `inject`
   (and `regenerate`) write this same path for a song, so the last command to run wins.

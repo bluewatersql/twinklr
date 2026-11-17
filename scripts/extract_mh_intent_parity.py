@@ -12,7 +12,8 @@ asserts the targets on the current renderer. Usage: `scripts/README.md`.
 Facts are read from the old renderer's own output: every fixture segment is serialised
 by the old exporter (`DmxSettingsBuilder`) and the slider and value-curve settings it
 writes are sampled on the 20 ms frame grid, per xLights layer, before emission
-quantisation. Which layer xLights actually showed is a separate finding (`LAYER_PLAYBACK`).
+quantisation. Which layer xLights actually showed is a separate finding (`LAYER_PLAYBACK`),
+transcribed from `layer_playback.py` in the W0 evidence folder.
 """
 
 from __future__ import annotations
@@ -794,50 +795,81 @@ def _show_rows() -> list[dict[str, Any]]:
 # --- what xLights played: the layer finding --------------------------------------------
 
 LAYER_PLAYBACK: dict[str, Any] = {
+    "provenance": (
+        "transcribed from the output of layer_playback.py (path below), run 2026-11-17 on "
+        "the two files named here; not measured by this extraction script"
+    ),
     "question": (
-        "the old exporter wrote transitions as a second EffectLayer under each head's base "
-        "layer, without a LayerMethod: did xLights play the transition, the base, or a mix?"
+        "the old exporter wrote transitions as a second EffectLayer under each head's "
+        "section layer, without a LayerMethod: did xLights play the transition, the "
+        "section layer, or a mix?"
+    ),
+    "scope": (
+        "one song: the owner's 2026-11-16 viewing render (Need A Favor) on the owner rig, "
+        "the old renderer's reference .xsq produced by the code at commit dcc14ddf, read "
+        "under implementation-brief.md row 139 (viewing render and old-renderer reference: "
+        "inputs)"
     ),
     "source": {
         "xsq": "~/xlights/_twinklr_verify/p3_view/out/legacy_need_a_favor.xsq",
         "xsq_sha256": "7d75ab25d4f28c0e3811ae67c83c6ce7751e4358c28f9ee029b0bf1b7320df34",
         "fseq": "~/xlights/_twinklr_verify/p3_view/out/legacy_need_a_favor.fseq",
         "fseq_sha256": "b8070827f929c8da80499ccc481cb3edfb6c15da9f10aff1884b363fa005f294",
-        "what": (
-            "the old renderer's .xsq of the P3 viewing song and the .fseq xLights rendered "
-            "from it (P3 verification output, 2026-11-16); read only"
-        ),
         "script": "changes/2026_11_12_mh_true_up/evidence/2026-11-17-w0-intent-parity/"
         "layer_playback.py",
     },
-    "fseq": "v2.2, zstd, 64 channels in 4 sparse ranges of 16 (one per head), 9870 frames of 20 ms",
+    "fseq": "v2.2, zstd, 64 channels in 4 sparse ranges of 16, 9870 frames of 20 ms",
+    "head_to_range": (
+        "computed, not assumed: each head's agreement with its section layer outside "
+        "transitions is 0.972-0.980 on its own range and at most 0.686 on any other"
+    ),
     "xsq_layers": (
         "per head: the first EffectLayer holds the 26-28 section effects, the second the 4 "
         "transition effects; no setting names a LayerMethod"
     ),
     "frames_inside_transition_effects": {
-        "with_a_base_effect": {
-            "played_base_only": 6351,
+        "with_a_section_effect": {
+            "played_section_only": 6351,
             "played_either": 4112,
             "played_transition_only": 4,
             "played_neither": 393,
         },
-        "without_a_base_effect": {"played_transition": 1668, "other": 144},
+        "neither_resampled": {
+            "matches_section_at_t-20_t+20_or_mid_frame": 82,
+            "within_the_section_curve_swing_over_those_samples": 240,
+            "left": 71,
+            "left_on_channel_2": 64,
+            "left_on_channels_3_and_11": 7,
+            "left_nearer_the_transition_than_the_section": 24,
+            "note": (
+                "channel 2's section curve moves up to ~75 bytes per frame and its "
+                "transition byte is 0, so a low byte there is nearer the transition by "
+                "coincidence; none of the 7 others is nearer the transition (3 lie within "
+                "3 bytes of a section sample a frame away, 4 are on the last frame before a "
+                "section effect ends)"
+            ),
+        },
+        "without_a_section_effect": {
+            "played_transition": 1668,
+            "other": 144,
+            "other_matches_transition_at_t-20_t+20_or_mid_frame": 144,
+        },
+        "section_byte_zero_under_nonzero_transition": 0,
         "unit": "channel-frames within ±1 of the sampled value",
     },
     "example": {
         "head": "MH2",
         "transition_effect_ms": [128100, 131140],
         "boundary_ms": 129625,
-        "channel_11": "played 123 until 129620, then 39 (the base layer's cut); the "
+        "channel_11": "played 123 until 129620, then 39 (the section layer's cut); the "
         "transition layer would have glided 123 -> 100",
     },
     "finding": (
-        "where a base effect covered the frame, xLights played the base layer; the transition "
-        "layer showed only where the base had no effect (MH1 and MH4 in a section without "
-        "them, 129620-150900 ms), as a fade from or to nothing. Between two sections every "
-        "boundary played as a cut. The 393 'neither' channel-frames are base curves faster "
-        "than this sampling, none matches the transition layer"
+        "in the owner's 2026-11-16 viewing render of one song, wherever the section layer's "
+        "byte was non-zero, the section layer played: every boundary between two sections "
+        "played as a cut. The transition layer showed only where a head had no section "
+        "effect (MH1 and MH4, 129620-150900 ms), as a fade to or from nothing. No frame had "
+        "a zero section byte under a non-zero transition byte, so that case is unobserved"
     ),
 }
 
@@ -885,10 +917,15 @@ _TRANSITION = [
     f"{OLD}sequencer/moving_heads/export/xsq_adapter.py:272-292 (transitions on a second layer)",
 ]
 _NOT_PLAYED = (
-    "the transition was written on a second xLights layer under the untrimmed base layer, "
-    "and xLights played the base wherever it had an effect (LAYER_PLAYBACK): the blend in "
-    "these facts was not what played, the boundary played as a cut. The target is the "
-    "planner's intent, a smooth lit change between sections"
+    "the transition was written on a second xLights layer under the untrimmed section "
+    "layer; in the one render measured (LAYER_PLAYBACK) the section layer played wherever "
+    "its byte was non-zero, so the blend in these facts was not what played and the "
+    "boundary played as a cut. The target is the planner's intent, a smooth lit change "
+    "between sections"
+)
+_WINDOW = (
+    "the test's window is this row's transition_effect_from_boundary_ms (for CROSSFADE "
+    "-500...+1500 ms, the old 25% early split); W8 keeps that window or updates the row"
 )
 _SHOW = [
     f"{OLD}sequencer/show_coordination.py:69-73 (_ROLE_MH_INTENSITY), 83-98 (_PRESET_RGB), "
@@ -1212,6 +1249,7 @@ ANNOTATIONS: dict[str, dict[str, Any]] = {
             ),
             "not_a_parity_target": [
                 _NOT_PLAYED,
+                _WINDOW,
                 *(
                     [
                         "MORPH, SWEEP and FADE_VIA_BLACK wrote the same blend as a symmetric "
@@ -1236,6 +1274,7 @@ ANNOTATIONS: dict[str, dict[str, Any]] = {
         ),
         "not_a_parity_target": [
             _NOT_PLAYED,
+            _WINDOW,
             "the old renderer ignored the mode and wrote a lit blend like a symmetric "
             "crossfade; the intent (fade through black) is the target, not that blend",
         ],
@@ -1248,14 +1287,15 @@ ANNOTATIONS: dict[str, dict[str, Any]] = {
             "Under `twinklr show`, with the same plan (intensity null), a section whose macro "
             "focal role for the heads is LEAD renders hotter than with SUPPORT: no lit frame "
             "dimmer, some lit frame brighter (a raised floor or a beat pulse, per the W5 "
-            "table); with REST no lit frame is brighter than with SUPPORT (as authored); on "
-            "every head."
+            "table); with REST no lit frame is brighter than with SUPPORT (as authored); the "
+            "dark frames and every channel but the dimmer identical; on every head."
         ),
         "not_a_parity_target": [
             "the old projection overwrote the plan's intensity (LEAD INTENSE, SUPPORT SMOOTH, "
-            "REST SLOW) whatever the plan said. The revised plan also states the focal role "
-            "as a validator rule on the planner's intensity; W9 owns both and may satisfy "
-            "this row either way"
+            "REST SLOW) whatever the plan said. The design (integrator decision, 2026-11-17) "
+            "applies the macro focal role deterministically in the show render, adjusting "
+            "the section's effective intensity and recording it in the trace; this row tests "
+            "that render effect"
         ],
     },
     "show_focal_support": {

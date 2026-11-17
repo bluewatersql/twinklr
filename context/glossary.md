@@ -18,7 +18,10 @@ updated: 2026-11-17
 - **Moving head** — pan/tilt light fixture with dimmer, shutter, color, and gobo channels.
 - **Physical profile** — a fixture's `physical_profile`: which DMX offset carries which
   axis or wheel, each axis' calibrated range, each wheel state's byte, and the head's
-  timings. The moving-head renderer reads only this, never `dmx_mapping`.
+  timings. The moving-head renderer reads only this, never `dmx_mapping`. A wheel or
+  shutter state may carry a **meaning tag** (`hex`, `pattern`, `strobe`): what it shows,
+  for the planner's colour, gobo and strobe choices; never defaulted, and not read by
+  the renderer until song-intent W3/W4.
 - **Template** — a moving-head choreography unit, a JSON `TemplateDoc` whose steps state
   motion, dimmer or shutter pulse, wheel states and phase spread across the heads. The
   catalog's seven **families** live in `catalog/templates/moving_heads/`. LLMs select

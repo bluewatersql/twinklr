@@ -13,6 +13,9 @@ DMX_CHANNEL_COUNT_ATTRIBUTES = ("DmxChannelCount", "parm1")
 with no `parm1`). `parm1` is kept only as a fallback for layouts without it; that it
 holds a DMX channel count is unverified."""
 
+DMX_COLOR_WHEEL_SLOTS = 20
+"""Colour-wheel slots read from a DMX model (`DmxColorWheelColor<i>`, `i` below this)."""
+
 
 class Alias(BaseModel):
     """Alias for a model or modelGroup."""
@@ -103,6 +106,21 @@ class Model(BaseModel):
             if value is not None and str(value).strip():
                 return attribute, str(value).strip()
         return None
+
+    def dmx_color_wheel(self) -> tuple[tuple[str, str], ...]:
+        """The colour-wheel slots a DMX model declares, as raw `(DMX value, colour)`
+        pairs from its `DmxColorWheelDMX<i>` and `DmxColorWheelColor<i>` attributes (`i`
+        below `DMX_COLOR_WHEEL_SLOTS`), in slot order; a slot missing either is skipped."""
+        extra = self.model_extra or {}
+        slots = (
+            (extra.get(f"DmxColorWheelDMX{index}"), extra.get(f"DmxColorWheelColor{index}"))
+            for index in range(DMX_COLOR_WHEEL_SLOTS)
+        )
+        return tuple(
+            (value, color)
+            for value, color in slots
+            if isinstance(value, str) and isinstance(color, str)
+        )
 
 
 class SubModel(BaseModel):

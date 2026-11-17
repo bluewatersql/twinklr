@@ -68,7 +68,10 @@ See [product/overview.md](product/overview.md).
     renderer deleted in the cutover rendered these. The owner has directed that all of
     them be rendered on this renderer, with nothing cut from the planner contract; the
     work is planned as W0–W9 ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)). The renderer is not
-    complete until then.
+    complete until then. Profiles can already tag what each wheel and shutter state
+    shows (`hex`, `pattern`, `strobe`; W1), which is what will make those choices
+    available on a rig; nothing reads the tags until W3/W4, and `twinklr run` writes
+    paste-ready tags for untagged states to `profile_tags.txt`, noting it in one line.
 
   `twinklr run`, `show`, `eval-report`, `inject` and `regenerate` all use it;
   `regenerate` re-renders the whole song. Gate time on eight heads and a four-minute

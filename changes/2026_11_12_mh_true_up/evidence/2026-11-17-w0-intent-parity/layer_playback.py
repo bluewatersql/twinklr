@@ -15,6 +15,7 @@ sparse) is decoded here: the repository has no FSEQ frame reader, only a byte co
 
 from __future__ import annotations
 
+from collections import Counter
 from itertools import pairwise
 import json
 from pathlib import Path
@@ -131,15 +132,58 @@ def main(xsq: Path, fseq: Path) -> dict[str, Any]:
     header, data = read_fseq(fseq)
     models = read_xsq(xsq)
     width = int(header["channels"])
+    names = sorted(models)
+    ranges = range(len(header["sparse_ranges"]))
 
-    def played(model_index: int, channel: int, time_ms: int) -> int:
-        return data[(time_ms // STEP_MS) * width + model_index * 16 + channel - 1]
+    def played(range_index: int, channel: int, time_ms: int) -> int:
+        return data[(time_ms // STEP_MS) * width + range_index * 16 + channel - 1]
+
+    def in_transition(name: str, time_ms: int) -> bool:
+        return any(a <= time_ms < b for a, b, _ in models[name][1])
+
+    # Which sparse range is which head: agreement with the head's section layer on frames
+    # outside every transition effect, sampled every 100 ms.
+    agreement: dict[str, list[float]] = {}
+    for name in names:
+        base = models[name][0]
+        scores = []
+        for index in ranges:
+            hits = total = 0
+            for time_ms in range(0, int(header["frames"]) * STEP_MS, 100):
+                if in_transition(name, time_ms):
+                    continue
+                for channel in range(1, 17):
+                    expected = predicted(base, channel, time_ms)
+                    if expected is not None:
+                        total += 1
+                        hits += abs(played(index, channel, time_ms) - expected) <= 1
+            scores.append(round(hits / total, 3))
+        agreement[name] = scores
+    mapping = {name: max(ranges, key=lambda i: agreement[name][i]) for name in names}
+    assert sorted(mapping.values()) == list(ranges), mapping
+    for name, index in mapping.items():
+        best = agreement[name][index]
+        others = [score for i, score in enumerate(agreement[name]) if i != index]
+        assert best >= 0.95 and max(others) <= 0.8, (name, agreement[name])
 
     counts = {
         "with_a_base_effect": {"base_only": 0, "either": 0, "transition_only": 0, "neither": 0},
         "without_a_base_effect": {"transition": 0, "other": 0},
     }
-    for index, name in enumerate(sorted(models)):  # sparse ranges in head order
+    neither = {
+        "matches_base_resampled": 0,
+        "within_base_swing": 0,
+        "between_layers_outside_base_swing": 0,
+        "unexplained": 0,
+    }
+    other = {"matches_transition_resampled": 0, "unexplained": 0}
+    other_examples: list[list[Any]] = []
+    neither_examples: list[list[Any]] = []
+    base_zero_under_transition = 0
+    offsets = (-STEP_MS, STEP_MS, STEP_MS / 2)  # neighbouring frames and the frame's middle
+
+    for name in names:
+        index = mapping[name]
         base, transitions = models[name]
         for start, end, values in transitions:
             for time_ms in range(start - start % STEP_MS + STEP_MS, end, STEP_MS):
@@ -148,10 +192,26 @@ def main(xsq: Path, fseq: Path) -> dict[str, Any]:
                     layer_1 = sample(value, (time_ms - start) / (end - start))
                     byte = played(index, channel, time_ms)
                     if not covered:
-                        key = "transition" if abs(byte - layer_1) <= 1 else "other"
-                        counts["without_a_base_effect"][key] += 1
+                        if abs(byte - layer_1) <= 1:
+                            counts["without_a_base_effect"]["transition"] += 1
+                            continue
+                        counts["without_a_base_effect"]["other"] += 1
+                        nearby = [
+                            sample(value, min(1.0, max(0.0, (time_ms + d - start) / (end - start))))
+                            for d in offsets
+                        ]
+                        key = (
+                            "matches_transition_resampled"
+                            if any(abs(byte - v) <= 1 for v in nearby)
+                            else "unexplained"
+                        )
+                        other[key] += 1
+                        if len(other_examples) < 6:
+                            other_examples.append([name, time_ms, channel, byte, layer_1, nearby])
                         continue
                     layer_0 = predicted(base, channel, time_ms)
+                    if layer_0 == 0 and layer_1 > 1:
+                        base_zero_under_transition += 1
                     on_0 = layer_0 is not None and abs(byte - layer_0) <= 1
                     on_1 = abs(byte - layer_1) <= 1
                     key = (
@@ -164,6 +224,27 @@ def main(xsq: Path, fseq: Path) -> dict[str, Any]:
                         else "neither"
                     )
                     counts["with_a_base_effect"][key] += 1
+                    if key != "neither" or layer_0 is None:
+                        continue
+                    resampled = [predicted(base, channel, int(time_ms + d)) for d in offsets]
+                    swing = [v for v in (layer_0, *resampled) if v is not None]
+                    low, high = sorted((layer_0, layer_1))
+                    if any(abs(byte - v) <= 1 for v in swing):
+                        neither["matches_base_resampled"] += 1
+                    elif min(swing) - 1 <= byte <= max(swing) + 1:
+                        # Between the section curve's own values a frame either side: a
+                        # base curve faster than this sampling, not a mix of layers.
+                        neither["within_base_swing"] += 1
+                    elif low + 1 < byte < high - 1:
+                        neither["between_layers_outside_base_swing"] += 1
+                        neither_examples.append(
+                            [name, time_ms, channel, byte, layer_0, layer_1, resampled]
+                        )
+                    else:
+                        neither["unexplained"] += 1
+                        neither_examples.append(
+                            [name, time_ms, channel, byte, layer_0, layer_1, resampled]
+                        )
     gaps = {
         name: [(a[1], b[0]) for a, b in pairwise(sorted(layers[0])) if b[0] > a[1]]
         for name, layers in models.items()
@@ -171,8 +252,22 @@ def main(xsq: Path, fseq: Path) -> dict[str, Any]:
     return {
         "fseq": header,
         "layer_effects": {n: [len(x) for x in v] for n, v in models.items()},
+        "range_agreement": agreement,
+        "mapping": mapping,
         "base_gaps": gaps,
         "counts": counts,
+        "neither_resolved": neither,
+        "neither_left_by_channel": dict(
+            sorted(Counter(example[2] for example in neither_examples).items())
+        ),
+        "neither_left_closer_to_transition_than_base": sum(
+            abs(byte - layer_1) < abs(byte - layer_0)
+            for _, _, _, byte, layer_0, layer_1, _ in neither_examples
+        ),
+        "neither_left_examples": neither_examples[:8],
+        "other_resolved": other,
+        "other_examples": other_examples[:4],
+        "base_zero_under_nonzero_transition": base_zero_under_transition,
     }
 
 

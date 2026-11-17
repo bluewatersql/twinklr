@@ -218,14 +218,10 @@ class LayoutProfiler:
         if display_as not in DMX_MODEL_TYPES:
             return None
 
-        color_wheel: list[DmxColorWheelEntry] = []
-        for i in range(20):
-            dmx_key = f"DmxColorWheelDMX{i}"
-            color_key = f"DmxColorWheelColor{i}"
-            if dmx_key in attrs and color_key in attrs:
-                color_wheel.append(
-                    DmxColorWheelEntry(dmx_value=attrs[dmx_key], color=attrs[color_key])
-                )
+        color_wheel = [
+            DmxColorWheelEntry(dmx_value=value, color=color)
+            for value, color in model.dmx_color_wheel()
+        ]
 
         extra = model.model_extra or {}
         pan_raw = extra.get("PanMotor")

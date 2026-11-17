@@ -24,7 +24,18 @@ from fractions import Fraction
 from itertools import pairwise
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationError, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
+
+from twinklr.core.sequencer.moving_heads.libraries.color import canonical_hex
+from twinklr.core.sequencer.moving_heads.libraries.gobo import GoboPattern
 
 if TYPE_CHECKING:
     from pydantic import ModelWrapValidatorHandler
@@ -34,6 +45,12 @@ MAX_DMX_EFFECT_CHANNELS = 48
 
 AxisName = Literal["pan", "tilt", "dimmer", "zoom"]
 DiscreteName = Literal["shutter", "color", "gobo"]
+StrobeSpeed = Literal["slow", "medium", "fast"]
+"""A strobing shutter state's speed: the planner's `strobe_slow`/`_medium`/`_fast`."""
+
+STATE_TAGS: dict[str, str] = {"color": "hex", "gobo": "pattern", "shutter": "strobe"}
+"""The one meaning tag each discrete channel kind's states may carry."""
+_TAG_CHANNEL = {tag: channel for channel, tag in STATE_TAGS.items()}
 
 _AXIS_UNITS: dict[str, str] = {
     "pan": "degree",
@@ -237,7 +254,14 @@ class AxisCapability(BaseModel):
 
 
 class DiscreteState(BaseModel):
-    """A semantic state: the DMX range it occupies and the one byte that selects it."""
+    """A semantic state: the DMX range it occupies and the one byte that selects it.
+
+    A state may also say what it means, for the planner's colour, gobo and strobe
+    choices: one tag per channel kind (`hex` on color, `pattern` on gobo, `strobe` on
+    shutter; the profile checks the kind). Tags are never defaulted: an untagged state
+    is simply not offered. Absent tags are left out of dumps, so an untagged profile
+    dumps, and so fingerprints, as before.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -245,6 +269,29 @@ class DiscreteState(BaseModel):
     range_max: int = Field(ge=0, le=255)
     value: int = Field(ge=0, le=255, description="Byte emitted to select this state")
     settle_ms: int | None = Field(default=None, ge=0, description="Settle time after selection")
+    hex: str | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description=(
+            "Colour a color-wheel state shows: '#RRGGBB', or a colour preset name stored "
+            "as its canonical '#RRGGBB'"
+        ),
+    )
+    pattern: GoboPattern | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Pattern a gobo state projects, in the planner's gobo vocabulary",
+    )
+    strobe: StrobeSpeed | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="How fast a shutter state strobes",
+    )
+
+    @field_validator("hex", mode="before")
+    @classmethod
+    def _canonical_hex(cls, value: Any) -> Any:
+        return canonical_hex(value) if isinstance(value, str) else value
 
     @model_validator(mode="after")
     def _validate_value(self) -> DiscreteState:
@@ -452,6 +499,7 @@ class FixtureCapabilities(BaseModel):
                 raise ValueError(f"{name} axis unit must be {_AXIS_UNITS[name]!r}")
 
         self._validate_visibility()
+        self._validate_tags()
 
         # The default byte state must be one the profile itself could command.
         for wheel_name, wheel in self.discrete.items():
@@ -493,6 +541,53 @@ class FixtureCapabilities(BaseModel):
             raise ValueError(
                 "dimmer_zero_extinguishes needs the dimmer's allowed window to admit 0"
             )
+
+    def _validate_tags(self) -> None:
+        """Reject a meaning tag the channel kind cannot carry, and a strobe the shutter's
+        declared open, closed or extinguishing states contradict or another state
+        already claims. Colour and gobo states may share a value: a wheel can hold two
+        slots of one colour, or a static and a shaking copy of one gobo."""
+        for channel, wheel in self.discrete.items():
+            expected = STATE_TAGS[channel]
+            for name, state in wheel.states.items():
+                for tag in STATE_TAGS.values():
+                    if tag != expected and getattr(state, tag) is not None:
+                        raise ValueError(
+                            f"discrete.{channel}.states.{name}.{tag}: a {channel} state takes "
+                            f"`{expected}`, not `{tag}`; move the tag to a "
+                            f"{_TAG_CHANNEL[tag]} state or remove it"
+                        )
+        shutter = self.discrete.get("shutter")
+        if shutter is None:
+            return
+        claimed: dict[str, str] = {}
+        for name, state in sorted(shutter.states.items()):
+            if state.strobe is None:
+                continue
+            roles = [
+                role
+                for role, holds in (
+                    ("the shutter's open_state", name == shutter.open_state),
+                    ("the shutter's closed_state", name == shutter.closed_state),
+                    (
+                        "an extinguishing shutter state (visibility)",
+                        name in self.visibility.extinguishing_shutter_states,
+                    ),
+                )
+                if holds
+            ]
+            if roles:
+                raise ValueError(
+                    f"discrete.shutter.states.{name}.strobe: {name!r} is {' and '.join(roles)}, "
+                    "which cannot strobe; tag the state that strobes, or remove the tag"
+                )
+            if state.strobe in claimed:
+                raise ValueError(
+                    f"discrete.shutter.states: {claimed[state.strobe]!r} and {name!r} both "
+                    f"claim strobe {state.strobe!r}; one state per speed: tag one of them "
+                    "with another speed (slow, medium or fast), or remove its tag"
+                )
+            claimed[state.strobe] = name
 
     def check_initial_state(self, state: InitialFixtureState | None) -> tuple[str, ...]:
         """Return every reason `state` cannot serve as this fixture's known time-zero state.
