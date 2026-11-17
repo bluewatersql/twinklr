@@ -9,10 +9,12 @@ applied. The two errors were independent and did not cancel.
 
 from __future__ import annotations
 
+from itertools import pairwise
 import logging
 
 import pytest
 
+from tests.support.moving_heads import plan_section
 from tests.unit.agents.sequencer.moving_heads.test_context import (
     create_minimal_audio_profile,
 )
@@ -189,3 +191,197 @@ class TestPlannerAndRendererAgree:
 
         for bar in range(1, len(UNEVEN_BARS) + 1):
             assert planner._ms_to_bar(renderer._bar_to_ms(bar)) == bar
+
+
+# The 2026-11-17 "Need A Favor" shape: 61 bars of 3000 ms from 2000 ms, so the grid
+# ends at 185 000 ms, 12.4 s before the 197 400 ms song does.
+SHORT_GRID_BARS = [2000.0 + 3000.0 * index for index in range(61)]
+SHORT_GRID_SONG = [
+    ("intro", 0, 32000),
+    ("verse_1", 32000, 62000),
+    ("verse_2", 62000, 95000),
+    ("chorus_1", 95000, 128000),
+    ("break", 128000, 158000),
+    ("chorus_2", 158000, 191000),  # starts inside the grid, ends beyond it
+    ("verse_3", 191000, 197400),  # starts beyond the grid's last bar
+]
+# The "Dance Jams" shape: 135 bars of 2000 ms from 0; the grid ends at 270 000 ms.
+DANCE_GRID_BARS = [2000.0 * index for index in range(135)]
+DANCE_SONG = [
+    ("verse_1", 0, 250000),
+    ("instrumental", 250000, 274000),
+    ("verse_2", 274000, 278000),
+]
+
+
+def short_grid_context(
+    bars: list[float] = SHORT_GRID_BARS,
+    song: list[tuple[str, int, int]] = SHORT_GRID_SONG,
+) -> MovingHeadPlanningContext:
+    """A song whose beat grid stops before the audio ends."""
+    sections = [
+        SongSectionRef(section_id=section_id, name=section_id.split("_")[0], start_ms=a, end_ms=b)
+        for section_id, a, b in song
+    ]
+    grid = make_grid(bars).model_copy(update={"duration_ms": float(song[-1][2])})
+    return MovingHeadPlanningContext(
+        audio_profile=create_minimal_audio_profile(duration_ms=song[-1][2], sections=sections),
+        fixtures=FixtureContext(count=4),
+        available_templates=["sweep_lr_fan_hold"],
+        beat_grid=grid,
+    )
+
+
+class TestGridShorterThanTheSong:
+    def test_bars_stay_within_the_grid_and_the_out_of_grid_section_is_left_out(self) -> None:
+        context = short_grid_context()
+        structure = context.for_prompt()["song_structure"]
+        bars = [(s["section_id"], s["start_bar"], s["end_bar"]) for s in structure["sections"]]
+
+        assert structure["total_bars"] == 61
+        assert bars == [
+            ("intro", 1, 10),
+            ("verse_1", 11, 20),
+            ("verse_2", 21, 31),
+            ("chorus_1", 32, 42),
+            ("break", 43, 52),
+            ("chorus_2", 53, 61),
+        ]
+        assert structure["beyond_grid"] == {
+            "from_ms": 185000,
+            "seconds": 12.4,
+            "section_ids": ["verse_3"],
+        }
+
+    def test_the_dance_jams_shape_is_clamped_the_same_way(self) -> None:
+        structure = short_grid_context(DANCE_GRID_BARS, DANCE_SONG).song_structure()
+        bars = [(s["section_id"], s["start_bar"], s["end_bar"]) for s in structure["sections"]]
+
+        assert bars == [("verse_1", 1, 125), ("instrumental", 126, 135)]
+        assert structure["beyond_grid"]["section_ids"] == ["verse_2"]
+        assert structure["beyond_grid"]["seconds"] == 8.0
+
+    @pytest.mark.parametrize(
+        ("bars", "song"),
+        [(SHORT_GRID_BARS, SHORT_GRID_SONG), (DANCE_GRID_BARS, DANCE_SONG)],
+    )
+    def test_the_table_is_contiguous_and_ends_on_the_last_bar(
+        self, bars: list[float], song: list[tuple[str, int, int]]
+    ) -> None:
+        structure = short_grid_context(bars, song).song_structure()
+        sections = structure["sections"]
+
+        assert sections[0]["start_bar"] == 1
+        assert all(b["start_bar"] == a["end_bar"] + 1 for a, b in pairwise(sections))
+        assert sections[-1]["end_bar"] == structure["total_bars"]
+
+    def test_the_cut_is_reported(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.WARNING):
+            short_grid_context().song_structure()
+        assert "The beat grid ends at bar 61 (185.0 s), 12.4 s before the song ends" in caplog.text
+        assert "verse_3 left unplanned" in caplog.text
+
+    def test_a_grid_covering_the_song_has_nothing_beyond_it(self, uneven: BeatGrid) -> None:
+        assert make_context(uneven).song_structure()["beyond_grid"] is None
+
+
+class TestThePlannerIsNotShownASectionBeyondTheGrid:
+    """The prompts say what the grid leaves unplanned, and show no macro row, palette
+    line, focal entry or lyric-cue advice for a section beyond it."""
+
+    @staticmethod
+    def _context() -> MovingHeadPlanningContext:
+        from tests.unit.agents.sequencer.moving_heads.test_orchestrator import (
+            create_test_macro_plan,
+        )
+
+        context = short_grid_context()
+        return context.model_copy(
+            update={
+                "macro_plan": create_test_macro_plan(context.audio_profile),
+                "head_focal_roles": {section_id: "LEAD" for section_id, *_ in SHORT_GRID_SONG},
+            }
+        )
+
+    @staticmethod
+    def _render(pack: str, variables: dict) -> str:
+        from pathlib import Path
+
+        from twinklr.core.agents.prompts.loader import PromptPackLoader
+        from twinklr.core.agents.prompts.renderer import PromptRenderer
+
+        base = (
+            Path(__file__).parents[5]
+            / "packages/twinklr/core/agents/sequencer/moving_heads/prompts"
+        )
+        return PromptRenderer().render(
+            PromptPackLoader(base_path=base).load(pack)["user"], variables
+        )
+
+    def test_the_planner_prompt_says_what_is_left_out_and_shows_no_such_section(self) -> None:
+        from twinklr.core.agents.sequencer.moving_heads.orchestrator import (
+            build_planner_variables,
+        )
+
+        variables = build_planner_variables(self._context())
+        assert variables["beyond_grid"]["section_ids"] == ["verse_3"]
+        rendered = self._render("planner", {**variables, "response_schema": "{}"})
+
+        assert (
+            "The last 12.4 s of the song lie beyond the detected beat grid and are not "
+            "planned (verse_3 left out)."
+        ) in rendered
+        assert "| chorus_2 |" in rendered
+        assert "verse_3 |" not in rendered and "**verse_3**" not in rendered
+        assert "`verse_3`" not in rendered
+
+    def test_the_judge_prompt_says_the_plan_without_them_is_complete(self) -> None:
+        from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+        from twinklr.core.agents.sequencer.moving_heads.orchestrator import build_judge_variables
+        from twinklr.core.agents.shared.judge.controller import IterationContext
+
+        variables = build_judge_variables(
+            self._context(),
+            ChoreographyPlan(
+                sections=[plan_section("intro", 1, 10, "mirror_wings")], overall_strategy="x"
+            ),
+            0,
+            IterationContext(),
+        )
+        assert variables["beyond_grid"]["section_ids"] == ["verse_3"]
+        rendered = self._render("judge", {**variables, "response_schema": "{}"})
+        assert "(verse_3 left out): a plan without them is complete." in rendered
+        assert "| verse_3 |" not in rendered
+
+    def test_no_lyric_cue_beyond_the_grid_is_advised(self) -> None:
+        from twinklr.core.agents.audio.lyrics.models import LyricContextModel, MomentCue
+        from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+        from twinklr.core.agents.sequencer.moving_heads.moment_cues import unanswered_high_cues
+
+        context = self._context()
+        cues = LyricContextModel(
+            has_lyrics=True,
+            vocal_coverage_pct=0.5,
+            moment_cues=[
+                MomentCue(
+                    cue_id=cue_id,
+                    section_id=section_id,
+                    timestamp_ms=at,
+                    emphasis="HIGH",
+                    text="la",
+                    visual_hint="Accent it.",
+                )
+                for cue_id, section_id, at in (
+                    ("in", "chorus_2", 160000),
+                    ("out", "verse_3", 193000),
+                )
+            ],
+        )
+        plan = ChoreographyPlan(
+            sections=[plan_section("intro", 1, 10, "mirror_wings")], overall_strategy="x"
+        )
+
+        advised = unanswered_high_cues(plan, cues, context.sections)
+        assert len(advised) == 2
+        (kept,) = unanswered_high_cues(plan, cues, context.sections, unplannable=("verse_3",))
+        assert "'chorus_2'" in kept

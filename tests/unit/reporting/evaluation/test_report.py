@@ -309,8 +309,8 @@ async def test_the_report_carries_each_sections_song_intent_and_the_plan_repairs
     tmp_path: Path,
 ) -> None:
     """The planner's song intent is reported per section as planned, with what the render
-    played of its colour and the fields the renderer does not render yet; the plan's
-    repairs are reported from the trace."""
+    played of its colour and intensity and the fields the renderer does not render yet;
+    the plan's repairs are reported from the trace."""
     accented = PLAN.sections[0].model_copy(
         update={
             "intensity": Intensity.DRAMATIC,
@@ -342,9 +342,14 @@ async def test_the_report_carries_each_sections_song_intent_and_the_plan_repairs
     assert first is not None and second is not None
     assert (first.intensity, first.color, first.gobo) == ("DRAMATIC", "PALETTE_ACCENT", None)
     assert first.events == ["bar 2 beat 3: hit"]
-    assert first.not_rendered == ["intensity", "events"]
+    assert first.not_rendered == ["events"]
     # The family rig's colour wheel carries no tags: the colour plays on no head.
-    (played,) = first.played
+    played, intensity = first.played
+    # The family holds the dimmer full: DRAMATIC dips and returns every half bar.
+    assert intensity == (
+        "intensity DRAMATIC: a pulse on the beat every 2 beats: full on the accent, down "
+        "to 75% between on MH1, MH2, MH3, MH4"
+    )
     assert played.startswith("colour PALETTE_ACCENT (#FF00FF, fixed table (magenta: ")
     assert played.endswith("no head shows it; MH1, MH2, MH3, MH4 keep their authored colour")
     assert second.not_rendered == [] and second.intensity is None
@@ -352,8 +357,8 @@ async def test_the_report_carries_each_sections_song_intent_and_the_plan_repairs
     markdown = (tmp_path / "report" / "report.md").read_text(encoding="utf-8")
     assert "**Song intent** (as planned):" in markdown
     assert "- intensity: DRAMATIC" in markdown and "- intensity: as authored" in markdown
-    assert "not rendered yet (intensity, events): a known regression" in markdown
-    assert f"- played: {played}" in markdown
+    assert "not rendered yet (events): a known regression" in markdown
+    assert f"- played: {played}" in markdown and f"- played: {intensity}" in markdown
     assert "**Plan repair** (section `s1`): moment cue 'ghost' dropped" in markdown
 
 

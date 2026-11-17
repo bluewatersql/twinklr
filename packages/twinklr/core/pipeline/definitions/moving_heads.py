@@ -9,8 +9,9 @@ rendering to an xLights .xsq sequence file.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
     MovingHeadRenderingStage,
@@ -19,6 +20,9 @@ from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
 from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
 from twinklr.core.pipeline import PipelineDefinition, StageDefinition
 from twinklr.core.pipeline.definitions.common import build_common_stages
+
+if TYPE_CHECKING:
+    from twinklr.core.sequencer.planning import MacroPlan
 
 
 def build_moving_heads_pipeline(
@@ -34,6 +38,7 @@ def build_moving_heads_pipeline(
     section_id: str | None = None,
     regeneration_nonce: str | None = None,
     include_macro: bool = True,
+    head_focal_roles: Callable[[MacroPlan], dict[str, str]] | None = None,
 ) -> PipelineDefinition:
     """Build the moving-head sequencer pipeline.
 
@@ -50,6 +55,8 @@ def build_moving_heads_pipeline(
         min_pass_score: Minimum score for plan approval, on the planners' 0-10 scale
             (`AgentSettings.min_pass_score` converts the 0-100 config field).
         fixture_config_path: Optional path to fixture config JSON.
+        head_focal_roles: `twinklr show`'s moving-head focal roles per macro section,
+            for the planner (`MovingHeadStage`); None under `run`.
 
     Returns:
         PipelineDefinition ready for execution.
@@ -90,6 +97,7 @@ def build_moving_heads_pipeline(
                 section_id=section_id,
                 regeneration_nonce=regeneration_nonce,
                 macro_planning_enabled=include_macro,
+                head_focal_roles=head_focal_roles,
             ),
             inputs=moving_head_inputs,
             input_type="dict[str, Any]",

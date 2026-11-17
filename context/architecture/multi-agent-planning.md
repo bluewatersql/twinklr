@@ -34,9 +34,11 @@ The choreography planner is an iterative refinement loop over structured Pydanti
    Structured feedback loops back to the planner. Up to 3 iterations by default.
 
 **Known regression.** The moving-head renderer applies the selected templates, presets
-and their bars, and each section's colour and gobo (resolved on the rig's tagged wheel
-states; the planner is told what the rig can show, and what it cannot is repaired). It
-does not yet render the rest of the plan's song intent; the renderer deleted in the
+and their bars, each section's colour and gobo (resolved on the rig's tagged wheel
+states; the planner is told what the rig can show, and what it cannot is repaired), and
+its intensity on the dimmer (DRAMATIC and INTENSE a beat-locked pulse; under `twinklr
+show` the heads' macro focal role moves it a step). It does not yet render the rest of
+the plan's song intent (events, transitions, motif, variation, density, modifiers); the renderer deleted in the
 single-renderer cutover rendered intensity, section colour, shutter and gobo events
 (cue-bound ones included) and entry transitions. The owner has ruled that
 all of it is rendered on the single path and that nothing leaves the planner contract
@@ -57,8 +59,8 @@ are not decision evidence.
 - **Categorical over numeric** — intensity is WHISPER/SOFT/MED/STRONG/PEAK for the
   display planner and SLOW/SMOOTH/FAST/DRAMATIC/INTENSE for the moving-head planner;
   duration is HIT/BURST/PHRASE/EXTENDED/SECTION. The display renderer resolves categories to precise
-  values; the moving-head renderer does not yet render planner intensity (the known
-  regression above).
+  values; the moving-head renderer plays DRAMATIC and INTENSE as a beat-locked dimmer
+  pulse and the other levels as authored.
 - **Templates as complete units** — each moving-head template states its steps' motion,
   pulses, wheel states and phase spread as data, checked on the rig before it is offered.
   The LLM selects templates and expresses typed categorical intent; it never invents

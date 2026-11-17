@@ -23,6 +23,9 @@ V2 Migration: Uses iteration number from IterationContext
 {% endfor %}
 
 **Total Bars**: {{ total_bars }}
+{% if beyond_grid is defined and beyond_grid %}
+The last {{ beyond_grid.seconds }} s of the song lie beyond the detected beat grid and are not planned{% if beyond_grid.section_ids %} ({{ beyond_grid.section_ids | join(', ') }} left out){% endif %}: a plan without them is complete.
+{% endif %}
 **Tempo**: {{ tempo }} BPM ({{ time_signature }})
 
 {% if audio_profile is defined and audio_profile %}

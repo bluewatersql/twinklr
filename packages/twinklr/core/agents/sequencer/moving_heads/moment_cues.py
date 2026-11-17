@@ -32,7 +32,7 @@ Repair rules, per section:
 from __future__ import annotations
 
 from bisect import bisect_left
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from typing import Any
 
 from twinklr.core.agents.audio.lyrics.models import LyricContextModel, MomentCue
@@ -383,9 +383,13 @@ def unanswered_high_cues(
     plan: ChoreographyPlan,
     lyric_context: LyricContextModel | None,
     song_sections: list[SongSectionRef],
+    *,
+    unplannable: Collection[str] = (),
 ) -> list[str]:
     """One line per HIGH-emphasis lyric moment cue that no event lands on, its section
-    planned or not: an advised revision, not an error."""
+    planned or not: an advised revision, not an error. A cue in an `unplannable` section
+    (beyond the beat grid, `MovingHeadPlanningContext.song_structure`) is never advised:
+    that section must not be planned."""
     if lyric_context is None or not lyric_context.moment_cues:
         return []
     cues = {cue.cue_id: cue for cue in lyric_context.moment_cues}
@@ -393,7 +397,7 @@ def unanswered_high_cues(
     planned = {section.section_id: section for section in plan.sections}
     lines: list[str] = []
     for cue in lyric_context.moment_cues:
-        if cue.emphasis != "HIGH" or cue.cue_id in unusable:
+        if cue.emphasis != "HIGH" or cue.cue_id in unusable or cue.section_id in unplannable:
             continue
         section = planned.get(cue.section_id)
         if section is None:

@@ -450,6 +450,20 @@ class TestMovingHeadPlannerOrchestrator:
             ]
 
     @pytest.mark.asyncio
+    async def test_the_show_focal_roles_re_key_the_plan_cache(
+        self, mock_provider: MagicMock, planning_context: MovingHeadPlanningContext
+    ) -> None:
+        """Under `twinklr show` the planner is told how the heads' focal role shapes
+        intensity, so the roles are part of the key."""
+        orchestrator = MovingHeadPlannerOrchestrator(provider=mock_provider)
+        baseline = await orchestrator.get_cache_key(planning_context)
+        lead = planning_context.model_copy(update={"head_focal_roles": {"intro": "LEAD"}})
+        rest = planning_context.model_copy(update={"head_focal_roles": {"intro": "REST"}})
+
+        keys = {baseline, *[await orchestrator.get_cache_key(c) for c in (lead, rest)]}
+        assert len(keys) == 3
+
+    @pytest.mark.asyncio
     async def test_the_response_schema_re_keys_the_plan_cache(
         self, mock_provider: MagicMock, planning_context: MovingHeadPlanningContext
     ) -> None:

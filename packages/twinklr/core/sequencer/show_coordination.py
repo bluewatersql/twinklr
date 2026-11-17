@@ -468,10 +468,32 @@ def moving_head_dark_spans(
     return tuple(spans)
 
 
+def moving_head_focal_roles(
+    macro_plan: MacroPlan,
+    graph: ChoreographyGraph,
+    *,
+    moving_head_target_ids: set[str],
+) -> dict[str, str]:
+    """The moving heads' focal role (LEAD, SUPPORT or REST) in each macro section, by song
+    section id, for the moving-head renderer (`RenderingPipeline(focal_roles=...)`), which
+    adjusts the section's intensity by it. A section that names no role for the moving-head
+    targets, or different roles for different ones, is left out (the planner's intensity
+    plays unchanged there)."""
+    expander = TargetExpander(graph)
+    roles: dict[str, str] = {}
+    for section in macro_plan.sections:
+        named = _role_map(section, expander)
+        found = {named[target_id] for target_id in moving_head_target_ids if target_id in named}
+        if len(found) == 1:
+            roles[section.section.section_id] = found.pop().value
+    return roles
+
+
 __all__ = [
     "CoordinationWindow",
     "coordinate_display_render_plan",
     "coordination_schedule",
     "moving_head_dark_spans",
+    "moving_head_focal_roles",
     "validate_macro_coordination",
 ]

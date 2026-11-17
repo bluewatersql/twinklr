@@ -79,14 +79,23 @@ See [product/overview.md](product/overview.md).
     for the planner). The offer also publishes each template's dark phases and the
     states its overlay masks cannot reach. Renderer revision 4. ([user guide](../docs/user-guide.md#how-a-sections-colour-and-gobo-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w3-w4-offer-colour/README.md))
+  - **Intensity on the dimmer** (W5, 2026-11-17, not yet seen by the owner). `as_authored`,
+    SLOW, SMOOTH and FAST play the template as authored; DRAMATIC (every half bar in
+    4/4, every bar in 3/4) and INTENSE (every beat) add a beat-locked pulse: over a level
+    below full a raised floor and an accent, over a full level (every catalog family) a
+    dip-and-return, full on the accent and easing to 75% / 60% between; dark frames and
+    every other channel untouched; a slow dimmer gets a smaller pulse, a dimmer latency
+    an earlier one, a head without a dimmer none. Under `twinklr show` the heads' macro
+    focal role moves a section's intensity a step (LEAD hotter, REST at most as
+    authored). The values are a proposal for the owner's W5 view. Renderer revision 5.
+    ([user guide](../docs/user-guide.md#how-a-sections-intensity-reaches-the-lights),
+    [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w5-intensity/README.md))
   - **Known regression: the rest of the song intent is not rendered yet.** The planner's
-    intensity, shutter and gobo events, lyric moment cues bound to events, section
-    transitions, motif variation, density and modifiers are accepted and ignored (a
-    per-section trace diagnostic says so), and `twinklr show` does not project the macro
-    focal role onto the heads. The renderer deleted in the cutover rendered intensity,
-    events and entry transitions. The owner has directed that all of it be rendered on
-    this renderer, with nothing cut from the planner contract; the remaining work is
-    W5–W9 ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)). The renderer is not
+    shutter and gobo events, lyric moment cues bound to events, section transitions,
+    motif variation, density and modifiers are accepted and ignored (a per-section trace
+    diagnostic says so). The renderer deleted in the cutover rendered events and entry
+    transitions. The owner has directed that all of it be rendered on this renderer,
+    with nothing cut from the planner contract; the remaining work is W6–W9 ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)). The renderer is not
     complete until then.
 
   `twinklr run`, `show`, `eval-report`, `inject` and `regenerate` all use it;

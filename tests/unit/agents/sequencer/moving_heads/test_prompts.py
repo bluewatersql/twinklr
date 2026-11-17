@@ -631,7 +631,10 @@ class TestPlannerUserPromptRendering:
 
     @staticmethod
     def _render(
-        hints: object = None, sections: list | None = None, rig_offer: object = None
+        hints: object = None,
+        sections: list | None = None,
+        rig_offer: object = None,
+        head_focal_roles: dict[str, str] | None = None,
     ) -> str:
         from tests.unit.agents.sequencer.moving_heads.test_orchestrator import (
             create_test_audio_profile,
@@ -655,6 +658,7 @@ class TestPlannerUserPromptRendering:
             available_templates=templates,
             macro_plan=create_test_macro_plan(profile),
             rig_offer=rig_offer,
+            head_focal_roles=head_focal_roles,
             template_descriptions=[
                 {
                     "template_id": template_id,
@@ -701,6 +705,32 @@ class TestPlannerUserPromptRendering:
         ):
             assert line in section, line
         assert "more than half a beat" not in section
+
+    def test_a_rig_without_a_dimmer_is_told_intensity_cannot_pulse(self) -> None:
+        from tests.support import moving_heads as m
+
+        full = self._render(rig_offer=m.tagged_offer())
+        none = self._render(rig_offer=m.tagged_offer().model_copy(update={"hit": "none"}))
+        some = self._render(rig_offer=m.tagged_offer().model_copy(update={"hit": "some"}))
+
+        assert "- **Intensity**" not in full
+        assert (
+            "- **Intensity**: no head has a dimmer axis, so `DRAMATIC` and `INTENSE` cannot "
+            "pulse here: every head plays its template's own level. Give emphasis with events "
+            "or colour instead.\n"
+        ) in none
+        assert "- **Intensity**: only some heads have a dimmer axis;" in some
+
+    def test_the_show_planner_is_told_how_the_focal_role_shapes_intensity(self) -> None:
+        roles = {"intro": "REST", "verse_1": "SUPPORT", "chorus_1": "LEAD", "outro": "REST"}
+        rendered = self._render(head_focal_roles=roles)
+
+        assert "**The moving heads' focal role** (deterministic code applies it" in rendered
+        assert "LEAD plays one step hotter" in rendered
+        assert "REST at most the template's own level" in rendered
+        for section_id, role in roles.items():
+            assert f"- `{section_id}`: {role}\n" in rendered
+        assert "focal role**" not in self._render()
 
     def test_an_untagged_rig_is_told_no_colour_or_gobo_is_offered(self) -> None:
         from tests.support import moving_heads as m

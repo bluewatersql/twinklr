@@ -118,6 +118,13 @@ class MovingHeadPlanningContext(BaseModel):
         "None when no pre-planning gate ran",
     )
 
+    # The moving heads' macro focal role per section, under `twinklr show` only
+    head_focal_roles: dict[str, str] | None = Field(
+        default=None,
+        description="The moving heads' macro focal role (LEAD, SUPPORT, REST) by section id, "
+        "which the show render applies to each section's intensity; None outside a show",
+    )
+
     # Template descriptions for prompt enrichment (optional)
     template_descriptions: list[TemplateDescription] | None = Field(
         default=None,
@@ -235,34 +242,7 @@ class MovingHeadPlanningContext(BaseModel):
             "total_bars": self.total_bars,
         }
 
-        # Song structure with sections
-        # A section's bars are inclusive: it starts on the bar its start time resolves to
-        # and ends on the bar before the one its end time resolves to (the next
-        # section's first bar, or the bar after the song's last), so consecutive
-        # sections share no bar and the last ends on the song's last bar.
-        section_entries = []
-        for section in self.sections:
-            start_bar = self._ms_to_bar(section.start_ms)
-            next_bar = self._ms_to_bar(section.end_ms)
-            section_entries.append(
-                {
-                    "name": section.name,
-                    "section_id": section.section_id,
-                    "start_ms": section.start_ms,
-                    "end_ms": section.end_ms,
-                    "start_bar": start_bar,
-                    "end_bar": max(start_bar, next_bar - 1),
-                    "_collapsed": next_bar <= start_bar,
-                }
-            )
-        self._warn_on_collapsed_sections(section_entries)
-        for entry in section_entries:
-            del entry["_collapsed"]
-
-        song_structure = {
-            "sections": section_entries,
-            "total_bars": self.total_bars,
-        }
+        song_structure = self.song_structure()
 
         # Fixture info for prompt
         fixtures = {
@@ -270,11 +250,21 @@ class MovingHeadPlanningContext(BaseModel):
             "groups": self.fixtures.groups,
         }
 
-        # Macro plan guidance per section (if available)
+        # Macro plan guidance per section (if available), for the sections the planner may
+        # plan: one beyond the beat grid is not shown, as it is not in the song structure.
+        plannable = {entry["section_id"] for entry in song_structure["sections"]}
         macro_guidance = None
         macro_contract = None
         if self.macro_plan:
             macro_contract = self.macro_plan.reader_projection()
+            macro_contract["sections"] = [
+                section
+                for section in macro_contract["sections"]
+                if section["section"]["section_id"] in plannable
+            ]
+            macro_contract["focal_arc"] = [
+                focus for focus in macro_contract["focal_arc"] if focus["section_id"] in plannable
+            ]
             macro_guidance = macro_contract["sections"]
             for section in macro_guidance:
                 section_id = section["section"]["section_id"]
@@ -305,16 +295,100 @@ class MovingHeadPlanningContext(BaseModel):
                 macro_contract["motif_continuity"] if macro_contract else None
             ),
             "macro_focal_arc": macro_contract["focal_arc"] if macro_contract else None,
+            "head_focal_roles": (
+                None
+                if self.head_focal_roles is None
+                else {
+                    section_id: role
+                    for section_id, role in self.head_focal_roles.items()
+                    if section_id in plannable
+                }
+            ),
             "rig_offer": (
                 None
                 if self.rig_offer is None
                 else offer_for_prompt(
                     self.rig_offer,
                     self.palettes,
-                    [section.section_id for section in self.sections],
+                    # The sections the planner may plan: none beyond the beat grid.
+                    [entry["section_id"] for entry in song_structure["sections"]],
                 )
             ),
         }
+
+    def song_structure(self) -> dict[str, Any]:
+        """The song's sections in the bars the renderer can play: the one computation
+        of section bars that the planning prompt, the validator and the selector read.
+
+        A section's bars are inclusive: it starts on the bar its start time resolves to
+        and ends on the bar before the one its end time resolves to (the next section's
+        first bar, or the bar after the song's last), so consecutive sections share no
+        bar. Bars are clamped to ``1..total_bars``: when the beat grid stops before the
+        audio ends, the last section starting inside the grid ends on ``total_bars``,
+        and a section starting beyond it is left out (it has no bar to render) and
+        named under ``beyond_grid`` with where the grid ends and the seconds it leaves
+        unplanned. ``beyond_grid`` is None when nothing was clamped or left out.
+        """
+        total_bars = self.total_bars
+        section_entries: list[dict[str, Any]] = []
+        omitted: list[str] = []
+        clamped = False
+        for section in self.sections:
+            start_bar = self._ms_to_bar(section.start_ms)
+            next_bar = self._ms_to_bar(section.end_ms)
+            if start_bar > total_bars:
+                omitted.append(section.section_id)
+                continue
+            end_bar = max(start_bar, next_bar - 1)
+            if end_bar > total_bars:
+                end_bar = total_bars
+                clamped = True
+            section_entries.append(
+                {
+                    "name": section.name,
+                    "section_id": section.section_id,
+                    "start_ms": section.start_ms,
+                    "end_ms": section.end_ms,
+                    "start_bar": start_bar,
+                    "end_bar": end_bar,
+                    "_collapsed": next_bar <= start_bar,
+                }
+            )
+        self._warn_on_collapsed_sections(section_entries)
+        for entry in section_entries:
+            del entry["_collapsed"]
+
+        beyond_grid: dict[str, Any] | None = None
+        if omitted or clamped:
+            grid_end_ms = self._bar_end_ms(total_bars)
+            song_end_ms = self.sections[-1].end_ms
+            beyond_grid = {
+                "from_ms": round(grid_end_ms),
+                "seconds": round(max(0.0, song_end_ms - grid_end_ms) / 1000, 1),
+                "section_ids": omitted,
+            }
+            logger.warning(
+                "The beat grid ends at bar %d (%.1f s), %.1f s before the song ends; "
+                "section bars are clamped to it%s",
+                total_bars,
+                grid_end_ms / 1000,
+                beyond_grid["seconds"],
+                f" and {', '.join(omitted)} left unplanned" if omitted else "",
+            )
+
+        return {
+            "sections": section_entries,
+            "total_bars": total_bars,
+            "beyond_grid": beyond_grid,
+        }
+
+    def _bar_end_ms(self, bar: int) -> float:
+        """The end of 1-indexed ``bar``: the next bar's downbeat, extrapolated by the
+        average bar past the grid; nominal tempo without a grid."""
+        if self.beat_grid is not None and self.beat_grid.bar_boundaries:
+            return self.beat_grid.get_bar_start_ms(bar)
+        tempo = 120.0 if not self.tempo or self.tempo <= 0 else self.tempo
+        return bar * self.beats_per_bar * 60_000.0 / tempo
 
     @staticmethod
     def _warn_on_collapsed_sections(section_entries: list[dict[str, Any]]) -> None:

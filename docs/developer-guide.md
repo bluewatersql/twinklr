@@ -299,7 +299,7 @@ _Source: `packages/twinklr/core/sequencer/vocabulary/`_
 
 Semantic enums that bridge LLM planning (categorical terms) and rendering (precise values):
 
-- **Intensity**: `WHISPER`, `SOFT`, `MED`, `STRONG`, `PEAK` (display; `IntensityLevel`) — mapped to per-lane display brightness. The moving-head planner uses `SLOW`, `SMOOTH`, `FAST`, `DRAMATIC`, `INTENSE` (`Intensity`, `sequencer/models/enum.py`); the moving-head renderer does not yet render planner intensity, a known regression being fixed ([plan](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md))
+- **Intensity**: `WHISPER`, `SOFT`, `MED`, `STRONG`, `PEAK` (display; `IntensityLevel`) — mapped to per-lane display brightness. The moving-head planner uses `SLOW`, `SMOOTH`, `FAST`, `DRAMATIC`, `INTENSE` (`Intensity`, `sequencer/models/enum.py`); the moving-head renderer plays `DRAMATIC` and `INTENSE` as a beat-locked dimmer pulse and the other levels as authored (`sequencer/moving_heads/intensity.py`; [user guide](user-guide.md#how-a-sections-intensity-reaches-the-lights))
 - **Duration**: `HIT`, `BURST`, `PHRASE`, `EXTENDED`, `SECTION` — mapped to timing
 - **Display**: `DisplayElementKind`, `DisplayProminence`, `GroupArrangement`
 - **Spatial**: `DisplayZone`, `HorizontalZone`, `VerticalZone`, `DepthZone`

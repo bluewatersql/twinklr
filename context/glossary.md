@@ -43,15 +43,15 @@ updated: 2026-11-17
 - **Categorical planning** — LLM reasons in semantic categories (display intensity:
   WHISPER/SOFT/MED/STRONG/PEAK; moving-head intensity: SLOW/SMOOTH/FAST/DRAMATIC/INTENSE;
   duration: HIT/BURST/PHRASE/EXTENDED/SECTION) which
-  deterministic code resolves to precise values. The moving-head renderer does not yet
-  render planner intensity: a known regression being fixed
-  ([plan](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
+  deterministic code resolves to precise values. The moving-head renderer plays DRAMATIC
+  and INTENSE as a beat-locked dimmer pulse and the other levels as authored
+  ([user guide](../docs/user-guide.md#how-a-sections-intensity-reaches-the-lights)).
 - **ChoreographyPlan** — the structured Pydantic plan the moving-head planner produces:
   per song section, 1-3 parts (template + preset over bars) and the section's **song
   intent** (intensity, colour, gobo, timed events tied to lyric moment cues, motif
   variation, density, entry/exit transitions; an intensity, colour or gobo of
-  `as_authored` keeps the template's own look and needs a reason). The parts, colour
-  and gobo render; the rest is a known regression being fixed.
+  `as_authored` keeps the template's own look and needs a reason). The parts, colour,
+  gobo and intensity render; the rest is a known regression being fixed.
 - **Plan repair** — deterministic normalisation that drops or adjusts one planned item
   the song cannot hold (an unknown cue is dropped; an event outside its section is moved
   into it) instead of refusing the plan, keeping as much of it as the song allows; recorded in the plan's `repairs`, the trace's `plan_repairs` and the

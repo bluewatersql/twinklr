@@ -98,6 +98,11 @@ from twinklr.core.sequencer.moving_heads.identity import (
     RENDERER_REVISION,
     render_fingerprint,
 )
+from twinklr.core.sequencer.moving_heads.intensity import (
+    SHAPED_LEVELS,
+    effective_intensity,
+    shape_section,
+)
 from twinklr.core.sequencer.moving_heads.song_intent import (
     DarkPhases,
     HeadWheels,
@@ -1944,8 +1949,8 @@ def _section_preset(
     when it ran) did not leave it out; otherwise the template's effective variant (the
     base without a gate result), with a warning when the part named a preset.
 
-    An undeclared id is not turned into an energy preset: intensity is planner intent,
-    which the renderer does not apply yet.
+    An undeclared id is not turned into an energy preset: intensity plays on the dimmer
+    (`intensity.shape_section`), never through a preset.
     """
     template_id = template_doc.template.template_id
     declared = {preset.preset_id: preset for preset in template_doc.presets}
@@ -1997,11 +2002,10 @@ def _unrendered_intent_message(section: PlanSection) -> str | None:
     """What of the section's song intent the renderer does not render yet, split into
     what the renderer before the cutover rendered (a regression) and what no renderer
     has rendered yet; None for a section that sets none of it. Its colour and gobo
-    render (`song_intent.resolve_section_look`), so they are never listed."""
+    (`song_intent.resolve_section_look`) and its intensity (`intensity.shape_section`)
+    render, so they are never listed."""
     regressed: list[str] = []
     new: list[str] = []
-    if section.intensity is not None:
-        regressed.append("intensity")
     old_events = [e for e in section.events if e.action.value in _SHUTTER_AND_GOBO_ACTIONS]
     if old_events:
         regressed.append("shutter and gobo events")
@@ -2148,6 +2152,7 @@ class RenderingPipeline:
         admission: TemplateAdmission | None = None,
         dark_spans: Sequence[tuple[int, int]] = (),
         palettes: Mapping[str, SectionPalette] | None = None,
+        focal_roles: Mapping[str, str] | None = None,
     ):
         """Initialize rendering pipeline.
 
@@ -2192,6 +2197,11 @@ class RenderingPipeline:
                 role names (`song_intent.requested_color`); without one, the fixed role
                 table's colour. Render identity for the sections that resolve one
                 (`rendered_palettes`); the trace records them as `palettes`.
+            focal_roles: The moving heads' macro focal role (LEAD, SUPPORT, REST) in each
+                song section, by section id (`twinklr show` only): it adjusts the
+                section's effective intensity (`intensity.effective_intensity`). Render
+                identity for the sections it adjusts (`rendered_focal_roles`); the trace
+                records those as `focal_roles`.
 
         Raises:
             UnsupportedRenderModeError: The renderer cannot render this rig (see
@@ -2222,6 +2232,7 @@ class RenderingPipeline:
         )
         self._shortest_lit_ms = shortest_lit_ms
         self.palettes = dict(palettes or {})
+        self.focal_roles = dict(focal_roles or {})
         self.artifacts: DeliveryArtifacts | None = None
         """Set by `render()` when `output_path` is given."""
         self.sequence: XSequence | None = None
@@ -2270,6 +2281,7 @@ class RenderingPipeline:
             locks=self.locks,
             preset_substitutions=substitutions,
             dark_spans=self.dark_spans,
+            focal_roles=self.rendered_focal_roles(),
         )
 
     def rendered_palettes(self) -> dict[str, SectionPalette]:
@@ -2282,6 +2294,21 @@ class RenderingPipeline:
             if section.color is not None
             and section.color.value.startswith("PALETTE_")
             and section.section_id in self.palettes
+        }
+
+    def rendered_focal_roles(self) -> dict[str, str]:
+        """The focal role of each plan section whose intensity it changes (of
+        `focal_roles`), by section id: render identity. A role that leaves the planner's
+        intensity as it is (SUPPORT; REST on an identity level) changes no byte."""
+        return {
+            section.section_id: self.focal_roles[section.section_id]
+            for section in self.choreography_plan.sections
+            if section.section_id in self.focal_roles
+            and effective_intensity(
+                None if section.intensity is None else section.intensity.value,
+                self.focal_roles[section.section_id],
+            )
+            != (None if section.intensity is None else section.intensity.value)
         }
 
     def checkpoint_record(self, *, live_layout: bool = False) -> dict[str, Any]:
@@ -2341,6 +2368,10 @@ class RenderingPipeline:
             # As the dark spans: the re-render resolves palette roles through them.
             checkpoint["palettes"] = record["palettes"]
             inputs["palettes"] = record["palettes"]
+        if "focal_roles" in record:
+            # As the palettes: the re-render adjusts each section's intensity by them.
+            checkpoint["focal_roles"] = record["focal_roles"]
+            inputs["focal_roles"] = record["focal_roles"]
         return checkpoint
 
     def render(self) -> list[FixtureSegment]:
@@ -2452,6 +2483,13 @@ class RenderingPipeline:
             held = look.states
             refused = 0 if unplayable is None else len(unplayable)
             compiled_steps: list[dict[str, str | int]] = []
+            asked = None if section.intensity is None else section.intensity.value
+            focal_role = self.focal_roles.get(section.section_id.split("|")[0])
+            level = effective_intensity(asked, focal_role)
+            if level == asked:
+                focal_role = None  # it changes nothing here
+            shaped: dict[str, Any] = {}
+            """What the section's intensity shaping did (`shape_section`), once compiled."""
 
             def compile_section(
                 held_states: Mapping[str, Mapping[ChannelName, str]],
@@ -2460,6 +2498,8 @@ class RenderingPipeline:
                 preset: TemplatePreset | None = preset,
                 refused: int = refused,
                 compiled_steps: list[dict[str, str | int]] = compiled_steps,
+                level: str | None = level,
+                shaped: dict[str, Any] = shaped,
             ) -> list[FixtureSegment]:
                 if unplayable is not None:
                     del unplayable[refused:]  # a recompile records its refusals again
@@ -2474,8 +2514,21 @@ class RenderingPipeline:
                     held_states=held_states,
                 )
                 compiled_steps[:] = result.dropped_steps
+                segments = result.segments
+                if level in SHAPED_LEVELS:
+                    # Before the dark spans and boundary dips, so their darkness holds.
+                    segments, record = shape_section(
+                        segments,
+                        level,
+                        profiles=profiles,
+                        phase_map=phase_map,
+                        origin_ms=self.beat_grid.get_bar_start_ms(context.start_bar - 1),
+                        beats_per_bar=self.beat_grid.beats_per_bar,
+                    )
+                    shaped.clear()
+                    shaped.update(record)
                 return _dark_over_spans(
-                    result.segments,
+                    segments,
                     self.dark_spans,
                     profiles,
                     shortest_lit_ms=self._shortest_lit_ms,
@@ -2640,6 +2693,27 @@ class RenderingPipeline:
             record = _played_record(look.record(), outcomes)
             if boundaries:
                 record["boundaries"] = boundaries
+            if asked is not None or focal_role is not None:
+                record["intensity"] = {
+                    "asked": asked,
+                    **({} if focal_role is None else {"focal_role": focal_role}),
+                    "effective": level,
+                    "shape": dict(shaped) if level in SHAPED_LEVELS else None,
+                }
+                if shaped.get("unavailable"):
+                    diagnostics.append(
+                        MHDiagnostic(
+                            code="unsupported_attribute",
+                            severity="warning",
+                            message=(
+                                f"section {section.section_id!r}: intensity {level} is not "
+                                f"shaped on {', '.join(shaped['unavailable'])}, which have no "
+                                "dimmer axis; they play the template's own level"
+                            ),
+                            section_id=section.section_id,
+                            action="unchanged",
+                        )
+                    )
             if len(record) > 1:
                 section_looks.append(record)
             message = _unplayed_message(section.section_id, outcomes)
@@ -2848,9 +2922,13 @@ class RenderingPipeline:
                 section_id: palette.model_dump(mode="json")
                 for section_id, palette in palettes.items()
             }
+        focal_roles = self.rendered_focal_roles()
+        if focal_roles:
+            # Left out when no focal role changes a section's intensity (`twinklr run`).
+            self.render_record["focal_roles"] = dict(sorted(focal_roles.items()))
         if section_looks:
-            # What each section's colour and gobo play on each head, and the wheel changes
-            # they make at boundaries; left out when no section sets either.
+            # What each section's colour, gobo and intensity play on each head, and the
+            # wheel changes they make at boundaries; left out when no section sets any.
             self.render_record["section_looks"] = section_looks
         if self.choreography_plan.repairs:
             # What repair changed in the planner's response; left out when nothing was.

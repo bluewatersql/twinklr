@@ -476,7 +476,7 @@ def mismatch_message(summary: RenderSummary) -> str:
         "it differs in " + "; ".join(summary.mismatched_inputs)
         if summary.mismatched_inputs
         else "no recorded input differs (fixture profiles and model names, the rig, "
-        "templates, beat grid, dark spans, section palettes, revisions), so the "
+        "templates, beat grid, dark spans, section palettes, focal roles, revisions), so the "
         "checkpoint's plan or recorded policy, or the recorded identity itself differ"
     )
     return (
@@ -528,6 +528,8 @@ def _mismatched_inputs(run: Mapping[str, Any], rerender: Mapping[str, Any]) -> l
         differs.append("dark spans")
     if run.get("palettes", {}) != rerender.get("palettes", {}):
         differs.append("section palettes")
+    if run.get("focal_roles", {}) != rerender.get("focal_roles", {}):
+        differs.append("focal roles")
     for key, name in (
         ("renderer_revision", "renderer revision"),
         ("encoder_version", "encoder version"),

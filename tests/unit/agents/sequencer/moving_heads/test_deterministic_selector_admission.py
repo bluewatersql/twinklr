@@ -367,3 +367,38 @@ def test_a_selector_plan_round_trips_through_the_plan_schema() -> None:
     assert all(
         section.set_intent_fields()[:2] == ("intensity", "color") for section in restored.sections
     )
+
+
+@pytest.mark.parametrize(("energy", "plays"), [(90, True), (78, True), (40, False)])
+def test_the_selectors_intensity_plays_on_the_dimmer(energy: int, plays: bool) -> None:
+    """The energy→intensity policy now shows: a DRAMATIC or INTENSE section renders a
+    beat-locked dimmer pulse, an identity level the template's own bytes."""
+    from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
+
+    heads = ("MH1", "MH2", "MH3", "MH4")
+    plan = (
+        DeterministicSelector(seed=1, admission=_admission(("mirror_wings",)))
+        .select([_section("chorus", energy, 1)])
+        .plan
+    )
+    authored = plan.model_copy(
+        update={"sections": [s.model_copy(update={"intensity": None}) for s in plan.sections]}
+    )
+
+    def frames(chosen: ChoreographyPlan) -> list[dict[int, int]]:
+        pipeline = RenderingPipeline(
+            choreography_plan=chosen,
+            beat_grid=m.bars_grid(*([500.0] * 4)),
+            fixture_group=m.family_rig(heads),
+            job_config=m.family_job(heads),
+            media_file="silence.wav",
+        )
+        pipeline.render()
+        return [dict(frame.channels) for frame in pipeline.frames]
+
+    played, own = frames(plan), frames(authored)
+    dimmer = 5  # the family rig's dimmer channel
+    assert [{k: v for k, v in f.items() if k != dimmer} for f in played] == [
+        {k: v for k, v in f.items() if k != dimmer} for f in own
+    ]
+    assert (played != own) is plays

@@ -211,10 +211,13 @@ def _target(group_id: str) -> PlanTarget:
     return PlanTarget(type=TargetType.GROUP, id=group_id)
 
 
-def _macro(mh_id: str, sections: MacroSpec) -> MacroPlan:
+def _macro(
+    mh_id: str, sections: MacroSpec, heads_role: FocalRoleKind = FocalRoleKind.SUPPORT
+) -> MacroPlan:
     """The macro sections; in one where the heads answer, the tree calls and the moving
     heads respond on alternate beats, so the heads rest through every call beat."""
     tree, heads = _target("MEGA_TREE"), _target(mh_id)
+    lead = heads if heads_role is FocalRoleKind.LEAD else tree
     return MacroPlan(
         sections=[
             MacroSection(
@@ -230,9 +233,12 @@ def _macro(mh_id: str, sections: MacroSpec) -> MacroPlan:
                 theme=ThemeRef(theme_id="theme.holiday.traditional", scope=ThemeScope.SECTION),
                 motif_ids=[],
                 focal_roles=[
-                    FocalRole(target=tree, role=FocalRoleKind.LEAD),
+                    FocalRole(
+                        target=tree,
+                        role=FocalRoleKind.LEAD if lead is tree else FocalRoleKind.SUPPORT,
+                    ),
                     FocalRole(target=_target(ARCH_ID), role=FocalRoleKind.SUPPORT),
-                    FocalRole(target=heads, role=FocalRoleKind.SUPPORT),
+                    FocalRole(target=heads, role=heads_role),
                 ],
                 call_response_pairs=(
                     [
@@ -260,7 +266,7 @@ def _macro(mh_id: str, sections: MacroSpec) -> MacroPlan:
         ],
         motif_continuity=[],
         focal_arc=[
-            FocalAssignment(section_id=section_id, lead_target=tree) for section_id, *_ in sections
+            FocalAssignment(section_id=section_id, lead_target=lead) for section_id, *_ in sections
         ],
     )
 
@@ -323,6 +329,7 @@ def _recorded(
     moving_heads: MovingHeadSpec = SWING,
     calls: list[str],
     planning_stage: bool = False,
+    heads_role: FocalRoleKind = FocalRoleKind.SUPPORT,
 ) -> CombinedShowWiring:
     """The wiring with every provider-backed stage replaced by a recorded one; with
     `planning_stage`, the real moving-head planning stage is kept (its provider call is
@@ -332,7 +339,7 @@ def _recorded(
     outputs: dict[str, object] = {
         "profile": _audio_profile() if planning_stage else object(),
         "lyrics": None if planning_stage else object(),
-        "macro": _macro(mh_id, macro),
+        "macro": _macro(mh_id, macro, heads_role),
         "groups": None,
         "holistic": None,
         "holistic_corrector": None,
@@ -516,12 +523,11 @@ async def test_unified_show_renders_the_heads_as_the_standalone_render(
     assert "dark_spans" not in record
     assert record["render_fingerprint"] == standalone.fingerprint()
     assert record["layout_check"] == "performed"
-    # The macro focal role is not projected onto the heads: said, not done. (A palette-role
-    # colour resolves through the section's macro palette, as under `twinklr run`.)
-    projected = [d for d in record["diagnostics"] if "macro focal role" in d["message"]]
-    assert [(d["section_id"], d["severity"], d["action"]) for d in projected] == [
-        ("drop", "warning", "unchanged")
-    ]
+    # The heads SUPPORT here: their focal role leaves the planner's intensity as it is, so
+    # the show renders (and identifies) the heads as the standalone render does, and no
+    # diagnostic says a focal role is not applied.
+    assert "focal_roles" not in record
+    assert not [d for d in record["diagnostics"] if "focal role" in d["message"]]
     assert _effect_types(sequence) == {
         "Dmx MH1": {"DMX"},
         "Dmx MH2": {"DMX"},
@@ -834,6 +840,7 @@ async def _show_command(
     macro: MacroSpec = CALL_RESPONSE,
     job: JobConfig | None = None,
     exit_code: int = 0,
+    heads_role: FocalRoleKind = FocalRoleKind.SUPPORT,
 ) -> tuple[Path, Path, Path]:
     """`twinklr show` end to end, offline, with the real moving-head planning stage (its
     provider answered by a recorded plan), which writes the plan checkpoint; it must exit
@@ -850,7 +857,11 @@ async def _show_command(
 
     def recorded(**kwargs: Any) -> CombinedShowWiring:
         return _recorded(
-            prepare_combined_show_pipeline(**kwargs), macro=macro, calls=[], planning_stage=True
+            prepare_combined_show_pipeline(**kwargs),
+            macro=macro,
+            calls=[],
+            planning_stage=True,
+            heads_role=heads_role,
         )
 
     async def planner(self: object, planning_context: object) -> IterationResult:
@@ -947,6 +958,42 @@ async def test_eval_report_reproduces_a_show_render_with_its_dark_spans(
     for curve in (c for section in report.sections for c in section.curves):
         if curve.channel != "dimmer":
             assert curve.lit_range is not None and curve.lit_range <= curve.stats.range
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_eval_report_reproduces_a_show_whose_lead_heads_play_hotter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With the heads LEAD in the macro plan, the show plays the section one step hotter
+    than the planner's intensity (as authored → DRAMATIC), records the focal role in the
+    trace and the checkpoint, and `eval-report` re-renders exactly it; a record that loses
+    the role names it as what differs."""
+    artifact_dir, fixture_path, audio_path = await _show_command(
+        tmp_path, monkeypatch, macro=UNIFIED, heads_role=FocalRoleKind.LEAD
+    )
+    trace = json.loads(
+        (artifact_dir / f"{artifact_dir.name}_twinklr_show.xsq.trace.json").read_text()
+    )["render"]
+    checkpoint = artifact_dir / "checkpoints" / "plans" / "final.json"
+    data = json.loads(checkpoint.read_text(encoding="utf-8"))
+    assert trace["focal_roles"] == data["render"]["focal_roles"] == {"drop": "LEAD"}
+    assert data["render"]["inputs"]["focal_roles"] == {"drop": "LEAD"}
+    (look,) = trace["section_looks"]
+    assert look["intensity"]["focal_role"] == "LEAD"
+    assert (look["intensity"]["asked"], look["intensity"]["effective"]) == (None, "DRAMATIC")
+
+    report = await _evaluate(checkpoint, fixture_path, audio_path, tmp_path / "report")
+    assert report.render is not None
+    assert report.render.fingerprint_matches is True, report.render.mismatched_inputs
+
+    del data["render"]["focal_roles"]
+    lost = tmp_path / "lost.json"
+    lost.write_text(json.dumps(data), encoding="utf-8")
+    report = await _evaluate(lost, fixture_path, audio_path, tmp_path / "lost")
+    assert report.render is not None
+    assert report.render.fingerprint_matches is False
+    assert report.render.mismatched_inputs == ["focal roles"]
 
 
 @pytest.mark.integration

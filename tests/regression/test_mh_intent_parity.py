@@ -103,10 +103,6 @@ PREFIXES = (
 """Row-id prefix of each test below; together they cover every regression row."""
 
 PENDING: dict[str, tuple[str, str]] = {
-    "intensity_dramatic": ("W5", "intensity DRAMATIC"),
-    "intensity_intense": ("W5", "intensity INTENSE"),
-    "intensity_dramatic_on_authored_pulse": ("W5", "intensity DRAMATIC on an authored pulse"),
-    "intensity_intense_on_authored_pulse": ("W5", "intensity INTENSE on an authored pulse"),
     "shutter_closed_open": ("W6", "shutter CLOSED/OPEN events"),
     "shutter_strobe_slow": ("W6", "shutter STROBE_SLOW event"),
     "shutter_strobe_medium": ("W6", "shutter STROBE_MEDIUM event"),
@@ -120,7 +116,6 @@ PENDING: dict[str, tuple[str, str]] = {
     "transition_in_morph": ("W8", "transition_in MORPH"),
     "transition_in_sweep": ("W8", "transition_in SWEEP"),
     "transition_in_fade_via_black": ("W8", "transition_in FADE_VIA_BLACK"),
-    "show_focal_lead": ("W9", "show macro focal role"),
 }
 """Rows not rendered yet: (task that renders it, intent). A task deletes its entries."""
 

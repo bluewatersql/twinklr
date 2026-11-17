@@ -90,11 +90,12 @@ dimmer effects. Song intent makes them follow this song: its energy, its colours
 lyrics, its boundaries.
 
 **`intensity`**: how hard the light drives, from the section's energy target.
-- `SLOW`: gentle and unhurried
-- `SMOOTH`: flowing and even
-- `FAST`: brisk and lively
-- `DRAMATIC`: bold, punchy accents on the strong beats
-- `INTENSE`: maximum drive, accenting every beat
+Deterministic code plays it on the dimmer, locked to the beat:
+- `SLOW`, `SMOOTH`, `FAST`: the template's own level and pulse, as authored (the calm
+  and even end of the range)
+- `DRAMATIC`: a bold pulse on the strong beats (every half bar in 4/4, every bar in
+  3/4)
+- `INTENSE`: maximum drive, a harder pulse on every beat
 - `as_authored`: the template's own level, when it already fits (say why)
 
 Read it from the Macro Strategy energy target:

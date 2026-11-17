@@ -11,10 +11,13 @@ import logging
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
     from twinklr.core.pipeline.context import PipelineContext
     from twinklr.core.pipeline.result import StageResult
     from twinklr.core.sequencer.moving_heads.pipeline import TemplateAdmission
+    from twinklr.core.sequencer.planning import MacroPlan
     from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 logger = logging.getLogger(__name__)
@@ -94,6 +97,7 @@ class MovingHeadStage:
         section_id: str | None = None,
         regeneration_nonce: str | None = None,
         macro_planning_enabled: bool = True,
+        head_focal_roles: Callable[[MacroPlan], dict[str, str]] | None = None,
     ) -> None:
         """Initialize moving head planner stage.
 
@@ -104,6 +108,9 @@ class MovingHeadStage:
             max_iterations: Maximum refinement iterations (default: 3)
             min_pass_score: Minimum score for approval (default: 7.0)
             include_template_metadata: Load template descriptions from registry (default: True)
+            head_focal_roles: Under `twinklr show`, the moving heads' focal role in each
+                macro section (`show_coordination.moving_head_focal_roles`), which the
+                show render applies to intensity; the planner is told. None under `run`.
         """
         self.fixture_count = fixture_count
         self.available_templates = available_templates
@@ -114,6 +121,7 @@ class MovingHeadStage:
         self.section_id = section_id
         self.regeneration_nonce = regeneration_nonce
         self.macro_planning_enabled = macro_planning_enabled
+        self.head_focal_roles = head_focal_roles
 
     @property
     def name(self) -> str:
@@ -227,6 +235,11 @@ class MovingHeadStage:
                 macro_planning_enabled=self.macro_planning_enabled,
                 template_descriptions=template_descriptions,
                 rig_offer=admission.offer if isinstance(admission, TemplateAdmission) else None,
+                head_focal_roles=(
+                    self.head_focal_roles(macro_plan)
+                    if self.head_focal_roles is not None and macro_plan is not None
+                    else None
+                ),
             )
 
             # Store planning context for debugging

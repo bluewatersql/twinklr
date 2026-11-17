@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -12,6 +13,7 @@ from twinklr.core.pipeline.definitions.display import build_display_pipeline
 from twinklr.core.pipeline.definitions.moving_heads import build_moving_heads_pipeline
 from twinklr.core.pipeline.show_stages import CombinedShowRenderStage
 from twinklr.core.sequencer.display.xlights_mapping import XLightsMapping
+from twinklr.core.sequencer.show_coordination import moving_head_focal_roles
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
 from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
@@ -82,6 +84,12 @@ def build_combined_show_pipeline(
             }
             for fixture in fixture_group.expand_fixtures()
         ],
+        # The planner is told how the show render applies the heads' focal role.
+        head_focal_roles=partial(
+            moving_head_focal_roles,
+            graph=choreo_graph,
+            moving_head_target_ids=moving_head_target_ids,
+        ),
     )
     common_ids = {"audio", "profile", "lyrics", "macro"}
     display_branch = [

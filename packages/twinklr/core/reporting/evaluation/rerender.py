@@ -208,6 +208,7 @@ async def rerender_plan(
         admission=recorded.admission,
         dark_spans=recorded.dark_spans,
         palettes=recorded.palettes,
+        focal_roles=recorded.focal_roles,
     )
 
     # Render segments

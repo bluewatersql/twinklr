@@ -31,6 +31,7 @@ from twinklr.core.sequencer.show_coordination import (
     coordinate_display_render_plan,
     coordination_schedule,
     moving_head_dark_spans,
+    moving_head_focal_roles,
     validate_macro_coordination,
 )
 from twinklr.core.sequencer.templates.group.models.choreography import (
@@ -836,3 +837,27 @@ def test_moving_head_dark_spans_are_where_the_schedule_rests_them(
     )
 
     assert spans == expected
+
+
+def test_the_moving_heads_focal_role_is_read_per_section_for_the_render() -> None:
+    """Each section's role for the moving-head targets, by song section id; a section that
+    names none for them (or contradicting ones) is left out."""
+    heads = PlanTarget(type=TargetType.GROUP, id="MOVING_HEADS")
+    tree = PlanTarget(type=TargetType.GROUP, id="MEGA_TREE")
+    arches = PlanTarget(type=TargetType.GROUP, id="ARCH_LEFT")
+
+    def roles(*named: FocalRole, ids: set[str] | None = None) -> dict[str, str]:
+        return moving_head_focal_roles(
+            _macro(roles=list(named)), _graph(), moving_head_target_ids=ids or {"MOVING_HEADS"}
+        )
+
+    for kind in FocalRoleKind:
+        lead = [] if kind is FocalRoleKind.LEAD else [FocalRole(target=tree, role="LEAD")]
+        assert roles(FocalRole(target=heads, role=kind), *lead) == {"drop": kind.value}
+    assert roles(FocalRole(target=tree, role="LEAD")) == {}
+    mixed = (
+        FocalRole(target=tree, role="LEAD"),
+        FocalRole(target=heads, role="SUPPORT"),
+        FocalRole(target=arches, role="REST"),
+    )
+    assert roles(*mixed, ids={"MOVING_HEADS", "ARCH_LEFT"}) == {}

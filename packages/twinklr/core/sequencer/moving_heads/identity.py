@@ -27,14 +27,17 @@ if TYPE_CHECKING:
 BACKEND_ID = "xlights_dmx"
 """The backend the renderer writes: xLights DMX effects in an `.xsq`."""
 
-RENDERER_REVISION = "4"
+RENDERER_REVISION = "5"
 """Bumped by hand in the commit that intentionally changes the renderer's output; the
 render identity also carries the frame encoder's own version. 3: a section's colour and
 gobo are rendered (song-intent rendering W4), so a plan that sets them renders
 differently from revision 2. 4 (W3/W4 review fix round): a colour change that cannot dip
 before a lit boundary turns in the section's first dark window instead of not at all, a
 held state an overlay mask cannot reach falls back to the authored one, and a palette
-role the section's palette lacks plays PRIMARY's stop instead of the fixed table's."""
+role the section's palette lacks plays PRIMARY's stop instead of the fixed table's. 5
+(W5): DRAMATIC and INTENSE play on the dimmer (`intensity.shape_section`), and under
+`twinklr show` the moving heads' macro focal role adjusts a section's intensity, so a
+plan that sets either, or a show render, renders differently from revision 4."""
 
 
 def render_fingerprint(
@@ -52,6 +55,7 @@ def render_fingerprint(
     preset_substitutions: Sequence[tuple[str, str | None]] = (),
     dark_spans: Sequence[tuple[int, int]] = (),
     palettes: Mapping[str, BaseModel] | None = None,
+    focal_roles: Mapping[str, str] | None = None,
 ) -> str:
     """Hash the functional inputs of a render.
 
@@ -77,6 +81,9 @@ def render_fingerprint(
         palettes: The macro palette each section that names a palette-role colour
             resolves it through, by section id; hashed only when there are any, so a
             render without one keeps its earlier identity.
+        focal_roles: The moving heads' macro focal role by song section id (`twinklr
+            show`), which adjusts each section's intensity; hashed only when there are
+            any, so a render without them keeps its earlier identity.
 
     Returns:
         A 64-character lowercase SHA-256 hex digest.
@@ -105,6 +112,8 @@ def render_fingerprint(
         payload["palettes"] = {
             section_id: palette.model_dump(mode="json") for section_id, palette in palettes.items()
         }
+    if focal_roles:
+        payload["focal_roles"] = dict(focal_roles)
     if locks:
         payload["locks"] = sorted(
             (_canonical_lock(lock.model_dump(mode="json")) for lock in locks),

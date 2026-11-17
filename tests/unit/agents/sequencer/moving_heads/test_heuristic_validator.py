@@ -525,3 +525,69 @@ def test_a_section_shorter_than_a_bar_is_not_required(available_templates):
     )
 
     assert validator.validate(plan).errors == []
+
+
+class TestGridShorterThanTheSong:
+    """The 2026-11-17 failed run: the table ran past `total_bars`, so following it
+    and clamping it were both errors. The table is now clamped to the grid."""
+
+    @staticmethod
+    def _plan(*bars: tuple[str, int, int]) -> ChoreographyPlan:
+        return ChoreographyPlan(
+            sections=[_section(name, start, end, "sweep_lr_fan_hold") for name, start, end in bars],
+            overall_strategy=STRATEGY,
+        )
+
+    def test_a_plan_following_the_table_is_clean(self) -> None:
+        from tests.unit.agents.sequencer.moving_heads.test_context_grid import (
+            DANCE_GRID_BARS,
+            DANCE_SONG,
+            SHORT_GRID_BARS,
+            SHORT_GRID_SONG,
+            short_grid_context,
+        )
+
+        for bars, song in ((SHORT_GRID_BARS, SHORT_GRID_SONG), (DANCE_GRID_BARS, DANCE_SONG)):
+            context = short_grid_context(bars, song)
+            table = context.song_structure()["sections"]
+            plan = self._plan(*((s["section_id"], s["start_bar"], s["end_bar"]) for s in table))
+            assert HeuristicValidator.from_context(context).validate(plan).errors == []
+
+    def test_the_failed_runs_iteration_1_plan_is_an_error(self) -> None:
+        """It followed the old table: chorus_2 to bar 63, verse_3 at bar 64."""
+        from tests.unit.agents.sequencer.moving_heads.test_context_grid import (
+            short_grid_context,
+        )
+
+        context = short_grid_context()
+        head = [("intro", 1, 10), ("verse_1", 11, 20), ("verse_2", 21, 31)]
+        head += [("chorus_1", 32, 42), ("break", 43, 52)]
+        errors = (
+            HeuristicValidator.from_context(context)
+            .validate(self._plan(*head, ("chorus_2", 53, 63), ("verse_3", 64, 64)))
+            .errors
+        )
+
+        assert "Unit 'chorus_2' ends at bar 63, beyond total_bars (61)" in errors
+        assert "Section 'chorus_2' end_bar (63) doesn't match song structure (61)" in errors
+        assert (
+            "Section 'verse_3' lies beyond the detected beat grid (its last bar is 61); "
+            "leave it out of the plan"
+        ) in errors
+
+    def test_the_failed_runs_iteration_2_plan_is_clean_once_it_matches_the_table(self) -> None:
+        """Iteration 2 clamped into the grid (chorus_2 53-60, verse_3 61); against the
+        corrected table chorus_2 runs to bar 61 and verse_3 is not planned."""
+        from tests.unit.agents.sequencer.moving_heads.test_context_grid import (
+            short_grid_context,
+        )
+
+        validator = HeuristicValidator.from_context(short_grid_context())
+        head = [("intro", 1, 10), ("verse_1", 11, 20), ("verse_2", 21, 31)]
+        head += [("chorus_1", 32, 42), ("break", 43, 52)]
+
+        as_sent = validator.validate(self._plan(*head, ("chorus_2", 53, 60), ("verse_3", 61, 61)))
+        matching = validator.validate(self._plan(*head, ("chorus_2", 53, 61)))
+
+        assert "Section 'chorus_2' end_bar (60) doesn't match song structure (61)" in as_sent.errors
+        assert matching.errors == []

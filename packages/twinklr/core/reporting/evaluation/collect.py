@@ -79,6 +79,7 @@ class _RecordedInputs(TypedDict):
     rig: _RecordedRig
     dark_spans: NotRequired[list[list[int]]]
     palettes: NotRequired[dict[str, dict[str, Any]]]
+    focal_roles: NotRequired[dict[str, str]]
 
 
 @dataclass(frozen=True)
@@ -96,6 +97,8 @@ class RecordedRender:
             merged (`twinklr show`'s coordination rests); empty when there were none.
         palettes: The macro palette each section resolved a palette-role colour
             through, by section id; empty when none did.
+        focal_roles: The moving heads' macro focal role by song section id, which
+            adjusted each section's intensity (`twinklr show`); empty under `run`.
         inputs: The run trace's input hashes (`fixtures`, `template_sha256`,
             `beat_grid_sha256`, `renderer_revision`, `encoder_version`, and
             `dark_spans` when there were any) and the rendered rig's identity (`rig`).
@@ -107,6 +110,7 @@ class RecordedRender:
     admission: TemplateAdmission | None
     dark_spans: tuple[tuple[int, int], ...]
     palettes: Mapping[str, SectionPalette]
+    focal_roles: Mapping[str, str]
     inputs: Mapping[str, Any]
 
 
@@ -161,6 +165,7 @@ def _recorded_render(render: dict[str, Any]) -> RecordedRender:
             render.get("dark_spans", ())
         ),
         palettes=TypeAdapter(dict[str, SectionPalette]).validate_python(render.get("palettes", {})),
+        focal_roles=TypeAdapter(dict[str, str]).validate_python(render.get("focal_roles", {})),
         admission=None
         if admission is None
         else TemplateAdmission(

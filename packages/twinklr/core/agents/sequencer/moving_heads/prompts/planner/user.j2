@@ -27,6 +27,9 @@ V2 Migration: Uses structured context from MovingHeadPlanningContext
 {% endfor %}
 
 **Total Duration**: {{ total_bars }} bars
+{% if beyond_grid is defined and beyond_grid %}
+The last {{ beyond_grid.seconds }} s of the song lie beyond the detected beat grid and are not planned{% if beyond_grid.section_ids %} ({{ beyond_grid.section_ids | join(', ') }} left out){% endif %}.
+{% endif %}
 
 ## Beat Grid
 
@@ -98,6 +101,11 @@ plays as its wheel colour, not darker or paler (brightness is `intensity`'s).
 {% endif %}
 - **Strobe speeds**: {% if rig_offer.strobes.all or rig_offer.strobes.some %}{{ (rig_offer.strobes.all + rig_offer.strobes.some) | join(', ') }}{% else %}none tagged{% endif +%}
 - **Hit** (a dimmer accent): {{ {"all": "every head", "some": "some heads", "none": "no head"}[rig_offer.hit] }}
+{% if rig_offer.hit == "none" %}
+- **Intensity**: no head has a dimmer axis, so `DRAMATIC` and `INTENSE` cannot pulse here: every head plays its template's own level. Give emphasis with events or colour instead.
+{% elif rig_offer.hit == "some" %}
+- **Intensity**: only some heads have a dimmer axis; `DRAMATIC` and `INTENSE` pulse on those, and the others play their template's own level.
+{% endif %}
 {% if rig_offer.exclusions %}
 - **Not with these templates** (their overlay masks are too short to turn the wheel there): {% for e in rig_offer.exclusions %}`{{ e.template_id }}`: {{ e.states | join(', ') }}{% if not loop.last %}; {% endif %}{% endfor +%}
 {% endif %}
@@ -205,6 +213,12 @@ The MacroPlanner has defined the following strategic guidance for each section. 
 **Focal arc:**
 {% for focus in macro_focal_arc %}
 - `{{ focus.section_id }}`: lead {{ focus.lead_target.type }} `{{ focus.lead_target.id }}`
+{% endfor %}
+{% endif %}
+{% if head_focal_roles is defined and head_focal_roles %}
+**The moving heads' focal role** (deterministic code applies it to each section's `intensity` when the show renders): LEAD plays one step hotter (`as_authored`, `SLOW`, `SMOOTH` and `FAST` play as `DRAMATIC`; `DRAMATIC` as `INTENSE`), SUPPORT plays your choice, REST at most the template's own level (`DRAMATIC` and `INTENSE` play as authored). Still set `intensity` from the section's energy; the role is applied on top of it.
+{% for section_id, role in head_focal_roles.items() %}
+- `{{ section_id }}`: {{ role }}
 {% endfor %}
 {% endif %}
 

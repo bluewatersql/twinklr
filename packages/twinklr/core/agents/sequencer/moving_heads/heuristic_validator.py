@@ -191,6 +191,15 @@ class HeuristicValidator:
                     "every section of the Song Structure table, each over its own bars"
                 )
 
+        # A section the beat grid ends before has no bar to render
+        beyond_grid = self.song_structure.get("beyond_grid") or {}
+        for section_id in beyond_grid.get("section_ids", []):
+            if section_id in covered_section_ids:
+                errors.append(
+                    f"Section '{section_id}' lies beyond the detected beat grid (its last "
+                    f"bar is {self._total_bars}); leave it out of the plan"
+                )
+
         # A strategy and a reason, not a placeholder
         if _is_placeholder(plan.overall_strategy):
             errors.append(

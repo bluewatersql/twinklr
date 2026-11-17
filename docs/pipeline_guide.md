@@ -765,9 +765,11 @@ uv run twinklr run \
    complete 20 ms DMX frames and writes the `.xsq` output file. Each section's colour
    (a palette role through the section's macro palette) and gobo play the tagged wheel
    states nearest them, turned only in the dark ([user guide](user-guide.md#how-a-sections-colour-and-gobo-reach-the-lights)).
-   It does not yet render the rest of the planner's song intent (intensity, timed
-   accents and lyric moment cues, entry and exit transitions, motif variation, density,
-   modifiers): a known regression from the single-renderer cutover, being fixed
+   Its intensity plays on the dimmer, locked to the beat (`DRAMATIC` and `INTENSE` a
+   pulse, the other levels as authored; under `twinklr show` the heads' macro focal role
+   moves it a step: [user guide](user-guide.md#how-a-sections-intensity-reaches-the-lights)).
+   It does not yet render the rest of the planner's song intent (timed accents and lyric
+   moment cues, entry and exit transitions, motif variation, density, modifiers): a known regression from the single-renderer cutover, being fixed
    ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 
 ### Demo Scripts

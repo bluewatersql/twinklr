@@ -87,6 +87,8 @@ def build_planner_variables(
         "template_descriptions": prompt_context.get("template_descriptions"),
         # Sections (with bar positions)
         "sections": prompt_context["song_structure"]["sections"],
+        # The song's tail the beat grid does not reach, when it does not reach the end
+        "beyond_grid": prompt_context["song_structure"]["beyond_grid"],
         # Audio profile (for initial iteration)
         "audio_profile": context.audio_profile if iteration == 0 else None,
         # Lyric context (for initial iteration)
@@ -96,6 +98,8 @@ def build_planner_variables(
         "macro_palette_arc": prompt_context["macro_palette_arc"],
         "macro_motif_continuity": prompt_context["macro_motif_continuity"],
         "macro_focal_arc": prompt_context["macro_focal_arc"],
+        # How the show render adjusts intensity by the heads' focal role (show only)
+        "head_focal_roles": prompt_context["head_focal_roles"],
         # What the rig can show of the song intent
         "rig_offer": prompt_context["rig_offer"],
         # Feedback (for refinement iterations)
@@ -130,6 +134,7 @@ def build_judge_variables(
         "plan": plan.model_dump(mode="json"),
         # Song structure
         "sections": prompt_context["song_structure"]["sections"],
+        "beyond_grid": prompt_context["song_structure"]["beyond_grid"],
         "total_bars": context.total_bars,
         "tempo": context.tempo,
         "time_signature": context.time_signature,
@@ -281,6 +286,8 @@ class MovingHeadPlannerOrchestrator:
             },
             # What the planner is told the rig can show, and what repair keeps.
             "rig_offer": (context.rig_offer.model_dump(mode="json") if context.rig_offer else None),
+            # The show render adjusts intensity by these, and the prompt says so.
+            "head_focal_roles": context.head_focal_roles,
             # Bar numbers in the plan name positions on this authoritative grid.
             "beat_grid": (context.beat_grid.model_dump(mode="json") if context.beat_grid else None),
             # None is also a valid macro result, so the experiment ablation must
@@ -363,6 +370,9 @@ class MovingHeadPlannerOrchestrator:
 
         # Create validator function from context
         validator = create_validator_function(context)
+        # Sections beyond the beat grid are not planned, so their cues are not advised.
+        beyond_grid = context.song_structure()["beyond_grid"]
+        unplannable = () if beyond_grid is None else tuple(beyond_grid["section_ids"])
 
         # Run iteration loop
         result = await self.controller.run(
@@ -379,7 +389,7 @@ class MovingHeadPlannerOrchestrator:
             plan_normalizer=lambda plan: normalize_plan(plan, context),
             plan_repairs=lambda plan: [repair.describe() for repair in plan.repairs],
             plan_advisories=lambda plan: unanswered_high_cues(
-                plan, context.lyric_context, context.sections
+                plan, context.lyric_context, context.sections, unplannable=unplannable
             ),
         )
 

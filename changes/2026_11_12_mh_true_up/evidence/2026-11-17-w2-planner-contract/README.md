@@ -610,3 +610,39 @@ acceptance of the schema (not probed).
 Live requests for W2, all under the owner's 2026-11-13 authorization: probe 1 (14:30Z,
 rejected at schema validation, no tokens generated), probe 2 (14:41Z, compiled; degenerate
 one-section plan that our validator wrongly passed), probe 3 (15:09Z, above).
+
+## Addendum: song structure clamped to the beat grid (2026-11-17, after the "Need A Favor" run)
+
+The owner's viewing run (2026-11-17T17:19Z) failed at the moving-head stage. The beat grid
+covered 0-187,337 ms of a 197,400 ms song (61 bars). `nearest_bar_index` extrapolates past
+the grid, so the Song Structure table ran to bar 64. The validator also requires a
+section's bars to match the table and no unit to end after `total_bars`, so no plan could
+pass. Iteration 1 followed the table and hit "beyond total_bars"; iteration 2 clamped and
+hit "doesn't match song structure". Dance Jams has the same shape (135 bars, table to 139).
+
+Fix (`context.py`, `heuristic_validator.py`):
+- `MovingHeadPlanningContext.song_structure()` is now the one place section bars are
+  computed. `for_prompt`, the validator (`from_context`) and the selector all read it.
+- Bars stay inclusive and contiguous and are clamped to `1..total_bars`. A section
+  starting inside the grid ends no later than `total_bars`. A section starting beyond the
+  grid is left out, listed under `song_structure["beyond_grid"]` (`from_ms`, `seconds`,
+  `section_ids`) and logged as a warning.
+- The validator does not require an omitted section. Planning one is an error that says
+  to leave it out. The rig offer lists only plannable sections.
+- Tests reproduce both songs' shapes:
+  - the table stays within `total_bars`, is contiguous, and its last section ends on
+    `total_bars`;
+  - the out-of-grid section is omitted and reported;
+  - a plan that follows the table exactly is clean;
+  - the run's iteration-1 plan is an error;
+  - the iteration-2 plan is clean once it matches the corrected table.
+
+Still open, outside this fix's files:
+- The planner prompt does not yet state that the last N seconds are beyond the grid
+  (`beyond_grid` is not passed to `user.j2`).
+- The macro table still shows the omitted section.
+- `unanswered_high_cues` would still advise planning a HIGH cue of an omitted section.
+
+The tail beyond the grid renders dark. This is the deliberate Phase 2 P2.0 policy:
+`plan/phase-2-composition.md`, "Policy", and
+`tests/integration/test_mh_pipeline.py::test_silent_song_edges_are_held_dark_outside_the_covered_span`.

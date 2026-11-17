@@ -47,6 +47,7 @@ from twinklr.core.config.fixtures.state_tags import (
 )
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.models.enum import ChannelName
+from twinklr.core.sequencer.moving_heads.intensity import describe_intensity
 from twinklr.core.sequencer.moving_heads.libraries.color import (
     COLOR_PRESET_HEX,
     ColorPreset,
@@ -60,8 +61,9 @@ if TYPE_CHECKING:
     from twinklr.core.sequencer.planning import MacroPlan
     from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
-RENDERED_INTENT_FIELDS = frozenset({"color", "gobo"})
-"""The section song-intent fields (`PlanSection.set_intent_fields`) the renderer plays."""
+RENDERED_INTENT_FIELDS = frozenset({"intensity", "color", "gobo"})
+"""The section song-intent fields (`PlanSection.set_intent_fields`) the renderer plays:
+colour and gobo here, intensity in `intensity.py`."""
 
 FIXED_ROLE_COLORS: dict[PaletteRole, ColorPreset] = {
     PaletteRole.PRIMARY: ColorPreset.RED,
@@ -787,7 +789,8 @@ def describe_look(record: Mapping[str, Any]) -> list[str]:
     """A section's trace entry (`SectionLook.record`, as the renderer leaves it) as lines
     for a reader: what each asked colour and gobo plays on which heads from the
     section's start, where a head turns to it later or keeps the previous or authored
-    state, and each boundary's dark dip."""
+    state, each boundary's dark dip, and what its intensity plays
+    (`intensity.describe_intensity`)."""
     lines = []
     for key, noun in (("color", "colour"), ("gobo", "gobo")):
         entry = record.get(key)
@@ -836,4 +839,6 @@ def describe_look(record: Mapping[str, Any]) -> list[str]:
         else:
             what = f"kept the previous state ({boundary['kept_previous']['reason']})"
         lines.append(f"{boundary['fixture_id']} at {boundary['boundary_ms']} ms: {wheels}: {what}")
+    if "intensity" in record:
+        lines.append(describe_intensity(record["intensity"]))
     return lines

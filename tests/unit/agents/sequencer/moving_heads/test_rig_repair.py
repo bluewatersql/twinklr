@@ -220,3 +220,30 @@ def test_a_colour_change_a_fast_tempo_may_not_play_is_recorded_for_the_planner()
     assert "keep the previous section's colour" in repaired.repairs[0].reason
     assert "beat 10 of its cycle, past half the section" in repaired.repairs[1].reason
     assert slow.repairs == []  # 160 ms fits half a beat: every change dips before
+
+
+def test_intensity_a_rig_cannot_pulse_is_recorded_not_shaped() -> None:
+    """DRAMATIC and INTENSE play on the dimmer: on a rig where no head, or only some, has
+    a dimmer axis the choice is kept and recorded, so the planner can give emphasis with
+    events or colour; an identity level and a rig with a dimmer everywhere record nothing."""
+    profile = _profile(TAGGED)
+    plan = ChoreographyPlan(
+        sections=[
+            plan_section("s1", 1, 4, "mirror_wings", intensity="DRAMATIC"),
+            plan_section("s2", 5, 8, "mirror_wings", intensity="INTENSE"),
+            plan_section("s3", 9, 12, "mirror_wings", intensity="FAST"),
+        ],
+        overall_strategy="",
+    )
+
+    assert repair_rig_intent(plan, _offer(profile), {}).repairs == []
+    none = repair_rig_intent(plan, _offer(profile).model_copy(update={"hit": "none"}), {})
+    assert [(r.section_id, r.item, r.action) for r in none.repairs] == [
+        ("s1", "intensity DRAMATIC", RepairAction.RECORDED),
+        ("s2", "intensity INTENSE", RepairAction.RECORDED),
+    ]
+    assert none.sections == plan.sections
+    assert "no head of this rig has a dimmer axis" in none.repairs[0].reason
+    assert "events or colour" in none.repairs[0].reason
+    some = repair_rig_intent(plan, _offer(profile).model_copy(update={"hit": "some"}), {})
+    assert "only some heads of this rig have a dimmer axis" in some.repairs[0].reason

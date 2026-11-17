@@ -1,4 +1,4 @@
-"""Repair of the planner's colours and gobos against what the rig can show.
+"""Repair of the planner's colours, gobos and intensity against what the rig can show.
 
 Deterministic repair, as `moment_cues.bind_lyric_moment_cues` repairs what the song
 cannot hold: one planned item at a time, recorded in `ChoreographyPlan.repairs`, shown to
@@ -20,6 +20,7 @@ from twinklr.core.agents.sequencer.moving_heads.models import (
     PlanSection,
     RepairAction,
 )
+from twinklr.core.sequencer.moving_heads.intensity import SHAPED_LEVELS
 from twinklr.core.sequencer.moving_heads.song_intent import (
     RigOffer,
     SectionPalette,
@@ -64,6 +65,9 @@ def repair_rig_intent(
       event's pattern, that no head has likewise. States a part's template cannot hold
       (its overlay masks) count as not shown.
     - One some heads show is kept and recorded, naming the heads that keep their look.
+    - A DRAMATIC or INTENSE intensity on a rig where some or no head has a dimmer axis is
+      kept and recorded as not shaped there (`RigOffer.hit`): those heads play the
+      template's own level, so emphasis has to come from events or colour.
     - With `beat_grid`: a colour change between two sections that set colours, where a
       wheel change does not fit half the beat before the boundary, is recorded when the
       new section's template has no dark phase long enough for the turn in its first
@@ -113,6 +117,23 @@ def repair_rig_intent(
                 )
             elif shown.status == "partial":
                 note(item, RepairAction.RECORDED, partial_reason(shown.heads, shown.missing))
+        if (
+            section.intensity is not None
+            and section.intensity.value in SHAPED_LEVELS
+            and offer.hit != "all"
+        ):
+            note(
+                f"intensity {section.intensity.value}",
+                RepairAction.RECORDED,
+                (
+                    "no head of this rig has a dimmer axis"
+                    if offer.hit == "none"
+                    else "only some heads of this rig have a dimmer axis"
+                )
+                + ", and intensity is played on the dimmer: "
+                + ("the heads play" if offer.hit == "none" else "the others play")
+                + " the template's own level; emphasis there needs events or colour",
+            )
         if section.gobo is not None:
             shown_gobo = rig.gobo(section.gobo)
             item = f"gobo {section.gobo.value}"

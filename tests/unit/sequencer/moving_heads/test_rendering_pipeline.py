@@ -104,11 +104,10 @@ def test_a_neutral_section_reports_no_unrendered_intent() -> None:
     assert _unrendered(pipeline) == []
 
 
-def test_set_intent_is_reported_unrendered_per_section_and_renders_as_authored() -> None:
-    """Intensity is not rendered yet, and on a rig whose colour wheel is not tagged a
-    colour has nothing to play: the frames are those of the neutral plan. Each section
-    that set unrendered intent says which fields, naming the plan that fixes it; the
-    colour, which renders, is not among them."""
+def test_rendered_intent_is_not_reported_unrendered_and_identity_plays_as_authored() -> None:
+    """SMOOTH is the identity intensity, and on a rig whose colour wheel is not tagged a
+    colour has nothing to play: the frames are those of the neutral plan. Intensity and
+    colour render, so neither is reported as unrendered."""
     neutral = _pipeline()
     neutral.render()
     plan = neutral.choreography_plan
@@ -116,7 +115,7 @@ def test_set_intent_is_reported_unrendered_per_section_and_renders_as_authored()
         update={
             "sections": [
                 plan.sections[0].model_copy(
-                    update={"intensity": Intensity.DRAMATIC, "color": PlanColor.PALETTE_ACCENT}
+                    update={"intensity": Intensity.SMOOTH, "color": PlanColor.PALETTE_ACCENT}
                 ),
                 plan.sections[1],
             ]
@@ -131,12 +130,7 @@ def test_set_intent_is_reported_unrendered_per_section_and_renders_as_authored()
     pipeline.render()
 
     assert pipeline.frames == neutral.frames
-    (diagnostic,) = _unrendered(pipeline)
-    assert diagnostic["section_id"] == "s1"
-    assert "intensity: a known regression" in diagnostic["message"]
-    assert "colour" not in diagnostic["message"]
-    assert "not rendered by any renderer" not in diagnostic["message"]
-    assert "plan/song-intent-rendering.md" in diagnostic["message"]
+    assert _unrendered(pipeline) == []
 
 
 def test_intent_no_renderer_rendered_yet_is_not_called_a_regression() -> None:
@@ -155,8 +149,10 @@ def test_intent_no_renderer_rendered_yet_is_not_called_a_regression() -> None:
     pipeline.render()
 
     (diagnostic,) = _unrendered(pipeline)
-    assert "intensity: a known regression" in diagnostic["message"]
+    assert "intensity" not in diagnostic["message"]
+    assert "known regression" not in diagnostic["message"]
     assert "motif, density: not rendered by any renderer yet" in diagnostic["message"]
+    assert "plan/song-intent-rendering.md" in diagnostic["message"]
 
 
 def test_plan_repairs_reach_the_render_record_only_when_there_are_any() -> None:

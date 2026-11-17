@@ -10,7 +10,10 @@ from twinklr.core.formats.xlights.sequence.models.xsq import TimeMarker
 from twinklr.core.pipeline.display_stages import DisplayRenderStage
 from twinklr.core.pipeline.result import StageResult, failure_result, success_result
 from twinklr.core.sequencer.planning import GroupPlanSet, MacroPlan
-from twinklr.core.sequencer.show_coordination import moving_head_dark_spans
+from twinklr.core.sequencer.show_coordination import (
+    moving_head_dark_spans,
+    moving_head_focal_roles,
+)
 from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
 
 if TYPE_CHECKING:
@@ -65,9 +68,9 @@ class CombinedShowRenderStage:
         show` adds to the plan checkpoint once the export is written
         (`checkpoint_record`), for `eval-report` to re-render. A section's palette-role
         colour resolves through its macro palette, as under `twinklr run`
-        (`section_palettes`). The macro focal role is not projected onto the moving
-        heads yet (a known regression the song-intent rendering plan fixes); the render
-        record says so per section.
+        (`section_palettes`). The moving heads' macro focal role in each section adjusts
+        its intensity (`moving_head_focal_roles`, `intensity.effective_intensity`): LEAD
+        one step hotter, REST at most as authored; the render record says what played.
         """
 
         from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
@@ -150,7 +153,6 @@ class CombinedShowRenderStage:
             record, the frame runs and the render's checkpoint record.
         """
         from twinklr.core.sequencer.moving_heads.delivery import build_sequence
-        from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
         from twinklr.core.sequencer.moving_heads.pipeline import (
             RenderingPipeline,
             TemplateAdmission,
@@ -178,6 +180,9 @@ class CombinedShowRenderStage:
                 moving_head_target_ids=self._moving_head_target_ids,
             ),
             palettes=section_palettes(macro_plan),
+            focal_roles=moving_head_focal_roles(
+                macro_plan, self._graph, moving_head_target_ids=self._moving_head_target_ids
+            ),
         )
         segments = pipeline.render()
         assert pipeline.render_record is not None  # set by every render
@@ -190,31 +195,10 @@ class CombinedShowRenderStage:
             artist=artist,
             timeline_tracks=timeline_tracks,
         )
-        unprojected = [
-            MHDiagnostic(
-                code="unsupported_attribute",
-                severity="warning",
-                message=(
-                    f"section {section.section.section_id!r}: the show's macro focal role "
-                    "(intensity) is not projected onto the moving heads yet, a known "
-                    "regression being fixed under "
-                    "changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md; the "
-                    "heads' colour follows the plan's colour through the section's macro "
-                    "palette"
-                ),
-                section_id=section.section.section_id,
-                action="unchanged",
-            ).model_dump(mode="json")
-            for section in macro_plan.sections
-        ]
-        record = {
-            **pipeline.render_record,
-            "diagnostics": [*pipeline.render_record["diagnostics"], *unprojected],
-        }
         return sequence, {
             "moving_head_plan": mh_plan,
             "moving_head_segments": tuple(segments),
-            "render_record": record,
+            "render_record": pipeline.render_record,
             "moving_head_runs": pipeline.runs,
             "checkpoint_record": pipeline.checkpoint_record(),
         }
