@@ -474,3 +474,79 @@ dark phases (cascades, flick) were entered through gaps, which turn the wheel an
 Acceptance as stated (colour changes play wherever a dark window exists; every one that
 cannot is recorded and fed back as a repair): met on this song, with the over-report
 noted.
+
+## Second review follow-ups (2026-11-17, on `9d607f45`)
+
+The second review approved with one MEDIUM and six LOW follow-ups. Each is fixed in the
+same tree as W5's intensity rendering (shaping inside `compile_section` is untouched).
+
+| # | Finding | Fix |
+|---|---|---|
+| 1 (MEDIUM) | The boundary repair over-reported for templates that always enter dark (`finite_snap_hold` at 170 BPM: 3 false reports of 3), and the repair's "late" (start past half the section's beats) disagreed with the render's (turn time past the middle) | The gate checks every ordered pair of admitted templates (`pipeline._dark_entries`): each pair of their admitted variants, the predecessor compiled from bar 1 and the successor from each bar after it up to the predecessor's longest cycle, through `_enters_lit`, the same entry test `_boundary_change` makes (a back-to-back, non-substitutable previous cue whose next cues play as authored with the wheels held). It publishes `RigOffer.dark_entries` (successor → predecessor → the heads that always enter dark); the repair leaves those heads out. Skipped on a rig that offers no wheel state. `song_intent.is_late` (the dark window opens past half the section, one frame of tolerance) is now the one definition, used by both render sites and the repair. The repair also carries a predicted kept colour into the next boundary |
+| 2 | A dip added darkness existing darkness could replace, the half-beat bound tested the whole lead, and `added_ms` reported the lead | `pipeline._dip_span`: of the places the added darkness can start (the full lead before the boundary, or the end of any dark run the previous cue commands, so the dip rides it), the one adding the fewest lit frames; the half-beat bound applies to that added darkness; `dark_dip.added_ms` is it and `from_ms` is where the darkness the turn rides begins |
+| 3 | A template-excluded state was reported as "no head's colour wheel shows anything like it"; a multi-part section took the union of its parts' exclusions | The repair judges each part on its own template's offer (`rig_repair._parts`, `_judge`); events on the part they fall in. A state the rig shows but a template excludes names the template: "template 'masked_wheel_flick' cannot turn the color wheel to it and back in time: its overlay masks are too short for that state's settle". A state some parts show is kept and recorded ("plays in the parts on …; not in those on … (…)") |
+| 4 | The prompt's tempo rule used the median beat | `offer_for_prompt(..., half_beats)` adds `dip_boundaries` (`fit`, `of`, `shortest_half_beat_ms`) from half the beat before each section boundary (`MovingHeadPlanningContext._boundary_half_beats`, over `song_structure()`'s bars); the prompt says "It fits half the beat before N of this song's M section boundaries" when some do and some do not, and falls back to the median beat without a grid |
+| 5 | `FAST_INTENT_PIN` docstring said green | Says white, and why no boundary is recorded there (it enters dark) |
+| 6 | "Plays PRIMARY" was untrue where PRIMARY is not shown | Repair reason, prompt, user guide and current state now say the role is changed to `PALETTE_PRIMARY`, which then plays or not as any colour |
+| 7 | The repair used the rig-wide wheel change time | `HeadWheels.change_ms` (each head's longest change into an offered state); the repair judges and names each head on its own |
+
+### Item 1 against the render
+
+Synthetic owner-like rig (close latency 20 ms, every state settling 150 ms: 180 ms), 170
+BPM, four sections alternating red / blue over one admitted family, the gate's offer
+(scratch `repair_vs_render.py`):
+
+| Family | Sections of 1 bar | 2 bars | 4 bars |
+|---|---|---|---|
+| `finite_snap_hold`, `fly_in_cascade`, `fly_out_cascade` | 0 repairs / render enters dark | same | same (was 3 false reports for `finite_snap_hold`) |
+| `masked_wheel_flick` | 0 / 3 deferrals, none late (window at beat 2 of 4, the middle) | 0 / 3 deferrals | 0 / 3 deferrals |
+| `mirror_wings`, `target_orbit` | s2, s4 / kept at s2, s4 | same | same (was s2, s3, s4: s3 changed nothing, s2 having kept) |
+
+Gate cost: 2.25 → 2.37 s (16 bars), 9.11 → 9.19 s (64 bars) on the 7-family catalog.
+
+`Dance Jams Final Audio.mp3` (owner-authorized, offline, read in place, outputs under the
+scratchpad), every state settling 300 ms (a 320 ms change): the render kept the previous
+colour on 6 heads at s5, s6, s11, s12, as before. The repair now records **4** colour
+changes, s5 and s11 (MH2, MH3: the heads the render kept) and s6 and s12 (MH1, MH4,
+where the render kept one of them); **none into `finite_snap_hold`** (was 6, 2 of them
+false). At 150 ms settle: 6 dips, 0 repairs, unchanged.
+
+### Item 2: bytes
+
+| Case (scratch `dip_spans.py`) | Before | After |
+|---|---|---|
+| 120 BPM, no span | dip, 180 added | same, same frames |
+| 120 BPM, span over the boundary | dip, `added_ms` 0, from 7840 | same frames; `from_ms` 7500 (where the darkness begins) |
+| 120 BPM, span ending 120 ms before | dip, `added_ms` 180 (wrong) | `added_ms` 140; same frames |
+| 170 BPM, span ending 120 ms before | kept the previous colour | dip adding 120 ms (frames change) |
+| 170 BPM, span straddling (−160, +200) | deferred 20 ms into the section | dip adding 20 ms (frames change) |
+| 170 BPM, span covering (−400, +400) | deferred 20 ms into the section | turned in the darkness before the boundary, nothing added (frames change) |
+
+Bytes change only where a show's rest (a dark span) meets a lit colour change whose
+lead does not fit half a beat, or whose lead it covers. `RENDERER_REVISION` is 6.
+
+- Byte matrix (405 configs × 3 plans, scratch `run_matrix.sh` on an export of
+  `9d607f45` and on this tree): admission, frames, segments, `.xsq`, `.xtiming`,
+  `.xmap`, normalized record and trace identical in all 1215 renders; only the
+  fingerprint, the raw record and the raw trace differ (the revision string).
+- Pins: every frame and `.xsq` hash unchanged; the 49 fingerprints re-recorded
+  (revision 6). The combined-show golden: effects and trace hashes unchanged; its
+  render fingerprint re-recorded.
+
+### Tests added
+
+`test_rig_repair.py`: a template that always enters dark is not recorded and each head is
+judged on its own change; a template exclusion names the template; a multi-part section
+judges exclusions per part. `test_section_look_render.py`: at 170 BPM a dip rides a dark
+span (ends before, straddles, covers: 120 / 20 / 0 ms added, darkness changed only
+inside the lead); the gate publishes `finite_snap_hold` after itself for every head and
+not `mirror_wings`, the repair records none and the render enters dark; an untagged rig
+publishes none. `test_song_intent.py`: `dip_boundaries`, `is_late`. `test_prompts.py`:
+on a variable grid the prompt says 2 of 3 boundaries.
+
+### Verification (second review follow-ups)
+
+`pytest tests -q --no-cov`: 6938 passed, 30 skipped, 13 xfailed. Parity
+(`test_mh_intent_parity.py`): 13 passed, 13 xfailed; with `--runxfail` the 13 targets
+fail. Pins (`test_mh_pins.py`): 50 passed. `ruff check .`, `ruff format --check .`,
+`mypy .`: clean. No commit, no `make validate`, no provider calls.

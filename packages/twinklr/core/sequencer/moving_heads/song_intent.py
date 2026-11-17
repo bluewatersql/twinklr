@@ -224,6 +224,9 @@ class HeadWheels(BaseModel):
     unsettled: dict[str, tuple[str, ...]] = {}
     """Per wheel (`color`, `gobo`) that has tags, the states without a known settle that
     keep it from being offered; left out when there are none."""
+    change_ms: int | None = None
+    """This head's longest wheel change into any of its offered states
+    (`wheel_change_ms`); None when it offers none or a term is unknown."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -247,13 +250,26 @@ class HeadWheels(BaseModel):
             )
             if tagged and missing:
                 unsettled[channel] = missing
+        offered = {
+            "color": {} if "color" in unsettled else colors,
+            "gobo": {} if "gobo" in unsettled else gobos,
+        }
+        changes = [
+            wheel_change_ms(profile, settle)
+            for channel, wheel in (("color", color), ("gobo", gobo))
+            for name in offered[channel]
+            if wheel is not None and (settle := wheel.states[name].settle_ms) is not None
+        ]
         return cls(
             fixture_id=fixture_id,
             color_wheel=color is not None,
             gobo_wheel=gobo is not None,
-            colors={} if "color" in unsettled else colors,
-            gobos={} if "gobo" in unsettled else gobos,
+            colors=offered["color"],
+            gobos=offered["gobo"],
             unsettled=unsettled,
+            change_ms=None
+            if not changes or None in changes
+            else max(c for c in changes if c is not None),
         )
 
     def without(self, excluded: Mapping[str, Collection[str]]) -> HeadWheels:
@@ -443,6 +459,11 @@ class RigOffer(BaseModel):
     templates: dict[str, TemplateOffer]
     """Per admitted template id, its dark phases and the states it cannot hold (the gate
     fills it; empty for an offer made without one)."""
+    dark_entries: dict[str, dict[str, tuple[str, ...]]] = {}
+    """Per admitted template id and admitted predecessor template id, the heads that
+    always enter it dark after that template (the gate's check, on every pair of their
+    admitted variants, from each bar of the predecessor's cycle): a wheel change there
+    rides the entry and needs no dip (empty without a gate)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -504,8 +525,10 @@ def rig_offer(
     fixture_group: FixtureGroup,
     beat_grid: BeatGrid,
     templates: Mapping[str, TemplateOffer] | None = None,
+    dark_entries: Mapping[str, Mapping[str, Sequence[str]]] | None = None,
 ) -> RigOffer:
-    """The rig's offer for one song (`RigOffer`); `templates` from the gate."""
+    """The rig's offer for one song (`RigOffer`); `templates` and `dark_entries` from the
+    gate."""
     profiles = {
         fixture.fixture_id: fixture.config.physical_profile
         for fixture in fixture_group.expand_fixtures()
@@ -542,6 +565,10 @@ def rig_offer(
         else max(change for change in changes if change is not None),
         beat_ms=intervals[len(intervals) // 2] if intervals else None,
         templates=dict(templates or {}),
+        dark_entries={
+            t: {before: tuple(heads) for before, heads in after.items()}
+            for t, after in (dark_entries or {}).items()
+        },
     )
 
 
@@ -649,6 +676,35 @@ def partial_reason(shown: Collection[str], missing: Sequence[str]) -> str:
     )
 
 
+def is_late(window_start_ms: float, section_start_ms: float, section_end_ms: float) -> bool:
+    """Whether a deferred wheel change waits too long: its dark window opens after half
+    the section (a frame of tolerance for the frame grid). The render's trace and the plan
+    repair use this one definition."""
+    middle = section_start_ms + (section_end_ms - section_start_ms) / 2
+    return window_start_ms > middle + EFFECT_GRID_MS
+
+
+def excluded_reason(offer: RigOffer, template_ids: Collection[str], wheel: str) -> str | None:
+    """Why a state the rig shows is not offered with these templates: the templates whose
+    overlay masks are too short to turn to it and back (None when none excludes any)."""
+    named = sorted(
+        template_id
+        for template_id in template_ids
+        if any(
+            wheels.get(wheel)
+            for wheels in (
+                offer.templates.get(template_id) or TemplateOffer(variants={})
+            ).excluded.values()
+        )
+    )
+    if not named:
+        return None
+    return (
+        f"template {', '.join(repr(t) for t in named)} cannot turn the {wheel} wheel to it and "
+        "back in time: its overlay masks are too short for that state's settle"
+    )
+
+
 def section_palette_for(
     palettes: Mapping[str, SectionPalette], section_id: str
 ) -> SectionPalette | None:
@@ -676,7 +732,10 @@ def _shown(offer: ColorOffer) -> str:
 
 
 def offer_for_prompt(
-    offer: RigOffer, palettes: Mapping[str, SectionPalette], section_ids: Sequence[str]
+    offer: RigOffer,
+    palettes: Mapping[str, SectionPalette],
+    section_ids: Sequence[str],
+    half_beats: Sequence[float] | None = None,
 ) -> dict[str, Any]:
     """The offer as the planner prompt shows it: colours by how faithfully the rig shows
     them; each section's palette roles, the stop each takes and the wheel colour it lands
@@ -685,7 +744,9 @@ def offer_for_prompt(
     macro palette); gobos and strobe speeds by how many heads have them; whether a hit is
     possible; the wheel change time against half a beat; the templates with a dark phase
     long enough for a wheel change; and the states a template cannot hold. Sections
-    that share a palette share one entry."""
+    that share a palette share one entry. With `half_beats` (half the beat before each
+    section boundary), how many boundaries a dip fits before (`dip_boundaries`), since
+    the render decides per boundary; without them, the median beat (`dip_fits`)."""
     colors: dict[str, list[dict[str, str]]] = {
         "faithful": [],
         "approximate": [],
@@ -780,6 +841,13 @@ def offer_for_prompt(
         "wheel_change_beats": round_beats(offer.wheel_change_beats),
         "half_beat_ms": None if offer.beat_ms is None else round(offer.beat_ms / 2),
         "dip_fits": offer.dip_fits,
+        "dip_boundaries": None
+        if offer.wheel_change_ms is None or half_beats is None
+        else {
+            "fit": sum(1 for half in half_beats if offer.wheel_change_ms <= half),
+            "of": len(half_beats),
+            "shortest_half_beat_ms": round(min(half_beats)) if half_beats else None,
+        },
         "dark_windows": windows,
         "exclusions": exclusions,
     }

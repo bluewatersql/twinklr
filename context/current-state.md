@@ -72,12 +72,12 @@ See [product/overview.md](product/overview.md).
     strobe speeds, hit, wheel change time), the planner is shown it, and a colour or
     gobo no head can show is repaired. Each head plays the section's colour (a palette
     role through the section's macro palette, under `run` and `show` alike; the fixed
-    role table without one; a role the palette lacks plays PRIMARY) and gobo as its
+    role table without one; a role the palette lacks is repaired to PALETTE_PRIMARY) and gobo as its
     nearest tagged state, turned only in the dark; a change at a boundary the heads play
-    lit through dips dark for at most half a beat before the section, else turns in the
+    lit through dips dark (adding at most half a beat of darkness, riding any already there) before the section, else turns in the
     section's first dark window, else keeps the previous colour (recorded, and repaired
     for the planner). The offer also publishes each template's dark phases and the
-    states its overlay masks cannot reach. Renderer revision 4. ([user guide](../docs/user-guide.md#how-a-sections-colour-and-gobo-reach-the-lights),
+    states its overlay masks cannot reach and, per pair of templates, the heads that always enter one dark after the other. Renderer revision 6 (W3/W4 second review). ([user guide](../docs/user-guide.md#how-a-sections-colour-and-gobo-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w3-w4-offer-colour/README.md))
   - **Intensity on the dimmer** (W5, 2026-11-17, not yet seen by the owner). `as_authored`,
     SLOW, SMOOTH and FAST play the template as authored; DRAMATIC (every half bar in

@@ -8,6 +8,7 @@ the planner on its next revision, never a refusal. The resolution is the rendere
 
 from __future__ import annotations
 
+import bisect
 from collections.abc import Mapping, Sequence
 from itertools import pairwise
 from typing import TYPE_CHECKING, Any
@@ -24,6 +25,8 @@ from twinklr.core.sequencer.moving_heads.intensity import SHAPED_LEVELS
 from twinklr.core.sequencer.moving_heads.song_intent import (
     RigOffer,
     SectionPalette,
+    excluded_reason,
+    is_late,
     partial_reason,
     requested_color,
     round_beats,
@@ -45,9 +48,53 @@ def _canonical(template_id: str) -> str:
 
 
 def section_offer(offer: RigOffer, section: PlanSection) -> RigOffer:
-    """The offer for a section: without the states any of its parts' templates cannot
-    hold (`RigOffer.for_templates`)."""
-    return offer.for_templates({_canonical(part.template_id) for part in section.parts})
+    """The offer for a section's first part: without the states its template cannot hold
+    (`RigOffer.for_templates`). A boundary is entered through the first part."""
+    return offer.for_templates({_canonical(section.parts[0].template_id)})
+
+
+def _parts(offer: RigOffer, section: PlanSection) -> list[tuple[str, int, int, RigOffer]]:
+    """Each part of the section: its canonical template, its bars and its offer."""
+    out = []
+    for part, start, end in section.part_bars():
+        template_id = _canonical(part.template_id)
+        out.append((template_id, start, end, offer.for_templates({template_id})))
+    return out
+
+
+def _judge(
+    offer: RigOffer,
+    parts: Sequence[tuple[str, int, int, RigOffer]],
+    asked: str,
+    unavailable: Sequence[bool],
+    missing: Sequence[Sequence[str]],
+    played: Sequence[Sequence[str]],
+    wheel: str,
+    unshown: str,
+) -> tuple[str, str] | None:
+    """How a colour or gobo plays over a section's parts: `("clear", reason)` when no
+    part shows it, `("record", reason)` when some part or head does not, else None."""
+    templates = [template for template, *_ in parts]
+    if all(unavailable):
+        excluded = excluded_reason(offer, templates, wheel)
+        rig_wide = (
+            offer.color(asked).status != "unavailable"
+            if wheel == "color"
+            else offer.gobo(asked).available != "none"
+        )
+        return "clear", (excluded if excluded and rig_wide else unshown)
+    if any(unavailable):
+        kept = sorted({t for t, gone in zip(templates, unavailable, strict=True) if not gone})
+        lost = sorted({t for t, gone in zip(templates, unavailable, strict=True) if gone})
+        reason = excluded_reason(offer, lost, wheel) or unshown
+        return "record", (
+            f"plays in the parts on {', '.join(kept)}; not in those on {', '.join(lost)} ({reason})"
+        )
+    heads = sorted({head for gone in missing for head in gone})
+    if heads:
+        shown_by = sorted({head for heads_ in played for head in heads_} - set(heads))
+        return "record", partial_reason(shown_by, heads)
+    return None
 
 
 def repair_rig_intent(
@@ -59,20 +106,22 @@ def repair_rig_intent(
     """Repair the colours and gobos the rig cannot show, one item at a time.
 
     - A palette role the section's macro palette has no stop for (`RequestedColor.
-      role_missing`) becomes `PALETTE_PRIMARY` (adjusted).
-    - A section colour no head shows (`unavailable`) is cleared to as authored, and a
-      colour event's colour that no head shows drops the event; a section gobo, or a gobo
-      event's pattern, that no head has likewise. States a part's template cannot hold
-      (its overlay masks) count as not shown.
-    - One some heads show is kept and recorded, naming the heads that keep their look.
+      role_missing`) becomes `PALETTE_PRIMARY` (adjusted), which then stands or is
+      repaired as any colour.
+    - A section colour no part of the section shows (`unavailable` with each part's
+      template, which leaves out the states its overlay masks cannot reach) is cleared to
+      as authored, and a colour event's colour that the part it falls in does not show
+      drops the event; a section gobo, or a gobo event's pattern, likewise. The reason
+      names the template where its masks, not the rig, are why.
+    - One some parts or heads show is kept and recorded, naming what keeps its look.
     - A DRAMATIC or INTENSE intensity on a rig where some or no head has a dimmer axis is
       kept and recorded as not shaped there (`RigOffer.hit`): those heads play the
       template's own level, so emphasis has to come from events or colour.
     - With `beat_grid`: a colour change between two sections that set colours, where a
-      wheel change does not fit half the beat before the boundary, is recorded when the
-      new section's template has no dark phase long enough for the turn in its first
-      half (where the heads play straight into it they keep the previous colour, or turn
-      late).
+      head's wheel change does not fit half the beat before the boundary, is recorded
+      for the heads that do not always enter the new section's template dark after the
+      previous one (`RigOffer.dark_entries`) when it has no dark window long enough for the turn, or
+      only one that opens past half the section (`is_late`).
 
     A colour a head shows only approximately is not a repair: the offer says so up front
     and the render trace records what plays. Each repair is appended to `plan.repairs`.
@@ -81,7 +130,7 @@ def repair_rig_intent(
     sections: list[PlanSection] = []
     for section in plan.sections:
         palette = palettes.get(section.section_id)
-        rig = section_offer(offer, section)
+        parts = _parts(offer, section)
         update: dict[str, Any] = {}
 
         def note(
@@ -91,32 +140,60 @@ def repair_rig_intent(
                 PlanRepair(section_id=section_id, item=item, action=action, reason=reason)
             )
 
+        def colour_verdict(
+            hex_: str, among: Sequence[tuple[str, int, int, RigOffer]] = parts
+        ) -> tuple[str, str] | None:
+            shown = [rig.color(hex_) for *_, rig in among]
+            return _judge(
+                offer,
+                among,
+                hex_,
+                [s.status == "unavailable" for s in shown],
+                [s.missing for s in shown],
+                [list(s.heads) for s in shown],
+                "color",
+                unshown_color_reason(among[0][3]),
+            )
+
+        def gobo_verdict(
+            pattern: str, among: Sequence[tuple[str, int, int, RigOffer]] = parts
+        ) -> tuple[str, str] | None:
+            shown = [rig.gobo(pattern) for *_, rig in among]
+            return _judge(
+                offer,
+                among,
+                pattern,
+                [s.available == "none" for s in shown],
+                [s.missing for s in shown],
+                [list(s.states) for s in shown],
+                "gobo",
+                unshown_gobo_reason(among[0][3]),
+            )
+
         color = section.color
         if color is not None:
             asked = requested_color(color.value, palette)
-            item = f"colour {color.value} ({asked.hex}, {asked.source})"
             if asked.role_missing:
                 color = update["color"] = PlanColor.PALETTE_PRIMARY
                 note(
                     f"colour {section.color.value if section.color else ''}",
                     RepairAction.ADJUSTED,
                     f"the section's palette {palette.palette_id if palette else ''!r} has no "
-                    "stop for this role; it plays the palette's PRIMARY colour "
-                    "(PALETTE_PRIMARY)",
+                    "stop for this role; it is changed to PALETTE_PRIMARY, the palette's "
+                    "first colour",
                 )
                 asked = requested_color(color.value, palette)
-                item = f"colour {color.value} ({asked.hex}, {asked.source})"
-            shown = rig.color(asked.hex)
-            if shown.status == "unavailable":
+            item = f"colour {color.value} ({asked.hex}, {asked.source})"
+            verdict = colour_verdict(asked.hex)
+            if verdict is not None and verdict[0] == "clear":
                 update["color"] = None
                 note(
                     item,
                     RepairAction.ADJUSTED,
-                    unshown_color_reason(rig) + "; the section keeps its authored colour "
-                    "(as_authored)",
+                    verdict[1] + "; the section keeps its authored colour (as_authored)",
                 )
-            elif shown.status == "partial":
-                note(item, RepairAction.RECORDED, partial_reason(shown.heads, shown.missing))
+            elif verdict is not None:
+                note(item, RepairAction.RECORDED, verdict[1])
         if (
             section.intensity is not None
             and section.intensity.value in SHAPED_LEVELS
@@ -135,58 +212,50 @@ def repair_rig_intent(
                 + " the template's own level; emphasis there needs events or colour",
             )
         if section.gobo is not None:
-            shown_gobo = rig.gobo(section.gobo)
             item = f"gobo {section.gobo.value}"
-            if shown_gobo.available == "none":
+            verdict = gobo_verdict(section.gobo.value)
+            if verdict is not None and verdict[0] == "clear":
                 update["gobo"] = None
                 note(
                     item,
                     RepairAction.ADJUSTED,
-                    unshown_gobo_reason(rig) + "; the section keeps its authored gobo "
-                    "(as_authored)",
+                    verdict[1] + "; the section keeps its authored gobo (as_authored)",
                 )
-            elif shown_gobo.available == "some":
-                note(
-                    item,
-                    RepairAction.RECORDED,
-                    partial_reason(shown_gobo.states, shown_gobo.missing),
-                )
+            elif verdict is not None:
+                note(item, RepairAction.RECORDED, verdict[1])
         events = []
         changed_events = False
         for event in section.events:
+            here = [p for p in parts if p[1] <= event.bar <= p[2]] or parts[:1]
             if event.action is EventAction.COLOR and event.color is not None:
                 asked = requested_color(event.color.value, palette)
                 if asked.role_missing:
                     note(
                         f"event at {event.describe()}",
                         RepairAction.ADJUSTED,
-                        "the section's palette has no stop for this role; it plays the "
-                        "palette's PRIMARY colour (PALETTE_PRIMARY)",
+                        "the section's palette has no stop for this role; it is changed to "
+                        "PALETTE_PRIMARY, the palette's first colour",
                     )
                     event = event.model_copy(update={"color": PlanColor.PALETTE_PRIMARY})
                     changed_events = True
                     asked = requested_color(PlanColor.PALETTE_PRIMARY.value, palette)
-                shown = rig.color(asked.hex)
                 item = f"event at {event.describe()} ({asked.hex}, {asked.source})"
-                if shown.status == "unavailable":
-                    note(item, RepairAction.DROPPED, unshown_color_reason(rig))
+                verdict = colour_verdict(asked.hex, here)
+                if verdict is not None and verdict[0] == "clear":
+                    note(item, RepairAction.DROPPED, verdict[1])
                     changed_events = True
                     continue
-                if shown.status == "partial":
-                    note(item, RepairAction.RECORDED, partial_reason(shown.heads, shown.missing))
+                if verdict is not None:
+                    note(item, RepairAction.RECORDED, verdict[1])
             if event.action is EventAction.GOBO and event.gobo is not None:
-                shown_gobo = rig.gobo(event.gobo)
                 item = f"event at {event.describe()}"
-                if shown_gobo.available == "none":
-                    note(item, RepairAction.DROPPED, unshown_gobo_reason(rig))
+                verdict = gobo_verdict(event.gobo.value, here)
+                if verdict is not None and verdict[0] == "clear":
+                    note(item, RepairAction.DROPPED, verdict[1])
                     changed_events = True
                     continue
-                if shown_gobo.available == "some":
-                    note(
-                        item,
-                        RepairAction.RECORDED,
-                        partial_reason(shown_gobo.states, shown_gobo.missing),
-                    )
+                if verdict is not None:
+                    note(item, RepairAction.RECORDED, verdict[1])
             events.append(event)
         if changed_events:
             update["events"] = events
@@ -217,43 +286,60 @@ def _boundary_repairs(
     beat_grid: BeatGrid,
 ) -> list[PlanRepair]:
     """The colour changes between consecutive sections that set colours which the render
-    may not play from the boundary (see `repair_rig_intent`), one record per section."""
+    may not play from the boundary (see `repair_rig_intent`), one record per section;
+    each head judged on its own wheel change time."""
     repairs: list[PlanRepair] = []
-    change_ms = offer.wheel_change_ms
     beats = beat_grid.beat_boundaries
-    if change_ms is None or len(beats) < 2:
+    bars = beat_grid.bar_boundaries
+    changes = {head.fixture_id: head.change_ms for head in offer.heads}
+    if len(beats) < 2:
         return repairs
+    # What each head plays, the previous colour where a change was predicted not to.
+    played = (
+        _head_colors(sections[0], offer, palettes.get(sections[0].section_id)) if sections else {}
+    )
     for before, after in pairwise(sections):
-        old = _head_colors(before, offer, palettes.get(before.section_id))
-        new = _head_colors(after, offer, palettes.get(after.section_id))
-        heads = sorted(f for f in new if f in old and old[f] != new[f])
-        if not heads or after.start_bar - 1 >= len(beat_grid.bar_boundaries):
-            continue
-        boundary = beat_grid.bar_boundaries[after.start_bar - 1]
-        index = min(
-            max(next((i for i, b in enumerate(beats) if b >= boundary), 1), 1), len(beats) - 1
+        old = played if before.color is not None else {}
+        new = played = _head_colors(after, offer, palettes.get(after.section_id))
+        successor = _canonical(after.parts[0].template_id)
+        # Heads that always enter dark after the previous template turn in the entry.
+        dark = offer.dark_entries.get(successor, {}).get(
+            _canonical(before.parts[-1].template_id), ()
         )
-        beat = beats[index] - beats[index - 1]
-        if change_ms <= beat / 2:
+        heads = sorted(f for f in new if f in old and old[f] != new[f] and f not in dark)
+        if not heads or after.start_bar - 1 >= len(bars):
             continue
-        template = offer.templates.get(_canonical(after.parts[0].template_id))
+        boundary = bars[after.start_bar - 1]
+        end = bars[after.end_bar] if after.end_bar < len(bars) else beat_grid.duration_ms
+        index = min(max(bisect.bisect_left(beats, boundary), 1), len(beats) - 1)
+        beat = beats[index] - beats[index - 1]
+        slow: dict[str, int] = {
+            f: ms for f in heads if (ms := changes.get(f)) is not None and ms > beat / 2
+        }
+        if not slow:
+            continue
+        template = offer.templates.get(successor)
         variant = None
         if template is not None:
             preset = after.parts[0].preset_id
             variant = template.variants.get(preset or "base") or next(
                 iter(template.variants.values()), None
             )
-        needed = change_ms / beat
         starts = {
-            fixture_id: None if variant is None else variant.first_window(fixture_id, needed)
-            for fixture_id in heads
+            f: None if variant is None else variant.first_window(f, ms / beat)
+            for f, ms in slow.items()
         }
-        length = (after.end_bar - after.start_bar + 1) * beat_grid.beats_per_bar
         never = [f for f, start in starts.items() if start is None]
-        late = [f for f, start in starts.items() if start is not None and start > length / 2]
+        played = {**new, **{f: old[f] for f in never}}
+        late = [
+            f
+            for f, start in starts.items()
+            if start is not None and is_late(boundary + start * beat, boundary, end)
+        ]
         why = (
-            f"at this tempo a wheel change ({change_ms} ms dark) does not fit half the beat "
-            f"before the section ({beat / 2:.0f} ms)"
+            f"at this tempo the wheel change of {', '.join(slow)} "
+            f"({'/'.join(str(ms) for ms in sorted(set(slow.values())))} ms dark) does not fit "
+            f"half the beat before the section ({beat / 2:.0f} ms)"
         )
         if never:
             repairs.append(

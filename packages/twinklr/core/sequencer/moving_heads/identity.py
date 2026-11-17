@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 BACKEND_ID = "xlights_dmx"
 """The backend the renderer writes: xLights DMX effects in an `.xsq`."""
 
-RENDERER_REVISION = "5"
+RENDERER_REVISION = "6"
 """Bumped by hand in the commit that intentionally changes the renderer's output; the
 render identity also carries the frame encoder's own version. 3: a section's colour and
 gobo are rendered (song-intent rendering W4), so a plan that sets them renders
@@ -37,7 +37,10 @@ held state an overlay mask cannot reach falls back to the authored one, and a pa
 role the section's palette lacks plays PRIMARY's stop instead of the fixed table's. 5
 (W5): DRAMATIC and INTENSE play on the dimmer (`intensity.shape_section`), and under
 `twinklr show` the moving heads' macro focal role adjusts a section's intensity, so a
-plan that sets either, or a show render, renders differently from revision 4."""
+plan that sets either, or a show render, renders differently from revision 4. 6 (W3/W4
+second review): a boundary dip counts the darkness the previous cue already commands (a
+dark span) and is bounded by the darkness it adds, so where a dark span meets a colour
+change the dip adds less, or plays where revision 5 deferred or kept the change."""
 
 
 def render_fingerprint(

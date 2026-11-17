@@ -14,6 +14,7 @@ import pytest
 
 from tests.support import moving_heads as m
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanColor
+from twinklr.core.agents.sequencer.moving_heads.rig_repair import repair_rig_intent
 from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.moving_heads.libraries.gobo import GoboPattern
@@ -528,3 +529,85 @@ def test_the_gate_publishes_each_admitted_variants_dark_phases() -> None:
         assert windows[0][0] == pytest.approx(2.0, abs=0.05)
     wings = admission.offer.templates["mirror_wings"].variants
     assert all(not windows for phases in wings.values() for windows in phases.heads.values())
+
+
+@pytest.mark.parametrize(
+    ("span", "added"),
+    [
+        pytest.param((-600, -120), 120, id="ends-120-ms-before"),
+        pytest.param((-160, 100), 20, id="straddles"),
+        pytest.param((-400, 400), 0, id="covers"),
+    ],
+)
+def test_at_170_bpm_a_dip_rides_a_dark_span_and_adds_only_what_it_lacks(
+    span: tuple[int, int], added: int
+) -> None:
+    """The 180 ms change does not fit half a beat (176 ms), but a dark span before the
+    boundary already holds part of it: the dip darkens only the lit rest up to the
+    boundary, bounded and reported as the darkness it adds (W3/W4 second review)."""
+    boundary = int(FAST.bar_boundaries[4]) // FRAME * FRAME
+    spans = ((boundary + span[0], boundary + span[1]),)
+    neutral = Heads(render({}, {}, grid=FAST, fixture_group=owner_like(), dark_spans=spans))
+    pipeline = render(
+        {"color": PlanColor.RED},
+        {"color": PlanColor.BLUE},
+        grid=FAST,
+        fixture_group=owner_like(),
+        dark_spans=spans,
+    )
+    heads = Heads(pipeline)
+
+    assert pipeline.render_record is not None
+    for record in pipeline.render_record["section_looks"][1]["boundaries"]:
+        dip = record["dark_dip"]
+        assert (dip["added_ms"], dip["lead_ms"]) == (added, 180)
+        assert dip["from_ms"] <= record["boundary_ms"] - 180
+        changed = changed_darkness(heads, neutral, record["fixture_id"])
+        assert len(changed) * FRAME == added
+        assert all(dip["from_ms"] <= t < record["boundary_ms"] for t in changed)
+    assert heads.state("MH1", "color")[-1] == "blue"
+    assert_wheels_turn_dark(heads, "color")
+
+
+def test_the_gate_publishes_the_templates_a_template_always_enters_dark_after() -> None:
+    """At 170 BPM `finite_snap_hold` always repositions dark into a section after itself,
+    so a colour change there rides the entry and the plan repair records none;
+    `mirror_wings` plays lit into itself, so it needs a dip. A rig offering no wheel
+    state publishes none."""
+    job = m.family_job(HEADS)
+
+    def gate(fixture_group: FixtureGroup) -> Any:
+        return admit_templates(
+            ["finite_snap_hold", "mirror_wings"],
+            beat_grid=FAST,
+            fixture_group=fixture_group,
+            initial_states=job.moving_heads.initial_states,
+            failure_mode="error",
+        )
+
+    admission = gate(owner_like())
+    entries = admission.offer.dark_entries
+    plan = ChoreographyPlan(
+        sections=[
+            m.plan_section("s1", 1, 4, "finite_snap_hold", color="red"),
+            m.plan_section("s2", 5, 8, "finite_snap_hold", color="blue"),
+        ],
+        overall_strategy="",
+    )
+    pipeline = RenderingPipeline(
+        choreography_plan=plan,
+        beat_grid=FAST,
+        fixture_group=owner_like(),
+        job_config=job,
+        media_file="silence.wav",
+        admission=admission,
+    )
+    pipeline.render()
+
+    assert entries["finite_snap_hold"]["finite_snap_hold"] == HEADS
+    assert "mirror_wings" not in entries.get("mirror_wings", {})
+    assert repair_rig_intent(plan, admission.offer, {}, FAST).repairs == []
+    assert pipeline.render_record is not None
+    assert pipeline.render_record["section_looks"][1].get("boundaries", []) == []
+    assert Heads(pipeline).state("MH1", "color")[-1] == "blue"
+    assert gate(m.family_rig(HEADS)).offer.dark_entries == {}

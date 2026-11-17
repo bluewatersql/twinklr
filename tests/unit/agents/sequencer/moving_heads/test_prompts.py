@@ -635,6 +635,7 @@ class TestPlannerUserPromptRendering:
         sections: list | None = None,
         rig_offer: object = None,
         head_focal_roles: dict[str, str] | None = None,
+        beat_grid: object = None,
     ) -> str:
         from tests.unit.agents.sequencer.moving_heads.test_orchestrator import (
             create_test_audio_profile,
@@ -659,6 +660,7 @@ class TestPlannerUserPromptRendering:
             macro_plan=create_test_macro_plan(profile),
             rig_offer=rig_offer,
             head_focal_roles=head_focal_roles,
+            beat_grid=beat_grid,
             template_descriptions=[
                 {
                     "template_id": template_id,
@@ -705,6 +707,23 @@ class TestPlannerUserPromptRendering:
         ):
             assert line in section, line
         assert "more than half a beat" not in section
+
+    def test_on_a_variable_grid_the_prompt_says_how_many_boundaries_a_dip_fits(self) -> None:
+        """The render decides per boundary: with bars alternating 500 and 300 ms beats,
+        the 160 ms change fits half the beat before two of the three section boundaries
+        (the median beat would claim every one)."""
+        from tests.support import moving_heads as m
+
+        rendered = self._render(
+            rig_offer=m.tagged_offer(), beat_grid=m.bars_grid(*([500.0, 300.0] * 29))
+        )
+
+        assert (
+            "- **A wheel change** takes 160 ms of darkness (about 0.4 beat). It fits half "
+            "the beat before 2 of this song's 3 section boundaries (the shortest half beat "
+            "is 150 ms). Where it fits"
+        ) in rendered
+        assert "the change waits for the section's first dark moment long enough" in rendered
 
     def test_a_rig_without_a_dimmer_is_told_intensity_cannot_pulse(self) -> None:
         from tests.support import moving_heads as m

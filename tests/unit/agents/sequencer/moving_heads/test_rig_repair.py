@@ -53,6 +53,16 @@ def _offer(*profiles: FixtureCapabilities, **fields: Any) -> RigOffer:
     )
 
 
+def _slow() -> FixtureCapabilities:
+    """`_profile(TAGGED)` with close latency 20 ms and every colour settling in 150 ms: a
+    180 ms wheel change, more than half a beat at 170 BPM."""
+    payload = _profile(TAGGED).model_dump(mode="json")
+    payload["visibility"]["close_latency_ms"] = 20
+    for state in payload["discrete"]["color"]["states"].values():
+        state["settle_ms"] = 150
+    return FixtureCapabilities.model_validate(payload)
+
+
 def _section(section_id: str = "s1", bars: tuple[int, int] = (1, 4), **intent: Any) -> Any:
     template = intent.pop("template", "mirror_wings")
     return plan_section(section_id, *bars, template).model_copy(update=intent)
@@ -177,6 +187,38 @@ def test_a_state_a_template_cannot_hold_counts_as_not_shown_for_its_sections() -
         repaired = repair_rig_intent(plan, offer, {})
 
     assert [s.color for s in repaired.sections] == [None, PlanColor.BLUE]
+    (repair,) = repaired.repairs
+    assert repair.reason.startswith(
+        "template 'masked_wheel_flick' cannot turn the color wheel to it and back in time: "
+        "its overlay masks are too short for that state's settle"
+    )
+
+
+def test_a_multi_part_section_judges_a_template_exclusion_per_part() -> None:
+    """Blue is excluded only on `masked_wheel_flick`: a section whose second part is
+    `mirror_wings` keeps blue, recorded as not playing in the first part."""
+    offer = _offer(
+        _profile(TAGGED),
+        templates={
+            "masked_wheel_flick": TemplateOffer(variants={}, excluded={"MH1": {"color": ("blue",)}})
+        },
+    )
+    section = _section(color=PlanColor.BLUE, template="masked_wheel_flick")
+    second = section.parts[0].model_copy(update={"start_bar": 3, "template_id": "mirror_wings"})
+    section = section.model_copy(update={"parts": [section.parts[0], second]})
+
+    with m.family_catalog():
+        repaired = repair_rig_intent(
+            ChoreographyPlan(sections=[section], overall_strategy=""), offer, {}
+        )
+
+    assert repaired.sections[0].color is PlanColor.BLUE
+    (repair,) = repaired.repairs
+    assert repair.action is RepairAction.RECORDED
+    assert repair.reason.startswith(
+        "plays in the parts on mirror_wings; not in those on masked_wheel_flick "
+        "(template 'masked_wheel_flick' cannot turn the color wheel"
+    )
 
 
 def test_a_colour_change_a_fast_tempo_may_not_play_is_recorded_for_the_planner() -> None:
@@ -198,7 +240,7 @@ def test_a_colour_change_a_fast_tempo_may_not_play_is_recorded_for_the_planner()
             variants={"base": DarkPhases(cycle_beats=8.0, heads={"MH1": ((10.0, 11.0),)})}
         ),
     }
-    offer = _offer(_profile(TAGGED), wheel_change_ms=180, beat_ms=beat, templates=templates)
+    offer = _offer(_slow(), wheel_change_ms=180, beat_ms=beat, templates=templates)
     plan = ChoreographyPlan(
         sections=[
             _section("s1", (1, 3), color=PlanColor.RED),
@@ -211,7 +253,9 @@ def test_a_colour_change_a_fast_tempo_may_not_play_is_recorded_for_the_planner()
 
     with m.family_catalog():
         repaired = repair_rig_intent(plan, offer, {}, grid)
-        slow = repair_rig_intent(plan, offer.model_copy(update={"wheel_change_ms": 160}), {}, grid)
+        quick = repair_rig_intent(
+            plan, _offer(_profile(TAGGED), beat_ms=beat, templates=templates), {}, grid
+        )
 
     assert [(r.section_id, r.item, r.action) for r in repaired.repairs] == [
         ("s2", "colour change from section 's1'", RepairAction.RECORDED),
@@ -219,7 +263,47 @@ def test_a_colour_change_a_fast_tempo_may_not_play_is_recorded_for_the_planner()
     ]
     assert "keep the previous section's colour" in repaired.repairs[0].reason
     assert "beat 10 of its cycle, past half the section" in repaired.repairs[1].reason
-    assert slow.repairs == []  # 160 ms fits half a beat: every change dips before
+    # Each head is judged on its own wheel: a 140 ms change fits half a beat, so every
+    # change dips before its section.
+    assert quick.repairs == []
+
+
+def test_a_colour_change_into_a_template_that_always_enters_dark_is_not_recorded() -> None:
+    """The gate found `mirror_wings` always enters dark after itself (`dark_entries`):
+    the wheel turns in its entry, so the change at 170 BPM is not recorded. Each head is
+    judged on its own change: only the slow head is named."""
+    beat = 60_000 / 170
+    grid = m.bars_grid(*([beat] * 6))
+    templates = {
+        "mirror_wings": TemplateOffer(variants={"base": DarkPhases(cycle_beats=8.0, heads={})})
+    }
+    plan = ChoreographyPlan(
+        sections=[
+            _section("s1", (1, 3), color=PlanColor.RED),
+            _section("s2", (4, 6), color=PlanColor.BLUE),
+        ],
+        overall_strategy="",
+    )
+
+    with m.family_catalog():
+        dark = repair_rig_intent(
+            plan,
+            _offer(
+                _slow(),
+                templates=templates,
+                dark_entries={"mirror_wings": {"mirror_wings": ("MH1",)}},
+            ),
+            {},
+            grid,
+        )
+        lit = repair_rig_intent(
+            plan, _offer(_slow(), _profile(TAGGED), templates=templates), {}, grid
+        )
+
+    assert dark.repairs == []
+    (repair,) = lit.repairs
+    assert "the wheel change of MH1 (180 ms dark)" in repair.reason
+    assert "where MH1 play straight into the section" in repair.reason
 
 
 def test_intensity_a_rig_cannot_pulse_is_recorded_not_shaped() -> None:

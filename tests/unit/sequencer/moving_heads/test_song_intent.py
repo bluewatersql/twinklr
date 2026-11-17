@@ -15,6 +15,7 @@ from tests.support.moving_heads import discrete_profile_payload, plan_section
 from twinklr.core.agents.sequencer.moving_heads.models import PlanColor
 from twinklr.core.config.fixtures import FixtureCapabilities
 from twinklr.core.config.fixtures.state_tags import NEUTRAL_CHROMA, oklch
+from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.moving_heads.libraries.gobo import GoboPattern
 from twinklr.core.sequencer.moving_heads.song_intent import (
@@ -28,6 +29,7 @@ from twinklr.core.sequencer.moving_heads.song_intent import (
     color_offer,
     describe_look,
     gobo_offer,
+    is_late,
     offer_for_prompt,
     palette_role_color,
     requested_color,
@@ -514,6 +516,24 @@ def test_the_prompt_says_whether_a_wheel_change_fits_half_a_beat_and_where_it_ca
     assert (shown["dip_fits"], shown["half_beat_ms"]) == (False, 150)
     assert shown["dark_windows"] == ["masked_wheel_flick (from beat 2 of its cycle)"]
     assert offer_for_prompt(slow, {}, ["s"])["dip_fits"] is True
+
+
+def test_the_prompt_counts_the_boundaries_a_dip_fits_before() -> None:
+    """Given half the beat before each boundary, the offer says how many a 160 ms change
+    fits (the render decides per boundary); without them, the median beat decides."""
+    offer = m.tagged_offer(("MH1",))
+
+    shown = offer_for_prompt(offer, {}, ["s"], [250.0, 150.0, 250.0])
+
+    assert shown["dip_boundaries"] == {"fit": 2, "of": 3, "shortest_half_beat_ms": 150}
+    assert offer_for_prompt(offer, {}, ["s"])["dip_boundaries"] is None
+
+
+def test_a_deferral_is_late_when_its_window_opens_past_half_the_section() -> None:
+    """One definition for the render's trace and the plan repair, a frame of tolerance
+    for the frame grid."""
+    assert not is_late(1500 + EFFECT_GRID_MS, 1000, 2000)
+    assert is_late(1500 + 2 * EFFECT_GRID_MS, 1000, 2000)
 
 
 def test_a_template_exclusion_removes_states_from_its_offer_only() -> None:

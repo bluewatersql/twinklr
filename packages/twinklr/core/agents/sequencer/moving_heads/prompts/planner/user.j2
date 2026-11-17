@@ -87,8 +87,8 @@ plays as its wheel colour, not darker or paler (brightness is `intensity`'s).
 {% for section in rig_offer.sections %}
   - {% for section_id in section.section_ids %}`{{ section_id }}`{% if not loop.last %}, {% endif %}{% endfor %}{% if section.palette_id %} (`{{ section.palette_id }}`){% else %} (no macro palette: the fixed colours){% endif %}: {% for r in section.roles %}{% if r.missing %}{{ r.role }} not in this palette{% else %}{{ r.role }} {{ r.hex }} → {% if r.shown %}{{ r.shown }}{% if r.status != "faithful" %} ({{ r.status }}){% endif %}{% if r.same_as %} (same wheel colour as {{ r.same_as }}){% endif %}{% else %}not shown{% endif %}{% endif %}{% if not loop.last %}; {% endif %}{% endfor +%}
 {% endfor %}
-  A role not in a section's palette is not available there (a plan that picks it plays
-  PRIMARY). Where two roles land on the same wheel colour, choose contrast deliberately:
+  A role not in a section's palette is not available there: a plan that picks it is
+  changed to PALETTE_PRIMARY (which plays only where the rig shows PRIMARY's colour). Where two roles land on the same wheel colour, choose contrast deliberately:
   a named colour with its reason, or contrast through intensity or gobo.
 {% endif %}
 {% if not rig_offer.gobo_wheel %}
@@ -110,7 +110,10 @@ plays as its wheel colour, not darker or paler (brightness is `intensity`'s).
 - **Not with these templates** (their overlay masks are too short to turn the wheel there): {% for e in rig_offer.exclusions %}`{{ e.template_id }}`: {{ e.states | join(', ') }}{% if not loop.last %}; {% endif %}{% endfor +%}
 {% endif %}
 {% if rig_offer.wheel_change_ms is not none %}
-{% if rig_offer.dip_fits %}
+{% set dips = rig_offer.dip_boundaries %}
+{% if dips and dips.of and 0 < dips.fit < dips.of %}
+- **A wheel change** takes {{ rig_offer.wheel_change_ms }} ms of darkness (about {{ rig_offer.wheel_change_beats }} beat). It fits half the beat before {{ dips.fit }} of this song's {{ dips.of }} section boundaries (the shortest half beat is {{ dips.shortest_half_beat_ms }} ms). Where it fits and the heads play straight from one section into the next, they go dark for that long just before the new section's first beat; where it does not, the change waits for the section's first dark moment long enough{% if rig_offer.dark_windows %} ({{ rig_offer.dark_windows | join(', ') }}){% endif %}, or, in a section with none, does not play. Where a section starts dark (the heads reposition into it) the wheel turns there. Hold a colour across sections that flow into each other and change it where the music turns.
+{% elif (dips and dips.of and dips.fit == dips.of) or ((not dips or not dips.of) and rig_offer.dip_fits) %}
 - **A wheel change** takes {{ rig_offer.wheel_change_ms }} ms of darkness (about {{ rig_offer.wheel_change_beats }} beat). Where the heads play straight from one section into the next and its colour or gobo changes, they go dark for that long just before the new section's first beat; where a section starts dark (the heads reposition into it) the wheel turns there. Hold a colour across sections that flow into each other and change it where the music turns.
 {% else %}
 - **A wheel change** takes {{ rig_offer.wheel_change_ms }} ms of darkness (about {{ rig_offer.wheel_change_beats }} beat), more than half a beat ({{ rig_offer.half_beat_ms }} ms) at this tempo. Where a section starts dark (the heads reposition into it) the wheel turns there. Where the heads play straight into a section, its colour or gobo change waits for the section's first dark moment long enough{% if rig_offer.dark_windows %} ({{ rig_offer.dark_windows | join(', ') }}){% endif %} and plays from then; in a section with none it does not play, and the heads keep the previous colour. Change colour where a template with a dark moment starts, or keep it.

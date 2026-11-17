@@ -25,7 +25,10 @@ review fix round re-recorded every fingerprint once more (revision 4); every fra
 before). W5 re-recorded every fingerprint again (revision 5: DRAMATIC and INTENSE play on
 the dimmer, and a show's focal role adjusts intensity); every frame and `.xsq` hash is
 unchanged, no pinned plan setting an intensity, and added the intensity pins
-(`INTENSITY_PINS`). An intended
+(`INTENSITY_PINS`). The W3/W4 second review re-recorded every fingerprint again
+(revision 6: a boundary dip counts and is bounded by the darkness it adds over a dark
+span); every frame and `.xsq` hash is unchanged, the gated plan's dark span meeting no
+colour change. An intended
 output change bumps `RENDERER_REVISION` and re-records these pins in the same commit,
 saying why.
 """
@@ -54,178 +57,178 @@ HEADS = ("MH1", "MH2", "MH3", "MH4")
 
 PINS: dict[str, tuple[str, str]] = {
     "steady/finite_snap_hold/base": (
-        "21497879ceaf32a5fe637d0e03fece6b1c59bd8c36c4733e4fc8d411706ab510",
+        "c7d0f01886cc20833ccc8289b218baf16b8c5ac225eca3b26b168df8eaef48cb",
         "8dc76627bbfb3e4e0a170d097e491277cdb571b09c41198381db8cbcc374e120",
     ),
     "steady/finite_snap_hold/narrow": (
-        "7896a8822b6427dd1c27127e8cf90306d4792b11877e59bcb508198ce96783d9",
+        "342fcdb66c90eae30bd76d24110ca36dfab4f7e75b1bab839a971554ea98d2e2",
         "c0d8292c375a952740fbbb4fdec44ca69ed99c1bc90decfe2f2f22b57387ccce",
     ),
     "steady/finite_snap_hold/slow": (
-        "f6f081b33c294850994d0334386b7d0fa622e344672bde49faab6fb689dbcd9d",
+        "4810fc70570be374e9c94ca560f83348ca65d90991491ca017ee8a96580801e7",
         "4d455965979b705ad9af8136e4fd229c7b5374635e1786d07b8cab7636861b9d",
     ),
     "steady/fly_in_cascade/base": (
-        "e77deddba0d696b7ed4ce9c5a8da57d25c7d7907437b79a899fb65f53faca03a",
+        "974836af05ebac6b9b33941c6bf52ab06dc9154cde845992b2a686434611784c",
         "ffdfb044c11edf3040dd81744d17558a2d46c21181071367cca5f752a8413b0d",
     ),
     "steady/fly_in_cascade/narrow": (
-        "09929ef10ce5fbdfa39c0ced592b9d1a5fb64e5eae4c1087c9d67d30f888e2da",
+        "f570e6cfadf011c68b823e63cb9034d6d516908e84e2246c657f330f255cddab",
         "0280d85aaf1e832fc23b428e311b24ccb67dac720116f25f71d147261f88f310",
     ),
     "steady/fly_in_cascade/slow": (
-        "29b94a3268bd85a651773db4f1d8c576cefdbb8d431d536a51268d7e4af9869f",
+        "0cb63fb6362383cb5a0272c838c74603602fe5c101cd4219b4c2201808ebb66a",
         "dd49563a5956e1e52f4a2c01e8f005a64a297ff28f9155f3eb05d10a29312433",
     ),
     "steady/fly_out_cascade/base": (
-        "800d9e5479225c5bd457c212fe3d660472e8451e3f7896b4a91b82cd28f044b9",
+        "70af4790376ad7361b9da6efde7c21a6e1af00f1901cf7bbe3a0526200cd5a8c",
         "4235e01012dddfdae05f050fa904a9efa2e8eb4cf4f3b7e2ddd06b23951c733e",
     ),
     "steady/fly_out_cascade/narrow": (
-        "b5003cf355f588022fdf3a7bcc22415a6b1a526d47476e21e92bfaf2ca243c61",
+        "c50c2b42f2223e5b9ce21290a489b52e0c70fb19d17a1fe2c18ccb597e138930",
         "150edd82e9273731bd9ab781ab5c6caf420cf5d1129cddb637915687dab01a88",
     ),
     "steady/fly_out_cascade/slow": (
-        "45eae3eb13a66e6ea92c2af402d58e21aa431294d0caafe7cd08ccc2b8bdcdb4",
+        "7bee4fbff13cc4cfef31fc612c4036ff7d02fe2ae286e1fcd50453ba95397180",
         "c7e91342cab3b42a868f59ab824961da433ac89db0c5646f1fd41e29b0444a70",
     ),
     "steady/masked_wheel_flick/base": (
-        "5b7295f457dd41f4bf27954603fc0e9e96c3fa943b76c78caf776a76b9676b1c",
+        "45462c316caab61c80f58e6be13a03f32aa4f60fb3062b02c77bfdc273080cba",
         "08ce9090980dbfefa79b6d78c90ef0f0b0c8ef3a19bb47d193d9af34805cd2de",
     ),
     "steady/masked_wheel_flick/narrow": (
-        "9de0793d81cfe3bbe94c5a57d6d5d2c6f74520deb2f048ea21e35d05af72b1fd",
+        "8efc9ecc37b71a587ec1124155c58dcd56cf0f661df684495236257f06cf8881",
         "2537e7e6cf39dad19aadb07a271b223f83c2af7fbbe52b4732f6416cee5993ad",
     ),
     "steady/masked_wheel_flick/slow": (
-        "cff11d9c3e69fd8195551d95b81f46041e2da4fd09bb00f8daf0c74294844c9b",
+        "e12cea77c99ac323377b3709c92057831e0ec67c8c1c0175cf9baa364200308a",
         "56a758e57a37773c558bff6f8134843cf45c76d005021a6e882374d16d96431a",
     ),
     "steady/mirror_wings/base": (
-        "9757311be96e580b4d45775238a15ae78853a28fa74e3a3f8c52ebe0ca4691dd",
+        "9123251f67fd633dca89495bdc42da9532649fc66adcd0ac57fb0376fc199cd6",
         "8e3cb9be3de61f968b065d8d0442ac5551becdbbf4624afb76b13a58e0f000fd",
     ),
     "steady/mirror_wings/narrow": (
-        "26f9afbe831b0dfcb52f3156e3755c3a92a800b70de936911f84470ed212a906",
+        "0ef1369df420e75801264c44ac6a1c81305ea51f9483ca35273beab38781b4c4",
         "d83a23f4fea33e3e6f1b2bbfabdc0b5c26f605b673861c0021a1cc1c8bd36a1b",
     ),
     "steady/mirror_wings/slow": (
-        "c79b405ff63479c2b6b9dc9c04b6a937b43d89e90cafb4bac691f4cc6a55cadc",
+        "180ed389070241cd19baa346ca98eaf9cc3aa43dbae9654a205af1b1893b55b2",
         "bbcdbab3564fa3d0a7f107562326940ef92fa3f38130a37ac9d8b43f68bdd3b6",
     ),
     "steady/target_orbit/base": (
-        "df57fd7deeb1812cdba177f2dec95449667964c27b0b142eee944fc18a37a7ce",
+        "4a21818f15d067fdf7d7c6a2096b95122e38d11c4f9115069aad5cdbd881511a",
         "78d35ed327d359ca0cc456a151ae19f800a20b80ac1cc040ea4448be4d014ed1",
     ),
     "steady/target_orbit/narrow": (
-        "c2b5bdd096fe42cf16299aae71f60d5e0b3c4c8f0c0341d88131b9cd7d683bc8",
+        "d6f51cabea2ddc23dec12e4157970c80138021bd0b5ede4048f445494555784e",
         "a35e080540356862ecfe8738414c7cef0d781b639b869db97bc27ff0db5f180b",
     ),
     "steady/target_orbit/slow": (
-        "416a46d237fd2c8f6ffb64cbce29b26dcfaf33678f1b279a88456c2ff3ce5bf7",
+        "2579b51e41700dd9669330904ddcde8afc81f791c4080b4dc901b25bafa618f8",
         "a2eb0bf1f4d04307af57da96941f9d02e8c47ffcc583db3361b0a754975c7d36",
     ),
     "steady/zoom_wave/base": (
-        "5b374d8876e710cff80a73de65de65b819d101f7b25e5cf44480c945ba47a6b8",
+        "3366a42895258605ef5f45a9a989a551a9b07337bdb819f0d242353a7947d6c2",
         "bfa3f5ef5efd80d8f801f76ab412044d35161bb606288fc35f6fbeaf6970675a",
     ),
     "steady/zoom_wave/narrow": (
-        "8b5869ac750ceaedd610678d78a5e97b980e28a3e8708f291489da31d229fb5a",
+        "0cbeeae1b982afcd66cd00863d8c85afa773544582b8804fcb1f4f983b9a31ac",
         "0ddc62b56b92e1af2deedbc6b9bf47570bbe82663ff559091f3883f32e20169b",
     ),
     "steady/zoom_wave/slow": (
-        "30ac9837551ee89ddfea1e0f64f06baf21b1e98c8ccb769e3fa457bdd91b81b3",
+        "2ad57cdc2c92149c98f46fa18a8184e0c02efaf7ea9b36fd4cc420be1f339aa0",
         "394aa7ae9fb0cc8e948e2c1b68264b9652edbddd44bcefd9d5ac0dea8e5cdb2c",
     ),
     "variable/finite_snap_hold/base": (
-        "28ce23791dfd0206cb50c6bf61c448f2e00a0661731575a79cc231de6c57d879",
+        "2c7693822273b279864390fd9ae6933aab3cfcdb37f764bfa3271c95d501aa1e",
         "d03e6f47159bc26621e835d36e191f370e0f90955ddac4b356afb477e613ba0f",
     ),
     "variable/finite_snap_hold/narrow": (
-        "47a55ecc8fc3e8e0a76786b5f105051a31e270a01e6dc6d85d75281e70e2fd3d",
+        "8463b044b8e2d800797dffbab16850cf876a303810f9a97c34c3325657055926",
         "9af804ac9d4aa9765aba26e095a80714399942811724696373cc015653545af6",
     ),
     "variable/finite_snap_hold/slow": (
-        "b5cb9c694213eb5606af8c9dfaf756c48d0a538ea8df437ce11fe35ad872426a",
+        "7c2221ab71bd15456ea5d47cb005f36ec54b0d76560b587627fba624c06e7340",
         "e4f7f3d9a0863c4f423dae91e481e8874d5971308aa2196a93e6fca84a6d8930",
     ),
     "variable/fly_in_cascade/base": (
-        "39ce22a78f8c9d5d915c86713f10bc79548806d1dac1323f1e26bbb99b5fcd91",
+        "d8963aea00ce7b5a1c01daf7eedf1a3d64aa479af0a23ce0f9b183b793e067ea",
         "34f9987fa593584b7894352d13944905315dd6c260035971de447db3c121fd7a",
     ),
     "variable/fly_in_cascade/narrow": (
-        "c8444c1337d8f44114eb6a2127844a0b153ec381d25c536374a7274d296a1e19",
+        "7b0b4ab8057c585deffe8155a6ca82fcf7ae6ce011d730440ea2365bbcca2614",
         "f2d02f0c7cdbcda887bcd350188338a8bfe0ae583b2b5e092c64b921985f1a9e",
     ),
     "variable/fly_in_cascade/slow": (
-        "28f3db0232469ec85ac968007abc10e575661b7d4a13e9c5e0912b56cc063dcd",
+        "535298e15e52944bd3cc357555515ae128edb4358f590240d0e53945eab3d192",
         "49c484a8585d159fc61d0989eef1cc2a35fc22a5e46cf202f789736c8dd37ebe",
     ),
     "variable/fly_out_cascade/base": (
-        "d80a91085badb93e47e03b1f78660f5b69921c03caea2e0b5018d0820ccab891",
+        "644e9676ab3f2f88e2280309dbbefecf60ba6f4984b39a300c5d2138fb05e0e8",
         "36f29b21188085c76c462a8cfd73f3e10f21f7adfdbca525a674c4960aca28d2",
     ),
     "variable/fly_out_cascade/narrow": (
-        "a27d16a9df3ade0217164955820dcdfd1a63a0f13ad697c3b4652865cf385f9b",
+        "50dd6dce0bf24e39c23703e51b4645ea6c5e916cd7756d25ab7da6f24c902f95",
         "c773f3be51097dd3ec2c309f6149f76e6c3bb7f6d1ea24416aba4662a10cb420",
     ),
     "variable/fly_out_cascade/slow": (
-        "52d3dcd175fd8fd384c297ec950bbd8f99442882b0ccc37bbe31393063a695b4",
+        "988d24ac886ab3714ef23e5a2ebb68b0fbb454251d17432a84c4be22d47d55d8",
         "de6e5fb69f6beeeb43df051367101bd88d3d75b61e811bab2ac3e69d2edd499a",
     ),
     "variable/masked_wheel_flick/base": (
-        "473bfefd23c1e028bcf1341606a3036f3d0b50ff3d83de164d8148b440ee4053",
+        "214af9a5e03e551a52dd2f2921a2198e6c45bed7a3eb1bddc14ead393289e154",
         "a628fb0ca672aba2a7c36e3ecfafcf1003b8d9c8a06adc5edcf0840004981f3f",
     ),
     "variable/masked_wheel_flick/narrow": (
-        "1567ef29a255dadaabe30019e605d1ed25d733aca280370d05507c2bf1cd0121",
+        "99f6e151206d562732f62edf17d6f6215f4787d2415b8cba0586da70977c1f0a",
         "a8b2c6b2cf905f657c6993dca020c6aa14bbfacc10f89bfb97491860bc81a6c3",
     ),
     "variable/masked_wheel_flick/slow": (
-        "1b3c271c51c3bfeca144a7b41d7fb427bd8d377351c11b3c69e683964d5a9570",
+        "a9eba0175a5dea4c5f105026364bb62aa6d6049b2dd2bb2c9289972f6e6bdce3",
         "058ed1d9cbdde981fa5213dd23654d42fc86a9ebd6150fc50b089e07f85825f8",
     ),
     "variable/mirror_wings/base": (
-        "f50e9e72d588867ebfdaa9c467aa3382a63869bcc3e10c09ad16ce0fdb7ab65f",
+        "e29bd78bd2d5b39f09a27157a1421937143fa22b9999f271caad6d698f589991",
         "a59b343515d159c1603c1a0ed576afa3b6721178a643ad1c5fbc02d6bb706dde",
     ),
     "variable/mirror_wings/narrow": (
-        "6120e496dad3103f2f22a4d5beee2d49a7e7282b6d6b072eb3c2f3d991abce4f",
+        "adf7150f8b49bf71f8931fac053bd7e726a4221863963efc77b07f771a6c2b6e",
         "4d326471bc6af0e6f429bd8e5d5b7e374587d3f545a2fe3d2ad3ef908ab6f801",
     ),
     "variable/mirror_wings/slow": (
-        "1a2fd040887ead5b8b99bd21891e65ae3e7b7e0ce57968069912d53d508d98f1",
+        "856e60049c5859e8807020f8c08517f2e9ae9599c0eeb8757d762a531387177b",
         "cee179ea21422e5e6f268664dd79981055afedfd98c5849c5dbfd44f5b80904e",
     ),
     "variable/target_orbit/base": (
-        "b3c9a7ba2e5ea3793bd3aafb135f39af29fa69274fceee196c5af8085359b864",
+        "92d10ed1203eb00d6889c08d6b54f3f577eb832e3acd7f55daa1e3b0cf2f87de",
         "2bfe8b5bd75f0097dd6fb8011e38a11578764984050474ddf0ee402ae3c85fa1",
     ),
     "variable/target_orbit/narrow": (
-        "5c5a20733a93fc71aff5f7b3edfa4bb71cc2bc2ddcb8cea71865056505df97a7",
+        "2d4908d5074a3709b7e88146919056f781a6ab4eb02735be1a0157a3e767aaac",
         "9f453dce2badb89d745c808896a8fe6d3b9feafacf5d122371d75d0a6377b4a6",
     ),
     "variable/target_orbit/slow": (
-        "ae303b96279a21f3bc9c9c1242f550c4944271f60a050ac49dc120c88825af57",
+        "bd9d06e6db53c176c54abe11b51dcd37104461229ad9af2bf06aa1915309a0d7",
         "ac930585ef5e3f15f79cc7267d407f586e99f71923c67b287415b69ec32365c5",
     ),
     "variable/zoom_wave/base": (
-        "e6e31e1816b87fcd114bb84e1f2edcbfcd29ae873317f15ceacbdbb0b2bf0e67",
+        "e948372eb5f828fb0f33b172e616423e430dde29d4367edcb4cf75b463f7b776",
         "0020b12393f7dd4cf89bb4c4bbf3cd942ed5aa0de2abde665b3caffefdc751a7",
     ),
     "variable/zoom_wave/narrow": (
-        "f3c51f2ef8ba92259844e8741e435d85b4cf52b55a596a0bd61ec9fa4fcdb9a5",
+        "5814e0550a3c0b03aa6b49dc115069e2df11a3d3a47fd551dbc8f8fb37733aec",
         "a39df6ddbe83086edd4664152946711a1b5a24a927837fd366218594215ce44a",
     ),
     "variable/zoom_wave/slow": (
-        "76b0b769692ee56b69f1dfae30ada05698f27a9e0bf47341b8790eec9896f4cd",
+        "4da85f4d75065440261ee6e8f895f405eb5596b54c380fdcc4c8af9b4833bf0d",
         "503a36b0d6d9b85cfa6e5518367e787f835571fbc02f9f44e09f96f2c6689561",
     ),
 }
 """`grid/template/variant`: (render fingerprint, SHA-256 of the encoded frames)."""
 
 MULTI_PIN = (
-    "268158e76a345de94a5d61b834cc38d870e2aec39d929650392bb7e1cc8af9a3",
+    "fc5f09f19ed3b47eb0d134ddf388e605c25072f1f92a5b1db8efc2ddab1dc31c",
     "3ea6b3fca42f7ea4bbed6068c580331ce3649c6ef4c49f77f7b23fff7599fba7",
     "9ef5b7a162ca49079bb1a5261223b9ebcd399f8b7bb48463942ba4271861c6fb",
 )
@@ -234,7 +237,7 @@ MULTI_PIN = (
 MULTI_SECTIONS = ("mirror_wings", "target_orbit", "finite_snap_hold", "fly_in_cascade")
 
 GATED_PIN = (
-    "99ccc4dcbdbf3392a5a35f649a2f9740cc99a42893786f06df169fe43f62593f",
+    "cfc39023660d78749d4de1f4d62109867a583aa858314778468428f862c7ca5c",
     "b971080b47c7c7b20e2466c76bfa187b6bb1872a5ec4ac6c316b9d0c614c96bd",
     "7f2d1e3bf22d121835f2c586bdea34718958dc234d6c2577fed66900fc4be14d",
 )
@@ -397,7 +400,7 @@ def test_gated_render_with_dark_spans_and_a_fallback_is_pinned(tmp_path: Path) -
 
 
 INTENT_PIN = (
-    "1b40476b083d4fdb2dbc1391f113849a28b1a7d7cf5c51519221791e498c664d",
+    "930236cfef9319d5f94ca4a210936f0cd39aac74d959c67d7146db37d2923126",
     "ad91f4f2da8e0fc5bca0e07a7a9d9003d7880d59dee2499b30389be403e36d3b",
     "9968e9a4b0d5892d7891177fbdab9a0dca7d300d09998a946a5b908a51c17c46",
 )
@@ -451,7 +454,7 @@ def section_palettes_of(palette_id: str) -> SectionPalette:
 
 
 FAST_INTENT_PIN = (
-    "fa7ae17d4deae654134dc77584732c1b3e62476b1e46d761629d620278ceaf52",
+    "21001f467ecb1af2df612cd2b270264db87a6fa819ebb4e82a28f7722f446bc1",
     "2785d278f4341c611a0aaf60b9e22ee2e6e1accc8f70252442f7402bfd308a54",
 )
 """The fast song-intent plan: (render fingerprint, frames SHA-256). Recorded in the W3/W4
@@ -463,7 +466,8 @@ def test_colour_changes_that_cannot_dip_at_170_bpm_are_pinned() -> None:
     """170 BPM on owner-like timings (close latency 20 ms, every wheel state settling in
     150 ms: a 180 ms change, more than half a beat): red, then blue over the overlay
     family (turned in its first mask), then red over `mirror_wings` (no dark moment: the
-    heads keep blue), then green over `finite_snap_hold`."""
+    heads keep blue), then white over `finite_snap_hold` (it enters dark, so the wheel
+    turns in its entry and no boundary is recorded)."""
     payload = m.tagged_family_rig(HEADS).model_dump(mode="json")
     for fixture in payload["fixtures"]:
         profile = fixture["config"]["physical_profile"]
@@ -502,15 +506,15 @@ def test_colour_changes_that_cannot_dip_at_170_bpm_are_pinned() -> None:
 
 INTENSITY_PINS: dict[str, tuple[str, str]] = {
     "full/mirror_wings/INTENSE": (
-        "78362b9d59e83519db42b061cabfb93fb244def58ab106cfa36985e31d1f15b9",
+        "b0a8e97043180df51cdce3053336da0f8a45a8399f8dcb44b84715048273d543",
         "448dd5edb8649aa4e4a1d31725c6de92a9e1d8d3be740297a0de11dd76a8c57a",
     ),
     "headroom/intensity_half_hold/DRAMATIC": (
-        "978d8a6496ebc5c4c64be0f2d88322d3c44d916f90cbcf041b2215f0e279e978",
+        "141c8dc48f61c02783f3766e28039742d0e1cd91db4ee86bd3fcd56a4eff0bcc",
         "edaeefd213f3b8b3a1249b7c226c712178b124c5dfaba25365f367a2fd2aa689",
     ),
     "authored_pulse/intensity_authored_pulse/INTENSE": (
-        "ec8f16cacb12bc4260fc01fd8272086f5e03a8dd75af97ac855d1948f0f17330",
+        "455f9a33ff172e3d3677d7bea0dd2365c83ee0fafc40bf1765cf604ec1ea58f1",
         "b68545de8bcd90df249892f45dcb04ace410ad3776914e188624c406ee8e820a",
     ),
 }

@@ -6,6 +6,7 @@ following V2 Agent Framework patterns (modeled after MacroPlanner/GroupPlanner).
 
 from __future__ import annotations
 
+import bisect
 import logging
 from typing import Any
 
@@ -312,9 +313,25 @@ class MovingHeadPlanningContext(BaseModel):
                     self.palettes,
                     # The sections the planner may plan: none beyond the beat grid.
                     [entry["section_id"] for entry in song_structure["sections"]],
+                    self._boundary_half_beats(song_structure["sections"]),
                 )
             ),
         }
+
+    def _boundary_half_beats(self, sections: list[dict[str, Any]]) -> list[float] | None:
+        """Half the beat before each section boundary (each section's first bar but the
+        song's first), on the beat grid; None without one."""
+        if self.beat_grid is None or len(self.beat_grid.beat_boundaries) < 2:
+            return None
+        bars, beats = self.beat_grid.bar_boundaries, self.beat_grid.beat_boundaries
+        halves = []
+        for entry in sections[1:]:
+            index = int(entry["start_bar"]) - 1
+            if not 0 <= index < len(bars):
+                continue
+            at = min(max(bisect.bisect_left(beats, bars[index]), 1), len(beats) - 1)
+            halves.append((beats[at] - beats[at - 1]) / 2)
+        return halves
 
     def song_structure(self) -> dict[str, Any]:
         """The song's sections in the bars the renderer can play: the one computation
