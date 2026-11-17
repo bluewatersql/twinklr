@@ -557,8 +557,9 @@ def test_the_planner_is_told_to_answer_the_song_in_every_section() -> None:
         "colour or gobo change or a soft pulse, not a strobe. Hold a colour across a section "
         "and change it where the palette or the mood turns. Contrast makes the chorus land: "
         "a restrained verse is part of answering the song.",
-        "Leave a field null only when you can say in `reasoning` why the template's own "
-        "look already answers this moment.",
+        "Choose `as_authored` for `intensity`, `color` or `gobo` only when you can say in "
+        "`reasoning` why the template's own look already answers this moment;",
+        "Every other action sets `color` and `gobo` to `none`.",
         "Intensity that stays flat across a clear change of energy ignores the song.",
         "Answer every high- and medium-emphasis cue of a section",
         "`section_role`: what the section does in the song",
@@ -583,7 +584,7 @@ def test_the_planner_is_told_to_answer_the_song_in_every_section() -> None:
         assert boundary in line, mode
     assert "Answer every high- and medium-emphasis lyric moment cue" in user
     assert "keep a restrained verse restrained so the chorus lands" in user
-    assert "A field left null needs a reason there." in user
+    assert "A section that keeps the authored look (`as_authored`) needs a reason there." in user
 
 
 def test_the_judge_penalises_a_plan_that_ignores_the_song() -> None:
@@ -593,7 +594,7 @@ def test_the_judge_penalises_a_plan_that_ignores_the_song() -> None:
         "a high-emphasis lyric moment cue with no event (unanswered)",
         "intensity that stays flat across a clear change of energy target",
         "colour that ignores the section's palette",
-        "a plan whose sections are mostly null song intent",
+        "a plan whose sections are mostly `as_authored` or empty",
         "cannot score above the soft-fail band",
         "a plan that is busy rather than responsive: strobes or the highest intensity in "
         "low-energy sections, accents too dense to read, colour changes faster than the "

@@ -377,3 +377,45 @@ def test_an_invalid_current_plan_is_not_called_old() -> None:
 
     with pytest.raises(ValidationError):
         load_plan(broken, remedy="unused")
+
+
+# --- "no choice" is a string member, None in Python -------------------------------------
+
+
+def test_no_choice_is_a_sentinel_member_in_the_schema_and_none_in_python() -> None:
+    schema = ChoreographyPlan.model_json_schema()
+    section_fields = schema["$defs"]["PlanSection"]["properties"]
+    event_fields = schema["$defs"]["PlanEvent"]["properties"]
+
+    for field, sentinel in (
+        (section_fields["intensity"], "as_authored"),
+        (section_fields["color"], "as_authored"),
+        (section_fields["gobo"], "as_authored"),
+        (event_fields["color"], "none"),
+        (event_fields["gobo"], "none"),
+    ):
+        assert field["type"] == "string"
+        assert field["enum"][-1] == sentinel
+        assert None not in field["enum"]
+
+    planned = plan(
+        section(
+            intensity="as_authored",
+            color="as_authored",
+            gobo="as_authored",
+            events=[event(2, 1, "hit", color="none", gobo="none")],
+        )
+    ).sections[0]
+    assert (planned.intensity, planned.color, planned.gobo) == (None, None, None)
+    assert (planned.events[0].color, planned.events[0].gobo) == (None, None)
+
+
+def test_the_dump_spells_no_choice_as_the_sentinel_and_reads_back() -> None:
+    """The dumped (and hashed) form names the sentinel; Python None reads in as well."""
+    planned = plan(section(events=[event(2, 1, "hit")]))
+    dumped = planned.model_dump(mode="json")["sections"][0]
+
+    assert (dumped["intensity"], dumped["color"], dumped["gobo"]) == ("as_authored",) * 3
+    assert (dumped["events"][0]["color"], dumped["events"][0]["gobo"]) == ("none", "none")
+    assert ChoreographyPlan.model_validate(planned.model_dump(mode="json")) == planned
+    assert planned.model_dump()["sections"][0]["intensity"] == "as_authored"

@@ -31,9 +31,10 @@ intent**: how the light answers this moment of the song.
 **Every section answers the song.** Set `intensity` from its energy target, a
 palette-role `color` from its palette, and answer every high- and medium-emphasis lyric
 moment cue and every drop and hit with an event chosen to fit the section (see
-Proportion). Leave a field null only when you can say in `reasoning` why the template's
-own look already answers this moment. A plan whose sections are mostly null ignores the
-song.
+Proportion). Choose `as_authored` for `intensity`, `color` or `gobo` only when you can
+say in `reasoning` why the template's own look already answers this moment; leave an
+event list empty only for the same reason. A plan whose sections are mostly
+`as_authored` ignores the song.
 
 **Proportion.** Answering the song is not making the show busy. Accents are
 punctuation: give each section a few, spaced so each one lands, and save strobes and the
@@ -94,6 +95,7 @@ lyrics, its boundaries.
 - `FAST`: brisk and lively
 - `DRAMATIC`: bold, punchy accents on the strong beats
 - `INTENSE`: maximum drive, accenting every beat
+- `as_authored`: the template's own level, when it already fits (say why)
 
 Read it from the Macro Strategy energy target:
 - an energy target of `LOW`: `SLOW` or `SMOOTH`
@@ -116,10 +118,11 @@ gives each section's palette and its colours.
 - A palette role keeps the heads in the same colour story as the rest of the show and
   follows the palette when it changes between sections. A named colour (`red`, `blue`,
   ..., `uv`) is fixed whatever the palette: use one only for a deliberate contrast, and
-  say why.
+  say why. `as_authored` keeps the template's own colour.
 
 **`gobo`**: the beam's pattern for the whole section (`open` is a plain beam): a texture
-that suits the section's imagery (stars for a night sky, flame for warmth).
+that suits the section's imagery (stars for a night sky, flame for warmth); `as_authored`
+keeps the template's own.
 
 **`events`**: timed accents at an absolute bar and beat (both 1-indexed) inside the
 section.
@@ -130,7 +133,7 @@ section.
 - `color`: a colour change; set the event's `color` (same vocabulary as above)
 - `gobo`: a pattern change; set the event's `gobo`
 
-Every other action leaves `color` and `gobo` null. Answer the song's drops, hits and
+Every other action sets `color` and `gobo` to `none`. Answer the song's drops, hits and
 stops and the lyric moment cues below, in proportion to the section.
 
 **`moment_cues`** and **`moment_cue_id`**: tie light to the lyrics. The Lyric Context
@@ -211,4 +214,5 @@ owns them and resolves every category above.
 - ❌ A high- or medium-emphasis lyric moment cue with no event, or a drop with no accent
 - ❌ The same intensity across sections whose energy clearly changes
 - ❌ A named colour where a palette role would follow the song's palette, without a reason
-- ❌ A section with every song-intent field null and no reason in `reasoning`
+- ❌ A section with every song-intent field `as_authored` or empty and no reason in
+  `reasoning`

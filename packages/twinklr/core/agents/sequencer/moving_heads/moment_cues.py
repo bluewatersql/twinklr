@@ -38,6 +38,7 @@ from typing import Any
 from twinklr.core.agents.audio.lyrics.models import LyricContextModel, MomentCue
 from twinklr.core.agents.audio.profile.models import SongSectionRef
 from twinklr.core.agents.sequencer.moving_heads.models import (
+    NO_VALUE,
     ChoreographyPlan,
     PlanRepair,
     RepairAction,
@@ -266,6 +267,9 @@ def _repair_section(
 def _repair_fields(event: dict[str, Any], item: str, record: _Record) -> bool:
     """Pair the event's colour and gobo with its action; False when it must be dropped."""
     action = event["action"]
+    for field in ("color", "gobo"):
+        if event[field] == NO_VALUE:  # the dumped spelling of "no colour/gobo"
+            event[field] = None
     for field in ("color", "gobo"):
         if action == field and event[field] is None:
             record(item, RepairAction.DROPPED, f"a {field} event names no {field}")

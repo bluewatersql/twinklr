@@ -1037,3 +1037,30 @@ async def test_timeout_seconds_bounds_the_whole_call(mock_anthropic_clients: dic
         )
 
     assert isinstance(caught.value.__cause__, TimeoutError)
+
+
+@pytest.mark.asyncio
+async def test_a_schema_form_claude_refuses_fails_before_any_request(
+    mock_anthropic_clients: dict,
+) -> None:
+    """An enum listing null (refused live on 2026-11-17 under a type list) is caught
+    offline: nothing is sent."""
+    from typing import Literal
+
+    from pydantic import BaseModel, ConfigDict
+
+    class Nullable(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+
+        pick: Literal["a", "b", None]
+
+    provider = _make_provider(mock_anthropic_clients)
+
+    with pytest.raises(LLMProviderError, match="an enum that lists null"):
+        await provider.generate_json_async(
+            messages=[{"role": "user", "content": "test"}],
+            model="claude-opus-5-5",
+            response_model=Nullable,
+        )
+
+    mock_anthropic_clients["async_client"].messages.stream.assert_not_called()

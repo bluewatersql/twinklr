@@ -32,14 +32,14 @@ ChoreographyPlan{sections: [PlanSection] (>=1), overall_strategy: str}
 PlanSection{section_id, start_bar, end_bar, section_role: str|null, energy_level: 0-100|null,
   parts: [PlanPart{start_bar, template_id, preset_id: str|null, modifiers: [{key, value}],
                    label: str|null, reasoning}] (1-3),
-  intensity: SLOW|SMOOTH|FAST|DRAMATIC|INTENSE|null,
+  intensity: SLOW|SMOOTH|FAST|DRAMATIC|INTENSE|as_authored,
   color: PALETTE_PRIMARY|PALETTE_ACCENT|PALETTE_WARM|PALETTE_COOL|PALETTE_NEUTRAL
-         |red|blue|green|yellow|magenta|cyan|orange|purple|amber|lime|white|warm_white|cool_white|uv|null,
-  gobo: open|circles|triangles|stars|diamonds|clouds|prism|shatter|dots|flame|water|foliage|abstract|null,
+         |red|blue|green|yellow|magenta|cyan|orange|purple|amber|lime|white|warm_white|cool_white|uv|as_authored,
+  gobo: open|circles|triangles|stars|diamonds|clouds|prism|shatter|dots|flame|water|foliage|abstract|as_authored,
   moment_cues: [cue_id],
   events: [PlanEvent{bar, beat, moment_cue_id: str|null,
                      action: open|closed|strobe_slow|strobe_medium|strobe_fast|pulse|hit|color|gobo,
-                     color: <colour vocabulary>|null, gobo: <gobo vocabulary>|null}],
+                     color: <colour vocabulary>|none, gobo: <gobo vocabulary>|none}],
   motif_id: str|null, variation: NONE|NARROW|WIDEN|SLOWER|FASTER,
   density: REST|SPARSE|BALANCED|BUSY,
   transitions: [PlanTransition] (0-2: at most one ENTRY, one EXIT),
@@ -53,14 +53,21 @@ PlanTransition (sequencer/models/transition.py){edge: ENTRY|EXIT,
                                strategy: snap|smooth|crossfade|fade_via_black|sequence}] (0-6)}
 ```
 
-- A null intensity, colour or gobo keeps the template's own look; the prompts ask the
-  planner to answer the song and to give a reason for any null (Prompts below).
-  `PlanSection.set_intent_fields()` names the fields a section set away from neutral.
-- **Nullable enums** are `Literal[..., None]`. The strict-schema builder
-  (`schema_utils._normalize_supported_schema`) now types every bare string enum: a
-  nullable one is `{"type": ["string", "null"], "enum": [..., null]}`, a non-null one
-  `{"type": "string", ...}`, so OpenAI strict mode, which needs a type on every value
-  schema, accepts it (review item 1). Each costs one union on Claude.
+- **"No choice" is a string member, not null** (after the live probe, below). A section's
+  `intensity`, `color` and `gobo` take `as_authored` to keep the template's own look; an
+  event's `color` and `gobo` take `none` when its action does not use them. Each is a
+  plain `{"type": "string", "enum": [..., "<sentinel>"]}`, the sentinel last; no enum lists
+  null and none sits under a type list, so one schema form is valid on every provider and
+  costs no union. In Python the sentinel is `None` (an `Annotated` type: a
+  `BeforeValidator` reads the sentinel as `None`, a `PlainSerializer` writes `None` as the
+  sentinel, `WithJsonSchema` derives the enum from the vocabulary), so consumers, repair,
+  the selector, reports and the parity block keep testing `is None`; Python callers may
+  still pass `None`. **Every dump, and so the hashed form, spells the sentinel**
+  (`"as_authored"`, `"none"`), in JSON and Python modes alike. The prompts ask the planner
+  to answer the song and to give a reason for any `as_authored` (Prompts below).
+- The other optional fields (`section_role`, `energy_level`, `preset_id`, `label`,
+  `moment_cue_id`, `motif_id`) stay `anyOf` string/integer or null, the form the
+  already-probed registered schemas use.
 - **In-model rules (context-free only):** bar order and 1-indexing; parts start at the
   section's start, are strictly ordered and start inside the section; 1-3 parts; moment
   cue ids unique and not blank; at most one ENTRY and one EXIT; each transition channel
@@ -109,19 +116,27 @@ Measured with the project's `claude_json_schema` / `claude_schema_size` and
 |---|---|---|---|---|---|
 | Old contract (`10f3ac49`) | 25 | 126 | 55 | 7 | 94 |
 | First W2 (`1f953f96`, typeless nullable enums) | 5 | 57 | 39 | 7 | 161 |
-| **W2 after the fix round** | **11** | **60** | **40** | **7** | **166** |
+| Fix round (`897c4501`, enums typed `["string","null"]`: **refused live**) | 11 | 60 | 40 | 7 | 166 |
+| **After the probe fix (sentinel members)** | **6** | **60** | **40** | **7** | **166** |
 
-The fix round added one union per typed nullable enum (5: section `intensity`, `color`,
-`gobo`; event `color`, `gobo`), and the nullable `label` (1 union, 3 nodes). The finer
-length (9) and split (5) enums cost no node. Margin: 5 unions, 8 nodes. The eleven unions:
-`section_role`, `energy_level`, `preset_id`, `label`, `moment_cue_id`, `motif_id` and the
-five nullable enums. Response-schema hash `d9389872…88be49` (was `a76326c7…8683a9` at
-`10f3ac49`). `test_no_registered_strict_schema_has_an_untyped_enum` guards every
-registered spec; no other spec's size changed.
+The sentinel members cost no union and no node (enum size is free in the node count). The
+six unions are the optional `section_role`, `energy_level`, `preset_id`, `label`,
+`moment_cue_id`, `motif_id`. Margin: 10 unions, 8 nodes. Response-schema hash
+`50a67e62…dca39877` (was `a76326c7…8683a9` at `10f3ac49`).
+`test_no_registered_strict_schema_has_an_untyped_enum` and
+`test_no_registered_schema_sent_to_claude_uses_a_form_claude_refuses` guard every
+registered spec. The generic "type every bare enum" rule the fix round added to
+`schema_utils.py` is reverted: nothing needs it now.
+
+**Scan of every registered spec for the probe's hazard** (an enum listing null, or an
+enum under a type list): none has it (asset_prompt_enricher, audio_profile, lyrics,
+group_planner, section_judge, holistic_corrector, holistic_judge, mh_planner, mh_judge,
+macro_planner, macro_judge, vision_judge, show_vision_judge); no other agent's schema
+changed.
 
 `mh_planner` is in `_CLAUDE_COMPILED_SPECS`: by measure it is within the limits and the
-provider sends it as `output_config.format`. **Its live compile is pending the probe**
-(review item 7; the test comment and `context/current-state.md` say so). The
+provider sends it as `output_config.format`. Its first live compile was refused (Live
+probe, below); the fixed schema's live compile is pending the integrator's next request. The
 oversize-schema provider tests use `MacroPlan` (8 / 83, still over).
 
 ## Field mapping, old contract (`10f3ac49`) → W2, as implemented
@@ -141,16 +156,16 @@ Marks: **kept**; **reshaped, same range** (the two transition rows: same range, 
 | `preset_id` (section or segment, free string) | `PlanPart.preset_id` | kept | Admission decides validity; a `--template-dir` preset of any name stays choosable |
 | `modifiers` (section and segment) | `PlanPart.modifiers` | reshaped, same range | |
 | `reasoning` (section and segment) | `PlanSection.reasoning`, `PlanPart.reasoning` | kept | |
-| `intensity` (required, 5 values) | `intensity` (5 values or null) | reshaped, same range | null added |
-| `color_intent` (`PALETTE_ROLE` + 5 roles, or `EXPLICIT` + 14 presets) | `color` (5 `PALETTE_*` + 14 presets, or null) | reshaped, same range | Both arms in one enum (tested equal to `PaletteRole` and `ColorPreset`) |
+| `intensity` (required, 5 values) | `intensity` (5 values or `as_authored`) | reshaped, same range | `as_authored` added (None in Python) |
+| `color_intent` (`PALETTE_ROLE` + 5 roles, or `EXPLICIT` + 14 presets) | `color` (5 `PALETTE_*` + 14 presets, or `as_authored`) | reshaped, same range | Both arms in one enum (tested equal to `PaletteRole` and `ColorPreset`) |
 | `shutter_events[]` (`pattern`: 6 values; `moment_cue_id`) | `events[]`, `action` of the same 6 values | reshaped, same range | |
-| `gobo_events[]` (`pattern`: 13 `GoboPattern`; `moment_cue_id`) | `events[]`, `action: gobo` + `gobo` | reshaped, same range | |
+| `gobo_events[]` (`pattern`: 13 `GoboPattern`; `moment_cue_id`) | `events[]`, `action: gobo` + `gobo` (13 values; `none` on other actions) | reshaped, same range | |
 | `moment_cues[{cue_id}]` | `moment_cues[cue_id]` | reshaped, same range | |
 | `transition_in` (`TransitionHint` or null) | `transitions[edge=ENTRY]` | reshaped, same range | Same 5 modes and `CurveLibrary`; `per_channel_overrides` → `channels` list |
 | `transition_out` | `transitions[edge=EXIT]` | reshaped, same range | Its own length (not shared) |
 | `TransitionHint.duration_bars` (0-8) | `length`: 9 steps, BEAT (¼ bar in 4/4) … EIGHT_BARS, including 1½, 3 and 6 bars | reshaped, same range, quantised to steps | Review item 13: the whole old range in finer steps; a value between steps snaps to the nearest (1.25 bars → BAR or ONE_AND_HALF_BARS); code owns the exact milliseconds |
 | `TransitionHint.fade_out_ratio` (0-1) | `split`: QUARTER, THIRD, HALF, TWO_THIRDS, THREE_QUARTERS | reshaped, same range, quantised to steps | Review item 14; a value between steps snaps to the nearest. The old model's default 0.5 is HALF; the W0 parity fixture's 0.25 is QUARTER |
-| — | `gobo` (section), `action: hit`, `action: color` + `color`, `mode: blackout`, `motif_id`, `variation`, `density`, null for intensity/colour/gobo | new | |
+| — | `gobo` (section), `action: hit`, `action: color` + `color`, `mode: blackout`, `motif_id`, `variation`, `density`, `as_authored` for intensity/colour/gobo | new | |
 
 Removed with their callers (rule 9; no other importer, config or doc reader):
 `PlanSegment`, `ColorIntent`/`ColorIntentKind`/`PaletteRoleColorIntent`/
@@ -219,12 +234,14 @@ and DMX. Key passages, before (`1f953f96`) → after:
 > empty list, means "as the template is authored."** Set a field only when it serves the
 > music; leaving it null is a valid, deliberate choice.
 
-After (Plan Structure):
+After (Plan Structure, as of the probe fix):
 > **Every section answers the song.** Set `intensity` from its energy target, a
-> palette-role `color` from its palette, and an accent (an event) on every high- and
-> medium-emphasis lyric moment cue and on the drops and hits. Leave a field null only when
-> you can say in `reasoning` why the template's own look already answers this moment. A
-> plan whose sections are mostly null ignores the song.
+> palette-role `color` from its palette, and answer every high- and medium-emphasis lyric
+> moment cue and every drop and hit with an event chosen to fit the section (see
+> Proportion). Choose `as_authored` for `intensity`, `color` or `gobo` only when you can
+> say in `reasoning` why the template's own look already answers this moment; leave an
+> event list empty only for the same reason. A plan whose sections are mostly
+> `as_authored` ignores the song.
 
 plus: what `section_role` and `energy_level` are for and that `reasoning` must name the
 energy, palette colour, cues and moments answered; intensity read from the energy target
@@ -253,15 +270,15 @@ authored already serves the music." After: a "Song Intent: Answer This Song" che
 (intensity from the energy target, a palette role from the Section palettes, an event on
 every high- and medium-emphasis cue listed for the section and on drops, hits and stops,
 `section_role`/`energy_level`, motif and variation across repeats, a transition per shaped
-boundary, "A field left null needs a reason there.").
+boundary, "A section that keeps the authored look (`as_authored`) needs a reason there.").
 
 **Judge developer.** Before: "Song-intent fields that are null or empty mean 'as the
 template is authored'; that is valid, not missing" and "…left as authored where the
-template already serves?". After: a null is "schema-valid, but judged in Phase 2 as a
-choice that needs a reason"; Musical Synchronization requires a cue-bound event for every
+template already serves?". After: an `as_authored` intensity, colour or gobo or an empty
+event list is "schema-valid, but judged in Phase 2 as a choice that needs a reason"; Musical Synchronization requires a cue-bound event for every
 high-emphasis cue and intensity that follows the energy targets; **Penalise** an
 unanswered high-emphasis cue (and unanswered medium ones), flat intensity across a clear
-energy change, colour that ignores the palette, and mostly-null plans ("cannot score above
+energy change, colour that ignores the palette, and mostly-`as_authored` plans ("cannot score above
 the soft-fail band"); **Reward** reasoning that cites the lyrics (cue ids and text),
 energy targets and palette colours. The judge now sees the lyric moment cues
 (`build_judge_variables` passes `lyric_context`; `judge/user.j2` lists them) and the
@@ -289,7 +306,7 @@ Pinned by `test_prompts.py` (`test_the_planner_is_told_to_answer_the_song_in_eve
 "left as authored where", "that is valid, not missing" and similar). Emphasis is written
 "high-/medium-emphasis" in prose because the project's guard forbids hand-listing two
 taxonomy enum values on one prompt line. The schema's field descriptions were reworded the
-same way ("from the section's energy (null: the template's own)").
+same way ("from the section's energy (as_authored: the template's own, with a reason)").
 
 ## Consumers
 
@@ -311,8 +328,8 @@ same way ("from the section's energy (null: the template's own)").
 ## User-visible changes and re-keying
 
 - **Every song plans again once.** The planner cache key hashes the response schema
-  (`spec_prompt_hash` → `response_schema_hash`, `a76326c7…` → `d9389872…`) and the prompt
-  packs (`cfb07167…` → `b495d2ec…`); no manual bump is needed
+  (`spec_prompt_hash` → `response_schema_hash`, `a76326c7…` → `50a67e62…`) and the prompt
+  packs (`cfb07167…` → `8a67005a…`); no manual bump is needed
   (`test_the_response_schema_re_keys_the_plan_cache`). The first `run`/`show`/`inject` per
   song is a paid planning call; a plan that leaves a high-emphasis cue unanswered can take
   one more planner call (bounded by `max_iterations`).
@@ -349,7 +366,7 @@ byte-identical frames, segments, `.xsq`, `.xtiming`, `.xmap` (`<w2>/selector_byt
 Pins: the 44 frame hashes and both `.xsq` hashes unchanged; the 44 fingerprints and the
 combined-show golden's moving-head fingerprint re-recorded again
 (`tests/golden/fixtures/combined_show_drop.json`: `3be80a97…` at `10f3ac49` →
-`98f85710…`); its effects and trace hashes unchanged.
+`b2583195…`); its effects and trace hashes unchanged.
 
 Intent parity: only the "Plans and calls" block changed (now with `label` and the finer
 length/split mapping), plus `overall_strategy=""` on the anchor's plan construction; no
@@ -377,14 +394,40 @@ It exits non-zero unless the response was provider-enforced (`json_schema`), val
 a `ChoreographyPlan`, and has no validator errors; it prints the effort used, usage, the
 song intent per section, the repair count and each repair, and any unanswered HIGH cue
 (the dry run exits non-zero if the schema would not be sent enforced). Dry run on this
-tree: schema 11 / 60, 10,971 bytes; developer 27,715, system 4,890, user 8,342 characters;
-`schema_enforced True`; request 54,685 bytes; exit 0.
+tree: schema 6 / 60, 10,941 bytes, no Claude schema hazard; developer 27,737, system 4,890,
+user 8,381 characters; `schema_enforced True`; request 54,681 bytes; exit 0. The probe now
+catches a provider refusal and exits 1 with its message.
+
+## Live probe (2026-11-17)
+
+The integrator sent the one authorized request after committing `897c4501`:
+`probe_planner.py --live`, 2026-11-17T14:30:51Z, request id
+`req_011Ch8fJpv3DhpHFfhp6KGYs`, log `probe_live.log` in this folder. Purpose: prove
+Claude compiles and enforces the 11 / 60 schema on the real rendered planner pack.
+Result: **HTTP 400**, no tokens generated:
+
+> output_config.format.schema: Invalid schema: Enum value 'PALETTE_PRIMARY' does not match
+> declared type '['string', 'null']'
+
+Claude does not accept an `enum` under a list-valued `type`. What changed:
+- the five nullable enums became plain string enums with a sentinel member (`as_authored`
+  for the section's intensity, colour and gobo; `none` for an event's colour and gobo),
+  `None` in Python, the sentinel in every dump (Contract above);
+- `claude_schema_hazards` (`agents/providers/anthropic.py`) encodes the lesson, with the
+  provider's message quoted: an enum under a type list, or an enum listing null, is
+  refused before any request is sent (`_build_request` raises), and a test holds every
+  registered schema to it;
+- prompts say `as_authored` / `none` where they said null; the probe catches a provider
+  refusal and exits 1;
+- the schema is 6 unions / 60 nodes; fingerprints re-recorded; the byte proof re-run.
+
+One further request will be sent by the integrator after this fix.
 
 ## Verification (this tree, fresh)
 
 | Command | Result |
 |---|---|
-| `uv run pytest tests -q --no-cov` | 6754 passed, 30 skipped, 24 xfailed |
+| `uv run pytest tests -q --no-cov` | 6758 passed, 30 skipped, 24 xfailed |
 | `uv run ruff check .` | All checks passed |
 | `uv run ruff format --check .` | 1296 files already formatted |
 | `uv run mypy .` | no issues in 649 source files |
@@ -398,7 +441,7 @@ tree: schema 11 / 60, 10,971 bytes; developer 27,715, system 4,890, user 8,342 c
 
 | # | Item | Done |
 |---|---|---|
-| 1 | Typeless nullable enums | Typed `["string","null"]` by the strict builder; guard test over every registered spec; re-pinned 11 / 60 |
+| 1 | Typeless nullable enums | First typed `["string","null"]` (refused live by Claude); now plain string enums with a sentinel member; guard tests; re-pinned 6 / 60 |
 | 2 | Selector policy deleted | Restored and mapped onto `intensity` / `color`; tests restored and extended |
 | 3 | Pairing as a model error | Removed from the model; repaired (drop when the value is missing, clear a stray one) |
 | 4 | Edge cues dropped | Snapped to the section's nearest beat; out-of-section and out-of-bar events clamped; no-grid binding kept; dropped only when the section has no beat |
@@ -415,9 +458,9 @@ tree: schema 11 / 60, 10,971 bytes; developer 27,715, system 4,890, user 8,342 c
 
 ## For the integrator and the owner
 
-1. The OpenAI acceptance of `["string","null"]`-typed enums and Claude's compile of the
-   11 / 60 schema are both unverified live; the Claude probe is ready (above). The OpenAI
-   form is the one OpenAI documents for nullable fields.
+1. The fixed schema is unverified live: one further request will be sent by the
+   integrator with `probe_planner.py --live`. OpenAI's strict mode accepts plain typed
+   string enums (the form every other registered schema already uses).
 2. The advisory re-plan can cost one extra planner call per run when a high-emphasis cue
    is left unanswered (never more than `max_iterations` allows).
 3. Lengths and splits remain categories (finer now); code owns the exact durations.

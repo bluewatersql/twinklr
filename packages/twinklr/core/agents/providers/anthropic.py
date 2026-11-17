@@ -155,6 +155,41 @@ def claude_schema_size(schema: dict[str, Any]) -> ClaudeSchemaSize:
     return ClaudeSchemaSize(union_parameters=unions, nodes=nodes)
 
 
+def claude_schema_hazards(schema: dict[str, Any]) -> list[str]:
+    """Schema forms Claude refuses to compile, found before any request is sent.
+
+    The 2026-11-17 live probe of the moving-head plan
+    (changes/2026_11_12_mh_true_up/evidence/2026-11-17-w2-planner-contract/README.md,
+    request `req_011Ch8fJpv3DhpHFfhp6KGYs`) was refused with HTTP 400:
+    "output_config.format.schema: Invalid schema: Enum value 'PALETTE_PRIMARY' does not
+    match declared type '['string', 'null']'". An `enum` under a list-valued `type` is
+    therefore refused; an `enum` that lists null is not used either (spell "no choice" as
+    a string member, or use `anyOf` with `{"type": "null"}`, the form the probed schemas
+    use). Returns one line per hazard, naming its location.
+    """
+    hazards: list[str] = []
+
+    def walk(node: Any, path: str) -> None:
+        if isinstance(node, list):
+            for index, item in enumerate(node):
+                walk(item, f"{path}/{index}")
+            return
+        if not isinstance(node, dict):
+            return
+        enum = node.get("enum")
+        if isinstance(enum, list):
+            if isinstance(node.get("type"), list):
+                hazards.append(f"{path or '/'}: an enum under the type list {node['type']}")
+            if None in enum:
+                hazards.append(f"{path or '/'}: an enum that lists null")
+        for key, child in node.items():
+            if key != "enum":
+                walk(child, f"{path}/{key}")
+
+    walk(schema, "")
+    return hazards
+
+
 def _claude_schema_node(value: Any) -> Any:
     if isinstance(value, list):
         return [_claude_schema_node(item) for item in value]
@@ -463,6 +498,12 @@ class AnthropicProvider:
             schema = claude_json_schema(schema_model)
             size = claude_schema_size(schema)
             if size.within_limits:
+                hazards = claude_schema_hazards(schema)
+                if hazards:
+                    raise LLMProviderError(
+                        f"The {schema_model.__name__} schema uses forms Claude refuses to "
+                        "compile: " + "; ".join(hazards)
+                    )
                 output_config["format"] = {"type": "json_schema", "schema": schema}
             elif not allow_prompt_only_schema:
                 raise LLMProviderError(

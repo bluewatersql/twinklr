@@ -11,9 +11,19 @@ neutral renders exactly as its templates are authored.
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    PlainSerializer,
+    ValidationError,
+    WithJsonSchema,
+    field_validator,
+    model_validator,
+)
 from pydantic.json_schema import SkipJsonSchema
 
 from twinklr.core.sequencer.models.enum import Intensity
@@ -90,54 +100,49 @@ class RepairAction(StrEnum):
     RECORDED = "recorded"
 
 
-# Nullable choices are spelled as one enum that includes null, so a provider's grammar
-# sees one enum rather than a union.
-IntensityChoice = Literal[
-    Intensity.SLOW,
-    Intensity.SMOOTH,
-    Intensity.FAST,
-    Intensity.DRAMATIC,
-    Intensity.INTENSE,
-    None,
-]
-ColorChoice = Literal[
-    PlanColor.PALETTE_PRIMARY,
-    PlanColor.PALETTE_ACCENT,
-    PlanColor.PALETTE_WARM,
-    PlanColor.PALETTE_COOL,
-    PlanColor.PALETTE_NEUTRAL,
-    PlanColor.RED,
-    PlanColor.BLUE,
-    PlanColor.GREEN,
-    PlanColor.YELLOW,
-    PlanColor.MAGENTA,
-    PlanColor.CYAN,
-    PlanColor.ORANGE,
-    PlanColor.PURPLE,
-    PlanColor.AMBER,
-    PlanColor.LIME,
-    PlanColor.WHITE,
-    PlanColor.WARM_WHITE,
-    PlanColor.COOL_WHITE,
-    PlanColor.UV,
-    None,
-]
-GoboChoice = Literal[
-    GoboPattern.OPEN,
-    GoboPattern.CIRCLES,
-    GoboPattern.TRIANGLES,
-    GoboPattern.STARS,
-    GoboPattern.DIAMONDS,
-    GoboPattern.CLOUDS,
-    GoboPattern.PRISM,
-    GoboPattern.SHATTER,
-    GoboPattern.DOTS,
-    GoboPattern.FLAME,
-    GoboPattern.WATER,
-    GoboPattern.FOLIAGE,
-    GoboPattern.ABSTRACT,
-    None,
-]
+AS_AUTHORED = "as_authored"
+"""The section-level choice that keeps the template's own intensity, colour or gobo."""
+
+NO_VALUE = "none"
+"""The event-level choice for an event that carries no colour or gobo."""
+
+
+def _sentinel_choice(
+    vocabulary: type[StrEnum], sentinel: str
+) -> tuple[BeforeValidator, PlainSerializer, WithJsonSchema]:
+    """Spell "no choice" as one more member of a string enum instead of null.
+
+    Claude refuses an enum under a `["string", "null"]` type and counts every `anyOf`
+    against its union limit; a plain string enum with a sentinel member is accepted by
+    every provider at no union. In Python the sentinel is `None` (so consumers test
+    `is None`); every dump, and so the plan's hash, spells it as the sentinel string.
+    """
+    values = [member.value for member in vocabulary]
+    return (
+        BeforeValidator(lambda value: None if value == sentinel else value),
+        PlainSerializer(
+            lambda value: sentinel if value is None else str(value.value), return_type=str
+        ),
+        WithJsonSchema({"type": "string", "enum": [*values, sentinel]}),
+    )
+
+
+_INTENSITY = _sentinel_choice(Intensity, AS_AUTHORED)
+_SECTION_COLOR = _sentinel_choice(PlanColor, AS_AUTHORED)
+_SECTION_GOBO = _sentinel_choice(GoboPattern, AS_AUTHORED)
+_EVENT_COLOR = _sentinel_choice(PlanColor, NO_VALUE)
+_EVENT_GOBO = _sentinel_choice(GoboPattern, NO_VALUE)
+
+IntensityChoice = Annotated[Intensity | None, _INTENSITY[0], _INTENSITY[1], _INTENSITY[2]]
+"""A section's intensity, or `as_authored` (None in Python)."""
+ColorChoice = Annotated[PlanColor | None, _SECTION_COLOR[0], _SECTION_COLOR[1], _SECTION_COLOR[2]]
+"""A section's colour, or `as_authored` (None in Python)."""
+GoboChoice = Annotated[GoboPattern | None, _SECTION_GOBO[0], _SECTION_GOBO[1], _SECTION_GOBO[2]]
+"""A section's gobo, or `as_authored` (None in Python)."""
+EventColorChoice = Annotated[PlanColor | None, _EVENT_COLOR[0], _EVENT_COLOR[1], _EVENT_COLOR[2]]
+"""An event's colour, or `none` (None in Python)."""
+EventGoboChoice = Annotated[GoboPattern | None, _EVENT_GOBO[0], _EVENT_GOBO[1], _EVENT_GOBO[2]]
+"""An event's gobo, or `none` (None in Python)."""
 
 PART_IDS = ("A", "B", "C")
 """The ids code gives a section's unlabelled parts, by position, when it has more than one."""
@@ -181,8 +186,12 @@ class PlanEvent(BaseModel):
         description="The lyric moment cue this event lands on, or null"
     )
     action: EventAction = Field(description="What the heads do")
-    color: ColorChoice = Field(description="The colour for a color event; otherwise null")
-    gobo: GoboChoice = Field(description="The pattern for a gobo event; otherwise null")
+    color: EventColorChoice = Field(
+        description="The colour for a color event; `none` for every other action"
+    )
+    gobo: EventGoboChoice = Field(
+        description="The pattern for a gobo event; `none` for every other action"
+    )
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -220,13 +229,16 @@ class PlanSection(BaseModel):
         max_length=len(PART_IDS),
     )
     intensity: IntensityChoice = Field(
-        description="How hard the light drives, from the section's energy (null: the template's own)"
+        description="How hard the light drives, from the section's energy "
+        "(as_authored: the template's own, with a reason)"
     )
     color: ColorChoice = Field(
         description="The section's colour, a role in its palette or a named colour "
-        "(null: the template's own)"
+        "(as_authored: the template's own, with a reason)"
     )
-    gobo: GoboChoice = Field(description="The section's beam pattern (null: the template's own)")
+    gobo: GoboChoice = Field(
+        description="The section's beam pattern (as_authored: the template's own)"
+    )
     moment_cues: list[str] = Field(description="Lyric moment cue ids this section answers")
     events: list[PlanEvent] = Field(
         description="Timed accents on the section's lyric cues and musical moments"

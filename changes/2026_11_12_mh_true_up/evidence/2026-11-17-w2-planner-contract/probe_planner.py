@@ -45,6 +45,7 @@ from twinklr.core.agents.providers.anthropic import (  # noqa: E402
     claude_json_schema,
     claude_schema_size,
 )
+from twinklr.core.agents.providers.errors import LLMProviderError  # noqa: E402
 from twinklr.core.agents.schema_utils import (  # noqa: E402
     get_json_schema_example,
     response_schema_hash,
@@ -193,7 +194,14 @@ async def main() -> int:
 
     print("utc_start", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
     started = time.time()
-    response = await provider.generate_json_async(messages=messages, model=MODEL, **request_kwargs)
+    try:
+        response = await provider.generate_json_async(
+            messages=messages, model=MODEL, **request_kwargs
+        )
+    except LLMProviderError as error:
+        print("utc_end", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+        print("PROBE FAILED: the provider refused the request:", error)
+        return 1
     print("utc_end", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
     mode = response.metadata.structured_output_mode
     print(

@@ -32,8 +32,9 @@ Before evaluating creative quality, verify the plan is **technically sound**:
 - All required fields are present
 - Each section has 1-3 `parts` in bar order, the first starting at the section's
   `start_bar`; a part plays until the next part starts (one part covers the section)
-- A song-intent field that is null or empty keeps the template's own look: schema-valid,
-  but judged in Phase 2 as a choice that needs a reason
+- A section's `intensity`, `color` or `gobo` of `as_authored`, or an empty event list,
+  keeps the template's own look: schema-valid, but judged in Phase 2 as a choice that
+  needs a reason; an event's `color` and `gobo` are `none` unless its action uses them
 
 **Timing**:
 - Bar ranges are valid (`end_bar >= start_bar`)
@@ -85,8 +86,9 @@ name the section and the cue):
 - a high-emphasis lyric moment cue with no event (unanswered), and medium-emphasis cues
   left unanswered;
 - intensity that stays flat across a clear change of energy target;
-- colour that ignores the section's palette (null, or a named colour with no reason);
-- a plan whose sections are mostly null song intent: the templates alone do not follow
+- colour that ignores the section's palette (`as_authored`, or a named colour with no
+  reason);
+- a plan whose sections are mostly `as_authored` or empty: the templates alone do not follow
   the song, so such a plan cannot score above the soft-fail band;
 - a plan that is busy rather than responsive: strobes or the highest intensity in
   low-energy sections, accents too dense to read, colour changes faster than the music
