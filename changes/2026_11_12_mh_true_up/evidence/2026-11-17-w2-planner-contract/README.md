@@ -336,7 +336,7 @@ same way ("from the section's energy (as_authored: the template's own, with a re
 - **Old checkpoints** are refused by `eval-report` by name (re-run the command that planned
   them); **old live plans** by `regenerate` (run `twinklr inject`). The two historical
   checkpoints under `evaluations/` stay as history.
-- **On Claude** the plan is sent schema-enforced (live compile pending the probe).
+- **On Claude** the plan is sent schema-enforced (compiled and enforced live, probe 3 below).
 - Renders, timing tracks and sidecars are byte-identical for equivalent plans; **render
   fingerprints change** (the hashed plan dump changed). Timing labels: as the table above.
 
@@ -582,3 +582,31 @@ that adaptive thinking at `high` ran little or none here.
 | 4 | Advisory text | "an accent that suits its emphasis and visual hint" |
 | 5 | Quantisation and defaults | Rows marked "same range, quantised to steps"; old default 0.5 → HALF, W0 fixture 0.25 → QUARTER |
 | 6 | Typos | Judge "name the section and the cue"; overview "Its schema is…" |
+
+## Live probe 3 (2026-11-17, integrator)
+
+Purpose: confirm the final schema compiles and that a complete, song-responsive plan
+comes back once the prompt and validator defects found by probe 2 were fixed. One request,
+SDK retries off, synthetic song, no owner data. Log `probe_live_3.log`, response
+`probe_response_3.json`. Code at `f9e348da`.
+
+- Sent 2026-11-17T15:09:44Z, 29.8 s, mode `json_schema` (provider-enforced), finish
+  `end_turn`, 20,514 prompt and 3,402 completion tokens. Schema hash `e09b6057…`,
+  6 unions and 60 nodes.
+- All four song sections planned on the song's bars. Repairs 0, validator errors 0,
+  unanswered high-emphasis cues 0.
+- Intent per section: intro SLOW, sparse, palette neutral, fade up from dark, no events
+  (reason given); verse SMOOTH, palette primary, a warm colour change on the
+  medium-emphasis cue; chorus DRAMATIC, busy, palette accent, a hit on the high-emphasis
+  cue, a stars gobo on the low-emphasis cue, one strobe; outro SLOW, sparse, one soft
+  pulse, morph in from the chorus. Reasoning cites energy target, palette and lyric
+  lines, and states restraint in the verse so the chorus lifts.
+
+What this shows: the contract compiles on Claude, is enforced, and one plan answered the
+song with proportion. What it does not show: plan quality in general (one synthetic song,
+one sample), anything about rendering (intent is still not rendered), or OpenAI's
+acceptance of the schema (not probed).
+
+Live requests for W2, all under the owner's 2026-11-13 authorization: probe 1 (14:30Z,
+rejected at schema validation, no tokens generated), probe 2 (14:41Z, compiled; degenerate
+one-section plan that our validator wrongly passed), probe 3 (15:09Z, above).

@@ -1,0 +1,441 @@
+{
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "response": {
+    "sections": [
+      {
+        "section_id": "intro",
+        "start_bar": 1,
+        "end_bar": 7,
+        "section_role": "intro",
+        "energy_level": 25,
+        "parts": [
+          {
+            "start_bar": 1,
+            "template_id": "zoom_wave",
+            "preset_id": null,
+            "modifiers": [],
+            "label": null,
+            "reasoning": "A gentle sway with breathing beam width is the softest continuous look in the library (energy 20-60), a glow that wakes up over the piano without competing with the mega tree."
+          }
+        ],
+        "intensity": "SLOW",
+        "color": "PALETTE_NEUTRAL",
+        "gobo": "open",
+        "moment_cues": [],
+        "events": [],
+        "motif_id": "pulse",
+        "variation": "NONE",
+        "density": "SPARSE",
+        "transitions": [
+          {
+            "edge": "ENTRY",
+            "mode": "fade_via_black",
+            "length": "TWO_BARS",
+            "curve": "ease_in_out_sine",
+            "split": "HALF",
+            "channels": []
+          },
+          {
+            "edge": "EXIT",
+            "mode": "crossfade",
+            "length": "BAR",
+            "curve": "ease_in_out_sine",
+            "split": "HALF",
+            "channels": []
+          }
+        ],
+        "reasoning": "LOW energy target and the directive to open softly: SLOW intensity, sparse density, and the palette's neutral warm white as a soft glow under the piano. The heads fade up from dark over two bars to 'wake up'. Events are deliberately empty: there are no lyric cues here and the zoom wave's own breathing already states the pulse motif quietly; no strobes, per the patterns to avoid. A one-bar crossfade hands into the verse."
+      },
+      {
+        "section_id": "verse_1",
+        "start_bar": 8,
+        "end_bar": 22,
+        "section_role": "verse",
+        "energy_level": 45,
+        "parts": [
+          {
+            "start_bar": 8,
+            "template_id": "masked_wheel_flick",
+            "preset_id": null,
+            "modifiers": [],
+            "label": null,
+            "reasoning": "A gentle lit sway with a masked colour flick gives the verse a groove and colour interest while staying restrained, leaving the cascade movement for the chorus."
+          }
+        ],
+        "intensity": "SMOOTH",
+        "color": "PALETTE_PRIMARY",
+        "gobo": "open",
+        "moment_cues": [
+          "verse-home"
+        ],
+        "events": [
+          {
+            "bar": 16,
+            "beat": 1,
+            "moment_cue_id": "verse-home",
+            "action": "color",
+            "color": "PALETTE_WARM",
+            "gobo": "none"
+          }
+        ],
+        "motif_id": "pulse",
+        "variation": "WIDEN",
+        "density": "BALANCED",
+        "transitions": [
+          {
+            "edge": "EXIT",
+            "mode": "sweep",
+            "length": "BAR",
+            "curve": "ease_in_quad",
+            "split": "HALF",
+            "channels": []
+          }
+        ],
+        "reasoning": "MED energy target kept restrained so the chorus can lift: SMOOTH intensity, balanced density, christmas red as the palette primary. The medium-emphasis cue 'find the way back home' gets a warm colour change as the line resolves, matching its visual hint, rather than any strobe or hit. The pulse motif widens slightly from the intro. The heads sweep, lit, across the last bar to lift into the chorus."
+      },
+      {
+        "section_id": "chorus_1",
+        "start_bar": 23,
+        "end_bar": 37,
+        "section_role": "chorus (song peak)",
+        "energy_level": 85,
+        "parts": [
+          {
+            "start_bar": 23,
+            "template_id": "fly_out_cascade",
+            "preset_id": null,
+            "modifiers": [],
+            "label": null,
+            "reasoning": "Mirrored wings flying out from the centre in a staggered cascade read as light bursting outward on 'light it up' - the most energetic, expansive look in the library for the song's single peak."
+          }
+        ],
+        "intensity": "DRAMATIC",
+        "color": "PALETTE_ACCENT",
+        "gobo": "open",
+        "moment_cues": [
+          "chorus-light",
+          "chorus-stars"
+        ],
+        "events": [
+          {
+            "bar": 23,
+            "beat": 3,
+            "moment_cue_id": "chorus-light",
+            "action": "hit",
+            "color": "none",
+            "gobo": "none"
+          },
+          {
+            "bar": 31,
+            "beat": 1,
+            "moment_cue_id": "chorus-stars",
+            "action": "gobo",
+            "color": "none",
+            "gobo": "stars"
+          },
+          {
+            "bar": 36,
+            "beat": 1,
+            "moment_cue_id": null,
+            "action": "strobe_medium",
+            "color": "none",
+            "gobo": "none"
+          }
+        ],
+        "motif_id": "pulse",
+        "variation": "FASTER",
+        "density": "BUSY",
+        "transitions": [
+          {
+            "edge": "ENTRY",
+            "mode": "snap",
+            "length": "BEAT",
+            "curve": "linear",
+            "split": "HALF",
+            "channels": []
+          }
+        ],
+        "reasoning": "PEAK energy target and the song's peak with full voices: DRAMATIC intensity, busy density, christmas green as the palette accent against the red verse. The high-emphasis 'light it up' cue gets a bright hit, the low-emphasis 'under the stars' gets a starry gobo texture per its hint, and the show's only strobe is a short medium strobe near the chorus end as the final lift - the biggest moment stays the biggest. The pulse motif quickens. A snap on the downbeat cuts into the chorus."
+      },
+      {
+        "section_id": "outro",
+        "start_bar": 38,
+        "end_bar": 45,
+        "section_role": "outro (release)",
+        "energy_level": 25,
+        "parts": [
+          {
+            "start_bar": 38,
+            "template_id": "target_orbit",
+            "preset_id": null,
+            "modifiers": [],
+            "label": null,
+            "reasoning": "A slow unified circle about the aim, lit throughout, settles the energy into a calm, warm close and contrasts the chorus's cascades without repeating the intro's zoom wave."
+          }
+        ],
+        "intensity": "SLOW",
+        "color": "PALETTE_WARM",
+        "gobo": "open",
+        "moment_cues": [],
+        "events": [
+          {
+            "bar": 42,
+            "beat": 1,
+            "moment_cue_id": null,
+            "action": "pulse",
+            "color": "none",
+            "gobo": "none"
+          }
+        ],
+        "motif_id": "pulse",
+        "variation": "SLOWER",
+        "density": "SPARSE",
+        "transitions": [
+          {
+            "edge": "ENTRY",
+            "mode": "morph",
+            "length": "TWO_BARS",
+            "curve": "ease_out_sine",
+            "split": "HALF",
+            "channels": [
+              {
+                "channel": "gobo",
+                "strategy": "fade_via_black"
+              }
+            ]
+          },
+          {
+            "edge": "EXIT",
+            "mode": "fade_via_black",
+            "length": "FOUR_BARS",
+            "curve": "ease_out_sine",
+            "split": "HALF",
+            "channels": []
+          }
+        ],
+        "reasoning": "RELEASE energy target two steps below the peak: SLOW intensity, sparse density, and the palette's warm colour for the calm, peaceful close of the mood arc. A single soft pulse restates the pulse motif slowly as the held chord arrives; there are no lyric cues here. The entry morphs out of the chorus over two bars, clearing the star gobo in the dark, and the heads fade to black over the last four bars with the held chord."
+      }
+    ],
+    "overall_strategy": "The heads follow the song's wistful-to-joyful-to-peaceful arc as accents to the mega tree: a neutral glow over the piano intro, a restrained red verse with a warm turn on 'find the way back home', a dramatic green cascade chorus with a hit on 'light it up', stars on 'under the stars' and the show's only strobe, then a slow warm orbit fading to black. The pulse motif runs through every section, widening, quickening at the peak and slowing at the close."
+  },
+  "plan": {
+    "sections": [
+      {
+        "section_id": "intro",
+        "start_bar": 1,
+        "end_bar": 7,
+        "section_role": "intro",
+        "energy_level": 25,
+        "parts": [
+          {
+            "start_bar": 1,
+            "template_id": "zoom_wave",
+            "preset_id": null,
+            "modifiers": [],
+            "label": null,
+            "reasoning": "A gentle sway with breathing beam width is the softest continuous look in the library (energy 20-60), a glow that wakes up over the piano without competing with the mega tree."
+          }
+        ],
+        "intensity": "SLOW",
+        "color": "PALETTE_NEUTRAL",
+        "gobo": "open",
+        "moment_cues": [],
+        "events": [],
+        "motif_id": "pulse",
+        "variation": "NONE",
+        "density": "SPARSE",
+        "transitions": [
+          {
+            "edge": "ENTRY",
+            "mode": "fade_via_black",
+            "length": "TWO_BARS",
+            "curve": "ease_in_out_sine",
+            "split": "HALF",
+            "channels": []
+          },
+          {
+            "edge": "EXIT",
+            "mode": "crossfade",
+            "length": "BAR",
+            "curve": "ease_in_out_sine",
+            "split": "HALF",
+            "channels": []
+          }
+        ],
+        "reasoning": "LOW energy target and the directive to open softly: SLOW intensity, sparse density, and the palette's neutral warm white as a soft glow under the piano. The heads fade up from dark over two bars to 'wake up'. Events are deliberately empty: there are no lyric cues here and the zoom wave's own breathing already states the pulse motif quietly; no strobes, per the patterns to avoid. A one-bar crossfade hands into the verse."
+      },
+      {
+        "section_id": "verse_1",
+        "start_bar": 8,
+        "end_bar": 22,
+        "section_role": "verse",
+        "energy_level": 45,
+        "parts": [
+          {
+            "start_bar": 8,
+            "template_id": "masked_wheel_flick",
+            "preset_id": null,
+            "modifiers": [],
+            "label": null,
+            "reasoning": "A gentle lit sway with a masked colour flick gives the verse a groove and colour interest while staying restrained, leaving the cascade movement for the chorus."
+          }
+        ],
+        "intensity": "SMOOTH",
+        "color": "PALETTE_PRIMARY",
+        "gobo": "open",
+        "moment_cues": [
+          "verse-home"
+        ],
+        "events": [
+          {
+            "bar": 16,
+            "beat": 1,
+            "moment_cue_id": "verse-home",
+            "action": "color",
+            "color": "PALETTE_WARM",
+            "gobo": "none"
+          }
+        ],
+        "motif_id": "pulse",
+        "variation": "WIDEN",
+        "density": "BALANCED",
+        "transitions": [
+          {
+            "edge": "EXIT",
+            "mode": "sweep",
+            "length": "BAR",
+            "curve": "ease_in_quad",
+            "split": "HALF",
+            "channels": []
+          }
+        ],
+        "reasoning": "MED energy target kept restrained so the chorus can lift: SMOOTH intensity, balanced density, christmas red as the palette primary. The medium-emphasis cue 'find the way back home' gets a warm colour change as the line resolves, matching its visual hint, rather than any strobe or hit. The pulse motif widens slightly from the intro. The heads sweep, lit, across the last bar to lift into the chorus."
+      },
+      {
+        "section_id": "chorus_1",
+        "start_bar": 23,
+        "end_bar": 37,
+        "section_role": "chorus (song peak)",
+        "energy_level": 85,
+        "parts": [
+          {
+            "start_bar": 23,
+            "template_id": "fly_out_cascade",
+            "preset_id": null,
+            "modifiers": [],
+            "label": null,
+            "reasoning": "Mirrored wings flying out from the centre in a staggered cascade read as light bursting outward on 'light it up' - the most energetic, expansive look in the library for the song's single peak."
+          }
+        ],
+        "intensity": "DRAMATIC",
+        "color": "PALETTE_ACCENT",
+        "gobo": "open",
+        "moment_cues": [
+          "chorus-light",
+          "chorus-stars"
+        ],
+        "events": [
+          {
+            "bar": 23,
+            "beat": 3,
+            "moment_cue_id": "chorus-light",
+            "action": "hit",
+            "color": "none",
+            "gobo": "none"
+          },
+          {
+            "bar": 31,
+            "beat": 2,
+            "moment_cue_id": "chorus-stars",
+            "action": "gobo",
+            "color": "none",
+            "gobo": "stars"
+          },
+          {
+            "bar": 36,
+            "beat": 1,
+            "moment_cue_id": null,
+            "action": "strobe_medium",
+            "color": "none",
+            "gobo": "none"
+          }
+        ],
+        "motif_id": "pulse",
+        "variation": "FASTER",
+        "density": "BUSY",
+        "transitions": [
+          {
+            "edge": "ENTRY",
+            "mode": "snap",
+            "length": "BEAT",
+            "curve": "linear",
+            "split": "HALF",
+            "channels": []
+          }
+        ],
+        "reasoning": "PEAK energy target and the song's peak with full voices: DRAMATIC intensity, busy density, christmas green as the palette accent against the red verse. The high-emphasis 'light it up' cue gets a bright hit, the low-emphasis 'under the stars' gets a starry gobo texture per its hint, and the show's only strobe is a short medium strobe near the chorus end as the final lift - the biggest moment stays the biggest. The pulse motif quickens. A snap on the downbeat cuts into the chorus."
+      },
+      {
+        "section_id": "outro",
+        "start_bar": 38,
+        "end_bar": 45,
+        "section_role": "outro (release)",
+        "energy_level": 25,
+        "parts": [
+          {
+            "start_bar": 38,
+            "template_id": "target_orbit",
+            "preset_id": null,
+            "modifiers": [],
+            "label": null,
+            "reasoning": "A slow unified circle about the aim, lit throughout, settles the energy into a calm, warm close and contrasts the chorus's cascades without repeating the intro's zoom wave."
+          }
+        ],
+        "intensity": "SLOW",
+        "color": "PALETTE_WARM",
+        "gobo": "open",
+        "moment_cues": [],
+        "events": [
+          {
+            "bar": 42,
+            "beat": 1,
+            "moment_cue_id": null,
+            "action": "pulse",
+            "color": "none",
+            "gobo": "none"
+          }
+        ],
+        "motif_id": "pulse",
+        "variation": "SLOWER",
+        "density": "SPARSE",
+        "transitions": [
+          {
+            "edge": "ENTRY",
+            "mode": "morph",
+            "length": "TWO_BARS",
+            "curve": "ease_out_sine",
+            "split": "HALF",
+            "channels": [
+              {
+                "channel": "gobo",
+                "strategy": "fade_via_black"
+              }
+            ]
+          },
+          {
+            "edge": "EXIT",
+            "mode": "fade_via_black",
+            "length": "FOUR_BARS",
+            "curve": "ease_out_sine",
+            "split": "HALF",
+            "channels": []
+          }
+        ],
+        "reasoning": "RELEASE energy target two steps below the peak: SLOW intensity, sparse density, and the palette's warm colour for the calm, peaceful close of the mood arc. A single soft pulse restates the pulse motif slowly as the held chord arrives; there are no lyric cues here. The entry morphs out of the chorus over two bars, clearing the star gobo in the dark, and the heads fade to black over the last four bars with the held chord."
+      }
+    ],
+    "overall_strategy": "The heads follow the song's wistful-to-joyful-to-peaceful arc as accents to the mega tree: a neutral glow over the piano intro, a restrained red verse with a warm turn on 'find the way back home', a dramatic green cascade chorus with a hit on 'light it up', stars on 'under the stars' and the show's only strobe, then a slow warm orbit fading to black. The pulse motif runs through every section, widening, quickening at the peak and slowing at the close.",
+    "repairs": []
+  }
+}

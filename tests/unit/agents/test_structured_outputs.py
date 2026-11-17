@@ -291,7 +291,7 @@ def test_all_registered_strict_roots_stay_within_openai_schema_ceilings() -> Non
 # registered specs are byte-identical to the probed ones, except `mh_planner`: its
 # song-intent contract (2026-11-17) is within the limits by measure and is sent as an
 # enforced format. Its first live probe was refused (an enum under a type list; see
-# `claude_schema_hazards`); the fixed schema's live compile is pending the next probe
+# `claude_schema_hazards`); the fixed schema compiled live on 2026-11-17 (W2 evidence record, probe 3)
 # (changes/2026_11_12_mh_true_up/evidence/2026-11-17-w2-planner-contract/).
 _CLAUDE_COMPILED_SPECS = frozenset(
     {

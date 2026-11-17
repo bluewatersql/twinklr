@@ -116,7 +116,7 @@ _Source: `packages/twinklr/core/agents/`_
 
 Data-driven agent system using `AgentSpec` data objects and an async runner — no agent class hierarchies. The orchestration loop:
 
-1. **Planner** generates a `ChoreographyPlan`: per song section, one to three templates (with presets) and the section's typed categorical song intent (intensity, colour, gobo, timed events tied to lyric MomentCues, motif variation, density, entry and exit transitions). Its schema is within Claude's measured limits and is sent to Claude as an enforced structured output (live compile pending a probe)
+1. **Planner** generates a `ChoreographyPlan`: per song section, one to three templates (with presets) and the section's typed categorical song intent (intensity, colour, gobo, timed events tied to lyric MomentCues, motif variation, density, entry and exit transitions). Its schema is within Claude's measured limits and is sent to Claude as an enforced structured output (compiled and enforced live on 2026-11-17)
 2. **Normalisation and heuristic validation**: deterministic code repairs single items the song cannot hold, keeping as much of each as the song allows (an event outside its section moves into it; an unknown cue is dropped), records each repair and shows it to the planner on the next revision; structural errors (a song section left unplanned, a section whose bars are not the song structure's, a template not offered, a placeholder reason or strategy) send the plan back
 3. **Judge** scores the plan (0-10) and decides: approve, soft-fail (revise), or hard-fail (redo)
 4. Structured feedback and the judge's own prior verdict history loop back into the next iteration
@@ -192,7 +192,7 @@ Created by the CLI with explicit configs, or via `TwinklrSession.from_directory(
   passed its first live end-to-end run on 2026-11-12, but the macro, group and audio
   planner schemas are too large for Claude to enforce server-side, so their output there
   is validated client-side only; the moving-head planner's schema is sent as an enforced
-  format, its live compile pending a probe. Ollama cloud's real-schema smoke awaits an owner decision.
+  format, compiled and enforced by Claude in a live probe on 2026-11-17. Ollama cloud's real-schema smoke awaits an owner decision.
 - **No live DMX control** — Twinklr generates sequence effects. Its guarded xLights workflow can inject/regenerate reserved layers in an open sequence, but it is not a real-time lighting controller.
 - **Empirical show acceptance remains open** — the combined `twinklr show` path is
   implemented, but xLights GUI, vision, and human-judgment gates remain deferred until a

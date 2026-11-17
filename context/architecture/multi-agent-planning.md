@@ -99,7 +99,7 @@ are not decision evidence.
   grammar is too large"), so the adapter sends those requests with the schema carried only
   by the prompt, decided before sending, and validates them client-side. The moving-head
   planner's schema is within the measured limits and is sent as an enforced format; its
-  live compile is pending the W2 probe. The first Claude live run passed on 2026-11-12
+  schema compiled and was enforced live on 2026-11-17 (W2 evidence record). The first Claude live run passed on 2026-11-12
   ([evaluation](../../evaluations/2026-11-12-claude-baseline-live-run/README.md)).
 - Runtime prompt packs: `packages/twinklr/core/**/prompts/` (Jinja2 — application source,
   distinct from the root `prompts/` agent-workflow library)

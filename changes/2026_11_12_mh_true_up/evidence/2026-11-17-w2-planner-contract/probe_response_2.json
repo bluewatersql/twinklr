@@ -1,0 +1,121 @@
+{
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "response": {
+    "sections": [
+      {
+        "section_id": "intro",
+        "start_bar": 1,
+        "end_bar": 7,
+        "section_role": "intro",
+        "energy_level": 40,
+        "parts": [
+          {
+            "start_bar": 1,
+            "template_id": "zoom_wave",
+            "preset_id": null,
+            "modifiers": [],
+            "label": null,
+            "reasoning": "A gentle sway with breathing beam width introduces the heads softly, sitting within its 20-60 energy range for a MED-but-opening intro."
+          }
+        ],
+        "intensity": "SMOOTH",
+        "color": "PALETTE_NEUTRAL",
+        "gobo": "open",
+        "moment_cues": [],
+        "events": [
+          {
+            "bar": 1,
+            "beat": 1,
+            "moment_cue_id": null,
+            "action": "open",
+            "color": "none",
+            "gobo": "none"
+          }
+        ],
+        "motif_id": "pulse",
+        "variation": "NONE",
+        "density": "SPARSE",
+        "transitions": [
+          {
+            "edge": "ENTRY",
+            "mode": "fade_via_black",
+            "length": "TWO_BARS",
+            "curve": "ease_in_out_sine",
+            "split": "HALF",
+            "channels": []
+          },
+          {
+            "edge": "EXIT",
+            "mode": "crossfade",
+            "length": "BAR",
+            "curve": "ease_in_out_sine",
+            "split": "HALF",
+            "channels": []
+          }
+        ],
+        "reasoning": "x"
+      }
+    ],
+    "overall_strategy": "x"
+  },
+  "plan": {
+    "sections": [
+      {
+        "section_id": "intro",
+        "start_bar": 1,
+        "end_bar": 7,
+        "section_role": "intro",
+        "energy_level": 40,
+        "parts": [
+          {
+            "start_bar": 1,
+            "template_id": "zoom_wave",
+            "preset_id": null,
+            "modifiers": [],
+            "label": null,
+            "reasoning": "A gentle sway with breathing beam width introduces the heads softly, sitting within its 20-60 energy range for a MED-but-opening intro."
+          }
+        ],
+        "intensity": "SMOOTH",
+        "color": "PALETTE_NEUTRAL",
+        "gobo": "open",
+        "moment_cues": [],
+        "events": [
+          {
+            "bar": 1,
+            "beat": 1,
+            "moment_cue_id": null,
+            "action": "open",
+            "color": "none",
+            "gobo": "none"
+          }
+        ],
+        "motif_id": "pulse",
+        "variation": "NONE",
+        "density": "SPARSE",
+        "transitions": [
+          {
+            "edge": "ENTRY",
+            "mode": "fade_via_black",
+            "length": "TWO_BARS",
+            "curve": "ease_in_out_sine",
+            "split": "HALF",
+            "channels": []
+          },
+          {
+            "edge": "EXIT",
+            "mode": "crossfade",
+            "length": "BAR",
+            "curve": "ease_in_out_sine",
+            "split": "HALF",
+            "channels": []
+          }
+        ],
+        "reasoning": "x"
+      }
+    ],
+    "overall_strategy": "x",
+    "repairs": []
+  }
+}
