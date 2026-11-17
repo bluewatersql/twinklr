@@ -33,7 +33,9 @@ intensity shaped per lit run); every frame and `.xsq` hash is unchanged but two 
 intensity pins'. W6/W7 re-recorded every fingerprint again (revision 8: the plan's events
 play, and the W5 re-review's accent rules); every frame and `.xsq` hash is unchanged, no
 pinned plan having events and the pins' steady grid meeting none of those rules, and
-added the event pins (`EVENT_PINS`). An intended
+added the event pins (`EVENT_PINS`). The W6/W7 fix round re-recorded every fingerprint
+again (revision 9: events on the bar grid, hits visible, bounded wheel turns, per-beat
+strobe rates); every frame and `.xsq` hash is unchanged but the event pins'. An intended
 output change bumps `RENDERER_REVISION` and re-records these pins in the same commit,
 saying why.
 """
@@ -62,178 +64,178 @@ HEADS = ("MH1", "MH2", "MH3", "MH4")
 
 PINS: dict[str, tuple[str, str]] = {
     "steady/finite_snap_hold/base": (
-        "82e238635d3392576d330fce5f448e700ffba0724ebd279c0022015fb5106868",
+        "5a46776bd5c4925e281d28295d0fffcb4ada324e3eecf08778474a79918e4033",
         "8dc76627bbfb3e4e0a170d097e491277cdb571b09c41198381db8cbcc374e120",
     ),
     "steady/finite_snap_hold/narrow": (
-        "f7b7a740a9bda86bd6d6a4c73b2e27fc10b5107f85c3c654680b95f57196ca41",
+        "2389d64582afb37c32daf57adb72022e6d1cf7af009a61d6e661eb8d897981f6",
         "c0d8292c375a952740fbbb4fdec44ca69ed99c1bc90decfe2f2f22b57387ccce",
     ),
     "steady/finite_snap_hold/slow": (
-        "d85475286c26c42e020e5ed5b1c63a00490e224baa872f740ec677c170a0519f",
+        "472c227911a3ad0c1c8cc1fe58e82b07e56b9e7431f34286747641e8d192f6dd",
         "4d455965979b705ad9af8136e4fd229c7b5374635e1786d07b8cab7636861b9d",
     ),
     "steady/fly_in_cascade/base": (
-        "9fdc874c1d31e74532155f7120b8521a3be142518b4a891a6dc777836816078c",
+        "ee1eafeea54659f84074a8b026dd85ba704d6a036402d523e631c39b37db0ecb",
         "ffdfb044c11edf3040dd81744d17558a2d46c21181071367cca5f752a8413b0d",
     ),
     "steady/fly_in_cascade/narrow": (
-        "5dd23051754892245b1aa9e9d92675db6ae581d5760a9897e241e76ce8766c5d",
+        "8894d7533055ecc9fd82c387a6e2eba751643b5e2c2a52790123eff38c59159b",
         "0280d85aaf1e832fc23b428e311b24ccb67dac720116f25f71d147261f88f310",
     ),
     "steady/fly_in_cascade/slow": (
-        "287110543153af1c06e1a30780a70c57fa6d41495019c8151db62b8eeea3a1b2",
+        "b7da6a896c4b631a2a34f9ba83b9f8f3966679cf7f8059f8d31d168c80ce702e",
         "dd49563a5956e1e52f4a2c01e8f005a64a297ff28f9155f3eb05d10a29312433",
     ),
     "steady/fly_out_cascade/base": (
-        "808b560bf5a84aca580ee8227b038536f1263c68c90d22bafbdf5b322ef11804",
+        "da59bfdd64e85bfe79297600bb6531ef1166a4462ccc6dfc61f4ed32b44fefb6",
         "4235e01012dddfdae05f050fa904a9efa2e8eb4cf4f3b7e2ddd06b23951c733e",
     ),
     "steady/fly_out_cascade/narrow": (
-        "1c71c087b29d7697b9884f88df3954116922a221ea13ce72fd5d58c037ef4557",
+        "475046e9e241df8af282df3a539460ca913e519c7ee9cc6facdccb0161a9944f",
         "150edd82e9273731bd9ab781ab5c6caf420cf5d1129cddb637915687dab01a88",
     ),
     "steady/fly_out_cascade/slow": (
-        "d7a8e5f32ad3903bfabf40d315f43deba3dfa688a1311e6a217f7358357e41c0",
+        "3e690df2c30adc4e4633f0fb26505f95be573153a2499865d48b88f978ea1cfa",
         "c7e91342cab3b42a868f59ab824961da433ac89db0c5646f1fd41e29b0444a70",
     ),
     "steady/masked_wheel_flick/base": (
-        "14982b2138c90afa05a29662e38d5769373d4e51568a7f930de2974043e02f49",
+        "1e0df7010cae285bd71748e835cb19123534998815f8cb35aaa3f265e8074982",
         "08ce9090980dbfefa79b6d78c90ef0f0b0c8ef3a19bb47d193d9af34805cd2de",
     ),
     "steady/masked_wheel_flick/narrow": (
-        "1ff329fa4c8787a2b0eda5891b0f32b6f160e67aa3f089650c2029b77f236012",
+        "8372cdf997c59ca83cff7d819baa4769df15219d91544b5d068b027da316abb5",
         "2537e7e6cf39dad19aadb07a271b223f83c2af7fbbe52b4732f6416cee5993ad",
     ),
     "steady/masked_wheel_flick/slow": (
-        "d6c5ddbdce4f8250a208b9bcede21c8c24107868e3ac699d51203c6058fb2897",
+        "6f2b8fac5e81f6f5aa16ea5be59d61cd245386a3c5ec0d09234e1a22a3feab2c",
         "56a758e57a37773c558bff6f8134843cf45c76d005021a6e882374d16d96431a",
     ),
     "steady/mirror_wings/base": (
-        "148447b50d22628c7e46430eaa7d05dcfed70f907268baa5f65a11407820cbcf",
+        "5dddd9264f0f73bc495b0b887f4f5d8d5414b5d7cdd1d906b02bcdc7b48d4804",
         "8e3cb9be3de61f968b065d8d0442ac5551becdbbf4624afb76b13a58e0f000fd",
     ),
     "steady/mirror_wings/narrow": (
-        "d40dc78c84984011d5e1072f905de9e66a64fa70ab26b211fe4aa70bf3dae81c",
+        "33f8c1a7d6ab642dc7425f198d7adb150d709fec6cb67fc3264561763bd943ce",
         "d83a23f4fea33e3e6f1b2bbfabdc0b5c26f605b673861c0021a1cc1c8bd36a1b",
     ),
     "steady/mirror_wings/slow": (
-        "6582dcb235fc15a692c34d1c1d415c6c9a077f5f5582d7906c0d52657eac5f1e",
+        "fa0f9205f1e87214939639dd553ce8496e609a360804c03356344148c786b084",
         "bbcdbab3564fa3d0a7f107562326940ef92fa3f38130a37ac9d8b43f68bdd3b6",
     ),
     "steady/target_orbit/base": (
-        "6463eb842487cd818ef64a87ea718295c96032c107ca265be094bd6146655af8",
+        "eeb626418420ec2490d9436f72c1349185c3d853f2f2023f3ccb10e063ac259a",
         "78d35ed327d359ca0cc456a151ae19f800a20b80ac1cc040ea4448be4d014ed1",
     ),
     "steady/target_orbit/narrow": (
-        "df5451018db35212810950e15ccdf72874a3ef17a36a8b69839aca09f92fe865",
+        "fedbf3230e905a980323c05b9a9ac9204c1d4f931eb3bb88f295b9d49726e5c3",
         "a35e080540356862ecfe8738414c7cef0d781b639b869db97bc27ff0db5f180b",
     ),
     "steady/target_orbit/slow": (
-        "16cb450ec47298f0234d696c07e592f5854951ad3b1507b42fe809d2abaeb924",
+        "494b37df707e323666f098553dbf3a64c827471d9cf7f1aab01795c567595686",
         "a2eb0bf1f4d04307af57da96941f9d02e8c47ffcc583db3361b0a754975c7d36",
     ),
     "steady/zoom_wave/base": (
-        "0e71caa00c946d6b168b8570e947edc6ba5604c192e6056c7a88731e278f7e69",
+        "efba186bd696556973dd4c9e55451ab4dbc3bd568fa49c730c9bd153b9937625",
         "bfa3f5ef5efd80d8f801f76ab412044d35161bb606288fc35f6fbeaf6970675a",
     ),
     "steady/zoom_wave/narrow": (
-        "fdb7ccb2eaf04eaacacb8ba5c5a379f69d871edab65c3bcbde6e4192c5f58265",
+        "e07b42e4b39d66dbce11e069fc6ad7f23dfbf6748c62489595fea0e92bbab98a",
         "0ddc62b56b92e1af2deedbc6b9bf47570bbe82663ff559091f3883f32e20169b",
     ),
     "steady/zoom_wave/slow": (
-        "a7d53901626976f6aa97c7b4baea31b190fefe2a743589f49850db9709b2c916",
+        "9b2934a0928c7e14cdd4ed154af723459acefc7982d70cfd8f64419f9fb4b250",
         "394aa7ae9fb0cc8e948e2c1b68264b9652edbddd44bcefd9d5ac0dea8e5cdb2c",
     ),
     "variable/finite_snap_hold/base": (
-        "c4ca8244e4355a6e29fd2266e678d4ea7370c2630c173994e0182d0666d00db3",
+        "0a100435fe0a2348ba8cca2fe552160ee370f2d968ccf5cacc4f289e40e51a64",
         "d03e6f47159bc26621e835d36e191f370e0f90955ddac4b356afb477e613ba0f",
     ),
     "variable/finite_snap_hold/narrow": (
-        "eb647b01c42cfa1244d3da0d8901b3925b7943a7ec37a8aa5e174a1bb3495a72",
+        "281c00f68396783322750a6d1c2d5b2a8fc2b58107b9f48027449eab92038f23",
         "9af804ac9d4aa9765aba26e095a80714399942811724696373cc015653545af6",
     ),
     "variable/finite_snap_hold/slow": (
-        "a829cc3380977537c87758156bbe960eb1e13f2bcc88337e81174ebbcd2b5b9c",
+        "34e34e6f04408c768a9ad468d7010688227192dcfe6c95f10ac8b5a963545ef7",
         "e4f7f3d9a0863c4f423dae91e481e8874d5971308aa2196a93e6fca84a6d8930",
     ),
     "variable/fly_in_cascade/base": (
-        "fc8d0d24f9da6cbd068779e74301320d8eec11740cd7f113575e27985c1967e1",
+        "1d1dc3e715c81efce1e232709ccbf788fac3a9daf26bb80fe4a9abe50ef7bcb6",
         "34f9987fa593584b7894352d13944905315dd6c260035971de447db3c121fd7a",
     ),
     "variable/fly_in_cascade/narrow": (
-        "f082eb09ba2051392ff7f57c33f5b12689083b90550eba7826c181f3d7adf50f",
+        "0e89cc2c3b62b161bf59b1f97e5fe487f97fa93a07eb58e4f08715d04f51216f",
         "f2d02f0c7cdbcda887bcd350188338a8bfe0ae583b2b5e092c64b921985f1a9e",
     ),
     "variable/fly_in_cascade/slow": (
-        "019a9a7d03c1c18b428d2c2eeadd9abbb337293e54d3ae8b312e08439fe8359f",
+        "cd9e6daa596f002960217a4febb61d70d1b46189fca31b0d6754c0f68d76510d",
         "49c484a8585d159fc61d0989eef1cc2a35fc22a5e46cf202f789736c8dd37ebe",
     ),
     "variable/fly_out_cascade/base": (
-        "aee10c0112fee662c37456e650c8d99484f0bb63cd0843efa01110c429352daa",
+        "56591e92366ce37a6b1bd5d2a9560b0bf5302344b9c98be75a6b8cec8bc37d94",
         "36f29b21188085c76c462a8cfd73f3e10f21f7adfdbca525a674c4960aca28d2",
     ),
     "variable/fly_out_cascade/narrow": (
-        "8a518caba8b7d40948532554681b07f77d0f09d1ff339655ae5b4999dfbba2c1",
+        "143db082ac2b61986e9871bb9cdf7daf2bc88ca134728f86850c8bd1f3310a16",
         "c773f3be51097dd3ec2c309f6149f76e6c3bb7f6d1ea24416aba4662a10cb420",
     ),
     "variable/fly_out_cascade/slow": (
-        "adf17be7764bfaaf5a8588c15846b9ef49fb34d1a84ac8d5cd0e1cab48d54d7b",
+        "19d5cd697e4c2d5608af19acf19c01e845a3d71453369abd58a990369fa83614",
         "de6e5fb69f6beeeb43df051367101bd88d3d75b61e811bab2ac3e69d2edd499a",
     ),
     "variable/masked_wheel_flick/base": (
-        "258d88f5153dc3d6ba72ae83f3ef7599e4050fcbb1cb3e065a2510412751ef3a",
+        "c03c8231a6f397ecac728c7e5ff8db1d5cfadf1bdbdf6ab9afb1be008c20bee0",
         "a628fb0ca672aba2a7c36e3ecfafcf1003b8d9c8a06adc5edcf0840004981f3f",
     ),
     "variable/masked_wheel_flick/narrow": (
-        "c96f164c2e64fc1a6a4d89a4b734b14f17293ee198efed099df5bb1952063f7b",
+        "eb17c0ac8c6d8b3d6ab1a9fada44a0551b69d411d7146a24a0293a0b275eb684",
         "a8b2c6b2cf905f657c6993dca020c6aa14bbfacc10f89bfb97491860bc81a6c3",
     ),
     "variable/masked_wheel_flick/slow": (
-        "ac50dba7feef727e4fcae4e32c8b2aac1c00ae93630021f3ed5dada35fecb972",
+        "d07f90814ad48bec65309de70ba25b20aa6ad4ac2c03b114b4762196e57250cd",
         "058ed1d9cbdde981fa5213dd23654d42fc86a9ebd6150fc50b089e07f85825f8",
     ),
     "variable/mirror_wings/base": (
-        "934ef013b3b90c41ee9cffa965cc82b6c9d496d1bec488b197446ab9672eca6b",
+        "5c396ddef04446bc1f8f048098e7f7cb7160100fd24078493276e285e7c20543",
         "a59b343515d159c1603c1a0ed576afa3b6721178a643ad1c5fbc02d6bb706dde",
     ),
     "variable/mirror_wings/narrow": (
-        "f86161c2ea2e98dea68dafd46fd138a69862c11980a0bc1127e4a9d1085e6f60",
+        "ce5ed9af68020c0181d64b688a2b619df4c623169534cc29bc195828ede44031",
         "4d326471bc6af0e6f429bd8e5d5b7e374587d3f545a2fe3d2ad3ef908ab6f801",
     ),
     "variable/mirror_wings/slow": (
-        "afe997bafa5ec25047fae6435d8a7618d842dedd4dafd52ffc855a2f17e5e980",
+        "9c607ade0c7ec98eae91cecfaa7f0c868c65533adbaf98f430835e76a325cfd7",
         "cee179ea21422e5e6f268664dd79981055afedfd98c5849c5dbfd44f5b80904e",
     ),
     "variable/target_orbit/base": (
-        "fcd98e44301e11f7b36bb78e460f031d916f5e54035cd337538154ae1328c784",
+        "66066c0af5ff9d7a33167941115dc18729a0e41fde826a9d3d7449c5f2747184",
         "2bfe8b5bd75f0097dd6fb8011e38a11578764984050474ddf0ee402ae3c85fa1",
     ),
     "variable/target_orbit/narrow": (
-        "18654e3bf74ad6c713aba62e01bb428bdc41b867f63043ab26c929a0a32ded59",
+        "a924b53192b4f6dcf473de70d2537d4209c453f56f998a9ca6ec0c6568119adb",
         "9f453dce2badb89d745c808896a8fe6d3b9feafacf5d122371d75d0a6377b4a6",
     ),
     "variable/target_orbit/slow": (
-        "e3ef0c77d58cf91ffe596592676a09c97e476c998286b6fbc5edfd63bd8263b4",
+        "9f1fd0fe44d57827d56c9f45e86933eaeb8f9dbc0f64d93e8e1997238bc3e90f",
         "ac930585ef5e3f15f79cc7267d407f586e99f71923c67b287415b69ec32365c5",
     ),
     "variable/zoom_wave/base": (
-        "3aef08eac45b01a1431c2ab82526e01b382ce7e7a7628678399837e0fdf95c5f",
+        "4714a6cee5298792ece04e473382a3b8b4c3122f0eede20521f1c993accb62a0",
         "0020b12393f7dd4cf89bb4c4bbf3cd942ed5aa0de2abde665b3caffefdc751a7",
     ),
     "variable/zoom_wave/narrow": (
-        "ace8bb7b46e9f372b655756b9c0994b556866073275d0831372d7dcd20cead8f",
+        "51fecb2530a1b2356eb2fef41fc10a02352c085a2035791f51098043472959d4",
         "a39df6ddbe83086edd4664152946711a1b5a24a927837fd366218594215ce44a",
     ),
     "variable/zoom_wave/slow": (
-        "d4b28efd84bfa2820be10dc1fab0a56d95c9d9a7e4fdac1fa4277e4cc71d8bc9",
+        "fa083ae8008309a0110deff0090cf2cfddf126e91876b592eb282d115d8a3556",
         "503a36b0d6d9b85cfa6e5518367e787f835571fbc02f9f44e09f96f2c6689561",
     ),
 }
 """`grid/template/variant`: (render fingerprint, SHA-256 of the encoded frames)."""
 
 MULTI_PIN = (
-    "7ebf2bf1decc8fb1f6e81513b1724946d3b0deec3f774634b1ad35f03f83d296",
+    "4971377f455faaef7a9372b6fa9c42cfd7da4a7ea447896022bbd1e8c88ebac6",
     "3ea6b3fca42f7ea4bbed6068c580331ce3649c6ef4c49f77f7b23fff7599fba7",
     "9ef5b7a162ca49079bb1a5261223b9ebcd399f8b7bb48463942ba4271861c6fb",
 )
@@ -242,7 +244,7 @@ MULTI_PIN = (
 MULTI_SECTIONS = ("mirror_wings", "target_orbit", "finite_snap_hold", "fly_in_cascade")
 
 GATED_PIN = (
-    "93e0b0472c26773bef8e7de909a86f61399eeae745e6f3bc8400ac6611a52438",
+    "aa2f68cfc3dabc30918435300c5ee91af89d5df17a3f69c5a18f46b62919674a",
     "b971080b47c7c7b20e2466c76bfa187b6bb1872a5ec4ac6c316b9d0c614c96bd",
     "7f2d1e3bf22d121835f2c586bdea34718958dc234d6c2577fed66900fc4be14d",
 )
@@ -405,7 +407,7 @@ def test_gated_render_with_dark_spans_and_a_fallback_is_pinned(tmp_path: Path) -
 
 
 INTENT_PIN = (
-    "35609e80eda9d07d7eff325d7db2f614c8899d30f69b0b788397e69259f730ba",
+    "4093bd3e0d09f07f3474c19cd93be5e5cf2259c8ad8cc9fee9fa38fb1892a577",
     "ad91f4f2da8e0fc5bca0e07a7a9d9003d7880d59dee2499b30389be403e36d3b",
     "9968e9a4b0d5892d7891177fbdab9a0dca7d300d09998a946a5b908a51c17c46",
 )
@@ -459,7 +461,7 @@ def section_palettes_of(palette_id: str) -> SectionPalette:
 
 
 FAST_INTENT_PIN = (
-    "a0160229651ede6ab166f5879cef71dd902114987249de825105adfccb9e3518",
+    "a88d9ba9f03bc293cc392df0ab922950c65e2c76c436cf4eabe8f9bebd501fe3",
     "2785d278f4341c611a0aaf60b9e22ee2e6e1accc8f70252442f7402bfd308a54",
 )
 """The fast song-intent plan: (render fingerprint, frames SHA-256). Recorded in the W3/W4
@@ -511,15 +513,15 @@ def test_colour_changes_that_cannot_dip_at_170_bpm_are_pinned() -> None:
 
 INTENSITY_PINS: dict[str, tuple[str, str]] = {
     "full/mirror_wings/INTENSE": (
-        "5d6178d89fa856ccae7a55f039615e6537545c7e35c6e421e4362579cfd6f5bc",
+        "dadb52d8609314a48ece065829fee42a23dd30bdc42e45e5a8b92c845773ecb6",
         "448dd5edb8649aa4e4a1d31725c6de92a9e1d8d3be740297a0de11dd76a8c57a",
     ),
     "headroom/intensity_half_hold/DRAMATIC": (
-        "24b6942b06fb7ca6bd83dc345e0e57d9668762cabc0217dd0dd6585f0871250a",
+        "5fdd2ca8b89a5f6223a1e5a59169bcd5f0c90038c81cc5201dec78e56e4a62cf",
         "13d0f907cfcf370c2e250c959632c3a7ce26d446b11afad12082f1748bc10e0d",
     ),
     "authored_pulse/intensity_authored_pulse/INTENSE": (
-        "558ef3fc178c46d521fcb5d3c5ba6ba7b9596ceaec6ed0103a1b980b006135a7",
+        "21a8a8b75ece360a18b9285e55d38ee1e0cdca884058581c4c711e40dd6dc7ae",
         "906a48806b8986bd1c2d0d72401d9838a2f46d5b910df9aed6064b169ba28ceb",
     ),
 }
@@ -561,14 +563,14 @@ def test_intensity_on_each_kind_of_authored_level_is_pinned(case: str) -> None:
 
 EVENT_PINS: dict[str, tuple[str, str, str]] = {
     "dimmer_strobe": (
-        "936770283447b592c83ff6b0fc0ae42c1544a46b2cfcebea474b3278dbfd90b7",
-        "333612f5883a237ac0cc060f9bc61359a6fac33074652dd6c1229c4c2feb2a5c",
-        "762065faa15acee37673175bd4a816550a061061e04391784ee0b8176d94be1a",
+        "e2ef97dad25cf1d37fe3481cefbaafd3477b30be9de3a1e5104562c5ae8be376",
+        "325f3945dfca1082d2d52dda9e22aad57330cd50c15123fc97663683dfc89358",
+        "2607e56ef3f1883d9da4c136e05dcfbf9ce3fc8ee46480c0fc75edf6aa623a9d",
     ),
     "tagged_strobe": (
-        "42eed5e78a436d4bacc35fe09d0d8124373616a818393abb285d75ad78f0f4c6",
-        "8c46d4a5295f80c10c8f8762389d5fefee876710e9ae7d4bdb0b044121481c71",
-        "e456c91ea716d34d2246238abb75881e1ec31989104a9dc984bf0ea4e43826c4",
+        "157a1ac856124432eef50612e07a3af1d6a90524b8aa2f26101f7c248ace60e3",
+        "19c59ccc365752f6dc6ce5ca9da155f4071daa723d22bf75f71d4f6d9fdb3ebb",
+        "31b093ee23b354df754e7c78f863148b9f3d446ec53dbebc833e1c2d423c798a",
     ),
 }
 """`rig`: (render fingerprint, frames SHA-256, delivered `.xsq` SHA-256) of the event-rich

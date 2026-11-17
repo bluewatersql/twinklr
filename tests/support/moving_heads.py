@@ -522,6 +522,22 @@ def bars_grid(*beat_ms: float) -> BeatGrid:
     )
 
 
+def pickup_grid(beat_ms: float, bars: int, *, pickup: int, beats_per_bar: int = 4) -> BeatGrid:
+    """`bars` bars of `beats_per_bar` steady beats after `pickup` beats before bar 1's
+    downbeat (an anacrusis: detected beats that belong to no bar), the first beat 15 ms
+    off the frame grid; the song ends one beat after its last beat."""
+    beats = [GRID_SHIFT_MS + beat_ms * i for i in range(pickup + beats_per_bar * bars + 1)]
+    return BeatGrid(
+        bar_boundaries=beats[pickup::beats_per_bar][:bars],
+        beat_boundaries=beats,
+        eighth_boundaries=BeatGrid._calculate_eighth_boundaries(beats),
+        sixteenth_boundaries=BeatGrid._calculate_sixteenth_boundaries(beats),
+        tempo_bpm=60_000 / beat_ms,
+        beats_per_bar=beats_per_bar,
+        duration_ms=beats[-1] + beat_ms,
+    )
+
+
 def untagged_offer(fixture_ids: Sequence[str] = ("MH1", "MH2", "MH3", "MH4")) -> RigOffer:
     """The offer of `family_rig(fixture_ids)`, whose wheel states carry no meaning tag:
     it offers no colour or gobo, for a gate result built by hand."""

@@ -44,6 +44,22 @@ from twinklr.core.agents.spec import AgentSpec
 logger = logging.getLogger(__name__)
 
 
+def cue_positions(context: MovingHeadPlanningContext) -> dict[str, str]:
+    """Each lyric moment cue's nearest beat as `bar N beat B` on the bar grid
+    (`BeatGrid.bar_and_beat`, the numbering the cue binder and the renderer use), by cue
+    id; empty without a grid or cues."""
+    grid, lyrics = context.beat_grid, context.lyric_context
+    if grid is None or lyrics is None or not lyrics.moment_cues:
+        return {}
+    positions = {}
+    for cue in lyrics.moment_cues:
+        index = grid.nearest_beat_index(float(cue.timestamp_ms))
+        position = None if index is None else grid.bar_and_beat(index)
+        if position is not None:
+            positions[cue.cue_id] = f"bar {position[0]} beat {position[1]}"
+    return positions
+
+
 def build_planner_variables(
     context: MovingHeadPlanningContext,
     iteration: int = 0,
@@ -91,8 +107,9 @@ def build_planner_variables(
         "beyond_grid": prompt_context["song_structure"]["beyond_grid"],
         # Audio profile (for initial iteration)
         "audio_profile": context.audio_profile if iteration == 0 else None,
-        # Lyric context (for initial iteration)
+        # Lyric context (for initial iteration), each cue's bar and beat on the bar grid
         "lyric_context": context.lyric_context if iteration == 0 else None,
+        "cue_positions": cue_positions(context),
         # Macro plan guidance (always include for coordination)
         "macro_plan": prompt_context["macro_plan"],
         "macro_palette_arc": prompt_context["macro_palette_arc"],
@@ -146,6 +163,7 @@ def build_judge_variables(
         "audio_profile": context.audio_profile,
         # Lyric moment cues, so the judge can see which the plan answers
         "lyric_context": context.lyric_context,
+        "cue_positions": cue_positions(context),
         # Macro plan guidance (enriched with palette/motifs for alignment validation)
         "macro_plan": prompt_context["macro_plan"],
         "macro_palette_arc": prompt_context["macro_palette_arc"],

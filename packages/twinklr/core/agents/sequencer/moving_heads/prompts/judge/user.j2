@@ -55,7 +55,7 @@ The last {{ beyond_grid.seconds }} s of the song lie beyond the detected beat gr
 ### Lyric Moment Cues
 
 {% for cue in lyric_context.moment_cues %}
-- `{{ cue.cue_id }}` ({{ cue.section_id }}, {{ cue.emphasis }}): "{{ cue.text }}" — {{ cue.visual_hint }}
+- `{{ cue.cue_id }}` ({{ cue.section_id }}{% if cue_positions is defined and cue.cue_id in cue_positions %}, {{ cue_positions[cue.cue_id] }}{% endif %}, {{ cue.emphasis }}): "{{ cue.text }}" — {{ cue.visual_hint }}
 {% endfor %}
 
 {% endif %}

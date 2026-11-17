@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from tests.support import moving_heads as m
 from tests.support.moving_heads import discrete_profile_payload, plan_section
 from twinklr.core.agents.sequencer.moving_heads.models import (
@@ -334,10 +336,11 @@ def test_intensity_a_rig_cannot_pulse_is_recorded_not_shaped() -> None:
 
 
 def test_events_the_render_plays_otherwise_are_recorded_and_kept() -> None:
-    """At 120 BPM on a rig whose darkness follows 40 ms phases a fast strobe plays
-    sixteenths, recorded; a hit on a beat where the template is dark on every head is
-    recorded as moving; a colour change 150 ms after the previous one (a 180 ms wheel
-    change) is recorded. The plan keeps every event (the render decides)."""
+    """At 120 BPM then 400 BPM on a rig whose darkness follows 40 ms phases a fast strobe
+    plays at most sixteenths, and one flash on the fast beats, recorded with its beats; a
+    hit on a beat where the template is dark on every head is recorded as moving; a colour
+    change 150 ms after the previous one (a 180 ms wheel change) is recorded, and, as it
+    cannot dip there either, as not playing. The plan keeps every event."""
     grid = m.bars_grid(*([500.0] * 4), *([150.0] * 4))
     templates = {
         "fly_out_cascade": TemplateOffer(
@@ -360,13 +363,75 @@ def test_events_the_render_plays_otherwise_are_recorded_and_kept() -> None:
         repaired = repair_rig_intent(plan, offer, {}, grid)
 
     assert repaired.sections[0].events == events
-    reasons = {r.item: r.reason for r in repaired.repairs if r.action is RepairAction.RECORDED}
-    assert reasons == {
-        "event at bar 1 beat 2: strobe_fast": "at this tempo it plays 4 flash(es) a beat, not "
-        "8: the darkness follows 40 ms phases",
-        "event at bar 3 beat 1: hit": "template 'fly_out_cascade' is dark on this beat on every "
-        "head (between its cues): the hit moves to the nearest beat the heads show, within a bar",
-        "event at bar 6 beat 2: color blue": "it comes 150 ms after the previous color change, "
-        "and a wheel change needs 180 ms of darkness: it turns late or does not play; space "
-        "wheel changes further apart",
-    }
+    reasons: dict[str, list[str]] = {}
+    for r in repaired.repairs:
+        assert r.action is RepairAction.RECORDED
+        reasons.setdefault(r.item, []).append(r.reason)
+    assert reasons["event at bar 1 beat 2: strobe_fast"] == [
+        "at this tempo it plays as few as 1 flash(es) a beat, not 8, on 31 of its 31 beats: "
+        "the darkness follows 40 ms phases"
+    ]
+    assert reasons["event at bar 3 beat 1: hit"] == [
+        "template 'fly_out_cascade' is dark on this beat on every head (between its cues): "
+        "the hit moves to the beat within a bar the most heads show, a later one first"
+    ]
+    blue = reasons["event at bar 6 beat 2: color blue"]
+    assert any("150 ms after the previous color change" in reason for reason in blue)
+    assert any("does not fit half the beat before it (75 ms)" in reason for reason in blue)
+
+
+def test_the_prompts_show_each_lyric_cue_at_its_bar_and_beat_on_the_bar_grid() -> None:
+    """Two pickup beats before bar 1: a cue on the third detected beat is bar 1 beat 1
+    for the planner, as for the binder and the renderer."""
+    from types import SimpleNamespace
+    from typing import cast
+
+    from twinklr.core.agents.audio.lyrics.models import LyricContextModel, MomentCue
+    from twinklr.core.agents.sequencer.moving_heads.context import MovingHeadPlanningContext
+    from twinklr.core.agents.sequencer.moving_heads.orchestrator import cue_positions
+
+    grid = m.pickup_grid(500.0, 4, pickup=2)
+    lyrics = LyricContextModel(
+        has_lyrics=True,
+        vocal_coverage_pct=0.5,
+        moment_cues=[
+            MomentCue(
+                cue_id=cue_id,
+                timestamp_ms=at,
+                section_id="s1",
+                emphasis="HIGH",
+                text="la",
+                visual_hint="Accent it.",
+            )
+            for cue_id, at in (("first", 1030), ("pickup", 520), ("later", 3540))
+        ],
+    )
+    context = cast(
+        "MovingHeadPlanningContext", SimpleNamespace(beat_grid=grid, lyric_context=lyrics)
+    )
+
+    assert cue_positions(context) == {"first": "bar 1 beat 1", "later": "bar 2 beat 2"}
+
+
+@pytest.mark.parametrize("closed", [True, False])
+def test_a_hit_inside_a_wheel_turns_dark_lead_is_recorded_only_where_the_turn_happens(
+    closed: bool,
+) -> None:
+    """At 400 BPM a 180 ms wheel change before 6.2 darkens 6.1 too: inside a `closed` the
+    change turns there and the hit on 6.1 moves (recorded); without it the change cannot
+    dip and does not play, so the hit is not recorded as moving."""
+    grid = m.bars_grid(*([500.0] * 4), *([150.0] * 4))
+    offer = _offer(_slow(), flash_ms=40, beat_ms=500.0)
+    events = [
+        *([_event(EventAction.CLOSED, bar=5, beat=1)] if closed else []),
+        _event(EventAction.HIT, bar=6, beat=1),
+        _event(EventAction.COLOR, bar=6, beat=2, color=PlanColor.RED),
+    ]
+    plan = ChoreographyPlan(sections=[_section("s1", (1, 8), events=events)], overall_strategy="")
+
+    with m.family_catalog():
+        repaired = repair_rig_intent(plan, offer, {}, grid)
+
+    items = {r.item: r.reason for r in repaired.repairs}
+    assert ("event at bar 6 beat 1: hit" in items) is closed
+    assert ("event at bar 6 beat 2: color red" in items) is not closed

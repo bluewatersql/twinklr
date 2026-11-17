@@ -531,6 +531,27 @@ def test_the_gate_publishes_each_admitted_variants_dark_phases() -> None:
     assert all(not windows for phases in wings.values() for windows in phases.heads.values())
 
 
+def test_the_published_dark_phases_are_a_steady_cycles_and_include_its_leading_darkness() -> None:
+    """`fly_in_cascade`'s MH2 and MH3 are dark from the cycle's first beat (the previous
+    cycle's tail; the first cycle's bar-1 entry missed it): published from the second
+    cycle, where the plan repair reads them."""
+    job = m.family_job(HEADS)
+    admission = admit_templates(
+        ["fly_in_cascade"],
+        beat_grid=GRID,
+        fixture_group=rig(),
+        initial_states=job.moving_heads.initial_states,
+        failure_mode="error",
+    )
+
+    phases = admission.offer.templates["fly_in_cascade"].variants["base"]
+    assert phases.cycle_beats == 8.0
+    for head in ("MH2", "MH3"):
+        assert phases.heads[head][0][0] == pytest.approx(0.0, abs=0.05)
+    for head in ("MH1", "MH4"):
+        assert phases.heads[head][0][0] == pytest.approx(3.0, abs=0.05)
+
+
 @pytest.mark.parametrize(
     ("span", "added"),
     [

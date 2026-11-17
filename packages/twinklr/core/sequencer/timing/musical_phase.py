@@ -25,6 +25,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
+from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 PhaseProvenance = Literal["observed", "adjacent_interval", "explicit"]
@@ -346,3 +347,15 @@ def _interpolated_beat(phase_map: MusicalPhaseMap, time_ms: float) -> Fraction:
     t0, t1 = Fraction(knots[index].time_ms), Fraction(knots[index + 1].time_ms)
     b0, b1 = beats[index], beats[index + 1]
     return b0 + (Fraction(time_ms) - t0) * (b1 - b0) / (t1 - t0)
+
+
+def cue_limits(phase_map: MusicalPhaseMap, duration_ms: int) -> tuple[int, int]:
+    """The frame-grid span a cue may occupy: `(start_limit_ms, end_limit_ms)`.
+
+    The start is the covered phase span's start rounded up to the frame grid; the end
+    is the earlier of the song's last whole frame and the covered end rounded down.
+    Outside it every fixture is held dark.
+    """
+    start = -(-Fraction(phase_map.covered_start_ms) // EFFECT_GRID_MS) * EFFECT_GRID_MS
+    covered_end = Fraction(phase_map.covered_end_ms) // EFFECT_GRID_MS * EFFECT_GRID_MS
+    return int(start), int(min(duration_ms // EFFECT_GRID_MS * EFFECT_GRID_MS, covered_end))

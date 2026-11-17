@@ -32,7 +32,6 @@ Repair rules, per section:
 
 from __future__ import annotations
 
-from bisect import bisect_left
 from collections.abc import Callable, Collection
 from typing import Any
 
@@ -45,6 +44,7 @@ from twinklr.core.agents.sequencer.moving_heads.models import (
     RepairAction,
 )
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map, cue_limits
 
 
 def bind_lyric_moment_cues(
@@ -215,7 +215,8 @@ def _repair_section(
     for event in section["events"]:
         item = f"{event['action']} event at bar {event['bar']} beat {event['beat']}"
         first_record = len(repairs)
-        event["cue_emphasis"] = None  # code-owned: set below for a bound event
+        # Code-owned: set below for a bound event.
+        event["cue_emphasis"] = event["cue_ms"] = None
         if not _repair_fields(event, item, record):
             continue
         cue_id = event["moment_cue_id"]
@@ -288,12 +289,18 @@ def _repair_fields(event: dict[str, Any], item: str, record: _Record) -> bool:
 
 
 def _section_beats(start_bar: int, end_bar: int, grid: BeatGrid | None) -> range | None:
-    """The beat indices of the grid inside the section's bars, None when there are none."""
+    """The beat indices of the grid inside the section's bars (`BeatGrid.bar_beat_indices`:
+    bars from the downbeats, a pickup before bar 1 in none), None when there are none."""
     if grid is None:
         return None
-    first = (start_bar - 1) * grid.beats_per_bar
-    last = min(end_bar * grid.beats_per_bar, len(grid.beat_boundaries)) - 1
-    return range(first, last + 1) if first <= last else None
+    bars = [r for bar in range(start_bar, end_bar + 1) if (r := grid.bar_beat_indices(bar))]
+    return range(bars[0].start, bars[-1].stop) if bars else None
+
+
+def _position(grid: BeatGrid, index: int) -> str:
+    """`bar N beat B` of the beat at `index` (`BeatGrid.bar_and_beat`)."""
+    position = grid.bar_and_beat(index)
+    return "before bar 1" if position is None else f"bar {position[0]} beat {position[1]}"
 
 
 def _bind(
@@ -304,20 +311,19 @@ def _bind(
     beats: range,
     record: _Record,
 ) -> None:
-    """Move the event to the section's beat nearest the cue. A cue past where the render
-    goes dark at the song's end (the renderer's `cue_limits`: the beat grid's covered
-    span, clamped to the song and the frame grid), in the clamped part of a section the
-    grid ends inside, lands on the grid's last beat, recorded so the planner sees the
-    accent is not where the lyric is."""
-    from twinklr.core.sequencer.moving_heads.pipeline import cue_limits
-    from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map
-
-    snapped_ms = grid.snap_to_nearest_beat(float(cue.timestamp_ms))
-    nearest = bisect_left(grid.beat_boundaries, snapped_ms)
+    """Move the event to the section's beat nearest the cue, numbered on the bar grid
+    (`BeatGrid.bar_and_beat`). A cue past where the render goes dark at the song's end
+    (`cue_limits`: the beat grid's covered span, clamped to the song and the frame grid),
+    in the clamped part of a section the grid ends inside, lands on the section's last
+    beat, recorded so the planner sees the accent is not where the lyric is."""
+    nearest = grid.nearest_beat_index(float(cue.timestamp_ms))
+    assert nearest is not None  # the section has beats, so the grid has
     index = min(max(nearest, beats.start), beats.stop - 1)
-    bpb = grid.beats_per_bar
-    event["bar"], event["beat"] = index // bpb + 1, index % bpb + 1
+    position = grid.bar_and_beat(index)
+    assert position is not None  # a beat of the section is in a bar
+    event["bar"], event["beat"] = position
     event["cue_emphasis"] = str(cue.emphasis)
+    event["cue_ms"] = cue.timestamp_ms
     covered_end = (
         cue_limits(build_musical_phase_map(grid), int(grid.duration_ms))[1]
         if len(grid.beat_boundaries) >= 2
@@ -336,8 +342,8 @@ def _bind(
         record(
             item,
             RepairAction.ADJUSTED,
-            f"lyric moment cue '{cue.cue_id}' is nearest bar {nearest // bpb + 1} beat "
-            f"{nearest % bpb + 1}, in a neighbouring section: placed on the section's "
+            f"lyric moment cue '{cue.cue_id}' is nearest {_position(grid, nearest)}, in a "
+            f"neighbouring section: placed on the section's "
             f"{'first' if index == beats.start else 'last'} beat (bar {event['bar']} beat "
             f"{event['beat']})",
         )
@@ -351,22 +357,39 @@ def _clamp(
     grid: BeatGrid | None,
     record: _Record,
 ) -> None:
-    """Move an event that lies outside the section, or on a beat its bar does not have,
-    into the section."""
+    """Move an event that lies outside the section, or on a beat its bar does not have
+    (on the grid: the beats detected in that bar), into the section; record one whose bar
+    lies beyond the beat grid (it cannot play)."""
     bpb = grid.beats_per_bar if grid is not None else None
+
+    def beats_in(bar: int) -> int | None:
+        return None if grid is None else len(grid.bar_beat_indices(bar))
+
     if event["bar"] < start_bar:
         event["bar"], event["beat"] = start_bar, 1
         record(item, RepairAction.ADJUSTED, f"before the section: moved to bar {start_bar} beat 1")
     elif event["bar"] > end_bar:
-        event["bar"], event["beat"] = end_bar, bpb or event["beat"]
+        event["bar"], event["beat"] = end_bar, beats_in(end_bar) or bpb or event["beat"]
         record(
             item,
             RepairAction.ADJUSTED,
             f"after the section: moved to bar {end_bar} beat {event['beat']}",
         )
-    elif bpb is not None and event["beat"] > bpb:
-        event["beat"] = bpb
-        record(item, RepairAction.ADJUSTED, f"a bar has {bpb} beats: moved to beat {bpb}")
+    count = beats_in(event["bar"])
+    if count == 0:
+        record(
+            item,
+            RepairAction.RECORDED,
+            f"bar {event['bar']} lies beyond the detected beat grid, where the render is "
+            "dark: the event does not play",
+        )
+    elif count is not None and event["beat"] > count:
+        event["beat"] = count
+        record(
+            item,
+            RepairAction.ADJUSTED,
+            f"bar {event['bar']} has {count} detected beats: moved to beat {count}",
+        )
 
 
 def _one_per_kind_and_beat(

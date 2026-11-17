@@ -36,6 +36,7 @@ The last {{ beyond_grid.seconds }} s of the song lie beyond the detected beat gr
 - **Tempo**: {{ tempo }} BPM
 - **Time Signature**: {{ time_signature }}
 - **Total Bars**: {{ total_bars }}
+- **Bars and beats** count from each bar's detected downbeat: `bar N beat B` is the B-th beat of bar N (beats before bar 1, a pickup, belong to no bar). A lyric cue's nearest bar and beat are listed with it.
 
 ## Available Resources
 
@@ -104,8 +105,8 @@ plays as its wheel colour, not darker or paler (`intensity` shapes the dimmer).
   - `closed` / `open`: {% if ev.dark == "none" %}no head can go dark, so neither plays{% else %}{% if ev.dark == "some" %}the heads that can go dark{% else %}the heads{% endif %} go dark from the beat until `open`, another shutter event or the section's end{% endif +%}
   - Strobes{% if rig_offer.strobes.all or rig_offer.strobes.some %} (the fixture's own strobe on the heads tagged for it: {{ (rig_offer.strobes.all + rig_offer.strobes.some) | join(', ') }}){% endif %}: {% for s in ev.strobes %}`{{ s.action }}` {% if s.plays is none %}cannot flash here{% elif s.plays == s.asked %}{{ s.plays }} flashes a beat{% else %}{{ s.plays }} flash{% if s.plays != 1 %}es{% endif %} a beat (not {{ s.asked }}: the darkness cannot follow faster){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}, from the beat until the next shutter event or the section's end
   - `pulse`: {% if ev.pulse_beats is none %}cannot pulse here{% else %}lit for the first half of {% if ev.pulse_beats == 1 %}every beat{% else %}every {{ ev.pulse_beats }} beats{% endif %}, dark for the second{% endif +%}
-  - `hit` (a dimmer accent): {{ {"all": "every head", "some": "some heads", "none": "no head"}[rig_offer.hit] }}{% if rig_offer.hit != "none" %}: full on the beat and easing back, cut deeper into the beat and longer for a high-emphasis lyric cue. Only the heads lit on its beat play it (a cascade lights a few at a time); where every head is dark there (a section's first beats while the heads reposition, a colour change's dark dip, a show's rest) it moves to the nearest beat they show, within a bar{% endif +%}
-  - `color` / `gobo` events: revealed on the beat after the wheel turns in the dark (as below); a head dark on that beat shows it from its next reveal
+  - `hit` (a dimmer accent): {{ {"all": "every head", "some": "some heads", "none": "no head"}[rig_offer.hit] }}{% if rig_offer.hit != "none" %}: a dip into the beat and a snap to full (a flash and a duck where the heads light up on that beat), deeper and longer for a high-emphasis lyric cue. Only the heads lit on its beat play it (a cascade lights a few at a time); where every head is dark there (a section's first beats while the heads reposition, a colour change's dark dip, a show's rest) it moves to the beat within a bar most heads show, a later one first{% endif +%}
+  - `color` / `gobo` events: revealed on the beat after the wheel turns in the dark{% if ev.wheel_max_bpm %}, which fits the half beat before it up to {{ ev.wheel_max_bpm }} BPM{% endif %}; at a faster passage the change turns in the template's next dark moment if one comes within a beat, else does not play (put it after a `closed`, where the heads are dark, or on a slower passage); a head dark on that beat shows it from its next reveal
 {% if rig_offer.hit == "none" %}
 - **Intensity**: no head has a dimmer axis, so `DRAMATIC` and `INTENSE` cannot pulse here: every head plays its template's own level. Give emphasis with events or colour instead.
 {% elif rig_offer.hit == "some" %}
@@ -195,7 +196,7 @@ plays as its wheel colour, not darker or paler (`intensity` shapes the dimmer).
 {% if lyric_context.moment_cues %}
 **Moment Cues**:
 {% for cue in lyric_context.moment_cues %}
-- `{{ cue.cue_id }}` ({{ cue.section_id }}, {{ cue.timestamp_ms }}ms, {{ cue.emphasis }}): "{{ cue.text }}" — {{ cue.visual_hint }}
+- `{{ cue.cue_id }}` ({{ cue.section_id }}, {{ cue.timestamp_ms }}ms{% if cue_positions is defined and cue.cue_id in cue_positions %}, nearest {{ cue_positions[cue.cue_id] }}{% endif %}, {{ cue.emphasis }}): "{{ cue.text }}" — {{ cue.visual_hint }}
 {% endfor %}
 {% endif %}
 {% endif %}

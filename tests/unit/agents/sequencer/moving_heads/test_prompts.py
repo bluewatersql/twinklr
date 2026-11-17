@@ -704,7 +704,7 @@ class TestPlannerUserPromptRendering:
             "`strobe_fast` 8 flashes a beat, from the beat until the next shutter event or the "
             "section's end\n",
             "  - `pulse`: lit for the first half of every beat, dark for the second\n",
-            "  - `hit` (a dimmer accent): every head: full on the beat and easing back",
+            "  - `hit` (a dimmer accent): every head: a dip into the beat and a snap to full",
             "- **A wheel change** takes 160 ms of darkness (about 0.4 beat). Where the heads "
             "play straight from one section into the next and its colour or gobo changes, "
             "they go dark for that long just before the new section's first beat",

@@ -311,7 +311,8 @@ def accent_starts(
       section's first lit run, `dark_before_beats` None), unless a beat accent lies at
       most `near_beat_beats` after it: that one, on the beat, is the run's accent."""
     first, last = times[0], times[-1]
-    end = _beats(grid, last + EFFECT_GRID_MS) or grid.beats(last)
+    after = _beats(grid, last + EFFECT_GRID_MS)
+    end = grid.beats(last) if after is None else after
     kept = [
         f
         for f in grid.accents

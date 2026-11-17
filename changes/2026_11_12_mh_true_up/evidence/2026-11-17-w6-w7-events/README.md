@@ -96,6 +96,9 @@ state settling in 150 ms: a 180 ms change, inside half a beat at both tempos):
 
 ## The hit (`events.apply_hits`, `HITS`)
 
+*Superseded in part by Fix round 1 (below): a hit with no room before its beat now flashes
+and ducks, counts as played only where visible, and moves later first.*
+
 | Emphasis (the bound lyric cue's; unbound `MED`) | Contrast into the beat | Decay |
 |---|---|---|
 | `LOW` | 0.25 of the top | 0.25 beat |
@@ -136,7 +139,7 @@ after → **lit for the hit**, easing back to dark (`lit_from_dark`). A hit is o
 the rig: heads dark there between their template's cues (they reposition or turn a wheel)
 do not play it, recorded. **Only where no head can show it on its beat** does it move, on
 every head, to the nearest beat within a bar inside the part (ties later), recorded
-`moved`; else not played.
+`moved`; else not played. *(Fix round 1: to the beat the most heads show, later first.)*
 
 **Decided differently from the brief:** the brief says a template's own dark phase lights
 for the hit. A cascade's dark phases and an overlay's masks are gaps between cues where
@@ -182,7 +185,8 @@ The plan keeps every event (the render decides and traces). The gate's admission
 entry-dip bound are unchanged for every rig and plan (byte matrix: gate identical in
 405/405). The published dark phases come from the gate's bar-1 compile and miss a cycle's
 leading darkness, so the hit repair can under-report (seen on `fly_in_cascade`, bar 45
-beat 3 below); it never refuses.
+beat 3 below); it never refuses. *(Fix round 1: published from a steady second cycle; the
+leading darkness is in them.)*
 
 ## The realistic plan (the owner's test song's shape, synthetic)
 
@@ -242,7 +246,11 @@ headroom variant (below) is monotone by construction.
 on the steady 120 BPM grid the pins use (the byte matrix confirms: event-free DRAMATIC and
 INTENSE renders differ from `7c6c2b08` only on the variable grid, 72 of 405
 configurations; identity levels in none). No intensity pin was re-recorded for frames;
-the unit tests above guard N1–N4.
+the unit tests above guard N1–N4. *Correction (Fix round 1, L4): "only on the variable
+grid" holds for the matrix's five grids (steady 120, variable, fast, edges, waltz) only.
+The review found event-free DRAMATIC/INTENSE renders also differ from `7c6c2b08` on steady
+78.3, 129 and 170 BPM grids, on cascade tail frames (N1's tail rule, by design); those
+grids were not in the matrix.*
 
 **H2 headroom variant** regenerated for this tree: scratch
 `w67/headroom_variant.patch` (one file, `intensity.py`, +17/−11; `git apply --check`
@@ -368,7 +376,7 @@ Proposals (all in `events.py`, `song_intent.py`, `intensity.py`): `STROBE_FLASHE
 - Strobes and `closed` are not led by the dimmer's latency (a pure delay; the first dark
   command is on the beat's frame, as the parity rows ask).
 - The hit repair reads the published dark phases, which miss a cycle's leading darkness:
-  it can under-report; the render decides and traces.
+  it can under-report; the render decides and traces. *(Fixed in Fix round 1.)*
 - Composition order: rests before events (same frames, simpler); hits after intensity.
 - `changes/ACTIVE.md`'s row was not touched (the integrator's).
 
@@ -392,3 +400,304 @@ Scratch (session-local, not committed):
 `tempo_examples.py`/`.txt`, `naf.py`, `naf_out.txt`, `sweep.py`, `rerecord_pins.py`,
 `record_event_pins.py`, `pin_honesty.py`, `gap_probe.py`, `gap_without_check.py`,
 `render_prompt.py`, `prompt_events.txt`, `headroom_variant.patch`, `tailflash_base.txt`).
+
+## Fix round 1 (review of `c0ee6a40`; 2026-11-17)
+
+Same worktree, no commits. Every finding of the two fix-round messages, what changed, and
+the evidence. Renderer revision 8 → **9**.
+
+### HIGH 1: bar and beat on the bar grid
+
+`c0ee6a40` placed `bar N beat B` at detected beat `(N − 1)·4 + B − 1`, counted from the
+first detected beat. On a grid with a pickup that is wrong by the pickup: the owner's test
+song's grid (scratch `p4view/events/naf_grid.json`) has two detected beats (476, 1230 ms)
+before bar 1's downbeat (2031 ms), so every planned event played **two beats early**
+(18.1 at 52152 ms instead of the downbeat 53672 ms; 21.1 at 61277 / 62786; 32.1 at 94690 /
+96200; 53.1 at 158487 / 160008).
+
+One function now numbers beats everywhere: `BeatGrid.bar_beat_indices(bar)` (the detected
+beats from bar N's downbeat, within 1 ms, up to the next bar's downbeat; the last bar at
+most `beats_per_bar`), with `beat_index`, `beat_time_ms`, `bar_and_beat` (None for a pickup
+beat or one past the last bar) and `nearest_beat_index` (ties to the earlier beat). A bar
+holds the beats detected in it (three in a short 4/4 bar, five in a long one); beat 1 is the
+downbeat. Callers: `events.section_events` (render), `moment_cues._bind`/`_clamp` (binder),
+`rig_repair._event_records` (repair), `pipeline` (trace), `orchestrator.cue_positions`
+(planner and judge prompts: each lyric cue is shown as "nearest bar N beat B"; the planner's
+Beat Grid block says how bars and beats are counted). `cue_limits` moved to
+`timing/musical_phase.py` (moment_cues no longer imports the pipeline lazily).
+
+- Tests: `test_beat_grid_conversion.py` (pickups 0–3 in 4/4 and 3/4: every bar.beat maps
+  to its index and back, pickup beats are in no bar, out-of-grid is None; bars of three
+  and five beats); `test_events_render.py`
+  `test_an_event_on_beat_one_lands_on_the_first_frame_of_its_bar_after_a_pickup` (pickups
+  1/2/3 × 4/4 and 3/4: `closed` at 3.1 is dark from the frame of bar 3's downbeat, not the
+  frame before; `open` at 3.3; a hit on a second section's downbeat plays there and is
+  traced 5.1), `test_a_cue_just_before_a_section_end_binds_inside_it_at_its_nearest_beat`
+  (same six grids: a cue 60 ms after the section's last beat binds to bar 4's last beat and
+  plays there), `test_the_prompts_show_each_lyric_cue_at_its_bar_and_beat_on_the_bar_grid`
+  (a cue in the pickup is left out; others numbered on the bar grid).
+- The REALISTIC fixture now carries the song's two pickup beats (`m.pickup_grid`).
+- **Parity rows**: all 22 pass unchanged; the parity grid has no pickup (first beat = first
+  downbeat), so both numberings agree there. No row depended on the wrong scheme.
+- **Event-free plans**: no event-free render uses bar.beat; the byte matrix (below) adds two
+  pickup grids and shows event-free plans byte-identical to `c0ee6a40` on every grid.
+
+### HIGH 2: no event vanishes silently
+
+An event that cannot be placed (outside its section, past the grid, on a beat its bar does
+not have) is now registered in the section's trace with `not_played` and why, counts in the
+per-section warning, and the binder records it: a beat its bar lacks is moved to the bar's
+last detected beat (RECORDED), a bar past the grid is recorded as not playing. Test
+`test_an_event_that_cannot_be_placed_is_traced_warned_and_repaired` (bar 9 past an 8-bar
+grid, 3.5 in 4/4, 4.1 outside bars 1–3).
+
+### MEDIUM 3 / H2: hits visibly distinct
+
+Integrator decision implemented. Per head (`events._play_hit`, `HitShape`):
+
+| Shape | When | Frames |
+|---|---|---|
+| `pre_dip` (dip and snap) | the head lit before the beat inside the section | over the quarter beat before, down to `max(floor, L − contrast·top)`, the last `visible_frames` frames held there; the top for `visible_frames` frames from the beat; decay to `L` |
+| `flash_and_duck` | dark before the beat (a reveal on it), or no room before it in the section | the top for `visible_frames` frames; then `contrast·top` below `L` (not below the floor) for `visible_frames` frames; recovering to `L` over the decay |
+| `lit_from_dark` | dark on the beat inside a cue (a `closed`, a dimmer dark phase), no wheel moving | the top, easing to dark over the decay |
+
+`visible_frames` = **N**: LOW 2, MED 3, HIGH 4 frames (40/60/80 ms). `HIT_FLOOR` 0.10 of
+the top. **Played rule (enforced in code)**: a head counts the hit played only where at
+least N frames differ from the level the section plays without it (`L`, the event-free
+render's dimmer at those frames) by at least `min(contrast, HIT_VISIBLE_CAP)`·top,
+`HIT_VISIBLE_CAP` = 0.40; otherwise the head's trace says "no visible change" and it is
+reported to the planner as not played. Base intensity levels are unchanged (only hit
+frames move).
+
+**Decided differently:** the threshold is capped at 0.40 rather than the full emphasis
+contrast. HIGH asks 0.60, but on INTENSE a full-level family plays about 0.60 before the
+beat (154) and the floor stops the dip at 26, a 0.50 drop; with the literal threshold a
+HIGH hit there would never count as played though it is the deepest cut the rig can make.
+Every MED and LOW threshold is the full contrast.
+
+Test `test_every_played_hit_differs_visibly_from_the_render_without_it` (the review's
+case): 4 families (`fly_out_cascade`, `fly_in_cascade`, `masked_wheel_flick`,
+`mirror_wings`) × 4 grids (78.3, 120, 170 BPM, a variable grid) × as authored and DRAMATIC,
+four HIGH hits each: every head the trace counts played is re-read from the encoded bytes
+against the render without hits — at least 4 frames differ by ≥ 0.40·255. No played hit is
+byte-identical to no hit (the review found every `fly_out_cascade` hit was). Also
+`test_a_hit_with_room_before_its_beat_dips_into_it_and_snaps_to_full` (LOW/MED/HIGH),
+`test_a_hit_on_a_reveal_flashes_and_ducks_below_the_section_level`,
+`test_a_stronger_cue_cuts_deeper_into_the_beat_and_rings_longer`.
+
+**Each hit's look** (MH1 dimmer bytes, 120 BPM, six frames before the beat's frame to
+eleven after; scratch `w67/fix1/hit_looks.py`, outputs `hit_looks_product.txt`,
+`hit_looks_variant.txt`):
+
+| Family, level | No hit | MED | HIGH |
+|---|---|---|---|
+| **product** `mirror_wings` as authored | 255 … 255 | 249, 230, 198, 153, 153, 153 \| 255 ×12 | 238, 187, 102, 102, 102, 102 \| 255 ×12 |
+| product `mirror_wings` DRAMATIC | 191 ×6 \| 255, 250, 245 … 211 | 185 … 89, 89, 89 \| 255, 255, 255, 253 … 213 | 174 … 38 ×4 \| 255 ×4, 253 … 222 |
+| product `mirror_wings` INTENSE | 159 … 153 \| 255, 247 … 185 | 153 … 52, 52, 51 \| 255 ×3, 251 … 187 | 144 … 26 ×4 \| 255 ×4, 251 … 202 |
+| product `fly_out_cascade` reveal, as authored | 0 ×6 \| 255 ×12 | 0 ×6 \| 255 ×3, 153 ×3, 177 … 249 | 0 ×6 \| 255 ×4, 102 ×4, 126 … 187 |
+| product `fly_out_cascade` reveal, DRAMATIC | 0 ×6 \| 255, 250 … 211 | 0 ×6 \| 255 ×3, 139, 134, 130, 150 … 205 | 0 ×6 \| 255 ×4, 83, 79, 75, 71, 92 … 143 |
+| product `fly_out_cascade` reveal, INTENSE | 0 ×6 \| 255, 247 … 185 | 0 ×6 \| 255 ×3, 130, 123, 116 … 179 | 0 ×6 \| 255 ×4, 72 … 53, 72 … 117 |
+| **headroom variant** `mirror_wings` as authored (0.82) | 209 … 209 | 203 … 107 ×3 \| 255 ×3, 247 … 211 | 192 … 56 ×4 \| 255 ×4, 249 … 221 |
+| variant `mirror_wings` DRAMATIC / INTENSE | 230 \| 255, 253 … 237 | 223 … 128 ×3 \| 255 ×3, 254 … 238 | 213 … 77 ×4 \| 255 ×4, 254 … 242 |
+| variant `fly_out_cascade` reveal, as authored | 0 ×6 \| 209 ×12 | 0 ×6 \| 255 ×3, 107 ×3, 131 … 203 | 0 ×6 \| 255 ×4, 56 ×4, 81 … 141 |
+| variant `fly_out_cascade` reveal, DRAMATIC / INTENSE | 0 ×6 \| 255, 253 … 237 | 0 ×6 \| 255 ×3, 147, 145, 144, 166 … 231 | 0 ×6 \| 255 ×4, 94 … 90, 113 … 169 |
+
+`intensity.py` changed in this round (L3: one line), the headroom patch
+(`w67/headroom_variant.patch`) still applies cleanly (`git apply --check`) and was not
+regenerated; the variant rows above are a patched copy of this tree.
+
+### MEDIUM 4: moves prefer later beats where most heads show
+
+A hit no head can show on its beat moves to the beat within `HIT_MOVE_BARS` (1) of it in
+the section that the most heads show, a later one before an earlier one (nearest first
+among equals), an earlier one only where nothing later serves. The trace records
+`moved: {bar, beat, direction, heads_lit}`; the describe line says "moved later to bar N
+beat B, where K head(s) show it". Tests `test_a_moved_hit_goes_later_to_the_beat_most_heads_show_and_says_so`,
+`test_a_hit_moves_earlier_only_where_no_later_beat_serves`.
+
+**Share of heads per hit per family** (120 BPM, as authored, the family rig, a MED hit on
+each of the 16 beats of bars 3–6, one render each; scratch `w67/fix1/hit_share.py`):
+
+| Family | Heads playing each hit | Shapes (head-hits) | Moved | Not visible |
+|---|---|---|---|---|
+| `finite_snap_hold` | 4/4 on 16 | pre_dip 64 | 0 | 0 |
+| `fly_in_cascade` | 2/4 on 16 | flash_and_duck 32 | 4 hits, all later | 0 |
+| `fly_out_cascade` | 2/4 on 16 | flash_and_duck 32 | 4 hits, all later | 0 |
+| `masked_wheel_flick` | 4/4 on 16 | pre_dip 32, flash_and_duck 32 | 4 hits, all later | 0 |
+| `mirror_wings` | 4/4 on 16 | pre_dip 64 | 0 | 0 |
+| `target_orbit` | 4/4 on 16 | pre_dip 64 | 0 | 0 |
+
+On the cascades the other two heads are dark between their template's cues (repositioning)
+and do not play the hit (unchanged rule, traced).
+
+### LOW 5: cue offset
+
+Each lyric cue's trace entry carries, per event, `offset_ms` per head (where it played
+minus the lyric's time; negative = before the lyric); `PlanEvent.cue_ms` (binder-set,
+excluded from the response schema like `cue_emphasis`) carries the lyric time. The
+eval-report line reads e.g. "hit at bar 7 beat 4 at 22540 ms (−230 ms from the lyric at
+22770 ms) on MH1, MH2, MH3, MH4". Test in the pickup cue test above.
+
+### H1: StopIteration
+
+`events._turn`'s `next(c for c in own if c.t0_ms >= end)` raised past a head's last cue
+(colour late in a cascade at 170 BPM). Now `next(..., None)`, and the late turn is bounded
+(H3). Sweep of the touched modules (`events.py`, `pipeline.py`, `rig_repair.py`,
+`moment_cues.py`, `song_intent.py`, `beat_grid.py`): every `next(` has a default except
+two that pick an element the code just put there (`pipeline`'s kept cue it dipped,
+`song_intent._shown`'s non-empty map); the one
+`.index(` (`events`, `own.index(holder)`) takes a cue drawn from `own`. A lookup in the
+gap-turn check (`events.py`, cue start after `_replace_from`) now has a default too. Test
+`test_a_colour_event_at_a_fast_tempo_never_crashes_the_render` (the review's four repros:
+`fly_out_cascade` 170 BPM colour 3.3 + `closed` 4.1; `fly_in_cascade` 170 and 180 BPM
+colour 3.4; 3/4 at 170): every render finishes, every event is traced, every wheel turn
+dark.
+
+### H3: bounded lateness, one dip test
+
+`song_intent.dip_fits(added_ms, beat_ms)` (≤ half the beat before) is the one test the
+render (`pipeline._boundary_change`, `events._turn`) and the repair (`_wheel_event_records`,
+per head's own change time) use. A change that cannot dip turns in the first dark window
+long enough within `WHEEL_LATE_BEATS` = **1 beat** after its beat (recorded late), else does
+not play (traced, recorded "it does not play"). The planner prompt's colour/gobo line names
+the fastest tempo at which the rig's slowest change fits before a beat (`wheel_max_bpm`).
+The repair also records a hit inside a wheel turn's dark lead (only where that turn
+happens: inside a `closed`), and the closed/rest/dark-phase cases as before. A show's rests
+are unknown when planning, so only the render's trace reports a hit they move. Tests
+`test_a_colour_event_that_cannot_dip_is_late_by_at_most_a_beat_else_not_played` (the
+review's `mirror_wings` 170 BPM close 20 settle 150 colour 3.1: not played, said so, the
+repair predicts it with the same numbers), `test_a_hit_inside_a_wheel_turns_dark_lead_is_recorded_only_where_the_turn_happens`.
+**Decided:** the bound is one beat (a colour more than a beat late no longer answers its
+cue).
+
+### M1: strobe rate per beat
+
+`events.strobe_beats` chooses each beat's rate (halving until a phase fits that beat's
+length), so a faster stretch slows only its own beats; the trace and the repair count the
+same beats ("on 16 of its 28 beats"). Test
+`test_a_strobe_slows_only_on_the_beats_it_cannot_follow_and_repair_agrees` (96 → 140 BPM,
+shutter latency 45 ms: 16 dark runs in a slow bar, 8 in a fast one).
+
+### M2: steady-state dark phases
+
+`pipeline._dark_phases` publishes a cycle's windows from the second cycle where the song
+holds two (its leading darkness, the previous cycle's tail, included); from the first
+otherwise. `fly_in_cascade` MH2/MH3 now publish (0.01, 3.01) (missing before). Test
+`test_the_published_dark_phases_are_a_steady_cycles_and_include_its_leading_darkness`.
+
+### L2: traced edge cases
+
+`closed` and `open` on one beat (the `closed` is traced "another shutter event on its beat
+replaces it"), an `open` with nothing to end ("nothing to open"), an event outside its
+section (HIGH 2). Test `test_closed_and_open_on_one_beat_and_an_open_with_nothing_to_end_are_traced`.
+
+### L3
+
+Pipeline identity sentinel instead of a list compare; `bool([...])` → `any(...)`; one
+bar-grid function (HIGH 1) replaces the copies; `cue_limits` moved (HIGH 1);
+`intensity.py` `_beats(...) or grid.beats(last)` → an explicit `None` check (a
+`Fraction(0)` read as missing; it occurs only at a run starting on the grid's origin, and
+the byte matrix shows no event-free change).
+
+### L4: statements corrected
+
+- This record's "event-free DRAMATIC/INTENSE differ only on the variable grid": corrected
+  in place (true for the matrix's grids only; steady 78.3/129/170 BPM differ on cascade
+  tail frames by N1).
+- User guide: the events section now describes bar numbering, unplaceable events, the hit's
+  two shapes (dip and snap; flash and duck on a reveal), the played rule, moves later
+  first, the one-beat lateness bound, per-beat strobe rates, `offset_ms`/`cue_ms`; the
+  repair paragraph lists what the repair predicts and says a show's rests are reported only
+  by the render. `context/current-state.md` reworded to the same ("repair records, with the
+  render's tests, what will play otherwise"). Planner developer and user prompts: the hit
+  description (dip and snap / flash and duck; later first).
+- `events.py` module docstring and `identity.RENDERER_REVISION` docstring updated.
+
+### The owner's test song plan, re-rendered (synthetic rig, real plan and grid)
+
+The planner's final plan for the test song (scratch `p4view/runs2/naf/.../plans/final.json`,
+read-only) on its detected grid (two pickup beats), the owner-like synthetic rig, cues
+rebound with the fixed binder (scratch `w67/fix1/real_plan.py`, output `real_plan.txt`).
+No provider call, no owner data beyond the scratch copies already used.
+
+| Section / event | Plays |
+|---|---|
+| intro `closed` 7.3 | dark from 21780 ms to the section's end |
+| intro hit 7.4 (cue HIGH) | lit from the dark at 22540 ms on all four (−230 ms from the lyric) |
+| verse_1 colour WARM 15.2 (cue MED) | orange revealed at 45320 ms after a 180 ms dip (−50 ms) |
+| verse_1 `pulse` 18.1 | from 53680 ms (bar 18's downbeat; `c0ee6a40`: 52152) |
+| verse_2 hit 21.1 | heads reposition dark on 21.1: moved later to 21.2, flash and duck on all four |
+| verse_2 colour PRIMARY 29.3 (cue HIGH) | red at 88600 ms after a dip (+330 ms) |
+| chorus_1 (`fly_out_cascade`) hits 32.1, 36.1, 40.1 | moved later to beat 2, flash and duck on MH1, MH4 (2 heads show it); MH2, MH3 dark, not played |
+| break (`fly_in_cascade`) hits 43.3, 45.3 (cues HIGH) | flash and duck on MH1, MH4 (+290, +50 ms); MH2, MH3 not played; a duplicate hit on 45.3 dropped by the binder (recorded) |
+| break colour WARM 49.1 | every head dark on the beat (the cascade's dark phase): the wheel turns in that darkness, orange from each head's next reveal, MH1, MH4 1520 ms and MH2, MH3 2280 ms after the beat (traced `late`, "dark on the beat") |
+| break `strobe_medium` 52.1 | dimmer strobe, 4 a beat, 156960–160000 ms |
+| chorus_2 hit 53.1 | flash and duck on all four at 160000 ms |
+| chorus_2 hit 59.4 (cue HIGH) | dip and snap from 180320 ms (−30 ms) |
+| chorus_2 colour NEUTRAL 61.4 (cue MED) | white at 186580 ms after a dip (−200 ms) |
+
+Every played hit differs from the render without events (bytes printed in `real_plan.txt`;
+e.g. 21.1 MH1 `255, 255, 255, 153, 153, 153, 166 …` against `255 …`). The one-beat bound
+(H3) applies to a change that needs darkness of its own (a dip or a deferral); a head
+already dark on the event's beat turns there and shows the change at its next reveal,
+however far (49.1: up to three beats), as in `c0ee6a40` — look question 4.
+
+### Byte matrix, fix round 1
+
+The same harness, base `c0ee6a40` (`git archive`, scratch `w67/base_c0`) against this
+tree, with two pickup grids added (`pickup2`: 4/4 with two beats before bar 1;
+`pickup1_waltz`: 3/4 with one): 567 configurations (9 rigs × 3 timings × 7 grids × 3
+policies), 14 renders each (scratch `w67/fix1/compare_round1.txt`).
+
+- **Identical in all 567:** the gate; plans A and B; **plan D (no events) at every level**
+  (as authored, SMOOTH, SLOW, FAST, DRAMATIC, INTENSE: frames, segments, normalised record
+  and trace, `.xsq`, `.xtiming`, `.xmap`), the pickup grids included. The bar-origin fix
+  and the L3 `None` check change no event-free byte anywhere in the matrix.
+- **Plan C (events):** frames, segments, trace and `.xsq` differ in all 567 by design (hit
+  shapes, the bar grid on pickup grids, bounded turns, per-beat strobes); the normalised
+  record is identical in 288 and differs in 279. `.xtiming`/`.xmap` identical.
+- **No render errored** on either tree; every colour and gobo byte change of every plan-C
+  render on this tree (567 × 6 levels) is dark from the close latency before through the
+  settle after (the harness's independent reader).
+
+Two edits came after this run started: `rig_repair` (a hit is recorded inside a wheel
+turn's lead only where the turn happens; message wording; not a render input) and a
+defaulted `next(` in `events.py` (byte-neutral wherever the cue is found, which every
+render above did). The suite below ran after both.
+
+### Revision, fingerprints
+
+- `RENDERER_REVISION` 8 → 9 (events on the bar grid; hit shapes and visibility; bounded
+  turns; per-beat strobes). Every fingerprint re-recorded (scratch `w67/rerecord_pins.py`,
+  `w67/rerecord_event_pins.py`): all 42 family pins, `MULTI_PIN`, `GATED_PIN`,
+  `INTENT_PIN`, `FAST_INTENT_PIN`, the 3 `INTENSITY_PINS`: fingerprint only, frames and
+  `.xsq` unchanged. `EVENT_PINS`: frames change by design (hits): `dimmer_strobe` frames
+  `333612f5…` → `325f3945…`, `tagged_strobe` `8c46d4a5…` → `19c59ccc…`. Combined-show golden
+  moving-head fingerprint `e88c6efa…` → `8fd209c4…`.
+- Plans: a bound event now also dumps `cue_ms` (null unless bound); the response schema is
+  unchanged (`SkipJsonSchema`). Planner cache re-keys (prompt text changed).
+
+### Look questions for the owner (PENDING-OWNER)
+
+1. Flash and duck on a reveal (cascade hits): reads as a hit? The duck is N frames at
+   `contrast` below the level.
+2. Visibility N (2/3/4 frames) and the 0.40 cap.
+3. Hits on cascades still light only the two heads whose window opens; moved hits land on
+   beat 2.
+4. A colour change on a cascade's dark beat waits for the next reveal (up to 2280 ms at 78
+   BPM in the test song).
+
+### Verification (fix round 1, this tree, fresh)
+
+| Command | Result |
+|---|---|
+| `uv run pytest tests -q --no-cov` | 7090 passed, 30 skipped, 4 xfailed |
+| `uv run pytest tests/regression/test_mh_pins.py -q --no-cov` | 52 passed |
+| `uv run pytest tests/regression/test_mh_intent_parity.py -q --no-cov` | 22 passed, 4 xfailed; `--runxfail`: 4 failed (the W8 transition rows), 22 passed |
+| `uv run ruff check .` | All checks passed |
+| `uv run ruff format --check .` | 1305 files already formatted |
+| `uv run mypy .` | No issues in 653 source files |
+| Byte matrix (base `c0ee6a40`, 7 grids) | as above |
+| `git apply --check w67/headroom_variant.patch` | clean |
+
+`make validate` not run (the integrator's; the tree is uncommitted).

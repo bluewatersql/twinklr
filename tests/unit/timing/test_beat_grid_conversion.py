@@ -135,3 +135,59 @@ class TestSnapToNearestBarUsesTheSameResolution:
     def test_snap_stays_clamped_to_an_existing_boundary(self, uneven: BeatGrid) -> None:
         """Unlike `get_bar_start_ms`, snapping never invents a boundary past the end."""
         assert uneven.snap_to_nearest_bar(99_000.0) == 10000.0
+
+
+# --- bar.beat on the bar grid (W6/W7 fix round) -------------------------------------------
+
+
+def _pickup(pickup: int, beats_per_bar: int = 4) -> BeatGrid:
+    """Four steady 500 ms bars after `pickup` beats before bar 1's downbeat."""
+    beats = [15.0 + 500.0 * i for i in range(pickup + beats_per_bar * 4 + 1)]
+    return BeatGrid(
+        bar_boundaries=beats[pickup::beats_per_bar][:4],
+        beat_boundaries=beats,
+        eighth_boundaries=[],
+        sixteenth_boundaries=[],
+        tempo_bpm=120.0,
+        beats_per_bar=beats_per_bar,
+        duration_ms=beats[-1] + 500.0,
+    )
+
+
+@pytest.mark.parametrize("pickup", [0, 1, 2, 3])
+@pytest.mark.parametrize("beats_per_bar", [4, 3])
+def test_bar_beats_count_from_the_bar_downbeat_not_the_first_detected_beat(
+    pickup: int, beats_per_bar: int
+) -> None:
+    grid = _pickup(pickup, beats_per_bar)
+
+    for bar in range(1, 5):
+        for beat in range(1, beats_per_bar + 1):
+            index = grid.beat_index(bar, beat)
+            assert index == pickup + (bar - 1) * beats_per_bar + beat - 1
+            assert grid.beat_time_ms(bar, 1) == grid.bar_boundaries[bar - 1]
+            assert grid.bar_and_beat(index) == (bar, beat)
+    for index in range(pickup):
+        assert grid.bar_and_beat(index) is None  # a pickup beat is in no bar
+    assert grid.beat_index(1, beats_per_bar + 1) is None
+    assert grid.beat_index(5, 1) is None and grid.beat_index(0, 1) is None
+
+
+def test_a_bar_holds_the_beats_detected_in_it() -> None:
+    """A bar with three detected beats in 4/4 and one with five: each holds its own."""
+    beats = [0.0, 500.0, 1000.0, 1500.0, 2000.0, 2500.0, 3000.0, 3500.0, 4000.0, 4500.0]
+    grid = BeatGrid(
+        bar_boundaries=[0.0, 1500.0, 4000.0],
+        beat_boundaries=beats,
+        eighth_boundaries=[],
+        sixteenth_boundaries=[],
+        tempo_bpm=120.0,
+        beats_per_bar=4,
+        duration_ms=5000.0,
+    )
+
+    assert list(grid.bar_beat_indices(1)) == [0, 1, 2]
+    assert list(grid.bar_beat_indices(2)) == [3, 4, 5, 6, 7]
+    assert grid.beat_time_ms(2, 5) == 3500.0 and grid.beat_index(1, 4) is None
+    assert list(grid.bar_beat_indices(3)) == [8, 9]  # the last bar: what is detected
+    assert grid.bar_and_beat(7) == (2, 5)

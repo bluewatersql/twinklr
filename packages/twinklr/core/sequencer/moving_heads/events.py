@@ -23,28 +23,39 @@ not.
   extinguishes (what the xLights preview shows) else the shutter. A rate whose half
   period is shorter than the darkness path can follow (one frame, the dimmer's full
   swing at its declared speed, or the shutter's latency plus settle each way) is played
-  at the fastest rate that fits, recorded.
+  at the fastest rate that fits, chosen beat by beat (a faster stretch slows only its own
+  beats), recorded.
 - **pulse**: a beat-locked on/off, lit for the first half of each beat and dark for the
   second (`PULSE_PERIODS_BEATS`, slower where the half beat does not fit).
-- **hit** (`apply_hits`, after intensity): a short bright accent on the beat. The dimmer
-  jumps to its top on the beat's frame and eases back to the level the section plays
-  over `decay_beats`; where the level just before the beat leaves less than `contrast`
-  of the top to rise, a pre-dip into the beat makes it (`HIT_PRE_DIP_BEATS`), never to
-  dark. Contrast and decay come from the bound lyric cue's emphasis (`HITS`; an unbound
-  hit uses `UNBOUND_EMPHASIS`). Because it reads the level the section plays after
-  intensity, a hit on a beat where an intensity accent lands is one accent, and on a
-  section below full (the headroom variant) it rises above the section's level instead.
-  A hit on a dark beat lights the head for the hit where the darkness is the dimmer's
-  inside a cue (a template's dimmer dark phase, a closed event) with no wheel moving;
-  where it is a show's rest, a repositioning or a wheel change it moves to the nearest
-  beat the head can show it (within `HIT_MOVE_BARS`), recorded.
+- **hit** (`apply_hits`, after intensity): a short bright accent on the beat, on the level
+  the section plays (`L`, after intensity), so a hit on a beat where an intensity accent
+  lands is one accent, and on a section below full (the headroom variant) it rises above
+  it. With room before the beat (the head lit there, inside the section) it dips
+  `contrast` below `L` over the quarter beat before (`HIT_PRE_DIP_BEATS`), holding the
+  last `visible_frames` frames, then snaps to the dimmer's top for that many frames and
+  decays back; without room (dark before, a reveal on the beat) it flashes the top and
+  ducks `contrast` below `L` for that many frames, recovering over `decay_beats`. Never
+  below `HIT_FLOOR`. Contrast, held frames and decay come from the bound lyric cue's
+  emphasis (`HITS`; an unbound hit uses `UNBOUND_EMPHASIS`). A head counts it played only
+  where `visible_frames` frames differ from `L` by `contrast` (at most `HIT_VISIBLE_CAP`);
+  else "no visible change". A hit on a dark beat lights the head for it where the
+  darkness is the dimmer's inside a cue (a template's dimmer dark phase, a closed event)
+  with no wheel moving; a head dark between its template's cues does not play it; where
+  every head is dark on the beat (a show's rest, a repositioning, a wheel change) it
+  moves to the beat within `HIT_MOVE_BARS` the most heads show, a later one first,
+  recorded.
 - **color / gobo**: the held colour (pattern) changes at the beat to the event's, resolved
   as the section's (`song_intent`: palette role or named colour → nearest offered state;
   pattern → tagged state), and holds until the next such event or the section's end. The
   wheel turns only while the head is dark: the reveal lands on the beat, after a dark
-  lead that rides darkness already there or dips at most half a beat
-  (`pipeline._dip_span`); else in the first dark window after the beat long enough
-  (recorded, late); else it does not play (recorded).
+  lead that rides darkness already there or adds at most half the beat before it
+  (`song_intent.dip_fits`, the test the plan repair uses too); else in the first dark
+  window after the beat long enough that reveals it within `WHEEL_LATE_BEATS` (recorded,
+  late); else it does not play (recorded). Inside a template overlay the event takes over
+  the overlay's state from the beat.
+
+Every bar and beat is counted from the bar's downbeat (`BeatGrid.beat_index`), as the
+planner, the cue binder and the plan repair count it.
 """
 
 from __future__ import annotations
@@ -76,10 +87,12 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import quantize_cu
 from twinklr.core.sequencer.moving_heads.song_intent import (
     PULSE_PERIODS_BEATS,
     STROBE_FLASHES_PER_BEAT,
+    WHEEL_LATE_BEATS,
     HeadWheels,
     SectionPalette,
     color_offer,
     darkness_ms,
+    dip_fits,
     flash_widths,
     frames_ms,
     gobo_offer,
@@ -91,7 +104,6 @@ from twinklr.core.sequencer.moving_heads.song_intent import (
 from twinklr.core.sequencer.timing.musical_phase import (
     MusicalPhaseError,
     MusicalPhaseMap,
-    musical_phase_fraction,
     musical_time_at,
 )
 
@@ -111,21 +123,35 @@ class HitShape:
     """One emphasis' hit (`HITS`)."""
 
     contrast: float
-    """The rise into the beat, as a share of the dimmer's top: where the level just
-    before the beat is higher than `top * (1 - contrast)`, a pre-dip brings it there."""
+    """How far below the level played, as a share of the dimmer's top, the hit's pre-dip
+    (or its duck after the flash) holds, and the least difference from the render
+    without the hit that counts as visible."""
     decay_beats: float
-    """The hit eases from the top back to the section's level over this many beats, as
-    `(1 - p)**2` (the intensity accent's curve)."""
+    """The hit eases from the top (or the duck) back to the section's level over this
+    many beats, as `(1 - p)**2` (the intensity accent's curve)."""
+    visible_frames: int
+    """The flash's frames at the top, the dip's (or duck's) held frames, and the least
+    number of frames that must differ visibly for the hit to count as played."""
 
 
 HITS: dict[str, HitShape] = {
-    "LOW": HitShape(contrast=0.25, decay_beats=0.25),
-    "MED": HitShape(contrast=0.40, decay_beats=0.5),
-    "HIGH": HitShape(contrast=0.60, decay_beats=0.75),
+    "LOW": HitShape(contrast=0.25, decay_beats=0.25, visible_frames=2),
+    "MED": HitShape(contrast=0.40, decay_beats=0.5, visible_frames=3),
+    "HIGH": HitShape(contrast=0.60, decay_beats=0.75, visible_frames=4),
 }
-"""Proposed (W6), by the bound lyric cue's emphasis: a stronger cue cuts deeper into the
-beat and rings longer. At full level (every catalog family) the hit is the pre-dip and
-the return to full; below full it also rises above the section's level."""
+"""Proposed (W6; the visible-change rule from the W6/W7 fix round), by the bound lyric
+cue's emphasis: a stronger cue cuts deeper, holds longer and rings longer. With room
+before the beat a hit is a pre-dip and a snap to full; without it (a reveal on the beat)
+a flash and a duck below the section's level."""
+
+HIT_FLOOR = 0.10
+"""A hit's pre-dip or duck never goes below this share of the dimmer's top: never dark."""
+
+HIT_VISIBLE_CAP = 0.40
+"""A hit counts as played on a head where at least its `visible_frames` frames differ from
+the level played without it by its `contrast` of the top, at most this share: between the
+floor and the top a level of 0.5 to 0.6 leaves no more room either way (a HIGH hit under
+INTENSE's sag). Proposed (W6/W7 fix round)."""
 
 HIT_MIN_LIT_FRAMES = 3
 """A hit plays on a lit head only where at least this many lit frames follow it (60 ms):
@@ -185,10 +211,14 @@ class TimedEvent:
     action: str
     bar: int
     beat: int
+    beat_index: int
+    """Its beat's index in the grid's `beat_boundaries` (`BeatGrid.beat_index`)."""
     beat_ms: float
     frame_ms: int
     cue_id: str | None
     emphasis: str | None
+    cue_ms: int | None
+    """The bound lyric cue's time (`PlanEvent.cue_ms`)."""
     color: str | None
     gobo: str | None
 
@@ -208,6 +238,8 @@ class TimedEvent:
         if self.cue_id is not None:
             record["moment_cue_id"] = self.cue_id
             record["emphasis"] = self.emphasis or UNBOUND_EMPHASIS
+            if self.cue_ms is not None:
+                record["cue_ms"] = self.cue_ms
         return record
 
 
@@ -220,22 +252,31 @@ class SectionEvents:
     """A plan section's events on the grid (`section_events`)."""
 
     events: tuple[TimedEvent, ...]
-    unplaced: tuple[dict[str, Any], ...]
-    """Events whose beat lies beyond the beat grid, with why."""
+    unplaced: tuple[tuple[int, dict[str, Any]], ...]
+    """Events that cannot be placed in the section's frames (their index in the plan
+    section, and the trace entry saying why)."""
     end_ms: int
     """The frame the section ends on."""
 
     def shutter_spans(self) -> list[tuple[TimedEvent, int, int]]:
         """Each closed, strobe and pulse event with the frames it plays over: from its
-        frame to the next shutter event's or the section's end."""
+        frame to the next shutter event's or the section's end (empty where another
+        shutter event shares its frame)."""
         shutter = [e for e in self.events if e.action in SHUTTER_ACTIONS]
-        if not shutter:
-            return []
         ends = [e.frame_ms for e in shutter[1:]] + [self.end_ms]
         return [
             (event, event.frame_ms, end)
-            for event, end in zip(shutter, ends, strict=True)
-            if event.action != "open" and end > event.frame_ms
+            for event, end in zip(shutter, ends[: len(shutter)], strict=True)
+            if event.action != "open"
+        ]
+
+    def opens(self) -> list[tuple[TimedEvent, bool]]:
+        """Each `open` and whether it ends a closed, strobe or pulse event."""
+        shutter = [e for e in self.events if e.action in SHUTTER_ACTIONS]
+        return [
+            (event, index > 0 and shutter[index - 1].action != "open")
+            for index, event in enumerate(shutter)
+            if event.action == "open"
         ]
 
     def wheel_events(self) -> list[TimedEvent]:
@@ -246,43 +287,69 @@ class SectionEvents:
 
 
 def section_events(section: _Section, beat_grid: BeatGrid) -> SectionEvents:
-    """The section's events on the grid, in time order (ties in plan order)."""
-    beats = beat_grid.beat_boundaries
-    per_bar = beat_grid.beats_per_bar
+    """The section's events on the grid, in time order (ties in plan order): each on its
+    bar's beat counted from the bar's downbeat (`BeatGrid.beat_index`: a pickup before
+    bar 1 shifts nothing). An event whose bar lies outside the section, beyond the grid,
+    or on a beat its bar does not have is unplaced, with why."""
     placed: list[TimedEvent] = []
-    unplaced: list[dict[str, Any]] = []
+    unplaced: list[tuple[int, dict[str, Any]]] = []
+    bars = beat_grid.bar_boundaries
+    end = bars[section.end_bar] if section.end_bar < len(bars) else beat_grid.duration_ms
+    end_ms = quantize_cue(round(end)).actual_ms
     for index, event in enumerate(section.events):
-        position = (event.bar - 1) * per_bar + event.beat - 1
         action = _value(event.action) or ""
-        if not 0 <= position < len(beats):
+        beat_index = beat_grid.beat_index(event.bar, event.beat)
+        why = None
+        if not section.start_bar <= event.bar <= section.end_bar:
+            why = f"bar {event.bar} lies outside its section (bars {section.start_bar}-{section.end_bar})"
+        elif beat_index is None and not beat_grid.bar_beat_indices(event.bar):
+            why = f"bar {event.bar} lies beyond the detected beat grid, where the render is dark"
+        elif beat_index is None:
+            why = (
+                f"bar {event.bar} has {len(beat_grid.bar_beat_indices(event.bar))} detected "
+                f"beats, not {event.beat}"
+            )
+        if why is not None or beat_index is None:
             unplaced.append(
-                {
-                    "action": action,
-                    "bar": event.bar,
-                    "beat": event.beat,
-                    "not_played": "its beat lies beyond the detected beat grid",
-                }
+                (
+                    index,
+                    {"action": action, "bar": event.bar, "beat": event.beat, "not_played": why},
+                )
             )
             continue
-        beat_ms = beats[position]
+        beat_ms = beat_grid.beat_boundaries[beat_index]
+        frame_ms = quantize_cue(round(beat_ms)).actual_ms
+        if frame_ms >= end_ms:
+            unplaced.append(
+                (
+                    index,
+                    {
+                        "action": action,
+                        "bar": event.bar,
+                        "beat": event.beat,
+                        "not_played": "its beat lies past its section's last frame",
+                    },
+                )
+            )
+            continue
         placed.append(
             TimedEvent(
                 index=index,
                 action=action,
                 bar=event.bar,
                 beat=event.beat,
+                beat_index=beat_index,
                 beat_ms=beat_ms,
-                frame_ms=quantize_cue(round(beat_ms)).actual_ms,
+                frame_ms=frame_ms,
                 cue_id=event.moment_cue_id,
                 emphasis=getattr(event, "cue_emphasis", None),
+                cue_ms=getattr(event, "cue_ms", None),
                 color=_value(event.color),
                 gobo=_value(event.gobo),
             )
         )
     placed.sort(key=lambda e: (e.frame_ms, e.index))
-    bars = beat_grid.bar_boundaries
-    end = bars[section.end_bar] if section.end_bar < len(bars) else beat_grid.duration_ms
-    return SectionEvents(tuple(placed), tuple(unplaced), quantize_cue(round(end)).actual_ms)
+    return SectionEvents(tuple(placed), tuple(unplaced), end_ms)
 
 
 # --- reading and writing one head's cues ------------------------------------------------
@@ -491,9 +558,9 @@ def _plan_shutter(
             }
         )
     path, dark_ms, lit_ms = widths
-    beat = _shortest_beat(beat_grid, start_ms, end_ms)
     widest = max(dark_ms, lit_ms)
     if event.action == "pulse":
+        beat = _shortest_beat(beat_grid, start_ms, end_ms)
         period = pulse_period(beat, widest)
         if period is None:
             return _ShutterPlan(
@@ -512,25 +579,69 @@ def _plan_shutter(
         )
         return _ShutterPlan(dark=dark, record=record)
     asked = STROBE_FLASHES_PER_BEAT[event.action]
-    flashes = strobe_flashes(event.action, beat, widest)
-    if flashes is None:
+    dark, rates = _strobe_dark(event, start_ms, end_ms, beat_grid, widest)
+    if not rates:
         return _ShutterPlan(
             record={
                 **record,
                 "not_played": f"the {path} cannot follow one flash a beat at this tempo",
             }
         )
-    record["plays"] = f"a {path} strobe, {flashes} flash(es) a beat"
-    record["flashes_per_beat"] = flashes
-    if flashes != asked:
-        record["degraded"] = (
-            f"{asked} flashes a beat need {beat / (2 * asked):.0f} ms phases; the {path} "
-            f"follows {widest} ms"
-        )
-    dark = _square_dark(
-        phase_map, event.beat_ms, start_ms, end_ms, Fraction(1, flashes), dark_first=True
+    slowest = min(rates)
+    record["plays"] = f"a {path} strobe, {slowest} flash(es) a beat" + (
+        f" (up to {max(rates)})" if max(rates) != slowest else ""
     )
+    record["flashes_per_beat"] = slowest
+    if slowest != asked:
+        slowed = sum(1 for n in rates if n != asked)
+        record["degraded"] = (
+            f"{asked} flashes a beat need phases of 1/{2 * asked} beat; the {path} follows "
+            f"{widest} ms: on {slowed} of {len(rates)} beats it plays fewer"
+        )
     return _ShutterPlan(dark=dark, record=record)
+
+
+def strobe_beats(beat_grid: BeatGrid, first_index: int, end_ms: float) -> list[tuple[float, float]]:
+    """Each beat `(start, length)` from the beat at `first_index` whose frame (the frame
+    nearest it) comes before `end_ms`'s (past the grid's last beat, at its last beat's
+    length). The render and the plan repair count a strobe's beats with it."""
+    beats = beat_grid.beat_boundaries
+    out: list[tuple[float, float]] = []
+    index = first_index
+    start = beats[index]
+    stop = quantize_cue(round(end_ms)).actual_ms
+    while quantize_cue(round(start)).actual_ms < stop:
+        if index + 1 < len(beats):
+            length = beats[index + 1] - start
+        else:
+            length = beats[-1] - beats[-2] if len(beats) > 1 else 500.0
+        out.append((start, length))
+        start, index = start + length, index + 1
+    return out
+
+
+def _strobe_dark(
+    event: TimedEvent, start_ms: int, end_ms: int, beat_grid: BeatGrid, widest: int
+) -> tuple[list[tuple[int, int]], list[int]]:
+    """A square-wave strobe's dark spans inside `[start_ms, end_ms)`, dark first, its rate
+    chosen per beat (`strobe_flashes` on that beat's length, so a faster stretch of the
+    song slows only its own beats), and the rate each beat plays (a beat that cannot
+    follow one flash stays lit)."""
+    spans: list[tuple[int, int]] = []
+    rates: list[int] = []
+    for beat_start, length in strobe_beats(beat_grid, event.beat_index, end_ms):
+        flashes = strobe_flashes(event.action, length, widest)
+        if flashes is None:
+            continue
+        if beat_start + length > start_ms:
+            rates.append(flashes)
+        half = length / (2 * flashes)
+        for j in range(0, 2 * flashes, 2):
+            a = max(start_ms, quantize_cue(round(beat_start + j * half)).actual_ms)
+            b = min(end_ms, quantize_cue(round(beat_start + (j + 1) * half)).actual_ms)
+            if b > a:
+                spans.append((a, b))
+    return spans, rates
 
 
 def _apply_strobe_state(
@@ -615,7 +726,9 @@ class _WheelContext:
         """The head's cues holding `new` from `cue`, which follows a gap the transaction pass
         turns the wheel in; None when that turn no longer fits the gap."""
         changed = _replace_from(own, channel, old, new, cue.t0_ms, self.profile)
-        index = next(i for i, c in enumerate(changed) if c.t0_ms == cue.t0_ms)
+        index = next((i for i, c in enumerate(changed) if c.t0_ms == cue.t0_ms), None)
+        if index is None:
+            return None
         return changed if index == 0 or self.gap_ok(changed, index) else None
 
 
@@ -634,8 +747,9 @@ def _turn(
     The reveal lands on the event's frame `T` after a dark lead (`wheel_change_ms`): the
     darkness rides what the cue before `T` already commands, else dips at most half a beat
     (`pipeline._dip_span`), never before `floor_ms` (the previous wheel event's reveal).
-    Else the turn waits for the first dark window after `T` (before `until_ms`, the next
-    event of this wheel) long enough. Else it does not play."""
+    Else the turn waits for the first dark window after `T` long enough that reveals it
+    within `WHEEL_LATE_BEATS` (and before `until_ms`, the next event of this wheel). Else it
+    does not play."""
     profile = ctx.profile
     capability = profile.discrete[DISCRETE_KEYS[channel]]
     settle = capability.states[new].settle_ms
@@ -679,7 +793,7 @@ def _turn(
         if holder is None
         else ctx.dip_span(ctx.dark_runs(holder, profile), max(holder.t0_ms, floor_ms), t, lead)
     )
-    if holder is not None and dip is not None and dip[1] <= half:
+    if holder is not None and dip is not None and dip_fits(dip[1], 2 * half):
         dark_from, added, dark_start = dip
         index = own.index(holder)
         darkened = holder
@@ -713,15 +827,20 @@ def _turn(
         else f"the {lead} ms of darkness, turn and settle it needs (adding {dip[1]} ms) do not "
         f"fit half the beat before it ({half:g} ms)"
     )
+    # A late turn may reveal at most `WHEEL_LATE_BEATS` after the beat (a frame of grid
+    # tolerance); later, the head would show the old state too long: not played.
+    latest = t + WHEEL_LATE_BEATS * _beat_ms(ctx.beat_grid, t) + FRAME
     for start, end in ctx.dark_windows(own, profile):
         if start < t or end - start < lead:
             continue
-        if start >= until_ms:
+        if start >= until_ms or start >= latest:
             break
         turn = start + frames_ms(darkness)
         turning = next((c for c in own if c.t0_ms <= turn < c.t1_ms), None)
         if turning is None:
-            following = next(c for c in own if c.t0_ms >= end)
+            following = next((c for c in own if c.t0_ms >= end), None)
+            if following is None or following.t0_ms > latest:
+                continue
             changed = ctx.turned_in_gap(own, channel, old, new, following)
             if changed is None:
                 continue
@@ -732,16 +851,20 @@ def _turn(
             }
             record["reveal_ms"] = following.t0_ms
             return changed, record, True
-        reveal = end
+        if end > latest:
+            continue
         record["deferred"] = {
             "turn_ms": turn,
-            "reveal_ms": reveal,
-            "late_ms": reveal - t,
+            "reveal_ms": end,
+            "late_ms": end - t,
             "reason": why,
         }
-        record["reveal_ms"] = reveal
+        record["reveal_ms"] = end
         return _replace_from(own, channel, old, new, turn, profile), record, True
-    record["not_played"] = f"{why}, and the section has no dark window long enough after it"
+    record["not_played"] = (
+        f"{why}, and no dark window long enough reveals it within {WHEEL_LATE_BEATS:g} beat "
+        "of the beat"
+    )
     return own, record, False
 
 
@@ -849,10 +972,19 @@ def apply_section_events(
     played = EventsPlayed()
     by_head = {f: _own(cues, f) for f in sorted({c.fixture_id for c in cues})}
     for event, span_start, span_end in events.shutter_spans():
+        here = start <= event.frame_ms < end
+        if span_end <= span_start:
+            if here:
+                for fixture_id in by_head:
+                    played.head(
+                        event,
+                        fixture_id,
+                        {"not_played": "another shutter event on its beat replaces it"},
+                    )
+            continue
         lo, hi = max(span_start, start), min(span_end, end)
         if lo >= hi:
             continue
-        here = start <= event.frame_ms < end
         for fixture_id, own in by_head.items():
             profile = profiles[fixture_id]
             plan = _plan_shutter(event, lo, hi, profile, phase_map, beat_grid)
@@ -881,13 +1013,18 @@ def apply_section_events(
             by_head[fixture_id] = own
             if here:
                 played.head(event, fixture_id, plan.record)
-    for event in events.events:
-        if event.action == "open" and start <= event.frame_ms < end:
+    for event, ends in events.opens():
+        if start <= event.frame_ms < end:
             for fixture_id in by_head:
                 played.head(
                     event,
                     fixture_id,
-                    {"from_ms": event.frame_ms, "plays": "the template's own shutter and level"},
+                    {"from_ms": event.frame_ms, "plays": "the template's own shutter and level"}
+                    if ends
+                    else {
+                        "not_played": "nothing to open: no closed, strobe or pulse event plays "
+                        "before it in the section"
+                    },
                 )
     wheel_events = [e for e in events.wheel_events() if start <= e.frame_ms < end]
     for fixture_id, own in by_head.items():
@@ -1037,8 +1174,10 @@ def apply_hits(
     beat's frame on every head that can show it there (lit, or lit for the hit where its
     darkness allows, `_forced_frames`); a head dark there between its template's cues
     does not play it. Only where no head can show it on its beat does the hit move, on
-    every head, to the nearest beat inside the part (within `HIT_MOVE_BARS`) where one can;
-    else it does not play. Returns the cues and the trace entry per event."""
+    every head, to the beat inside the part where the most heads can: a later beat within
+    `HIT_MOVE_BARS` first, an earlier one only where no later one serves; else it does
+    not play. A head counts it played only where its frames differ visibly from the
+    render without it (`_play_hit`). Returns the cues and the trace entry per event."""
     start, end = window
     records: dict[int, dict[str, Any]] = {}
     by_head = {f: _own(cues, f) for f in sorted({c.fixture_id for c in cues})}
@@ -1053,13 +1192,16 @@ def apply_hits(
             for f, own in by_head.items()
             if "dimmer" in profiles[f].axes
         }
-        home = beats.index(event.beat_ms) if event.beat_ms in beats else None
-        able: dict[str, tuple[int, str, int]] = {}
-        beat = event.beat_ms
-        for offset in [0] + [d for k in range(1, reach + 1) for d in (k, -k)]:
-            if home is None or not 0 <= home + offset < len(beats):
-                continue
-            beat = beats[home + offset]
+
+        def able_on(
+            index: int,
+            frames: dict[str, _HeadFrames] = frames,
+            shape: HitShape = shape,
+        ) -> dict[str, tuple[int, str, int]]:
+            """The heads that can show the hit on the beat at `index`: where, how and for
+            how many frames."""
+            able: dict[str, tuple[int, str, int]] = {}
+            beat = beats[index]
             for fixture_id, head in frames.items():
                 lead = _lead(profiles[fixture_id].axes["dimmer"], beat_grid)
                 t = quantize_cue(round(beat - lead)).actual_ms
@@ -1071,9 +1213,26 @@ def apply_hits(
                     able[fixture_id] = (lit, "lit", decay)
                 elif forced := _forced_frames(head, t, decay, dark_spans):
                     able[fixture_id] = (t, "lit_from_dark", forced)
-            if able:
-                break
-        index = beats.index(beat) if beat in beats else None
+            return able
+
+        home = event.beat_index
+        chosen, able, direction = home, able_on(home), None
+        if not able:
+            for side, offsets in (
+                ("later", range(1, reach + 1)),
+                ("earlier", range(-1, -reach - 1, -1)),
+            ):
+                candidates = [
+                    (len(found), -abs(offset), home + offset, found)
+                    for offset in offsets
+                    if 0 <= home + offset < len(beats) and (found := able_on(home + offset))
+                ]
+                if candidates:
+                    _, _, chosen, able = max(candidates, key=lambda c: (c[0], c[1]))
+                    direction = side
+                    break
+        beat = beats[chosen]
+        position = beat_grid.bar_and_beat(chosen)
         for fixture_id in by_head:
             if fixture_id not in frames:
                 heads[fixture_id] = {"not_played": "the head has no dimmer axis"}
@@ -1090,17 +1249,23 @@ def apply_hits(
                 continue
             t, how, count = able[fixture_id]
             axis = profiles[fixture_id].axes["dimmer"]
-            by_head[fixture_id], outcome = _play_hit(
+            played, outcome = _play_hit(
                 frames[fixture_id], axis, shape, phase_map, beat, t, how, count, start
             )
+            if played is None:
+                heads[fixture_id] = outcome
+                continue
+            by_head[fixture_id] = played
             outcome["played_ms"] = t
             if lead := _lead(axis, beat_grid):
                 outcome["lead_ms"] = lead
-            if beat != event.beat_ms and index is not None:
+            if direction is not None:
                 outcome["moved"] = {
                     "from_ms": event.frame_ms,
-                    "bar": index // beat_grid.beats_per_bar + 1,
-                    "beat": index % beat_grid.beats_per_bar + 1,
+                    "direction": direction,
+                    "bar": None if position is None else position[0],
+                    "beat": None if position is None else position[1],
+                    "heads_lit": len(able),
                     "reason": "every head is dark on the event's beat (a show's rest, a "
                     "repositioning or a wheel change)",
                 }
@@ -1150,73 +1315,101 @@ def _play_hit(
     how: str,
     count: int,
     part_start: int,
-) -> tuple[list[FixtureSegment], dict[str, Any]]:
-    """The head's cues with one hit at frame `t`: the top on `t`, easing back to the level
-    played over the decay (`count` frames, only lit or lit-from-dark ones), and, where the
-    level before `t` leaves less than the shape's contrast, a pre-dip into it."""
+) -> tuple[list[FixtureSegment] | None, dict[str, Any]]:
+    """The head's cues with one hit at frame `t`, and its trace entry; the cues are None
+    where the hit would not differ visibly from the render without it.
+
+    `shape.visible_frames` frames at the top on the beat (the flash). Where the head is lit
+    for at least that many frames plus one right before the beat, inside the section, a
+    pre-dip eases down over the quarter beat before it and holds `contrast` of the top
+    below the level played for its last `visible_frames` frames, then the flash and a
+    decay back to that level (`pre_dip`). Where it is not (dark before the beat, a reveal
+    on it), the flash is followed by a duck: `visible_frames` frames `contrast` below the
+    level played, recovering over the decay (`flash_and_duck`). Lit from the dark, the
+    flash eases back to dark over the decay. Neither dip goes below `HIT_FLOOR` of the top.
+    Visible: at least `visible_frames` frames differ from the level played by at least
+    `contrast` of the top (at most `HIT_VISIBLE_CAP`)."""
     top = float(axis.operable_range[1])
     zero = axis.dmx_word(0)
-    changed: dict[int, float] = {t: top}
+    floor = HIT_FLOOR * top
+    depth = shape.contrast * top
+    hold = shape.visible_frames
+    changed: dict[int, float] = {}
     outcome: dict[str, Any] = {
         "how": how,
         "contrast": shape.contrast,
         "decay_beats": shape.decay_beats,
     }
 
-    def phase(u: int) -> float:
-        try:
-            return float(musical_phase_fraction(phase_map, u, origin_ms=beat, period_beats=1))
-        except MusicalPhaseError:
-            return math.inf
+    def base(u: int) -> float:
+        return frames.levels[u] if how == "lit" else 0.0
 
-    for k in range(1, count):
+    def usable(u: int) -> bool:
+        return u in frames.cue_at and (how != "lit" or frames.lit[u])
+
+    after = []
+    for k in range(max(count, 2 * hold + 1)):
         u = t + k * FRAME
-        if u not in frames.cue_at or (how == "lit" and not frames.lit[u]):
+        if not usable(u) or (how != "lit" and k >= count):
             break
-        p = min(1.0, max(0.0, phase(u) / shape.decay_beats))
-        base = frames.levels[u] if how == "lit" else 0.0
-        value = base + (top - base) * (1 - p) ** 2
-        if axis.dmx_word(value) == zero:
-            break
-        changed[u] = max(base, value)
+        after.append(u)
+    flash = after[:hold]
+    for u in flash:
+        changed[u] = top
+    before: list[int] = []
     if how == "lit":
-        before = t - FRAME
-        needed = top * (1 - shape.contrast)
-        if (
-            before in frames.cue_at
-            and before >= part_start
-            and frames.lit[before]
-            and frames.levels[before] > needed
-        ):
-            try:
-                dip_start = musical_time_at(
-                    phase_map, Fraction(-HIT_PRE_DIP_BEATS), origin_ms=beat, period_beats=1
+        try:
+            dip_start = quantize_cue(
+                round(
+                    musical_time_at(
+                        phase_map, Fraction(-HIT_PRE_DIP_BEATS), origin_ms=beat, period_beats=1
+                    )
                 )
-            except MusicalPhaseError:
-                dip_start = Fraction(t - 2 * FRAME)
-            first = min(t - 2 * FRAME, quantize_cue(round(dip_start)).actual_ms)
-            span = [
-                u
-                for u in range(max(first, part_start), t, FRAME)
-                if u in frames.cue_at and frames.lit[u]
-            ]
-            # Only the frames right before the beat, without a dark frame between.
-            while span and any(
-                not frames.lit[w] for w in range(span[0], t, FRAME) if w in frames.lit
-            ):
-                span = span[1:]
-            for position, u in enumerate(span, start=1):
-                share = (position / len(span)) ** 2
-                level = frames.levels[u]
-                changed[u] = min(level, level + (needed - level) * share)
-            if span:
-                outcome["pre_dip"] = {"from_ms": span[0], "to_level": round(needed, 4)}
-    if axis.travel_speed_per_s is not None:
+            ).actual_ms
+        except MusicalPhaseError:
+            dip_start = t - (hold + 1) * FRAME
+        u = t - FRAME
+        while u >= max(part_start, min(dip_start, t - (hold + 1) * FRAME)) and usable(u):
+            before.insert(0, u)
+            u -= FRAME
+    rest = after[hold:]
+    if how == "lit" and len(before) >= hold + 1:
+        outcome["shape"] = "pre_dip"
+        easing = before[:-hold]
+        for position, u in enumerate(easing, start=1):
+            dipped = max(floor, base(u) - depth)
+            share = (position / (len(easing) + 1)) ** 2
+            changed[u] = min(base(u), base(u) + (dipped - base(u)) * share)
+        for u in before[-hold:]:
+            changed[u] = min(base(u), max(floor, base(u) - depth))
+        for k, u in enumerate(rest, start=1):
+            p = k / (len(rest) + 1)
+            changed[u] = max(base(u), base(u) + (top - base(u)) * (1 - p) ** 2)
+        outcome["pre_dip"] = {"from_ms": before[0]}
+    elif how == "lit":
+        outcome["shape"] = "flash_and_duck"
+        ducked = rest[:hold]
+        for u in ducked:
+            changed[u] = min(base(u), max(floor, base(u) - depth))
+        recover = rest[hold:]
+        for k, u in enumerate(recover, start=1):
+            duck = min(base(u), max(floor, base(u) - depth))
+            p = k / (len(recover) + 1)
+            changed[u] = base(u) - (base(u) - duck) * (1 - p) ** 2
+    else:
+        outcome["shape"] = "lit_from_dark"
+        for k, u in enumerate(rest, start=1):
+            p = k / (len(rest) + 1)
+            value = top * (1 - p) ** 2
+            if axis.dmx_word(value) == zero:
+                break
+            changed[u] = value
+    if axis.travel_speed_per_s is not None and changed:
         # Each frame-to-frame step within what the dimmer can travel in a frame, walking
         # forward from the frame before the hit to the frame after it.
         allowed = axis.travel_speed_per_s * FRAME / 1000
         lowest, highest = min(changed), max(changed) + FRAME
-        previous = frames.levels.get(lowest - FRAME)
+        previous: float | None = frames.levels.get(lowest - FRAME)
         clipped = False
         for u in range(lowest, highest + FRAME, FRAME):
             target = changed.get(u, frames.levels.get(u))
@@ -1232,15 +1425,28 @@ def _play_hit(
             previous = target
         if clipped:
             outcome["degraded"] = "the dimmer is too slow to jump to its top in a frame"
+    threshold = min(shape.contrast, HIT_VISIBLE_CAP)
+    words = abs(axis.dmx_word(threshold * top) - axis.dmx_word(0))
+    visible = sum(
+        1
+        for u, value in changed.items()
+        if abs(axis.dmx_word(value) - axis.dmx_word(base(u))) >= words - 1
+    )
+    outcome["visible_frames"] = visible
+    if visible < hold:
+        return None, {
+            "not_played": f"no visible change: the hit would differ from the section's level "
+            f"by {threshold:.0%} of full on {visible} frame(s), fewer than {hold}",
+            "visible_frames": visible,
+        }
     by_cue: dict[int, dict[int, float]] = {}
     for u, value in changed.items():
-        if u in frames.cue_at:
-            by_cue.setdefault(frames.cue_at[u], {})[u] = value
+        by_cue.setdefault(frames.cue_at[u], {})[u] = value
     own = [
         _with_levels(cue, frames.profile, by_cue[i]) if i in by_cue else cue
         for i, cue in enumerate(frames.own)
     ]
-    outcome["frames"] = len([u for u in changed if u >= t])
+    outcome["frames"] = len(changed)
     return own, outcome
 
 
@@ -1280,6 +1486,10 @@ def cue_summary(entry: Mapping[str, Any]) -> dict[str, Any]:
         elif "late" in outcome and "late_ms" in outcome["late"]:
             summary.setdefault("late", {})[fixture_id] = outcome["late"]["late_ms"]
     summary["played"] = played
+    if entry.get("cue_ms") is not None and played:
+        # Signed: where each head plays it, less the lyric's own time (negative: before).
+        summary["cue_ms"] = entry["cue_ms"]
+        summary["offset_ms"] = {f: at - int(entry["cue_ms"]) for f, at in played.items()}
     if "not_played" in entry:
         summary["not_played"] = entry["not_played"]
     return summary
@@ -1360,8 +1570,13 @@ def _describe_outcome(outcome: Mapping[str, Any]) -> str:
         said += ", lit for it from the dark"
     if "pre_dip" in outcome:
         said += f" after a pre-dip from {outcome['pre_dip']['from_ms']} ms"
+    if outcome.get("shape") == "flash_and_duck":
+        said += ", a flash and a duck below the section's level"
     if "moved" in outcome:
-        said += f" (moved to bar {outcome['moved']['bar']} beat {outcome['moved']['beat']})"
+        said += (
+            f" (moved {outcome['moved']['direction']} to bar {outcome['moved']['bar']} beat "
+            f"{outcome['moved']['beat']}, where {outcome['moved']['heads_lit']} head(s) show it)"
+        )
     if "degraded" in outcome:
         said += f" ({outcome['degraded']})"
     return said
@@ -1381,7 +1596,17 @@ def describe_lyric_cue(entry: Mapping[str, Any]) -> str:
         by_time: dict[int, list[str]] = {}
         for fixture_id, at in event.get("played", {}).items():
             by_time.setdefault(at, []).append(fixture_id)
-        played = [f"at {at} ms on {', '.join(heads)}" for at, heads in sorted(by_time.items())]
+        offsets = event.get("offset_ms", {})
+        played = [
+            f"at {at} ms"
+            + (
+                f" ({offsets[heads[0]]:+d} ms from the lyric at {event['cue_ms']} ms)"
+                if heads[0] in offsets
+                else ""
+            )
+            + f" on {', '.join(heads)}"
+            for at, heads in sorted(by_time.items())
+        ]
         if event.get("moved"):
             played.append(f"moved on {', '.join(event['moved'])}")
         if isinstance(event.get("not_played"), str):

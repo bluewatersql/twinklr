@@ -31,10 +31,17 @@ from twinklr.core.agents.audio.lyrics.models import LyricContextModel, MomentCue
 from twinklr.core.agents.audio.profile.models import SongSectionRef
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
 from twinklr.core.agents.sequencer.moving_heads.moment_cues import bind_lyric_moment_cues
+from twinklr.core.agents.sequencer.moving_heads.rig_repair import repair_rig_intent
 from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
-from twinklr.core.sequencer.moving_heads.events import HITS, STROBE_FLASHES_PER_BEAT
+from twinklr.core.sequencer.moving_heads.events import (
+    HIT_VISIBLE_CAP,
+    HITS,
+    STROBE_FLASHES_PER_BEAT,
+    describe_lyric_cue,
+)
 from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
+from twinklr.core.sequencer.moving_heads.song_intent import rig_offer
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 HEADS = ("MH1", "MH2", "MH3", "MH4")
@@ -184,7 +191,14 @@ def frame_of(time_ms: float) -> int:
 
 
 def beat_frame(beat_grid: BeatGrid, bar: int, beat: int) -> int:
-    return frame_of(beat_grid.beat_boundaries[(bar - 1) * 4 + beat - 1])
+    """The frame nearest beat `beat` of bar `bar`, counted from the bar's downbeat (read
+    from the grid's lists here, not through `BeatGrid.beat_index`)."""
+    first = next(
+        i
+        for i, b in enumerate(beat_grid.beat_boundaries)
+        if b >= beat_grid.bar_boundaries[bar - 1] - 1
+    )
+    return frame_of(beat_grid.beat_boundaries[first + beat - 1])
 
 
 def assert_wheels_turn_dark(frames: Frames) -> None:
@@ -364,42 +378,151 @@ def hit_window(beat_grid: BeatGrid, bar: int, beat: int, emphasis: str = "MED") 
     return range(at - math.ceil(before) - 1, at + math.ceil(after / FRAME) + 1)
 
 
-def test_a_hit_at_full_level_pre_dips_into_the_beat_and_lands_full_on_it() -> None:
+def visible_frames(frames: Frames, plain: Frames, head: str, at: int, emphasis: str) -> int:
+    """How many frames around a hit at frame `at` differ from the render without it by at
+    least the emphasis' contrast (at most `HIT_VISIBLE_CAP`) of full, read from the bytes."""
+    words = round(min(HITS[emphasis].contrast, HIT_VISIBLE_CAP) * 255)
+    a, b = frames.dimmer(head), plain.dimmer(head)
+    return sum(
+        1 for i in range(max(0, at - 30), min(len(a), at + 60)) if abs(a[i] - b[i]) >= words - 1
+    )
+
+
+@pytest.mark.parametrize("emphasis", ["LOW", "MED", "HIGH"])
+def test_a_hit_with_room_before_its_beat_dips_into_it_and_snaps_to_full(emphasis: str) -> None:
+    """At full level with the head lit before the beat: the last `visible_frames` frames
+    before it held `contrast` below the level, then that many frames at full."""
     beat_grid = grid(120)
-    plan = [section([event(3, 1, "hit")])]
+    plan = [section([event(3, 1, "hit", cue_emphasis=emphasis)])]
     frames, plain = Frames(render(plan)), Frames(render(without_events(plan)))
     at = beat_frame(beat_grid, 3, 1)
-    window = hit_window(beat_grid, 3, 1)
+    window = hit_window(beat_grid, 3, 1, emphasis)
+    shape = HITS[emphasis]
+    held = round(255 * (1 - shape.contrast))
 
-    assert_same_outside(frames, plain, window.start, window.stop)
-    floor = math.floor(255 * (1 - HITS["MED"].contrast))
+    assert_same_outside(frames, plain, window.start, window.stop + shape.visible_frames)
     for head in HEADS:
         dimmer = frames.dimmer(head)
         assert frames.dark(head) == plain.dark(head)
-        assert dimmer[at] == 255
-        before = dimmer[window.start : at]
-        assert before == sorted(before, reverse=True) and min(before) >= floor - 1, before
-        assert dimmer[at - 1] <= floor + 1  # the contrast into the beat
-        assert all(level == 255 for level in dimmer[at : window.stop])  # full: nothing to decay
+        assert all(abs(dimmer[i] - held) <= 1 for i in range(at - shape.visible_frames, at))
+        assert all(dimmer[i] == 255 for i in range(at, at + shape.visible_frames))
+        assert visible_frames(frames, plain, head, at, emphasis) >= shape.visible_frames
+
+
+def test_a_hit_on_a_reveal_flashes_and_ducks_below_the_section_level() -> None:
+    """A cascade head revealed on the hit's beat (dark before it, at full already in the
+    render without the hit): a flash of `visible_frames` frames, then as many frames
+    `contrast` below the level it plays, recovering; visibly different."""
+    beat_grid = grid(120)
+    plain = Frames(render([section([], template_id="fly_out_cascade")]))
+    head, bar, beat = next(
+        (h, bar, b)
+        for bar in range(2, 8)
+        for b in range(1, 5)
+        for h in HEADS
+        if plain.dark(h)[beat_frame(beat_grid, bar, b) - 1]
+        and not plain.dark(h)[beat_frame(beat_grid, bar, b)]
+    )
+    pipeline = render([section([event(bar, beat, "hit")], template_id="fly_out_cascade")])
+    frames = Frames(pipeline)
+    at = beat_frame(beat_grid, bar, beat)
+    shape = HITS["MED"]
+
+    (entry,) = looks(pipeline)["s1"]["events"]
+    assert entry["heads"][head]["shape"] == "flash_and_duck"
+    dimmer, base = frames.dimmer(head), plain.dimmer(head)
+    assert all(dimmer[i] == 255 for i in range(at, at + shape.visible_frames))
+    ducked = range(at + shape.visible_frames, at + 2 * shape.visible_frames)
+    assert all(base[i] - dimmer[i] >= round(shape.contrast * 255) - 1 for i in ducked)
+    assert visible_frames(frames, plain, head, at, "MED") >= shape.visible_frames
+    assert frames.dark(head) == plain.dark(head)
 
 
 def test_a_stronger_cue_cuts_deeper_into_the_beat_and_rings_longer() -> None:
-    """On a level below full the hit rises to the top on the beat and eases back to the
-    section's level: longer for HIGH than LOW; at full, HIGH's pre-dip is deeper."""
+    """On a level below full the hit rises to full on the beat and eases back: HIGH holds
+    more frames visibly apart from the render without it than LOW, and dips deeper."""
     beat_grid = grid(120)
     at = beat_frame(beat_grid, 3, 1)
-    lit_after = {}
+    seen, dips = {}, {}
+    plain = Frames(render([section([], template_id=HALF)]))
     for emphasis in ("LOW", "HIGH"):
         hit = event(3, 1, "hit", cue_emphasis=emphasis)
         half = Frames(render([section([hit], template_id=HALF)]))
-        full = Frames(render([section([hit])]))
-        dimmer, dark = half.dimmer("MH1"), half.dark("MH1")
-        needed = math.floor(255 * (1 - HITS[emphasis].contrast))
-        assert dimmer[at] == 255 and min(needed, 128) - 1 <= dimmer[at - 1] <= 128
-        assert all(level >= 128 for level, d in zip(dimmer[at:], dark[at:], strict=True) if not d)
-        lit_after[emphasis] = sum(1 for level in dimmer[at : at + 30] if level > 128)
-        assert full.dimmer("MH1")[at - 1] <= math.ceil(255 * (1 - HITS[emphasis].contrast)) + 1
-    assert lit_after["HIGH"] > lit_after["LOW"]
+        dimmer = half.dimmer("MH1")
+        assert dimmer[at] == 255
+        seen[emphasis] = visible_frames(half, plain, "MH1", at, emphasis)
+        dips[emphasis] = dimmer[at - 1]
+    assert seen["HIGH"] > seen["LOW"] >= HITS["LOW"].visible_frames
+    assert dips["HIGH"] < dips["LOW"] < 128
+
+
+GRIDS = {
+    "78.3": lambda: grid(78.3),
+    "120": lambda: grid(120),
+    "170": lambda: grid(170),
+    "variable": lambda: m.bars_grid(*[(560.0, 420.0, 600.0, 380.0)[i % 4] for i in range(8)]),
+}
+
+
+@pytest.mark.parametrize("level", [None, "DRAMATIC"])
+@pytest.mark.parametrize("tempo", list(GRIDS))
+@pytest.mark.parametrize(
+    "template_id", ["fly_out_cascade", "fly_in_cascade", "masked_wheel_flick", "mirror_wings"]
+)
+def test_every_played_hit_differs_visibly_from_the_render_without_it(
+    template_id: str, tempo: str, level: str | None
+) -> None:
+    """Four HIGH hits a bar and more apart: on every head the trace counts as played, at
+    least `visible_frames` frames differ from the render without the hits by the contrast
+    (capped), read from the bytes; a head the trace says did not play shows no change
+    there (the review's case: hits on reveals byte-identical to no hit)."""
+    beat_grid = GRIDS[tempo]()
+    hits = [event(b, k, "hit", cue_emphasis="HIGH") for b, k in ((2, 1), (3, 2), (5, 3), (7, 4))]
+    plan = [section(hits, template_id=template_id, intensity=level)]
+    pipeline = render(plan, beat_grid=beat_grid)
+    frames, plain = Frames(pipeline), Frames(render(without_events(plan), beat_grid=beat_grid))
+    played = 0
+    for entry in looks(pipeline)["s1"]["events"]:
+        for head, outcome in entry["heads"].items():
+            if "played_ms" not in outcome:
+                assert "not_played" in outcome, outcome
+                continue
+            played += 1
+            at = outcome["played_ms"] // FRAME
+            assert visible_frames(frames, plain, head, at, "HIGH") >= HITS["HIGH"].visible_frames
+    assert played
+
+
+def test_a_moved_hit_goes_later_to_the_beat_most_heads_show_and_says_so() -> None:
+    """A show's rest over the hit's beat: the hit moves to the next beat (later), every
+    head plays it there, and the trace says where and which way."""
+    beat_grid = grid(120)
+    rest = (round(beat_grid.beat_boundaries[8]) - 100, round(beat_grid.beat_boundaries[9]) - 100)
+    pipeline = render([section([event(3, 1, "hit")])], dark_spans=(rest,))
+    (entry,) = looks(pipeline)["s1"]["events"]
+    for head in HEADS:
+        moved = entry["heads"][head]["moved"]
+        assert (moved["direction"], moved["bar"], moved["beat"], moved["heads_lit"]) == (
+            "later",
+            3,
+            2,
+            4,
+        )
+
+
+def test_a_hit_moves_earlier_only_where_no_later_beat_serves() -> None:
+    """A rest over the section's last beats: nothing later within the section, so the hit
+    moves to the nearest earlier beat, recorded as earlier."""
+    beat_grid = grid(120)
+    rest = (round(beat_grid.beat_boundaries[13]) - 100, 8100)
+    pipeline = render(
+        [section([event(4, 3, "hit")], bars=(1, 4))],
+        beat_grid=beat_grid,
+        dark_spans=(rest,),
+    )
+    (entry,) = looks(pipeline)["s1"]["events"]
+    moved = entry["heads"]["MH1"]["moved"]
+    assert moved["direction"] == "earlier" and (moved["bar"], moved["beat"]) == (4, 1)
 
 
 @pytest.mark.parametrize("level", ["DRAMATIC", "INTENSE"])
@@ -445,7 +568,7 @@ def test_a_hit_in_a_closed_span_lights_the_head_for_it_and_returns_to_dark() -> 
     assert hit["heads"]["MH1"]["how"] == "lit_from_dark"
 
 
-def test_a_hit_on_a_show_rest_moves_to_the_nearest_beat_the_heads_show_and_is_recorded() -> None:
+def test_a_hit_on_a_show_rest_moves_and_is_recorded() -> None:
     beat_grid = grid(120)
     rest = (round(beat_grid.beat_boundaries[8]) - 100, round(beat_grid.beat_boundaries[9]) - 100)
     pipeline = render([section([event(3, 1, "hit")])], dark_spans=(rest,))
@@ -455,8 +578,6 @@ def test_a_hit_on_a_show_rest_moves_to_the_nearest_beat_the_heads_show_and_is_re
     for head in HEADS:
         assert frames.dimmer(head)[moved] == 255
         assert frames.dark(head)[beat_frame(beat_grid, 3, 1)]
-    (entry,) = looks(pipeline)["s1"]["events"]
-    assert entry["heads"]["MH1"]["moved"]["beat"] == 2
     assert pipeline.render_record is not None
     assert any(
         "moved to another beat" in d["message"] for d in pipeline.render_record["diagnostics"]
@@ -791,7 +912,8 @@ def realistic_plan(beat_grid: BeatGrid) -> ChoreographyPlan:
         for bar, beat, action, value, cue_id in events:
             planned.append(event(bar, beat, action, moment_cue_id=cue_id, color=value))
             if cue_id is not None:
-                at = beat_grid.beat_boundaries[(bar - 1) * 4 + beat - 1]
+                at = beat_grid.beat_time_ms(bar, beat)
+                assert at is not None
                 cues.append(
                     MomentCue(
                         cue_id=cue_id,
@@ -832,7 +954,7 @@ def test_the_realistic_plan_plays_every_event_honestly_and_traces_every_cue() ->
     byte change is dark through close latency and settle, every event is traced on every
     head (played, moved or not played with a reason), every lyric cue is traced, and the
     events the brief names play as designed."""
-    beat_grid = grid(78.3, bars=62)
+    beat_grid = m.pickup_grid(60_000 / 78.3, 62, pickup=2)  # two pickup beats, as the song
     pipeline = render(
         realistic_plan(beat_grid).sections, beat_grid=beat_grid, fixture_group=owner_like_rig()
     )
@@ -885,7 +1007,7 @@ def test_the_realistic_plan_darkens_only_where_an_event_says_and_lights_only_for
     beat (close latency + settle + half a beat); every newly lit frame follows a hit's
     beat by at most its decay (or lies in the beat before a section, where a colour the
     events already turned needs no boundary dip)."""
-    beat_grid = grid(78.3, bars=62)
+    beat_grid = m.pickup_grid(60_000 / 78.3, 62, pickup=2)  # two pickup beats, as the song
     plan = realistic_plan(beat_grid)
     rig_ = owner_like_rig()
     frames = Frames(render(plan.sections, beat_grid=beat_grid, fixture_group=rig_))
@@ -1016,3 +1138,206 @@ def test_a_colour_event_the_part_never_shows_lit_is_recorded_and_the_render_goes
         if e["action"] in ("color", "gobo")
         for o in e["heads"].values()
     ), [e["heads"] for e in events_ if e["action"] in ("color", "gobo")]
+
+
+# --- fix round 1: the bar grid, crashes, bounds, records ---------------------------------------
+
+
+@pytest.mark.parametrize("pickup", [1, 2, 3])
+@pytest.mark.parametrize("beats_per_bar", [4, 3])
+def test_an_event_on_beat_one_lands_on_the_first_frame_of_its_bar_after_a_pickup(
+    pickup: int, beats_per_bar: int
+) -> None:
+    """Pickup beats before bar 1 belong to no bar: `closed` at n.1 goes dark on the frame
+    nearest bar n's downbeat, `hit` at a second section's downbeat plays (not dropped),
+    and both trace that bar and beat."""
+    beat_grid = m.pickup_grid(500.0, 8, pickup=pickup, beats_per_bar=beats_per_bar)
+    plan = [
+        section([event(3, 1, "closed"), event(3, 3, "open")], bars=(1, 4)),
+        m.plan_section("s2", 5, 8, "mirror_wings", events=[event(5, 1, "hit")]),
+    ]
+    pipeline = render(plan, beat_grid=beat_grid)
+    frames = Frames(pipeline)
+    closed = frame_of(beat_grid.bar_boundaries[2])
+    opened = frame_of(beat_grid.beat_boundaries[pickup + 2 * beats_per_bar + 2])
+
+    for head in HEADS:
+        dark = frames.dark(head)
+        assert dark[closed] and not dark[closed - 1], head
+        assert all(dark[i] for i in range(closed, opened)) and not dark[opened], head
+    hit = looks(pipeline)["s2"]["events"][0]
+    downbeat = frame_of(beat_grid.bar_boundaries[4])
+    assert {o["played_ms"] for o in hit["heads"].values()} == {downbeat * FRAME}
+    assert (hit["bar"], hit["beat"]) == (5, 1)
+
+
+@pytest.mark.parametrize("pickup", [1, 2, 3])
+@pytest.mark.parametrize("beats_per_bar", [4, 3])
+def test_a_cue_just_before_a_section_end_binds_inside_it_at_its_nearest_beat(
+    pickup: int, beats_per_bar: int
+) -> None:
+    """A lyric cue 60 ms after the section's last beat binds to that beat, numbered on the
+    bar grid; the render plays it there."""
+    beat_grid = m.pickup_grid(500.0, 8, pickup=pickup, beats_per_bar=beats_per_bar)
+    last = pickup + 4 * beats_per_bar - 1  # the last beat of bar 4
+    cue_ms = int(beat_grid.beat_boundaries[last]) + 60
+    plan = ChoreographyPlan(
+        sections=[
+            section([event(1, 1, "hit", moment_cue_id="end")], bars=(1, 4), moment_cues=["end"]),
+            m.plan_section("s2", 5, 8, "mirror_wings"),
+        ],
+        overall_strategy="",
+    )
+    lyrics = LyricContextModel(
+        has_lyrics=True,
+        vocal_coverage_pct=0.25,
+        moment_cues=[
+            MomentCue(
+                cue_id="end",
+                timestamp_ms=cue_ms,
+                section_id="s1",
+                emphasis="HIGH",
+                text="the end",
+                visual_hint="Accent the line.",
+            )
+        ],
+    )
+    end = int(beat_grid.bar_boundaries[4])
+    song = [
+        SongSectionRef(section_id="s1", name="s1", start_ms=0, end_ms=end),
+        SongSectionRef(section_id="s2", name="s2", start_ms=end, end_ms=int(beat_grid.duration_ms)),
+    ]
+    bound = bind_lyric_moment_cues(plan, lyrics, beat_grid, song)
+    (hit,) = bound.sections[0].events
+
+    assert (hit.bar, hit.beat, hit.cue_ms) == (4, beats_per_bar, cue_ms)
+    pipeline = render(bound.sections, beat_grid=beat_grid)
+    (entry,) = looks(pipeline)["s1"]["events"]
+    at = frame_of(beat_grid.beat_boundaries[last]) * FRAME
+    assert {o["played_ms"] for o in entry["heads"].values()} == {at}
+    assert pipeline.render_record is not None
+    (cue,) = pipeline.render_record["lyric_cues"]
+    assert cue["events"][0]["offset_ms"] == dict.fromkeys(HEADS, at - cue_ms)
+    assert f"({at - cue_ms:+d} ms from the lyric at {cue_ms} ms)" in describe_lyric_cue(cue)
+
+
+def test_an_event_that_cannot_be_placed_is_traced_warned_and_repaired() -> None:
+    """An event in a bar past the beat grid, on a beat its bar does not have, or outside
+    its section: a trace entry saying why, a per-section warning; the binder records the
+    bar past the grid and moves a beat its bar lacks for the planner."""
+    beat_grid = grid(120, bars=8)
+    plan = [
+        section(
+            [event(9, 1, "hit"), event(3, 5, "hit"), event(4, 1, "closed")],
+            bars=(1, 3),
+        )
+    ]
+    pipeline = render(plan, beat_grid=beat_grid)
+    entries = looks(pipeline)["s1"]["events"]
+    reasons = sorted(e["not_played"] for e in entries if "not_played" in e)
+    assert reasons == [
+        "bar 3 has 4 detected beats, not 5",
+        "bar 4 lies outside its section (bars 1-3)",
+        "bar 9 lies outside its section (bars 1-3)",
+    ]
+    assert pipeline.render_record is not None
+    assert any(
+        "not played on every head" in d["message"] for d in pipeline.render_record["diagnostics"]
+    )
+    song = [SongSectionRef(section_id="s1", name="s1", start_ms=0, end_ms=16015)]
+    whole = ChoreographyPlan(
+        sections=[section([event(8, 2, "hit"), event(3, 5, "hit")], bars=(1, 9))],
+        overall_strategy="",
+    )
+    repaired = bind_lyric_moment_cues(whole, None, beat_grid, song)
+    said = {r.item: (r.action.value, r.reason) for r in repaired.repairs}
+    assert said["hit event at bar 3 beat 5"][1] == "bar 3 has 4 detected beats: moved to beat 4"
+    past = ChoreographyPlan(
+        sections=[section([event(10, 1, "hit")], bars=(1, 10))], overall_strategy=""
+    )
+    (record,) = bind_lyric_moment_cues(past, None, beat_grid, song).repairs
+    assert record.reason.startswith("bar 10 lies beyond the detected beat grid")
+
+
+@pytest.mark.parametrize(
+    ("template_id", "bpm", "beats_per_bar", "events"),
+    [
+        ("fly_out_cascade", 170, 4, [(3, 3, "color"), (4, 1, "closed")]),
+        ("fly_in_cascade", 170, 4, [(3, 4, "color")]),
+        ("fly_in_cascade", 180, 4, [(3, 4, "color")]),
+        ("fly_in_cascade", 170, 3, [(3, 3, "color")]),
+    ],
+)
+def test_a_colour_event_at_a_fast_tempo_never_crashes_the_render(
+    template_id: str, bpm: float, beats_per_bar: int, events: list[tuple[int, int, str]]
+) -> None:
+    """The review's crash (an unguarded `next` past the head's last cue): the render
+    finishes, every event is traced, every wheel turn is dark."""
+    beat_grid = m.pickup_grid(60_000 / bpm, 8, pickup=0, beats_per_bar=beats_per_bar)
+    planned = [event(b, k, a, **({"color": "red"} if a == "color" else {})) for b, k, a in events]
+    pipeline = render(
+        [section(planned, template_id=template_id)],
+        beat_grid=beat_grid,
+        fixture_group=rig(close=20, settle=150),
+    )
+
+    assert len(looks(pipeline)["s1"]["events"]) == len(events)
+    assert_wheels_turn_dark(Frames(pipeline))
+
+
+def test_a_colour_event_that_cannot_dip_is_late_by_at_most_a_beat_else_not_played() -> None:
+    """At 170 BPM on owner-like timings over `mirror_wings` (no dark window), a colour
+    change on 3.1 cannot dip (180 ms > 176 ms) and a later `closed` would reveal it bars
+    late: not played, said so; the hit inside the `closed` still lights; repair predicts
+    it with the render's own test."""
+    beat_grid = grid(170)
+    timings = rig(close=20, settle=150)
+    events = [event(3, 1, "color", color="red"), event(6, 1, "closed"), event(7, 2, "hit")]
+    plan = [section(events)]
+    pipeline = render(plan, beat_grid=beat_grid, fixture_group=timings)
+    colour, _, hit = looks(pipeline)["s1"]["events"]
+
+    assert all("within 1 beat" in o["not_played"] for o in colour["heads"].values())
+    assert all(o["how"] == "lit_from_dark" for o in hit["heads"].values())
+    offer = rig_offer(timings, beat_grid)
+    repaired = repair_rig_intent(
+        ChoreographyPlan(sections=plan, overall_strategy=""), offer, {}, beat_grid
+    )
+    (record,) = [r for r in repaired.repairs if r.item.startswith("event at bar 3 beat 1")]
+    assert "does not fit half the beat before it (176 ms)" in record.reason
+    assert "it does not play" in record.reason
+
+
+def test_a_strobe_slows_only_on_the_beats_it_cannot_follow_and_repair_agrees() -> None:
+    """Four bars at 96 BPM then four at 140 on a shutter rig with 45 ms latency: sixteenths
+    fit the slow bars and not the fast ones; the render plays 4 then 2 flashes a beat, the
+    trace and the repair count the same slowed beats."""
+    beat_grid = m.bars_grid(*([625.0] * 4 + [428.6] * 4))
+    shutter = rig(close=45, shutter_only=True)
+    plan = [section([event(2, 1, "strobe_medium")])]
+    pipeline = render(plan, beat_grid=beat_grid, fixture_group=shutter)
+    frames = Frames(pipeline)
+    slow_bar = range(frame_of(beat_grid.bar_boundaries[1]), frame_of(beat_grid.bar_boundaries[2]))
+    fast_bar = range(frame_of(beat_grid.bar_boundaries[5]), frame_of(beat_grid.bar_boundaries[6]))
+
+    assert dark_runs(frames.dark("MH1"), slow_bar) == 16
+    assert dark_runs(frames.dark("MH1"), fast_bar) == 8
+    (entry,) = looks(pipeline)["s1"]["events"]
+    degraded = entry["heads"]["MH1"]["degraded"]
+    repaired = repair_rig_intent(
+        ChoreographyPlan(sections=plan, overall_strategy=""),
+        rig_offer(shutter, beat_grid),
+        {},
+        beat_grid,
+    )
+    (record,) = repaired.repairs
+    assert "on 16 of 28 beats" in degraded and "on 16 of its 28 beats" in record.reason
+
+
+def test_closed_and_open_on_one_beat_and_an_open_with_nothing_to_end_are_traced() -> None:
+    pipeline = render([section([event(3, 1, "closed"), event(3, 1, "open"), event(4, 1, "open")])])
+    closed, opened, extra = looks(pipeline)["s1"]["events"]
+
+    assert closed["heads"]["MH1"] == {"not_played": "another shutter event on its beat replaces it"}
+    assert opened["heads"]["MH1"]["plays"] == "the template's own shutter and level"
+    assert extra["heads"]["MH1"]["not_played"].startswith("nothing to open")

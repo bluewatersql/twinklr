@@ -37,9 +37,8 @@ from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
     compile_template,
 )
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
-from twinklr.core.sequencer.moving_heads.pipeline import cue_limits
 from twinklr.core.sequencer.moving_heads.templates.library import TemplateRegistry
-from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map
+from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map, cue_limits
 
 Mutation = Callable[[TemplateDoc], None]
 

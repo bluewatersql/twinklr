@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 BACKEND_ID = "xlights_dmx"
 """The backend the renderer writes: xLights DMX effects in an `.xsq`."""
 
-RENDERER_REVISION = "8"
+RENDERER_REVISION = "9"
 """Bumped by hand in the commit that intentionally changes the renderer's output; the
 render identity also carries the frame encoder's own version. 3: a section's colour and
 gobo are rendered (song-intent rendering W4), so a plan that sets them renders
@@ -49,7 +49,12 @@ re-review): the plan's events play (`events`: closed/open, strobes, pulse, hits,
 gobo events, their lyric cues' emphasis), so a plan with events renders differently from
 revision 7; and intensity's accents start no flash on a lit run's last frames, take a beat
 just after a reveal in place of the reveal's own, start a run's own only after half a beat
-of darkness, and blend the headroom and full shapes between 0.8 and 1.0 of full."""
+of darkness, and blend the headroom and full shapes between 0.8 and 1.0 of full. 9 (W6/W7
+fix round): events are placed on the bar grid (a pickup before bar 1 shifts nothing), a hit
+with no room before its beat flashes and ducks and counts as played only where visible, a
+moved hit prefers later beats where most heads show it, a colour or gobo event that
+cannot dip turns at most a beat late or not at all, and a strobe's rate is chosen beat by
+beat."""
 
 
 def render_fingerprint(

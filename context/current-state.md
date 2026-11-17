@@ -99,19 +99,22 @@ See [product/overview.md](product/overview.md).
     take a beat accent just after a reveal in place of the reveal's own, give a run its
     own accent only after half a beat of darkness, and blend the headroom and full
     shapes between 80% and 100% of full.
-  - **Events and lyric cues** (W6/W7, 2026-11-17, not yet seen by the owner). Each
-    section's events play on its frames, per head, on the frame nearest the beat:
-    `closed` dark to the next shutter event or the section's end, `open` ends it;
-    strobes (the fixture's own where every head's shutter has a state tagged for the
-    speed, else 2 / 4 / 8 flashes a beat on musical time through the dimmer, or the
-    shutter, slowed where the darkness cannot follow); `pulse` lit the first half of
-    each beat; `hit` the dimmer's top on the beat easing back to the section's level, a
-    pre-dip into the beat at full, scaled by the bound lyric cue's emphasis, lit from a
-    dimmer dark phase, moved only where every head is dark; colour and gobo changes
-    revealed on the beat after a dark lead of at most half a beat, else late, else not
-    played. The trace records every event per head and every lyric cue; the offer says
-    what each event plays at the song's tempo; repair records what will play otherwise.
-    Renderer revision 8.
+  - **Events and lyric cues** (W6/W7 and its fix round, 2026-11-17, not yet seen by the
+    owner). Each section's events play on its frames, per head, on the frame nearest the
+    beat, `bar N beat B` counted from bar N's downbeat (a pickup shifts nothing; the
+    renderer, cue binder, repair and prompt agree): `closed` dark to the next shutter
+    event or the section's end, `open` ends it; strobes (the fixture's own where the
+    head's shutter has a state tagged for the speed, else 2 / 4 / 8 flashes a beat on
+    musical time through the dimmer, or the shutter, slowed beat by beat where the
+    darkness cannot follow); `pulse` lit the first half of each beat; `hit` a dip and
+    snap to full where the head is lit before the beat, a flash and duck where it is
+    revealed on it, scaled by the bound lyric cue's emphasis, counted played only where
+    visible, lit from a dimmer dark phase, moved only where every head is dark (later
+    first); colour and gobo changes revealed on the beat after a dark lead of at most
+    half a beat, else up to a beat late, else not played. The trace records every event
+    per head (unplaceable ones too) and every lyric cue with its offset from the lyric;
+    the offer says what each event plays at the song's tempo; repair records, with the
+    render's tests, what will play otherwise. Renderer revision 9.
     ([user guide](../docs/user-guide.md#how-a-sections-events-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w6-w7-events/README.md))
   - **Known regression: the rest of the song intent is not rendered yet.** The planner's

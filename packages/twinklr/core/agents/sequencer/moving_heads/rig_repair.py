@@ -23,12 +23,18 @@ from twinklr.core.agents.sequencer.moving_heads.models import (
     RepairAction,
 )
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
-from twinklr.core.sequencer.moving_heads.events import HIT_LATE_FRAMES, HIT_MIN_LIT_FRAMES
+from twinklr.core.sequencer.moving_heads.events import (
+    HIT_LATE_FRAMES,
+    HIT_MIN_LIT_FRAMES,
+    strobe_beats,
+)
 from twinklr.core.sequencer.moving_heads.intensity import SHAPED_LEVELS
 from twinklr.core.sequencer.moving_heads.song_intent import (
     STROBE_FLASHES_PER_BEAT,
+    WHEEL_LATE_BEATS,
     RigOffer,
     SectionPalette,
+    dip_fits,
     excluded_reason,
     is_late,
     partial_reason,
@@ -286,46 +292,62 @@ def _event_records(
     offer: RigOffer,
     beat_grid: BeatGrid | None,
 ) -> list[tuple[str, str]]:
-    """What the render will play differently from what an event asks, for the planner:
-    a shutter event on a rig whose heads cannot go dark; a strobe or pulse slower than
-    asked at this tempo (or not at all); a hit on heads without a dimmer, or on a beat
-    where the part's template is dark on some or every head (it plays on the others, or
-    moves); a colour or gobo change closer to the previous one than the wheel change
-    time. Each is `(item, reason)`; the plan keeps the event (the render decides, and its
-    trace records what played)."""
+    """What the render will play differently from what an event asks, for the planner
+    (`(item, reason)`; the plan keeps the event, the render decides and traces), each on
+    the bar grid (`BeatGrid.beat_index`) and with the render's own tests:
+
+    - a shutter event on a rig whose heads cannot go dark;
+    - a strobe or pulse slower than asked on some beat of its span at this tempo, or not
+      at all (`strobe_flashes` per beat, `pulse_period`);
+    - a hit on heads without a dimmer; on a beat the part's template is dark on some or
+      every head (published dark phases: it plays on the others, or moves); on a beat a
+      colour or gobo change's dark lead covers (it moves);
+    - a colour or gobo change whose wheel change does not fit half the beat before it on
+      some head (`dip_fits`, that head's change time) where no darkness is already
+      there: it turns up to `WHEEL_LATE_BEATS` late in a dark phase of the template, or
+      does not play; one closer to the previous change than the wheel change time."""
     records: list[tuple[str, str]] = []
-    beats = beat_grid.beat_boundaries if beat_grid is not None else []
-    per_bar = beat_grid.beats_per_bar if beat_grid is not None else 4
-
-    def beat_ms(event: PlanEvent) -> float | None:
-        index = (event.bar - 1) * per_bar + event.beat - 1
-        return beats[index] if 0 <= index < len(beats) else None
-
-    def beat_length(event: PlanEvent) -> float | None:
-        index = (event.bar - 1) * per_bar + event.beat - 1
-        if 0 <= index < len(beats) - 1:
-            return beats[index + 1] - beats[index]
-        return offer.beat_ms
-
-    previous: dict[str, PlanEvent] = {}
-    for event in events:
+    if beat_grid is None:
+        return records
+    beats = beat_grid.beat_boundaries
+    bars = beat_grid.bar_boundaries
+    end_ms = bars[section.end_bar] if section.end_bar < len(bars) else beat_grid.duration_ms
+    placed = [
+        (event, index)
+        for event in events
+        if (index := beat_grid.beat_index(event.bar, event.beat)) is not None
+    ]
+    shutter = [(e, i) for e, i in placed if e.action.value in SHUTTER_KINDS]
+    wheel_leads = []  # (start, end) of each colour/gobo change's dark lead, in ms
+    previous: dict[str, float] = {}
+    closed_from: list[tuple[float, float]] = []
+    for position, (event, index) in enumerate(shutter):
+        following = next((beats[i] for _, i in shutter[position + 1 :]), end_ms)
+        if event.action.value == "closed":
+            closed_from.append((beats[index], following))
+    for event, index in placed:
         action = event.action.value
         item = f"event at {event.describe()}"
-        shutter = action in ("open", "closed", "pulse") or action.startswith("strobe_")
-        if shutter and offer.dark == "none":
+        at = beats[index]
+        length = beats[index + 1] - at if index + 1 < len(beats) else offer.beat_ms
+        if action in SHUTTER_KINDS and offer.dark == "none":
             records.append((item, "no head of this rig can go dark, so it does not play"))
             continue
-        length = beat_length(event)
         tagged = offer.strobes.get(action.removeprefix("strobe_"))
         if action.startswith("strobe_") and (tagged is None or tagged.available != "all"):
             if offer.flash_ms is None:
                 records.append(
                     (item, "the heads' darkness has an unknown latency or settle: it cannot flash")
                 )
-            elif length is not None:
-                plays = strobe_flashes(action, length, offer.flash_ms)
+            else:
+                following = next((beats[i] for e, i in shutter if i > index), end_ms)
+                rates = [
+                    strobe_flashes(action, beat_length, offer.flash_ms)
+                    for _, beat_length in strobe_beats(beat_grid, index, following)
+                ]
                 asked = STROBE_FLASHES_PER_BEAT[action]
-                if plays is None:
+                played = [rate for rate in rates if rate is not None]
+                if not played:
                     records.append(
                         (
                             item,
@@ -333,12 +355,14 @@ def _event_records(
                             "cannot follow even one flash a beat: it does not play",
                         )
                     )
-                elif plays != asked:
+                elif min(played) != asked or len(played) < len(rates):
+                    slowed = sum(1 for rate in rates if rate != asked)
                     records.append(
                         (
                             item,
-                            f"at this tempo it plays {plays} flash(es) a beat, not {asked}: "
-                            f"the darkness follows {offer.flash_ms} ms phases",
+                            f"at this tempo it plays as few as {min(played)} flash(es) a beat, "
+                            f"not {asked}, on {slowed} of its {len(rates)} beats: the darkness "
+                            f"follows {offer.flash_ms} ms phases",
                         )
                     )
         if action == "pulse" and offer.flash_ms is not None and length is not None:
@@ -355,69 +379,178 @@ def _event_records(
                         ),
                     )
                 )
-        if action == "hit":
-            if offer.hit != "all":
-                records.append(
-                    (
-                        item,
-                        "no head has a dimmer axis, so it does not play"
-                        if offer.hit == "none"
-                        else "only the heads with a dimmer axis play it",
-                    )
-                )
-            dark = _dark_heads_on(event, parts, offer, per_bar, length)
-            if dark is not None:
-                template, heads, every = dark
-                records.append(
-                    (
-                        item,
-                        f"template {template!r} is dark on this beat on every head (between "
-                        "its cues): the hit moves to the nearest beat the heads show, within a bar"
-                        if every
-                        else f"template {template!r} is dark on this beat on {', '.join(heads)} "
-                        "(between its cues): only the other heads play it",
-                    )
-                )
         if action in ("color", "gobo"):
-            before = previous.get(action)
-            at, earlier = beat_ms(event), None if before is None else beat_ms(before)
+            wheel = _wheel_event_records(
+                event, item, index, at, parts, offer, beat_grid, closed_from
+            )
+            records += wheel
             slowest = max((h.change_ms or 0 for h in offer.heads), default=0)
-            if at is not None and earlier is not None and 0 < at - earlier < slowest:
+            earlier = previous.get(action)
+            if earlier is not None and 0 < at - earlier < slowest:
                 records.append(
                     (
                         item,
                         f"it comes {at - earlier:.0f} ms after the previous {action} change, "
-                        f"and a wheel change needs {slowest} ms of darkness: it turns late or does "
-                        "not play; space wheel changes further apart",
+                        f"and a wheel change needs {slowest} ms of darkness: it turns late or "
+                        "does not play; space wheel changes further apart",
                     )
                 )
-            previous[action] = event
+            previous[action] = at
+            if slowest and not wheel:  # it turns before its beat, dark from `slowest` before
+                wheel_leads.append((at - slowest, at))
+    for event, index in placed:
+        if event.action.value != "hit":
+            continue
+        item = f"event at {event.describe()}"
+        at = beats[index]
+        length = beats[index + 1] - at if index + 1 < len(beats) else offer.beat_ms
+        if offer.hit != "all":
+            records.append(
+                (
+                    item,
+                    "no head has a dimmer axis, so it does not play"
+                    if offer.hit == "none"
+                    else "only the heads with a dimmer axis play it",
+                )
+            )
+        if any(start <= at < end for start, end in wheel_leads):
+            records.append(
+                (
+                    item,
+                    "the heads are dark there for a colour or gobo change's wheel turn: the hit "
+                    "moves to the beat within a bar the most heads show, a later one first, or "
+                    "does not play where none does",
+                )
+            )
+            continue
+        dark = _dark_heads_on(event, index, parts, offer, beat_grid, length)
+        if dark is not None:
+            template, heads, every = dark
+            records.append(
+                (
+                    item,
+                    f"template {template!r} is dark on this beat on every head (between "
+                    "its cues): the hit moves to the beat within a bar the most heads show, "
+                    "a later one first"
+                    if every
+                    else f"template {template!r} is dark on this beat on {', '.join(heads)} "
+                    "(between its cues): only the other heads play it",
+                )
+            )
     return records
+
+
+SHUTTER_KINDS = frozenset(
+    {"open", "closed", "strobe_slow", "strobe_medium", "strobe_fast", "pulse"}
+)
+
+
+def _wheel_event_records(
+    event: PlanEvent,
+    item: str,
+    index: int,
+    at: float,
+    parts: Sequence[tuple[str, int, int, RigOffer]],
+    offer: RigOffer,
+    beat_grid: BeatGrid,
+    closed_from: Sequence[tuple[float, float]],
+) -> list[tuple[str, str]]:
+    """A colour or gobo change some head cannot dip for before its beat (`dip_fits` on its
+    own wheel change time and the beat before it), unless a `closed` already darkens the
+    head there or the part's template is dark through the lead: where the template has a
+    dark phase long enough within `WHEEL_LATE_BEATS` after the beat, it turns late; else
+    it does not play."""
+    beats = beat_grid.beat_boundaries
+    before = at - beats[index - 1] if index > 0 else (offer.beat_ms or 0.0)
+    if any(start < at <= end for start, end in closed_from):
+        return []
+    slow = {
+        h.fixture_id: h.change_ms
+        for h in offer.heads
+        if h.change_ms is not None and not dip_fits(h.change_ms, before)
+    }
+    if not slow:
+        return []
+    part = next((p for p in parts if p[1] <= event.bar <= p[2]), None)
+    template = None if part is None else offer.templates.get(part[0])
+    phases = (
+        None
+        if template is None or not template.variants
+        else template.variants.get("base") or next(iter(template.variants.values()))
+    )
+    late, never = [], []
+    for fixture_id, change in slow.items():
+        window = None
+        if phases is not None and phases.cycle_beats > 0 and part is not None:
+            start_index = beat_grid.beat_index(part[1], 1)
+            position = (
+                ((index - (start_index or 0)) % phases.cycle_beats)
+                if start_index is not None
+                else None
+            )
+            beat_ms = at - beats[index - 1] if index > 0 else (offer.beat_ms or 1.0)
+            needed = change / beat_ms
+            for start, end in phases.heads.get(fixture_id, ()):
+                for shift in (0.0, -phases.cycle_beats, phases.cycle_beats):
+                    a, b = start + shift, end + shift
+                    if (
+                        position is not None
+                        and b - a >= needed
+                        and position <= a <= position + WHEEL_LATE_BEATS
+                    ):
+                        window = a
+            if window is not None:
+                late.append(fixture_id)
+                continue
+        never.append(fixture_id)
+    why = (
+        f"at this tempo the wheel change of {', '.join(slow)} "
+        f"({'/'.join(str(ms) for ms in sorted(set(slow.values())))} ms dark) does not fit half "
+        f"the beat before it ({before / 2:.0f} ms)"
+    )
+    if never:
+        return [
+            (
+                item,
+                f"{why}, and its template has no dark moment long enough within "
+                f"{WHEEL_LATE_BEATS:g} beat after it: on {', '.join(never)} it does not play; "
+                "put the change where the heads are dark, on a slower passage, or after a "
+                "`closed`",
+            )
+        ]
+    return [
+        (
+            item,
+            f"{why}: on {', '.join(late)} it turns in the template's next dark moment, up to "
+            f"{WHEEL_LATE_BEATS:g} beat late",
+        )
+    ]
 
 
 def _dark_heads_on(
     event: PlanEvent,
+    index: int,
     parts: Sequence[tuple[str, int, int, RigOffer]],
     offer: RigOffer,
-    per_bar: int,
+    beat_grid: BeatGrid,
     beat_ms: float | None,
 ) -> tuple[str, list[str], bool] | None:
     """The part's template, the heads it is dark on at the event's beat (its published
-    dark phases, `RigOffer.templates`, at the render's frame tolerances: a beat within the
-    frames a hit needs lit before a dark window counts as dark, one within the frames a
-    hit may play late before a lit window as lit), and whether that is every head; None
-    when it is lit there on every head or nothing is published. The published phases
-    come from the gate's compile from bar 1, so a cycle's leading darkness may be missing
-    from them: the repair may under-report; the render decides, and its trace records
-    what played."""
+    steady-state dark phases, `RigOffer.templates`, counted in detected beats from the
+    part's downbeat, at the render's frame tolerances: a beat within the frames a hit
+    needs lit before a dark window counts as dark, one within the frames a hit may play
+    late before a lit window as lit), and whether that is every head; None when it is lit
+    there on every head or nothing is published. The render decides and traces what
+    played."""
     part = next((p for p in parts if p[1] <= event.bar <= p[2]), None)
     template = None if part is None else offer.templates.get(part[0])
     if part is None or template is None or not template.variants:
         return None
     phases = template.variants.get("base") or next(iter(template.variants.values()))
-    if phases.cycle_beats <= 0:
+    start_index = beat_grid.beat_index(part[1], 1)
+    if phases.cycle_beats <= 0 or start_index is None:
         return None
-    position = ((event.bar - part[1]) * per_bar + event.beat - 1) % phases.cycle_beats
+    position = (index - start_index) % phases.cycle_beats
     frame = 0.0 if not beat_ms else EFFECT_GRID_MS / beat_ms
     heads = sorted(
         fixture_id

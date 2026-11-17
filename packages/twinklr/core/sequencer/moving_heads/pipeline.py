@@ -80,6 +80,7 @@ from twinklr.core.sequencer.moving_heads.delivery import (
 )
 from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
 from twinklr.core.sequencer.moving_heads.events import (
+    SHUTTER_ACTIONS,
     WHEEL_ACTIONS,
     EventsPlayed,
     SectionEvents,
@@ -122,6 +123,7 @@ from twinklr.core.sequencer.moving_heads.song_intent import (
     SectionPalette,
     TemplateOffer,
     darkness_ms,
+    dip_fits,
     frames_ms,
     is_late,
     resolve_section_look,
@@ -135,23 +137,12 @@ from twinklr.core.sequencer.timing.musical_phase import (
     MusicalPhaseError,
     MusicalPhaseMap,
     build_musical_phase_map,
+    cue_limits,
     musical_phase_fraction,
     musical_time_at,
 )
 
 logger = logging.getLogger(__name__)
-
-
-def cue_limits(phase_map: MusicalPhaseMap, duration_ms: int) -> tuple[int, int]:
-    """The frame-grid span a cue may occupy: `(start_limit_ms, end_limit_ms)`.
-
-    The start is the covered phase span's start rounded up to the frame grid; the end
-    is the earlier of the song's last whole frame and the covered end rounded down.
-    Outside it every fixture is held dark.
-    """
-    start = -(-Fraction(phase_map.covered_start_ms) // EFFECT_GRID_MS) * EFFECT_GRID_MS
-    covered_end = Fraction(phase_map.covered_end_ms) // EFFECT_GRID_MS * EFFECT_GRID_MS
-    return int(start), int(min(duration_ms // EFFECT_GRID_MS * EFFECT_GRID_MS, covered_end))
 
 
 def _snap_dark_spans(
@@ -795,7 +786,7 @@ def _boundary_change(
         return _BoundaryChange(record, kept=kept)
     settle = frames_ms(max(max(known), EFFECT_GRID_MS))
     dip = _dip_span(_commanded_dark_runs(last.segment, profile), last.segment.t0_ms, boundary, lead)
-    if dip is not None and dip[1] <= half_beat_ms:
+    if dip is not None and dip_fits(dip[1], 2 * half_beat_ms):
         dark_from, added, dark_start = dip
         turn = boundary - settle
         darkened = last.segment
@@ -1704,12 +1695,19 @@ def _dark_phases(
     profiles: Mapping[str, FixtureCapabilities],
     phase_map: MusicalPhaseMap,
 ) -> DarkPhases:
-    """A rung's dark phases in its first cycle (`DarkPhases`), from its bar-1 compile: per
-    fixture, each dark window (`_dark_windows`) that opens inside the cycle, in beats from
-    the cycle's start."""
+    """A rung's dark phases in a steady cycle (`DarkPhases`), from its bar-1 compile: per
+    fixture, each dark window (`_dark_windows`) that opens inside the second cycle, in
+    beats from that cycle's start, so the darkness a cycle begins with (the previous
+    cycle's tail) is in them and the first cycle's entry is not; from the first cycle
+    where the song holds only one."""
     segments, context, _, cycle_bars = compile
-    start = context.start_ms
-    cycle_end = context.bar_offset_to_ms(cycle_bars)
+    first_end = context.bar_offset_to_ms(cycle_bars)
+    second_end = context.bar_offset_to_ms(2 * cycle_bars)
+    covered = max((segment.t1_ms for segment in segments), default=0)
+    if second_end <= covered:
+        start, cycle_end = first_end, second_end
+    else:
+        start, cycle_end = context.start_ms, first_end
 
     def beats(time_ms: float) -> float:
         return round(
@@ -2708,17 +2706,10 @@ class RenderingPipeline:
             ).items():
                 held = {**held, fixture_id: {**held.get(fixture_id, {}), **states}}
             part_events = [e for e in events.events if window[0] <= e.frame_ms < window[1]]
-            plays_events = bool(
-                [
-                    span
-                    for span in events.shutter_spans()
-                    if span[1] < window[1] and span[2] > window[0]
-                ]
-                or [e for e in part_events if e.action in WHEEL_ACTIONS]
-            )
+            plays_events = any(
+                e.action in SHUTTER_ACTIONS or e.action in WHEEL_ACTIONS for e in part_events
+            ) or any(span[1] < window[1] and span[2] > window[0] for span in events.shutter_spans())
             played_box: list[EventsPlayed] = [EventsPlayed()]
-            authored_states: dict[str, dict[ChannelName, str]] = {}
-            """The held states of the authored compile `_unplayable_holds` compares with."""
             refused = 0 if unplayable is None else len(unplayable)
             compiled_steps: list[dict[str, str | int]] = []
             asked = None if section.intensity is None else section.intensity.value
@@ -2740,8 +2731,12 @@ class RenderingPipeline:
                 played_box: list[EventsPlayed] = played_box,
                 template_heads: list[HeadWheels] = template_heads,
                 palette: SectionPalette | None = palette,
-                authored_states: dict[str, dict[ChannelName, str]] = authored_states,
+                *,
+                probe: bool = False,
             ) -> list[FixtureSegment]:
+                """The part compiled holding `held_states`, with its events; a `probe`
+                (the authored compile `_unplayable_holds` compares with) leaves the
+                section's events record alone."""
                 if unplayable is not None:
                     del unplayable[refused:]  # a recompile records its refusals again
                 result = compile_template(
@@ -2791,8 +2786,8 @@ class RenderingPipeline:
                         frame_ms=EFFECT_GRID_MS,
                     ),
                 )
-                if held_states is not authored_states:
-                    played_box[0] = events_played  # what the section plays, not the probe
+                if not probe:
+                    played_box[0] = events_played
                 return played
 
             section_cues = compile_section(held)
@@ -2830,7 +2825,7 @@ class RenderingPipeline:
             if template_doc.template.overlays and held:
                 fallback = _unplayable_holds(
                     section_cues,
-                    compile_section(authored_states),
+                    compile_section({}, probe=True),
                     held,
                     {overlay.channel for overlay in template_doc.template.overlays},
                     profiles,
@@ -2971,7 +2966,10 @@ class RenderingPipeline:
                 for event, event_entry in zip(part_events, entries, strict=True):
                     event_records[(base_id, event.index)] = event_entry
                 # An event beyond the beat grid is recorded on the section's first part.
-                record["events"] = entries + (list(events.unplaced) if first_part else [])
+                unplaced = list(events.unplaced) if first_part else []
+                for event_index, unplaced_entry in unplaced:
+                    event_records[(base_id, event_index)] = unplaced_entry
+                record["events"] = entries + [entry for _, entry in unplaced]
                 if any(e.action == "hit" for e in part_events):
                     hitting.append((section.section_id, window, events, record))
             if asked is not None or focal_role is not None or shape_for(level) is not None:
@@ -3140,16 +3138,7 @@ class RenderingPipeline:
                 else:
                     cue_entry["emphasis"] = bound[0][1].cue_emphasis
                     cue_entry["events"] = [
-                        cue_summary(event_records[(plan_section.section_id, i)])
-                        if (plan_section.section_id, i) in event_records
-                        else {
-                            "action": e.action.value,
-                            "bar": e.bar,
-                            "beat": e.beat,
-                            "played": {},
-                            "not_played": "its beat lies beyond the detected beat grid",
-                        }
-                        for i, e in bound
+                        cue_summary(event_records[(plan_section.section_id, i)]) for i, _ in bound
                     ]
                 lyric_cues.append(cue_entry)
         for section_look in section_looks:

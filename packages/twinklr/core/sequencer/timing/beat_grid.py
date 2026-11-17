@@ -17,6 +17,14 @@ from twinklr.core.sequencer.timing.resolver import TimeResolver
 
 logger = logging.getLogger(__name__)
 
+_BEAT_TOLERANCE_MS = 1.0
+"""A detected beat within this of a downbeat is that downbeat (both are detected times,
+which may differ by rounding)."""
+
+_BEAT_TOLERANCE_MS = 1.0
+"""A detected beat within this of a downbeat is that downbeat (both are detected times,
+which may differ by rounding)."""
+
 
 class BeatGrid(BaseModel):
     """Musical timing grid with pre-calculated bar and beat boundaries.
@@ -335,6 +343,68 @@ class BeatGrid(BaseModel):
         if fraction == 0.0:
             return start
         return start + fraction * (boundaries[floor_index + 1] - start)
+
+    # ======================================================================
+    # Bar.beat <-> detected beat (the one numbering of a beat in a bar)
+    #
+    # A plan's `bar N beat B` is the B-th detected beat at or after bar N's
+    # downbeat (`bar_boundaries[N - 1]`): bars come from the downbeats, never from
+    # the first detected beat, so a pickup before bar 1 shifts nothing. The
+    # renderer, the cue binder, the plan repair, the trace and the planner prompt
+    # all number beats through these methods.
+    # ======================================================================
+
+    def bar_beat_indices(self, bar: int) -> range:
+        """The indices (into `beat_boundaries`) of 1-indexed `bar`'s detected beats: from
+        the first beat at or after its downbeat up to the next bar's downbeat, so a bar
+        holds as many beats as were detected in it (fewer or more than `beats_per_bar`);
+        the last bar holds at most `beats_per_bar`. Empty for a bar outside the grid.
+        Beats before bar 1's downbeat (a pickup) belong to no bar."""
+        bars, beats = self.bar_boundaries, self.beat_boundaries
+        if not 1 <= bar <= len(bars):
+            return range(0)
+        start = bisect.bisect_left(beats, bars[bar - 1] - _BEAT_TOLERANCE_MS)
+        if bar < len(bars):
+            stop = bisect.bisect_left(beats, bars[bar] - _BEAT_TOLERANCE_MS)
+        else:
+            stop = min(len(beats), start + self.beats_per_bar)
+        return range(start, max(start, stop))
+
+    def beat_index(self, bar: int, beat: int) -> int | None:
+        """The index of beat `beat` (1-indexed) of bar `bar` (`bar_beat_indices`), or None
+        when the bar is outside the grid or has fewer detected beats."""
+        indices = self.bar_beat_indices(bar)
+        return indices[beat - 1] if 1 <= beat <= len(indices) else None
+
+    def beat_time_ms(self, bar: int, beat: int) -> float | None:
+        """The time of beat `beat` of bar `bar` (`beat_index`), or None."""
+        index = self.beat_index(bar, beat)
+        return None if index is None else self.beat_boundaries[index]
+
+    def bar_and_beat(self, beat_index: int) -> tuple[int, int] | None:
+        """The 1-indexed bar and beat of the detected beat at `beat_index`; None for a
+        beat before bar 1 (a pickup) or past the last bar's beats."""
+        beats = self.beat_boundaries
+        if not 0 <= beat_index < len(beats):
+            return None
+        bar = bisect.bisect_right(self.bar_boundaries, beats[beat_index] + _BEAT_TOLERANCE_MS)
+        indices = self.bar_beat_indices(bar)
+        if beat_index not in indices:
+            return None
+        return bar, beat_index - indices.start + 1
+
+    def nearest_beat_index(self, time_ms: float) -> int | None:
+        """The index of the detected beat nearest `time_ms` (ties to the earlier, as
+        `snap_to_nearest_beat`), or None without beats."""
+        beats = self.beat_boundaries
+        if not beats:
+            return None
+        index = bisect.bisect_left(beats, time_ms)
+        if index == 0:
+            return 0
+        if index == len(beats):
+            return len(beats) - 1
+        return index if beats[index] - time_ms < time_ms - beats[index - 1] else index - 1
 
     def nearest_bar_index(self, time_ms: float) -> int:
         """Resolve a time to the 0-based index of the *nearest* detected downbeat.

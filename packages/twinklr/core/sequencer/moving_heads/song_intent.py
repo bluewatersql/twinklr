@@ -445,6 +445,20 @@ def flash_widths(profile: FixtureCapabilities) -> tuple[str, int, int] | None:
     )
 
 
+WHEEL_LATE_BEATS = 1.0
+"""How late, in beats after its beat, a colour or gobo event that cannot dip before its
+beat may still be revealed (turned in a dark window of the template); later, it does not
+play (`events._turn`; the plan repair predicts it, `rig_repair`). Proposed (W7 fix
+round)."""
+
+
+def dip_fits(added_ms: float, beat_ms: float) -> bool:
+    """Whether a wheel change's dark lead adds at most half the beat before its reveal: the
+    one test the render (`events._turn`, the darkness the dip adds) and the plan repair
+    (each head's wheel change time) apply to a colour or gobo event."""
+    return added_ms <= beat_ms / 2
+
+
 def can_darken(profile: FixtureCapabilities) -> bool:
     """Whether a head can be commanded dark on its cue's path: its dimmer's zero
     extinguishes, or its closed shutter state does."""
@@ -967,6 +981,10 @@ def _events_for_prompt(offer: RigOffer) -> dict[str, Any]:
     return {
         "dark": offer.dark,
         "flash_ms": offer.flash_ms,
+        # The fastest tempo at which the slowest wheel change fits half a beat (`dip_fits`).
+        "wheel_max_bpm": None
+        if not offer.wheel_change_ms
+        else math.floor(60_000 / (2 * offer.wheel_change_ms)),
         "strobes": strobes,
         "pulse_beats": None
         if offer.flash_ms is None or offer.beat_ms is None

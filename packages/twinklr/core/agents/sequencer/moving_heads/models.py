@@ -197,6 +197,11 @@ class PlanEvent(BaseModel):
         description="The bound lyric moment cue's emphasis, set by the cue binder (code-owned, "
         "not planned): it scales a hit",
     )
+    cue_ms: SkipJsonSchema[int | None] = Field(
+        default=None,
+        description="The bound lyric moment cue's time, set by the cue binder (code-owned, not "
+        "planned): the trace reports how far from it the event plays",
+    )
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
