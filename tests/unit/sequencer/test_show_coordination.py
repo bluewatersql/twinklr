@@ -841,7 +841,7 @@ def test_moving_head_dark_spans_are_where_the_schedule_rests_them(
 
 def test_the_moving_heads_focal_role_is_read_per_section_for_the_render() -> None:
     """Each section's role for the moving-head targets, by song section id; a section that
-    names none for them (or contradicting ones) is left out."""
+    names none for them, contradicting ones, or one for only some of them is left out."""
     heads = PlanTarget(type=TargetType.GROUP, id="MOVING_HEADS")
     tree = PlanTarget(type=TargetType.GROUP, id="MEGA_TREE")
     arches = PlanTarget(type=TargetType.GROUP, id="ARCH_LEFT")
@@ -861,3 +861,22 @@ def test_the_moving_heads_focal_role_is_read_per_section_for_the_render() -> Non
         FocalRole(target=arches, role="REST"),
     )
     assert roles(*mixed, ids={"MOVING_HEADS", "ARCH_LEFT"}) == {}
+    # The heads render as one rig: a role named for some moving-head targets and not for
+    # the others is not applied to all of them.
+    partial = (FocalRole(target=heads, role="LEAD"), FocalRole(target=arches, role="SUPPORT"))
+    assert roles(*partial, ids={"MOVING_HEADS", "WINDOWS"}) == {}
+    assert roles(*partial, ids={"MOVING_HEADS"}) == {"drop": "LEAD"}
+
+
+def test_a_focal_role_not_held_by_every_moving_head_target_is_warned(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    heads = PlanTarget(type=TargetType.GROUP, id="MOVING_HEADS")
+    arches = PlanTarget(type=TargetType.GROUP, id="ARCH_LEFT")
+    macro = _macro(
+        roles=[FocalRole(target=heads, role="LEAD"), FocalRole(target=arches, role="SUPPORT")]
+    )
+    with caplog.at_level("WARNING"):
+        moving_head_focal_roles(macro, _graph(), moving_head_target_ids={"MOVING_HEADS", "WINDOWS"})
+    assert "section 'drop'" in caplog.text
+    assert "MOVING_HEADS LEAD, WINDOWS none" in caplog.text

@@ -8,6 +8,7 @@ under `twinklr show` the heads' focal role adjusts the section's intensity."""
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
+from itertools import pairwise
 import math
 from typing import Any
 
@@ -17,7 +18,9 @@ from tests.support import moving_heads as m
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
+from twinklr.core.sequencer.moving_heads.export.frame_encoder import quantize_cue
 from twinklr.core.sequencer.moving_heads.intensity import (
+    HEADROOM_BELOW,
     SHAPES,
     dramatic_period_beats,
     effective_intensity,
@@ -31,12 +34,35 @@ HALF = "intensity_half_hold"
 """Test-only: one held aim, the dimmer held at half."""
 
 
+RAMP = "intensity_ramp"
+"""Test-only: lit over three quarters of a 4-beat sweep, ramping up from dark to full over
+its first beat and down over its last."""
+STRONG_PULSE = "intensity_strong_pulse"
+"""Test-only: the template's own pulse, full and 0.6 on alternate beats."""
+NEAR_FULL = "intensity_near_full"
+"""Test-only: the dimmer held at 0.9."""
+
+
+def _held(step_id: str, low: float, high: float, period: float, duty: float) -> dict[str, Any]:
+    return m.hold_step(
+        step_id,
+        10.0,
+        dimmer={"period_beats": period, "duty_cycle": duty, "low": low, "high": high},
+    )
+
+
 @pytest.fixture(autouse=True)
 def _catalog() -> Iterator[None]:
-    hold = m.hold_step(
-        "hold", 10.0, dimmer={"period_beats": 4.0, "duty_cycle": 1.0, "low": 0.0, "high": 0.5}
-    )
-    with m.family_catalog(), m.registered_templates(m.loop_template_doc(HALF, [hold])):
+    ramp = m.envelope_step("ramp", 10.0, 20.0, lit=(0.0, 0.75), attack=1.0, release=1.0)
+    with (
+        m.family_catalog(),
+        m.registered_templates(
+            m.loop_template_doc(HALF, [_held("hold", 0.0, 0.5, 4.0, 1.0)]),
+            m.loop_template_doc(RAMP, [ramp]),
+            m.loop_template_doc(STRONG_PULSE, [_held("pulse", 0.6, 1.0, 2.0, 0.5)]),
+            m.loop_template_doc(NEAR_FULL, [_held("near", 0.0, 0.9, 4.0, 1.0)]),
+        ),
+    ):
         yield
 
 
@@ -129,8 +155,9 @@ def lit_beats(heads: Heads, head: str, beats: Sequence[float]) -> list[float]:
 
 
 def accent_frame(beat: float, lead_ms: int = 0) -> int:
-    """The first frame at or after `beat - lead_ms`: where the accent is commanded."""
-    return math.ceil((beat - lead_ms) / FRAME)
+    """The frame nearest `beat - lead_ms` (as the compiler places a template's own beat
+    edges): where the accent is commanded."""
+    return quantize_cue(round(beat - lead_ms)).actual_ms // FRAME
 
 
 def assert_same_but_dimmer(shaped: Heads, authored: Heads) -> None:
@@ -194,7 +221,7 @@ def test_intense_on_a_full_family_dips_between_beats_and_returns_on_each(bpm: fl
     shaped = Heads(render("INTENSE", beat_grid=beat_grid))
 
     assert_same_but_dimmer(shaped, authored)
-    floor = math.floor((1 - SHAPES["INTENSE"].dip_depth) * 255)
+    floor = math.floor(SHAPES["INTENSE"].full_floor * 255)
     for head in HEADS:
         dimmer, dark = shaped.dimmer(head), shaped.dark(head)
         lit = [i for i, is_dark in enumerate(dark) if not is_dark]
@@ -218,7 +245,7 @@ def test_dramatic_on_a_full_family_is_shallower_over_its_longer_period(
     intense = Heads(render("INTENSE", beat_grid=beat_grid))
 
     assert_same_but_dimmer(shaped, authored)
-    floor = math.floor((1 - SHAPES["DRAMATIC"].dip_depth) * 255)
+    floor = math.floor(SHAPES["DRAMATIC"].full_floor * 255)
     for head in HEADS:
         dimmer = shaped.dimmer(head)
         lit = [i for i, is_dark in enumerate(shaped.dark(head)) if not is_dark]
@@ -363,7 +390,9 @@ def test_the_trace_records_what_intensity_played() -> None:
             "decay_beats": 1.0,
             "floor_gain": SHAPES["DRAMATIC"].floor_gain,
             "peak_gain": SHAPES["DRAMATIC"].peak_gain,
-            "dip_floor": 1 - SHAPES["DRAMATIC"].dip_depth,
+            "full_floor": SHAPES["DRAMATIC"].full_floor,
+            "full_peak": SHAPES["DRAMATIC"].full_peak,
+            "headroom_below": HEADROOM_BELOW,
             "applied": {"dip_and_return": list(HEADS)},
         },
     }
@@ -389,3 +418,192 @@ def test_a_lead_section_plays_one_step_hotter_and_rest_as_authored() -> None:
     assert support.fingerprint() == authored.fingerprint() != lead.fingerprint()
     assert support.render_record is not None and "focal_roles" not in support.render_record
     assert "section_looks" not in support.render_record
+
+
+# --- review fix round: lit runs, run shapes, quantisation, limits ---------------------------
+
+
+def lit_runs(heads: Heads, head: str) -> list[range]:
+    """The head's runs of consecutive lit frames."""
+    dark = heads.dark(head)
+    runs, start = [], None
+    for i, is_dark in enumerate([*dark, True]):
+        if not is_dark and start is None:
+            start = i
+        elif is_dark and start is not None:
+            runs.append(range(start, i))
+            start = None
+    return runs
+
+
+@pytest.mark.parametrize("level", ["DRAMATIC", "INTENSE"])
+@pytest.mark.parametrize("template_id", ["fly_in_cascade", "fly_out_cascade"])
+def test_every_lit_window_of_a_cascade_comes_in_on_an_accent(level: str, template_id: str) -> None:
+    """A cascade lights each head for one beat in four, often on a beat DRAMATIC does not
+    accent: every lit window still starts full and eases off, on every head."""
+    authored = Heads(render(None, template_id=template_id))
+    shaped = Heads(render(level, template_id=template_id))
+
+    assert_same_but_dimmer(shaped, authored)
+    floor = math.floor(SHAPES[level].full_floor * 255)
+    for head in HEADS:
+        dimmer = shaped.dimmer(head)
+        runs = lit_runs(shaped, head)
+        assert len(runs) >= 6, head
+        for run in runs:
+            assert dimmer[run[0]] == 255, (head, run[0] * FRAME)
+            assert dimmer[run[-1]] < 255 and min(dimmer[i] for i in run) >= floor, head
+
+
+@pytest.mark.parametrize("level", ["DRAMATIC", "INTENSE"])
+def test_a_head_revealed_after_a_dark_span_mid_beat_comes_in_full(level: str) -> None:
+    spans = ((2000, 2260),)  # ends half a beat before the beat at 2515 ms
+    shaped = Heads(render(level, dark_spans=spans))
+
+    for head in HEADS:
+        dimmer, dark = shaped.dimmer(head), shaped.dark(head)
+        reveal = next(i for i in range(100, len(dark)) if dark[i - 1] and not dark[i])
+        assert reveal * FRAME == 2260
+        assert dimmer[reveal] == 255 and dimmer[reveal + 1] < 255, head
+
+
+def test_a_head_revealed_after_a_colour_dip_at_170_bpm_comes_in_full() -> None:
+    """At 170 BPM a colour change at a lit boundary dips dark before the section: the
+    reveal on the section's downbeat is at full on its first frame, never a frame at the
+    floor before the accent."""
+    colours = ("red", "blue", "red")
+    sections = [
+        {
+            "section_id": f"s{i + 1}",
+            "start_bar": 4 * i + 1,
+            "end_bar": 4 * i + 4,
+            "template_id": "mirror_wings",
+            "color": colour,
+            "intensity": "INTENSE",
+        }
+        for i, colour in enumerate(colours)
+    ]
+    pipeline = render(
+        None,
+        beat_grid=grid(170, bars=12),
+        fixture_group=m.tagged_family_rig(HEADS),
+        sections=sections,
+    )
+    shaped = Heads(pipeline)
+
+    assert pipeline.render_record is not None
+    dips = [
+        b
+        for look in pipeline.render_record["section_looks"]
+        for b in look.get("boundaries", [])
+        if "dark_dip" in b
+    ]
+    assert dips
+    for head in HEADS:
+        dimmer, dark = shaped.dimmer(head), shaped.dark(head)
+        reveals = [i for i in range(1, len(dark)) if dark[i - 1] and not dark[i]]
+        assert len(reveals) >= 3, head
+        assert all(dimmer[i] == 255 for i in reveals), (head, [dimmer[i] for i in reveals])
+
+
+@pytest.mark.parametrize("level", ["DRAMATIC", "INTENSE"])
+def test_a_ramp_to_full_keeps_its_shape(level: str) -> None:
+    """A run that reaches full is shaped as a whole, as a gain on its own level: the ramp
+    is never above its authored level, never below the dip floor of it, and never drops
+    by the dip at the frame it reaches full."""
+    authored = Heads(render(None, template_id=RAMP))
+    shaped = Heads(render(level, template_id=RAMP))
+
+    assert_same_but_dimmer(shaped, authored)
+    floor = SHAPES[level].full_floor
+    for head in HEADS:
+        dimmer, base = shaped.dimmer(head), authored.dimmer(head)
+        for run in lit_runs(shaped, head):
+            for i in run:
+                assert dimmer[i] <= base[i], (head, i * FRAME)
+                assert dimmer[i] >= math.floor(base[i] * floor) - 1, (head, i * FRAME)
+            reaches = [i for i in run[1:] if base[i] == 255 and base[i - 1] < 255]
+            assert all(dimmer[i] >= dimmer[i - 1] for i in reaches), head
+
+
+def test_a_template_pulse_at_full_is_not_inverted() -> None:
+    """The template's own full / 0.6 pulse under INTENSE: both beats are scaled alike, so a
+    0.6 beat never plays brighter than the full beat before it."""
+    authored = Heads(render(None, template_id=STRONG_PULSE))
+    shaped = Heads(render("INTENSE", template_id=STRONG_PULSE))
+
+    assert_same_but_dimmer(shaped, authored)
+    for head in HEADS:
+        dimmer, base = shaped.dimmer(head), authored.dimmer(head)
+        for run in lit_runs(shaped, head):
+            for i in run:
+                assert math.floor(base[i] * 0.6) - 1 <= dimmer[i] <= base[i]
+            beats: list[list[int]] = []
+            for i in run:
+                if i == run[0] or (base[i] == 255) != (base[i - 1] == 255):
+                    beats.append([])
+                beats[-1].append(i)
+            for bright, dim in pairwise(beats):
+                if base[bright[0]] == 255 and base[dim[0]] < 255:
+                    assert max(dimmer[i] for i in dim) <= max(dimmer[i] for i in bright) * 0.61
+
+
+def test_a_level_just_below_full_still_pulses() -> None:
+    """Held at 0.9 there is too little room to rise: the run is shaped as at full and
+    pulses on the beat."""
+    shaped = Heads(render("INTENSE", template_id=NEAR_FULL))
+
+    for head in HEADS:
+        dimmer = shaped.dimmer(head)
+        lit = list(lit_runs(shaped, head)[0])
+        assert max(dimmer[i] for i in lit) == round(0.9 * 255)
+        assert min(dimmer[i] for i in lit) <= round(0.9 * 255 * 0.62)
+
+
+def test_a_long_dimmer_latency_leads_by_under_half_a_beat_and_never_before_the_section() -> None:
+    """A 300 ms latency at 120 BPM leads the accents by 249 ms (just under half the
+    500 ms beat); after an as-authored section the shaped one starts full on its first
+    frame."""
+    sections = [
+        {"section_id": "s1", "start_bar": 1, "end_bar": 2, "template_id": "mirror_wings"},
+        {
+            "section_id": "s2",
+            "start_bar": 3,
+            "end_bar": 8,
+            "template_id": "mirror_wings",
+            "intensity": "INTENSE",
+        },
+    ]
+    beat_grid = grid(120)
+    pipeline = render(
+        None,
+        beat_grid=beat_grid,
+        fixture_group=_rig_with_dimmer(latency_ms=300),
+        sections=sections,
+    )
+    shaped = Heads(pipeline)
+
+    assert pipeline.render_record is not None
+    (look,) = [look for look in pipeline.render_record["section_looks"] if "intensity" in look]
+    assert look["intensity"]["shape"]["lead_ms"] == dict.fromkeys(HEADS, 249)
+    start = accent_frame(beat_grid.bar_boundaries[2])
+    for head in HEADS:
+        dimmer = shaped.dimmer(head)
+        assert dimmer[start - 1] == 255 and dimmer[start] == 255 and dimmer[start + 1] < 255
+        for beat in beat_grid.beat_boundaries[9:30]:
+            assert dimmer[accent_frame(beat, 249)] == 255
+
+
+def test_lead_on_a_full_family_adds_movement_not_light() -> None:
+    """The owner's open question (W5 review H2): on a family holding the dimmer full, a LEAD
+    section plays DRAMATIC's dip-and-return, so it averages less light than SUPPORT. This
+    pins today's behaviour until the owner rules."""
+    support = Heads(render(None, focal_roles={"s1": "SUPPORT"}))
+    lead = Heads(render(None, focal_roles={"s1": "LEAD"}))
+
+    assert_same_but_dimmer(lead, support)
+    for head in HEADS:
+        lit = [i for run in lit_runs(support, head) for i in run]
+        mean_lead = sum(lead.dimmer(head)[i] for i in lit) / len(lit)
+        mean_support = sum(support.dimmer(head)[i] for i in lit) / len(lit)
+        assert 0.75 < mean_lead / mean_support < 0.85, (head, mean_lead / mean_support)

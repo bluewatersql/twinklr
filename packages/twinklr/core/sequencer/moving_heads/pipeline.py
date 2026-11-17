@@ -99,8 +99,8 @@ from twinklr.core.sequencer.moving_heads.identity import (
     render_fingerprint,
 )
 from twinklr.core.sequencer.moving_heads.intensity import (
-    SHAPED_LEVELS,
     effective_intensity,
+    shape_for,
     shape_section,
 )
 from twinklr.core.sequencer.moving_heads.song_intent import (
@@ -2640,6 +2640,8 @@ class RenderingPipeline:
         held_by_fixture: dict[str, dict[ChannelName, str]] = {}
         """Per fixture, the wheel states song intent held in the section of its last cue."""
         section_looks: list[dict[str, Any]] = []
+        shaping: list[tuple[str, str | None, float, int, dict[str, Any]]] = []
+        """Per section a shaped intensity plays in: its id, level, bounds, trace entry."""
         for section in self.iterate_plan_sections(self.choreography_plan):
             (part,) = section.parts
             try:
@@ -2693,8 +2695,6 @@ class RenderingPipeline:
             level = effective_intensity(asked, focal_role)
             if level == asked:
                 focal_role = None  # it changes nothing here
-            shaped: dict[str, Any] = {}
-            """What the section's intensity shaping did (`shape_section`), once compiled."""
 
             def compile_section(
                 held_states: Mapping[str, Mapping[ChannelName, str]],
@@ -2703,8 +2703,6 @@ class RenderingPipeline:
                 preset: TemplatePreset | None = preset,
                 refused: int = refused,
                 compiled_steps: list[dict[str, str | int]] = compiled_steps,
-                level: str | None = level,
-                shaped: dict[str, Any] = shaped,
             ) -> list[FixtureSegment]:
                 if unplayable is not None:
                     del unplayable[refused:]  # a recompile records its refusals again
@@ -2719,21 +2717,8 @@ class RenderingPipeline:
                     held_states=held_states,
                 )
                 compiled_steps[:] = result.dropped_steps
-                segments = result.segments
-                if level in SHAPED_LEVELS:
-                    # Before the dark spans and boundary dips, so their darkness holds.
-                    segments, record = shape_section(
-                        segments,
-                        level,
-                        profiles=profiles,
-                        phase_map=phase_map,
-                        origin_ms=self.beat_grid.get_bar_start_ms(context.start_bar - 1),
-                        beats_per_bar=self.beat_grid.beats_per_bar,
-                    )
-                    shaped.clear()
-                    shaped.update(record)
                 return _dark_over_spans(
-                    segments,
+                    result.segments,
                     self.dark_spans,
                     profiles,
                     shortest_lit_ms=self._shortest_lit_ms,
@@ -2901,25 +2886,22 @@ class RenderingPipeline:
             record = _played_record(look.record(), outcomes)
             if boundaries:
                 record["boundaries"] = boundaries
-            if asked is not None or focal_role is not None:
+            if asked is not None or focal_role is not None or shape_for(level) is not None:
                 record["intensity"] = {
                     "asked": asked,
                     **({} if focal_role is None else {"focal_role": focal_role}),
                     "effective": level,
-                    "shape": dict(shaped) if level in SHAPED_LEVELS else None,
+                    "shape": None,
                 }
-                if shaped.get("unavailable"):
-                    diagnostics.append(
-                        MHDiagnostic(
-                            code="unsupported_attribute",
-                            severity="warning",
-                            message=(
-                                f"section {section.section_id!r}: intensity {level} is not "
-                                f"shaped on {', '.join(shaped['unavailable'])}, which have no "
-                                "dimmer axis; they play the template's own level"
-                            ),
-                            section_id=section.section_id,
-                            action="unchanged",
+                if shape_for(level) is not None:
+                    # Shaped once every darkness of the section is placed (below).
+                    shaping.append(
+                        (
+                            section.section_id,
+                            level,
+                            self.beat_grid.get_bar_start_ms(context.start_bar - 1),
+                            context.end_ms,
+                            record,
                         )
                     )
             if len(record) > 1:
@@ -2991,6 +2973,42 @@ class RenderingPipeline:
                 "on there along their authored paths; the trace's dark_spans lists them",
                 len(self.dark_spans),
             )
+
+        for section_id, level, start_ms, end_ms, record in shaping:
+            # Intensity plays on the cues as they will play: after the dark spans, the
+            # boundary dips, deferred turns and entry windows of every section, so a head
+            # revealed after any of them comes in on an accent.
+            base, _, segment = section_id.partition("|")
+            index = [
+                i
+                for i, cue in enumerate(cues)
+                if cue.section_id == base and cue.segment_id == (segment or "A")
+            ]
+            shaped, record["intensity"]["shape"] = shape_section(
+                [cues[i] for i in index],
+                level,
+                profiles=profiles,
+                phase_map=phase_map,
+                origin_ms=start_ms,
+                end_ms=end_ms,
+                beats_per_bar=self.beat_grid.beats_per_bar,
+            )
+            for i, cue in zip(index, shaped, strict=True):
+                cues[i] = cue
+            if record["intensity"]["shape"].get("unavailable"):
+                diagnostics.append(
+                    MHDiagnostic(
+                        code="unsupported_attribute",
+                        severity="warning",
+                        message=(
+                            f"section {section_id!r}: intensity {level} is not shaped on "
+                            f"{', '.join(record['intensity']['shape']['unavailable'])}, which "
+                            "have no dimmer axis; they play the template's own level"
+                        ),
+                        section_id=section_id,
+                        action="unchanged",
+                    )
+                )
 
         result = plan_prepositions(
             cues,

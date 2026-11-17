@@ -347,8 +347,8 @@ async def test_the_report_carries_each_sections_song_intent_and_the_plan_repairs
     played, intensity = first.played
     # The family holds the dimmer full: DRAMATIC dips and returns every half bar.
     assert intensity == (
-        "intensity DRAMATIC: a pulse on the beat every 2 beats: full on the accent, down "
-        "to 75% between on MH1, MH2, MH3, MH4"
+        "intensity DRAMATIC: a pulse on the beat every 2 beats: 100% of the authored level "
+        "on the accent, easing to 75% of it between on MH1, MH2, MH3, MH4"
     )
     assert played.startswith("colour PALETTE_ACCENT (#FF00FF, fixed table (magenta: ")
     assert played.endswith("no head shows it; MH1, MH2, MH3, MH4 keep their authored colour")

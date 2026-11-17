@@ -81,13 +81,18 @@ See [product/overview.md](product/overview.md).
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w3-w4-offer-colour/README.md))
   - **Intensity on the dimmer** (W5, 2026-11-17, not yet seen by the owner). `as_authored`,
     SLOW, SMOOTH and FAST play the template as authored; DRAMATIC (every half bar in
-    4/4, every bar in 3/4) and INTENSE (every beat) add a beat-locked pulse: over a level
-    below full a raised floor and an accent, over a full level (every catalog family) a
-    dip-and-return, full on the accent and easing to 75% / 60% between; dark frames and
+    4/4, every bar in 3/4) and INTENSE (every beat) add a beat-locked pulse, every lit
+    run (a reveal after any darkness) starting on an accent: over a level below full a
+    raised floor and an accent, over a full level (every catalog family) a
+    dip-and-return, the authored level on the accent easing to 75% / 60% of it between
+    (more movement, not more light: about 0.80 / 0.74 of it on average); dark frames and
     every other channel untouched; a slow dimmer gets a smaller pulse, a dimmer latency
     an earlier one, a head without a dimmer none. Under `twinklr show` the heads' macro
     focal role moves a section's intensity a step (LEAD hotter, REST at most as
-    authored). The values are a proposal for the owner's W5 view. Renderer revision 5.
+    authored) where every moving-head target holds it. The values are a proposal for the
+    owner's W5 view; whether peak and LEAD sections should be brighter on average (a
+    headroom variant is prepared for comparison) is the owner's open question. Renderer
+    revision 7.
     ([user guide](../docs/user-guide.md#how-a-sections-intensity-reaches-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w5-intensity/README.md))
   - **Known regression: the rest of the song intent is not rendered yet.** The planner's

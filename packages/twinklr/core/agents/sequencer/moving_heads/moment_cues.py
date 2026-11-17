@@ -302,13 +302,27 @@ def _bind(
     beats: range,
     record: _Record,
 ) -> None:
-    """Move the event to the section's beat nearest the cue."""
+    """Move the event to the section's beat nearest the cue. A cue past the beat grid's
+    covered span (its last beat plus one beat interval, where the render goes dark), in
+    the clamped part of a section the grid ends inside, lands on the grid's last beat,
+    recorded so the planner sees the accent is not where the lyric is."""
     snapped_ms = grid.snap_to_nearest_beat(float(cue.timestamp_ms))
     nearest = bisect_left(grid.beat_boundaries, snapped_ms)
     index = min(max(nearest, beats.start), beats.stop - 1)
     bpb = grid.beats_per_bar
     event["bar"], event["beat"] = index // bpb + 1, index % bpb + 1
-    if index != nearest:
+    boundaries = grid.beat_boundaries
+    covered_end = boundaries[-1] + boundaries[-1] - boundaries[-2] if len(boundaries) >= 2 else None
+    if covered_end is not None and cue.timestamp_ms > covered_end:
+        record(
+            item,
+            RepairAction.ADJUSTED,
+            f"lyric moment cue '{cue.cue_id}' at {cue.timestamp_ms} ms lies beyond the "
+            f"detected beat grid, where the render is dark from {round(covered_end)} ms: "
+            f"placed on the grid's last beat in the section (bar {event['bar']} beat "
+            f"{event['beat']})",
+        )
+    elif index != nearest:
         record(
             item,
             RepairAction.ADJUSTED,

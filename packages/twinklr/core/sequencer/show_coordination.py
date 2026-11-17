@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 from itertools import pairwise
+import logging
 import re
 
 from twinklr.core.sequencer.display.brightness import intensity_to_brightness
@@ -28,6 +29,8 @@ from twinklr.core.sequencer.templates.group.target_expander import TargetExpande
 from twinklr.core.sequencer.theming import get_palette
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.vocabulary import CoordinationMode, StepUnit
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -476,16 +479,35 @@ def moving_head_focal_roles(
 ) -> dict[str, str]:
     """The moving heads' focal role (LEAD, SUPPORT or REST) in each macro section, by song
     section id, for the moving-head renderer (`RenderingPipeline(focal_roles=...)`), which
-    adjusts the section's intensity by it. A section that names no role for the moving-head
-    targets, or different roles for different ones, is left out (the planner's intensity
-    plays unchanged there)."""
+    adjusts the section's intensity by it, and the planner, who is told so.
+
+    The renderer adjusts the whole rig's intensity, so a role applies only where every
+    moving-head target holds it. A section that names no role for them is left out
+    silently (the planner's intensity plays); one that names different roles for
+    different targets, or a role for some and none for others, is left out with a
+    warning: applying it to all would change heads the macro plan did not name.
+    """
     expander = TargetExpander(graph)
     roles: dict[str, str] = {}
     for section in macro_plan.sections:
         named = _role_map(section, expander)
-        found = {named[target_id] for target_id in moving_head_target_ids if target_id in named}
+        found = {named.get(target_id) for target_id in moving_head_target_ids}
+        if found == {None}:
+            continue
         if len(found) == 1:
-            roles[section.section.section_id] = found.pop().value
+            role = found.pop()
+            assert role is not None
+            roles[section.section.section_id] = role.value
+            continue
+        logger.warning(
+            "section %r: the macro plan gives the moving-head targets different focal roles "
+            "(%s); the heads render as one rig, so no focal role adjusts their intensity",
+            section.section.section_id,
+            ", ".join(
+                f"{target_id} {named[target_id].value if target_id in named else 'none'}"
+                for target_id in sorted(moving_head_target_ids)
+            ),
+        )
     return roles
 
 

@@ -10,13 +10,14 @@ import bisect
 import logging
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, computed_field
 
 from twinklr.core.agents.audio.lyrics.models import LyricContextModel
 from twinklr.core.agents.audio.profile.models import (
     AudioProfileModel,
     SongSectionRef,
 )
+from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.moving_heads.song_intent import (
     RigOffer,
     SectionPalette,
@@ -26,6 +27,7 @@ from twinklr.core.sequencer.moving_heads.song_intent import (
 from twinklr.core.sequencer.planning import MacroPlan
 from twinklr.core.sequencer.theming.catalog import get_palette
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +75,8 @@ class MovingHeadPlanningContext(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
+    _beyond_grid_logged: bool = PrivateAttr(default=False)
+    """Whether `song_structure` has warned about the song's tail beyond the beat grid."""
 
     # Phase 1 Outputs
     audio_profile: AudioProfileModel = Field(
@@ -343,8 +347,10 @@ class MovingHeadPlanningContext(BaseModel):
         bar. Bars are clamped to ``1..total_bars``: when the beat grid stops before the
         audio ends, the last section starting inside the grid ends on ``total_bars``,
         and a section starting beyond it is left out (it has no bar to render) and
-        named under ``beyond_grid`` with where the grid ends and the seconds it leaves
-        unplanned. ``beyond_grid`` is None when nothing was clamped or left out.
+        named under ``beyond_grid``: where the render goes dark (the end of the beat
+        grid's covered span, on the frame grid, as the renderer's cue limits put it) and
+        the seconds of song it leaves dark. ``beyond_grid`` is None when nothing was
+        clamped or left out. The warning is logged once per context (one per run).
         """
         total_bars = self.total_bars
         section_entries: list[dict[str, Any]] = []
@@ -377,18 +383,20 @@ class MovingHeadPlanningContext(BaseModel):
 
         beyond_grid: dict[str, Any] | None = None
         if omitted or clamped:
-            grid_end_ms = self._bar_end_ms(total_bars)
+            grid_end_ms = self._dark_from_ms(total_bars)
             song_end_ms = self.sections[-1].end_ms
             beyond_grid = {
                 "from_ms": round(grid_end_ms),
                 "seconds": round(max(0.0, song_end_ms - grid_end_ms) / 1000, 1),
                 "section_ids": omitted,
             }
+        if beyond_grid is not None and not self._beyond_grid_logged:
+            self._beyond_grid_logged = True
             logger.warning(
-                "The beat grid ends at bar %d (%.1f s), %.1f s before the song ends; "
-                "section bars are clamped to it%s",
+                "The beat grid ends at bar %d and the render goes dark at %.1f s, %.1f s before "
+                "the song ends; section bars are clamped to it%s",
                 total_bars,
-                grid_end_ms / 1000,
+                beyond_grid["from_ms"] / 1000,
                 beyond_grid["seconds"],
                 f" and {', '.join(omitted)} left unplanned" if omitted else "",
             )
@@ -399,11 +407,18 @@ class MovingHeadPlanningContext(BaseModel):
             "beyond_grid": beyond_grid,
         }
 
-    def _bar_end_ms(self, bar: int) -> float:
-        """The end of 1-indexed ``bar``: the next bar's downbeat, extrapolated by the
-        average bar past the grid; nominal tempo without a grid."""
-        if self.beat_grid is not None and self.beat_grid.bar_boundaries:
-            return self.beat_grid.get_bar_start_ms(bar)
+    def _dark_from_ms(self, bar: int) -> float:
+        """Where the render goes dark at the song's end: the beat grid's covered span's end
+        (its last beat plus one beat interval, or the song's edge), on the frame grid, as
+        the renderer's cue limits put it; without a grid, the end of 1-indexed ``bar`` at
+        nominal tempo."""
+        if self.beat_grid is not None and len(self.beat_grid.beat_boundaries) >= 2:
+            covered = build_musical_phase_map(self.beat_grid).covered_end_ms
+            frame = EFFECT_GRID_MS
+            return min(
+                int(self.beat_grid.duration_ms) // frame * frame,
+                int(covered // frame * frame),
+            )
         tempo = 120.0 if not self.tempo or self.tempo <= 0 else self.tempo
         return bar * self.beats_per_bar * 60_000.0 / tempo
 

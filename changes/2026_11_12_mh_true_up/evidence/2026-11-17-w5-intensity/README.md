@@ -302,3 +302,102 @@ Scratch (session-local, not committed):
 `/private/tmp/claude-501/-Users-ondeck-work-github-twinklr/9cfb5b66-fff4-47db-adcb-766b50dc61e9/scratchpad/w5/`
 (`matrix_w5.py`, `compare_w5.py`, `run_matrix.sh`, `rerecord_pins.py`,
 `intensity_pins.py`, `tempo_examples.py`).
+
+## Review fix round (2026-11-17, on `f0e2cff6`)
+
+The independent review of `9d607f45` confirmed byte identity, pins, parity and the
+dark-frame guarantees and returned REQUEST CHANGES (H1, H2, M1–M4, L1–L6). Done here: H1,
+M1, M2, M3, M4, L1–L6; H2 is the owner's decision and only a comparison variant was
+prepared (below). Uncommitted, no `make validate`, no provider call. Where this section
+and the text above differ, this section is current. The reviewer's scripts
+(`w5rev/tools/`) were run before and after; outputs in `w5/fix_before/` and
+`w5/fix_after/`.
+
+### What changed
+
+| # | Item | Done |
+|---|---|---|
+| H1, L1 | A lit window with no accent beat played flat (cascades under DRAMATIC: MH2/MH3 of `fly_in_cascade`, MH1/MH4 of `fly_out_cascade` at 191 throughout); a head revealed mid-beat came in partway down the decay | The shaping moved out of the section compile to one pass over each section's cues **once every darkness is placed** (dark spans, boundary dips, deferred turns, entry windows), and works per **lit run** (consecutive lit frames of one head). Every run starts on an accent (at the run's level, decaying from there) and rejoins the beat accents. Frame tests: both cascades × both levels (every window starts full, eases off, never under the floor), reveal after a dark span ending mid-beat, reveal after a colour dip at 170 BPM |
+| M1 | "Full" was decided per frame (a ramp reaching full dropped 64 words; a 1.0/0.6 pulse inverted; 0.87–<1.0 played flat at full) | Decided per lit run by its highest authored level `M` against `HEADROOM_BELOW = 0.85` of the dimmer's top. Both cases are now a **gain on the authored level**: full runs `a × (full_peak − (full_peak − full_floor)(1 − e))` (ramps and the template's own pulse keep their form); headroom runs `a × (1 + g(floor + peak·e))` with `g` capping the gains so the run's peak reaches the top at most (no clipping plateau). Frame tests: ramp to full (never above authored, never below the floor of it, no drop where it reaches full), 1.0/0.6 pulse not inverted, 0.9 held level pulses |
+| M2 | Prompts and docs did not say that at full level the pulse dips below the authored light | Developer prompt: at full level DRAMATIC/INTENSE "add movement, not brightness … eases below it between accents (about 75% / 60%)", below full they raise the light; the user prompt's colour line no longer says "brightness is `intensity`'s"; the user guide states the mean levels. LEAD wording and the table left as they were (H2) |
+| M3 | Missing frame tests | Added (see H1, M1, M4, L2), plus LEAD vs SUPPORT on a catalog family, pinned as today's behaviour (mean 0.75–0.85 of SUPPORT) until the owner rules on H2 |
+| M4 | The accent was quantised one frame after the template's own beat edge (a 20 ms frame at the floor before the snap to full, 8 cases at 170 BPM) | Accents start on the frame **nearest** the beat (`quantize_cue`, as the compiler places step starts and so the template's beat edges); a run starting at most one frame before an accent takes that accent at its first frame. The reviewer's 170 BPM colour-dip check (`w4low.py`) now reports no reveal below full |
+| L2 | Latency lead unbounded; the first downbeat after an unshaped section lost | Lead = `min(latency_ms, half the section's shortest beat − 1 ms)`; no accent before the section's first frame. Test: 300 ms latency at 120 BPM leads by 249 ms and the section's first frame is full. The template's own dimmer edges are not led (documented) |
+| L3 | Partial focal naming applied LEAD to the whole rig | Decided: the heads render as one rig, so a role applies only where **every** moving-head target holds it; none named → planner's choice silently; different roles, or a role for some targets and none for others → planner's choice with a warning naming each target's role. Same function feeds the planner's prompt, so it is told only the roles that apply. Tests |
+| L4 | `beyond_grid.seconds` measured from the extrapolated end of the last bar; warning repeated on every call | Measured from where the render goes dark: the beat grid's covered span end (last beat + one interval, or the song's edge) on the frame grid, as the renderer's cue limits put it; the warning is logged once per planning context (a private flag). Tests: quarter-beat grid → `from_ms` 182740 (not 185000), 14.7 s; three calls and a prompt build log once |
+| L5 | A lyric cue in the clamped tail of a straddling section bound silently to the last grid beat | Chosen: **recorded**, not skipped. The section is planned and the accent still plays at the end of the lit song, which serves the lyric better than dropping it, and the planner should know it is not on the lyric: `ADJUSTED` "lyric moment cue 'x' at T ms lies beyond the detected beat grid, where the render is dark from D ms: placed on the grid's last beat in the section (bar b beat k)". Advisories (`unanswered_high_cues`) are unaffected (the cue has an event). Test |
+| L6 | `_shape_head` long; `_AccentTiming` with special branches | Replaced by `_Grid` (the section's accent frames, lead clamped, computed once per head), `_lit_runs`, `_gains` (per run: the shape name and per-frame `(fixed, moving)` gain, `moving` scaled for a slow dimmer) and a short `_shape_head`; the `_Frame`, `_shaped` and `_AccentTiming` helpers are gone |
+
+Also fixed on the way: under a slow dimmer the scale now shrinks the dip toward the
+authored level (the first rewrite shrank the accent above the floor instead; caught by
+the reviewer's `limits.py`: `[153, 173, …]` → `[235, 255, 253, …]` at 4/s, as before).
+
+### Numbers (MH1 unless named; 120 BPM, beats 15 ms off the frame grid; `w5/fix_numbers.py`)
+
+| Case | Before (HEAD `f0e2cff6`) | After |
+|---|---|---|
+| `fly_in_cascade` DRAMATIC, MH2, lit 1520–2000 ms (beat 3, not accented), every 40 ms from 1500 | 0, 191 × 12 (flat) | 0, 250, 241, 232, 224, 217, 211, 206, 201, 198, 195, 193, 192 |
+| Ramp to full (envelope, attack 1 beat) DRAMATIC, 2000–3000 ms every 40 ms (authored 0, 10, 31, 51, 71, 92, 112, 133, 153, 173, 194, 214, 235) | 0, 15, 43, 69, 93, 116, 137, 158, 178, 198, 218, 238, 255, then 191 at the frame it reaches full | 0, 10, 29, 47, 64, 79, 94, 108, 122, 136, 149, 163, 177 (the ramp scaled by the decaying gain; full on the next accent) |
+| Same, INTENSE | 0, 17, 49, 78, …, 250, 255 | 0, 10, 29, 45, 59, 72, 83, 94, 104, 113, 122, 132, 142 |
+| Dark span 2000–2260 ms then INTENSE, from 2240 every 40 ms | 0, 177, 169, 163, 159, 156, 154, 255 (beat), … | 0, 247, 232, 218, 206, 195, 185, 255 (beat), … (2260 itself: 255) |
+| Held 0.9 INTENSE, 2000–3000 ms every 40 ms | 255 × 13 (flat: clipped at full) | 138, 222, 209, 196, 185, 175, 166, 159, 152, 147, 143, 140, 138 |
+| 170 BPM, colour dip before section 2 (starts 5662.1 ms), every 20 ms from 5460 | 190, 183, 177, dark × 7, **153**, 255, 244, … | 183, 177, 172, dark × 7, **255**, 244, 233, … |
+| The reviewer's `shape.py` (6 families × 5 grids incl. 3/4 and a drifting tempo × 2 levels), with its accent frames quantised to the nearest frame as the renderer now does | 0 problems (with its ceil quantisation) | 0 problems |
+
+### Revision, pins, matrix
+
+- **`RENDERER_REVISION` 6 → 7**: bytes change for an unchanged plan that sets DRAMATIC or
+  INTENSE (or a show whose focal role makes one).
+- **Pins:** every fingerprint re-recorded; every frame and `.xsq` hash unchanged except two
+  intensity pins: `headroom/intensity_half_hold/DRAMATIC` (its first lit run, after the
+  section's entry window on beat 2, now starts on an accent: L1) and
+  `authored_pulse/intensity_authored_pulse/INTENSE` (gains capped so the 0.8 beats peak at
+  full instead of clipping: M1). `full/mirror_wings/INTENSE` frames unchanged. Golden
+  moving-head fingerprint → `de596d6a…`, effects and trace unchanged.
+- **Byte matrix** against `f0e2cff6` (405 configurations × 8 renders, 39,285 leaves):
+  identical in all 405 — the gate; plans A and B (frames, segments, normalised record and
+  trace, `.xsq`, `.xtiming`, `.xmap`); plan C as authored, SMOOTH, SLOW, FAST (the same, the
+  normalised record and trace included). Different by design: plan C at DRAMATIC in all 405
+  (frames, segments, `.xsq`, trace: run-start accents on the cascades and the parts) and at
+  INTENSE in 189 (216 identical: where every lit run already started on a beat); in all of
+  them only the dimmer channel differs from the as-authored plan C on this tree and not one
+  frame moves between zero and non-zero dimmer. No render errored.
+- **Parity:** 13 passed, 13 xfailed; `--runxfail` 13 failed, every one an `AssertionError`
+  on its target. No assertion changed.
+
+### H2: the headroom comparison variant (not in the product)
+
+`w5/headroom_variant.patch` (one file, `intensity.py`, +17/−10): the `SHAPES` table gains
+entries for the identity levels and REST, and `effective_intensity`'s REST line returns
+`"REST"` — table values plus that one line, as the module is now structured
+(`shape_for(level)` looks every effective level up in `SHAPES`; the product has no entry
+for the identity levels, so they stay byte-identical).
+
+| Level (variant) | Gain on a full family | Mean lit level, `mirror_wings` | `fly_in_cascade` |
+|---|---|---|---|
+| as authored, SLOW, SMOOTH, FAST | 0.82 steady | 0.820 | 0.820 |
+| REST (focal) | 0.70 steady | 0.698 | 0.698 |
+| DRAMATIC | 0.90, accents to full every half bar | 0.919 | 0.935 |
+| INTENSE | 0.90, accents to full every beat | 0.935 | 0.935 |
+| LEAD on an as-authored section (→ DRAMATIC) | as DRAMATIC | 0.919 | 0.935 |
+| Product today, for comparison: DRAMATIC / INTENSE / identity | | 0.795 / 0.741 / 1.000 | 0.838 / 0.741 / 1.000 |
+
+Verified: `git apply --check` on this tree; applied to a scratch copy, its frame check
+(`w5/variant/check_variant.py`) passes: no zero on a lit frame, the dark frames equal the
+product's as-authored render, REST < verse < DRAMATIC ≤ INTENSE and LEAD above the verse in
+mean lit level (on the cascade DRAMATIC and INTENSE are equal: every lit window is one beat
+and starts on an accent). The variant changes identity-level bytes, so it needs the owner's
+ruling; the integrator applies it to a scratch copy for a comparison render.
+
+### Verification (after the last code edit)
+
+| Command | Result |
+|---|---|
+| `uv run pytest tests -q --no-cov` | 6955 passed, 30 skipped, 13 xfailed |
+| `uv run pytest tests/regression/test_mh_pins.py -q --no-cov` | 50 passed |
+| `uv run pytest tests/regression/test_mh_intent_parity.py -q --no-cov` | 13 passed, 13 xfailed; `--runxfail`: 13 failed (13 `AssertionError`s on their targets), 13 passed; the test file unchanged from HEAD |
+| `uv run ruff check .` | All checks passed |
+| `uv run ruff format --check .` | 1303 files already formatted |
+| `uv run mypy .` | No issues in 652 source files |
+| Byte matrix (`w5/run_matrix.sh`, base `f0e2cff6`; `w5/compare_w5.py matrix_head.jsonl matrix_fix.jsonl`) | As above |
+| Variant (`w5/headroom_variant.patch`) | `git apply --check` clean; `w5/variant/check_variant.py` on a patched scratch copy: PASS |

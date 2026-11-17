@@ -278,8 +278,32 @@ class TestGridShorterThanTheSong:
     def test_the_cut_is_reported(self, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.WARNING):
             short_grid_context().song_structure()
-        assert "The beat grid ends at bar 61 (185.0 s), 12.4 s before the song ends" in caplog.text
+        assert (
+            "The beat grid ends at bar 61 and the render goes dark at 185.0 s, 12.4 s before "
+            "the song ends"
+        ) in caplog.text
         assert "verse_3 left unplanned" in caplog.text
+
+    def test_the_cut_is_reported_once_per_run(self, caplog: pytest.LogCaptureFixture) -> None:
+        context = short_grid_context()
+        with caplog.at_level(logging.WARNING):
+            for _ in range(3):
+                context.song_structure()
+            context.for_prompt()
+        assert caplog.text.count("The beat grid ends at bar 61") == 1
+
+    def test_the_dark_tail_starts_where_the_render_goes_dark(self) -> None:
+        """The render covers the grid's last beat plus one beat interval, then goes dark:
+        with quarter-note beats that is 750 ms after the last downbeat, not a whole bar."""
+        beats = [2000.0 + 750.0 * index for index in range(4 * 60 + 1)]
+        grid = make_grid(SHORT_GRID_BARS).model_copy(
+            update={"beat_boundaries": beats, "duration_ms": 197400.0}
+        )
+        context = short_grid_context().model_copy(update={"beat_grid": grid})
+
+        beyond = context.song_structure()["beyond_grid"]
+        assert beyond["from_ms"] == 182740  # 182000 + 750, on the 20 ms frame grid
+        assert beyond["seconds"] == 14.7
 
     def test_a_grid_covering_the_song_has_nothing_beyond_it(self, uneven: BeatGrid) -> None:
         assert make_context(uneven).song_structure()["beyond_grid"] is None
@@ -385,3 +409,54 @@ class TestThePlannerIsNotShownASectionBeyondTheGrid:
         assert len(advised) == 2
         (kept,) = unanswered_high_cues(plan, cues, context.sections, unplannable=("verse_3",))
         assert "'chorus_2'" in kept
+
+    def test_a_cue_in_the_clamped_tail_lands_on_the_last_grid_beat_recorded(self) -> None:
+        """`chorus_2` starts inside the grid and ends past where the render goes dark;
+        an event bound to a lyric cue in that tail is placed on the grid's last beat and
+        the planner is told."""
+        from twinklr.core.agents.audio.lyrics.models import LyricContextModel, MomentCue
+        from twinklr.core.agents.sequencer.moving_heads.models import (
+            ChoreographyPlan,
+            RepairAction,
+        )
+        from twinklr.core.agents.sequencer.moving_heads.moment_cues import bind_lyric_moment_cues
+
+        context = self._context()
+        cues = LyricContextModel(
+            has_lyrics=True,
+            vocal_coverage_pct=0.5,
+            moment_cues=[
+                MomentCue(
+                    cue_id=cue_id,
+                    section_id="chorus_2",
+                    timestamp_ms=at,
+                    emphasis="HIGH",
+                    text="la",
+                    visual_hint="Accent it.",
+                )
+                for cue_id, at in (("inside", 170000), ("tail", 189000))
+            ],
+        )
+        event = {"bar": 53, "beat": 1, "action": "hit", "color": None, "gobo": None}
+        section = plan_section(
+            "chorus_2",
+            53,
+            61,
+            "mirror_wings",
+            moment_cues=["inside", "tail"],
+            events=[{**event, "moment_cue_id": "inside"}, {**event, "moment_cue_id": "tail"}],
+        )
+        plan = ChoreographyPlan(sections=[section], overall_strategy="x")
+
+        beats = [2000.0 + 750.0 * index for index in range(4 * 60 + 1)]
+        grid = make_grid(SHORT_GRID_BARS).model_copy(
+            update={"beat_boundaries": beats, "duration_ms": 197400.0}
+        )
+        bound = bind_lyric_moment_cues(plan, cues, grid, context.sections)
+
+        (tail,) = [r for r in bound.repairs if "beyond the detected beat grid" in r.reason]
+        assert tail.action is RepairAction.ADJUSTED
+        assert "'tail' at 189000 ms" in tail.reason
+        assert "dark from 182750 ms" in tail.reason
+        assert "(bar 61 beat 1)" in tail.reason
+        assert not [r for r in bound.repairs if "'inside'" in r.reason]
