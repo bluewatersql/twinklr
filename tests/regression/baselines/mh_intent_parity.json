@@ -1,0 +1,2976 @@
+{
+ "schema": 1,
+ "provenance": {
+  "tag": "mh-last-with-legacy-renderer",
+  "commit": "5d50580c8b1d3f600abc496dbca9c6a421da2f55",
+  "commit_source": "git get-tar-commit-id on the archive the script extracted",
+  "script": "scripts/extract_mh_intent_parity.py",
+  "renderer": "legacy_v1 RenderingPipeline.render(), DmxSettingsBuilder per segment",
+  "sampling": "per layer, before emission quantisation, on the 20 ms frame grid",
+  "show": "coordinate_moving_head_plan called directly; no full `twinklr show` run",
+  "frame_ms": 20
+ },
+ "layer_playback": {
+  "question": "the old exporter wrote transitions as a second EffectLayer under each head's base layer, without a LayerMethod: did xLights play the transition, the base, or a mix?",
+  "source": {
+   "xsq": "~/xlights/_twinklr_verify/p3_view/out/legacy_need_a_favor.xsq",
+   "xsq_sha256": "7d75ab25d4f28c0e3811ae67c83c6ce7751e4358c28f9ee029b0bf1b7320df34",
+   "fseq": "~/xlights/_twinklr_verify/p3_view/out/legacy_need_a_favor.fseq",
+   "fseq_sha256": "b8070827f929c8da80499ccc481cb3edfb6c15da9f10aff1884b363fa005f294",
+   "what": "the old renderer's .xsq of the P3 viewing song and the .fseq xLights rendered from it (P3 verification output, 2026-11-16); read only",
+   "script": "changes/2026_11_12_mh_true_up/evidence/2026-11-17-w0-intent-parity/layer_playback.py"
+  },
+  "fseq": "v2.2, zstd, 64 channels in 4 sparse ranges of 16 (one per head), 9870 frames of 20 ms",
+  "xsq_layers": "per head: the first EffectLayer holds the 26-28 section effects, the second the 4 transition effects; no setting names a LayerMethod",
+  "frames_inside_transition_effects": {
+   "with_a_base_effect": {
+    "played_base_only": 6351,
+    "played_either": 4112,
+    "played_transition_only": 4,
+    "played_neither": 393
+   },
+   "without_a_base_effect": {
+    "played_transition": 1668,
+    "other": 144
+   },
+   "unit": "channel-frames within \u00b11 of the sampled value"
+  },
+  "example": {
+   "head": "MH2",
+   "transition_effect_ms": [
+    128100,
+    131140
+   ],
+   "boundary_ms": 129625,
+   "channel_11": "played 123 until 129620, then 39 (the base layer's cut); the transition layer would have glided 123 -> 100"
+  },
+  "finding": "where a base effect covered the frame, xLights played the base layer; the transition layer showed only where the base had no effect (MH1 and MH4 in a section without them, 129620-150900 ms), as a fade from or to nothing. Between two sections every boundary played as a cut. The 393 'neither' channel-frames are base curves faster than this sampling, none matches the transition layer"
+ },
+ "setup": {
+  "grid": {
+   "first_beat_ms": 15.0,
+   "beat_ms": 500.0,
+   "bars": 8
+  },
+  "section_bars": [
+   1,
+   4
+  ],
+  "transition_sections": [
+   [
+    1,
+    4
+   ],
+   [
+    5,
+    8
+   ]
+  ],
+  "old_template": "fan_pulse",
+  "old_second_template": "wave_fan_hold",
+  "old_breathe_template": "hold_center_out_breathe",
+  "old_rig": {
+   "heads": [
+    "MH1",
+    "MH2",
+    "MH3",
+    "MH4"
+   ],
+   "channels": {
+    "pan": 1,
+    "tilt": 3,
+    "dimmer": 5,
+    "shutter": 6,
+    "color": 7,
+    "gobo": 8
+   },
+   "shutter_map": {
+    "closed": 64,
+    "open": 8,
+    "strobe_slow": 100,
+    "strobe_medium": 140,
+    "strobe_fast": 190
+   },
+   "color_map": {
+    "white": 0,
+    "red": 14,
+    "blue": 26,
+    "magenta": 40,
+    "amber": 52,
+    "cyan": 66
+   },
+   "gobo_map": {
+    "open": 0,
+    "dots": 10,
+    "stars": 20
+   }
+  },
+  "cue": {
+   "cue_id": "hook",
+   "timestamp_ms": 2690,
+   "section_id": "s1"
+  },
+  "run_palette": "core.rgb_primary",
+  "show_palette": "spec.cosmic_night",
+  "neutral": "neutral_intent {} is the old model's explicit neutral (SMOOTH, palette role PRIMARY, no events, no transition hint); null leaves every intent field out (the template as authored)"
+ },
+ "rows": [
+  {
+   "id": "intensity_slow",
+   "intent": {
+    "intensity": "SLOW"
+   },
+   "neutral_intent": {},
+   "facts": {
+    "set": {
+     "dimmer_min": 51,
+     "dimmer_max": 153,
+     "dimmer_distinct_levels": 8,
+     "peak_onsets_ms": [
+      20
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms"
+     ],
+     "peak_spacing_ms": [],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "dimmer_min": 51,
+     "dimmer_max": 153,
+     "dimmer_distinct_levels": 8,
+     "peak_onsets_ms": [
+      20
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms"
+     ],
+     "peak_spacing_ms": [],
+     "same_on_every_head": true
+    },
+    "template_as_authored": {
+     "dimmer_min": 131,
+     "dimmer_max": 255,
+     "dimmer_distinct_levels": 17,
+     "peak_onsets_ms": [
+      20,
+      2520,
+      5020,
+      7520
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms",
+      "2.2+5ms",
+      "3.3+5ms",
+      "4.4+5ms"
+     ],
+     "peak_spacing_ms": [
+      2500
+     ],
+     "same_on_every_head": true
+    }
+   },
+   "provenance": "rendered",
+   "status": "recorded",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py:21-40 (intensity onto every step)",
+    "packages/twinklr/core/sequencer/moving_heads/libraries/dimmer.py:50-59 (DEFAULT_DIMMER_PARAMS)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/dimmers/default.py:110-123,151-192 (period in bars to cycles; a pattern with its own table, HOLD or BLACKOUT, ignores intensity)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/movement/default.py:80-88 (movement ignores it)"
+   ],
+   "parity_target": null,
+   "not_a_parity_target": [
+    "SLOW rendered exactly as SMOOTH: the dimmer table gives SLOW and FAST the SMOOTH values since the owner reverted P4-F8 on 2026-11-12 (libraries/dimmer.py:51-54); the revised plan keeps them as the identity"
+   ]
+  },
+  {
+   "id": "intensity_fast",
+   "intent": {
+    "intensity": "FAST"
+   },
+   "neutral_intent": {},
+   "facts": {
+    "set": {
+     "dimmer_min": 51,
+     "dimmer_max": 153,
+     "dimmer_distinct_levels": 8,
+     "peak_onsets_ms": [
+      20
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms"
+     ],
+     "peak_spacing_ms": [],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "dimmer_min": 51,
+     "dimmer_max": 153,
+     "dimmer_distinct_levels": 8,
+     "peak_onsets_ms": [
+      20
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms"
+     ],
+     "peak_spacing_ms": [],
+     "same_on_every_head": true
+    },
+    "template_as_authored": {
+     "dimmer_min": 131,
+     "dimmer_max": 255,
+     "dimmer_distinct_levels": 17,
+     "peak_onsets_ms": [
+      20,
+      2520,
+      5020,
+      7520
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms",
+      "2.2+5ms",
+      "3.3+5ms",
+      "4.4+5ms"
+     ],
+     "peak_spacing_ms": [
+      2500
+     ],
+     "same_on_every_head": true
+    }
+   },
+   "provenance": "rendered",
+   "status": "recorded",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py:21-40 (intensity onto every step)",
+    "packages/twinklr/core/sequencer/moving_heads/libraries/dimmer.py:50-59 (DEFAULT_DIMMER_PARAMS)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/dimmers/default.py:110-123,151-192 (period in bars to cycles; a pattern with its own table, HOLD or BLACKOUT, ignores intensity)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/movement/default.py:80-88 (movement ignores it)"
+   ],
+   "parity_target": null,
+   "not_a_parity_target": [
+    "FAST rendered exactly as SMOOTH (same table entry, reverted P4-F8); movement ignored intensity, so FAST was not faster either"
+   ]
+  },
+  {
+   "id": "intensity_dramatic",
+   "intent": {
+    "intensity": "DRAMATIC"
+   },
+   "neutral_intent": {},
+   "facts": {
+    "set": {
+     "dimmer_min": 131,
+     "dimmer_max": 255,
+     "dimmer_distinct_levels": 17,
+     "peak_onsets_ms": [
+      20,
+      2520,
+      5020,
+      7520
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms",
+      "2.2+5ms",
+      "3.3+5ms",
+      "4.4+5ms"
+     ],
+     "peak_spacing_ms": [
+      2500
+     ],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "dimmer_min": 51,
+     "dimmer_max": 153,
+     "dimmer_distinct_levels": 8,
+     "peak_onsets_ms": [
+      20
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms"
+     ],
+     "peak_spacing_ms": [],
+     "same_on_every_head": true
+    },
+    "template_as_authored": {
+     "dimmer_min": 131,
+     "dimmer_max": 255,
+     "dimmer_distinct_levels": 17,
+     "peak_onsets_ms": [
+      20,
+      2520,
+      5020,
+      7520
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms",
+      "2.2+5ms",
+      "3.3+5ms",
+      "4.4+5ms"
+     ],
+     "peak_spacing_ms": [
+      2500
+     ],
+     "same_on_every_head": true
+    }
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W5",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py:21-40 (intensity onto every step)",
+    "packages/twinklr/core/sequencer/moving_heads/libraries/dimmer.py:50-59 (DEFAULT_DIMMER_PARAMS)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/dimmers/default.py:110-123,151-192 (period in bars to cycles; a pattern with its own table, HOLD or BLACKOUT, ignores intensity)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/movement/default.py:80-88 (movement ignores it)"
+   ],
+   "parity_target": "Relative to the neutral render of the same section: every frame dark there stays dark and every frame lit there stays lit; no lit frame is dimmer than the neutral one and the lowest lit level is higher (a raised floor); the dimmer pulses (at least two levels) with a period of a whole number of beats, longer than INTENSE's, each pulse peaking within one frame after a beat; on every head.",
+   "not_a_parity_target": [
+    "the 5-beat period (1.25 bars in the table) is a fact, not pinned: the revised plan has the W5 table set it, a whole number of beats longer than INTENSE's",
+    "the exact bytes (131-255 here) come from the template's 60 floor and min/max_norm over the table's 100-255; the new path scales its own levels",
+    "the pulse shape: 64 linearly interpolated samples per segment whatever its length (packages/twinklr/core/sequencer/models/context.py:148), here 4 per beat for INTENSE on the 4-bar step"
+   ]
+  },
+  {
+   "id": "intensity_intense",
+   "intent": {
+    "intensity": "INTENSE"
+   },
+   "neutral_intent": {},
+   "facts": {
+    "set": {
+     "dimmer_min": 171,
+     "dimmer_max": 255,
+     "dimmer_distinct_levels": 16,
+     "peak_onsets_ms": [
+      20,
+      520,
+      1020,
+      1520,
+      2020,
+      2520,
+      3020,
+      3520,
+      4020,
+      4520,
+      5020,
+      5520,
+      6020,
+      6520,
+      7020,
+      7520
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms",
+      "1.2+5ms",
+      "1.3+5ms",
+      "1.4+5ms",
+      "2.1+5ms",
+      "2.2+5ms",
+      "2.3+5ms",
+      "2.4+5ms",
+      "3.1+5ms",
+      "3.2+5ms",
+      "3.3+5ms",
+      "3.4+5ms",
+      "4.1+5ms",
+      "4.2+5ms",
+      "4.3+5ms",
+      "4.4+5ms"
+     ],
+     "peak_spacing_ms": [
+      500
+     ],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "dimmer_min": 51,
+     "dimmer_max": 153,
+     "dimmer_distinct_levels": 8,
+     "peak_onsets_ms": [
+      20
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms"
+     ],
+     "peak_spacing_ms": [],
+     "same_on_every_head": true
+    },
+    "template_as_authored": {
+     "dimmer_min": 131,
+     "dimmer_max": 255,
+     "dimmer_distinct_levels": 17,
+     "peak_onsets_ms": [
+      20,
+      2520,
+      5020,
+      7520
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms",
+      "2.2+5ms",
+      "3.3+5ms",
+      "4.4+5ms"
+     ],
+     "peak_spacing_ms": [
+      2500
+     ],
+     "same_on_every_head": true
+    },
+    "set_over_8_bars": {
+     "dimmer_min": 171,
+     "dimmer_max": 255,
+     "dimmer_distinct_levels": 16,
+     "peak_onsets_ms": [
+      20,
+      520,
+      1020,
+      1520,
+      2020,
+      2520,
+      3020,
+      3520,
+      4020,
+      4520,
+      5020,
+      5520,
+      6020,
+      6520,
+      7020,
+      7520,
+      8020,
+      8520,
+      9020,
+      9520,
+      10020,
+      10520,
+      11020,
+      11520,
+      12020,
+      12520,
+      13020,
+      13520,
+      14020,
+      14520,
+      15020,
+      15520
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms",
+      "1.2+5ms",
+      "1.3+5ms",
+      "1.4+5ms",
+      "2.1+5ms",
+      "2.2+5ms",
+      "2.3+5ms",
+      "2.4+5ms",
+      "3.1+5ms",
+      "3.2+5ms",
+      "3.3+5ms",
+      "3.4+5ms",
+      "4.1+5ms",
+      "4.2+5ms",
+      "4.3+5ms",
+      "4.4+5ms",
+      "5.1+5ms",
+      "5.2+5ms",
+      "5.3+5ms",
+      "5.4+5ms",
+      "6.1+5ms",
+      "6.2+5ms",
+      "6.3+5ms",
+      "6.4+5ms",
+      "7.1+5ms",
+      "7.2+5ms",
+      "7.3+5ms",
+      "7.4+5ms",
+      "8.1+5ms",
+      "8.2+5ms",
+      "8.3+5ms",
+      "8.4+5ms"
+     ],
+     "peak_spacing_ms": [
+      500
+     ],
+     "same_on_every_head": true
+    }
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W5",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py:21-40 (intensity onto every step)",
+    "packages/twinklr/core/sequencer/moving_heads/libraries/dimmer.py:50-59 (DEFAULT_DIMMER_PARAMS)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/dimmers/default.py:110-123,151-192 (period in bars to cycles; a pattern with its own table, HOLD or BLACKOUT, ignores intensity)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/movement/default.py:80-88 (movement ignores it)"
+   ],
+   "parity_target": "Relative to the neutral render of the same section: every frame dark there stays dark and every frame lit there stays lit; no lit frame is dimmer than the neutral one and the lowest lit level is higher (a raised floor); the dimmer pulses (at least two levels) with a period of a whole number of beats, one beat, each pulse peaking within one frame after a beat; on every head.",
+   "not_a_parity_target": [
+    "the exact bytes (171-255 here) come from the template's floor and norms over the table's 150-255",
+    "the pulse shape: 64 linearly interpolated samples per segment whatever its length (packages/twinklr/core/sequencer/models/context.py:148), here 4 per beat for INTENSE on the 4-bar step"
+   ]
+  },
+  {
+   "id": "intensity_dramatic_on_authored_pulse",
+   "intent": {
+    "intensity": "DRAMATIC"
+   },
+   "neutral_intent": null,
+   "old_template": "hold_center_out_breathe",
+   "facts": {
+    "set": {
+     "dimmer_min": 137,
+     "dimmer_max": 230,
+     "dimmer_distinct_levels": 30,
+     "peak_onsets_ms": [
+      1280,
+      3780,
+      6280
+     ],
+     "peak_onset_beats": [
+      "1.3+265ms",
+      "2.4+265ms",
+      "4.1+265ms"
+     ],
+     "peak_spacing_ms": [
+      2500
+     ],
+     "same_on_every_head": false
+    },
+    "template_as_authored": {
+     "dimmer_min": 76,
+     "dimmer_max": 153,
+     "dimmer_distinct_levels": 22,
+     "peak_onsets_ms": [
+      20,
+      6780
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms",
+      "4.2+265ms"
+     ],
+     "peak_spacing_ms": [
+      6760
+     ],
+     "same_on_every_head": false
+    }
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W5",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py:21-40 (intensity onto every step)",
+    "packages/twinklr/core/sequencer/moving_heads/libraries/dimmer.py:50-59 (DEFAULT_DIMMER_PARAMS)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/dimmers/default.py:110-123,151-192 (period in bars to cycles; a pattern with its own table, HOLD or BLACKOUT, ignores intensity)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/movement/default.py:80-88 (movement ignores it)"
+   ],
+   "parity_target": "On a template that authors its own dimmer pulse, against the template as authored: dark frames stay dark and lit frames stay lit; no lit frame is dimmer than as authored and the lowest lit level is higher; the dimmer still pulses with peaks within one frame after a beat; on every head.",
+   "not_a_parity_target": [
+    "the old renderer replaced the authored curve with the table's (the breathe's 4-bar swell became a 5-beat pulse); the revised plan raises the authored look instead, never below it"
+   ]
+  },
+  {
+   "id": "intensity_intense_on_authored_pulse",
+   "intent": {
+    "intensity": "INTENSE"
+   },
+   "neutral_intent": null,
+   "old_template": "fan_pulse",
+   "facts": {
+    "set": {
+     "dimmer_min": 171,
+     "dimmer_max": 255,
+     "dimmer_distinct_levels": 16,
+     "peak_onsets_ms": [
+      20,
+      520,
+      1020,
+      1520,
+      2020,
+      2520,
+      3020,
+      3520,
+      4020,
+      4520,
+      5020,
+      5520,
+      6020,
+      6520,
+      7020,
+      7520
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms",
+      "1.2+5ms",
+      "1.3+5ms",
+      "1.4+5ms",
+      "2.1+5ms",
+      "2.2+5ms",
+      "2.3+5ms",
+      "2.4+5ms",
+      "3.1+5ms",
+      "3.2+5ms",
+      "3.3+5ms",
+      "3.4+5ms",
+      "4.1+5ms",
+      "4.2+5ms",
+      "4.3+5ms",
+      "4.4+5ms"
+     ],
+     "peak_spacing_ms": [
+      500
+     ],
+     "same_on_every_head": true
+    },
+    "template_as_authored": {
+     "dimmer_min": 131,
+     "dimmer_max": 255,
+     "dimmer_distinct_levels": 17,
+     "peak_onsets_ms": [
+      20,
+      2520,
+      5020,
+      7520
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms",
+      "2.2+5ms",
+      "3.3+5ms",
+      "4.4+5ms"
+     ],
+     "peak_spacing_ms": [
+      2500
+     ],
+     "same_on_every_head": true
+    }
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W5",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py:21-40 (intensity onto every step)",
+    "packages/twinklr/core/sequencer/moving_heads/libraries/dimmer.py:50-59 (DEFAULT_DIMMER_PARAMS)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/dimmers/default.py:110-123,151-192 (period in bars to cycles; a pattern with its own table, HOLD or BLACKOUT, ignores intensity)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/movement/default.py:80-88 (movement ignores it)"
+   ],
+   "parity_target": "On a template that authors its own dimmer pulse, against the template as authored: dark frames stay dark and lit frames stay lit; no lit frame is dimmer than as authored and the lowest lit level is higher; the dimmer pulses once per beat, peaks within one frame after the beat; on every head.",
+   "not_a_parity_target": [
+    "the old renderer replaced the authored curve with the table's; the revised plan raises the authored look instead"
+   ]
+  },
+  {
+   "id": "intensity_smooth_on_energetic_template",
+   "intent": {
+    "intensity": "SMOOTH"
+   },
+   "neutral_intent": null,
+   "old_template": "fan_pulse",
+   "facts": {
+    "set": {
+     "dimmer_min": 51,
+     "dimmer_max": 153,
+     "dimmer_distinct_levels": 8,
+     "peak_onsets_ms": [
+      20
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms"
+     ],
+     "peak_spacing_ms": [],
+     "same_on_every_head": true
+    },
+    "template_as_authored": {
+     "dimmer_min": 131,
+     "dimmer_max": 255,
+     "dimmer_distinct_levels": 17,
+     "peak_onsets_ms": [
+      20,
+      2520,
+      5020,
+      7520
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms",
+      "2.2+5ms",
+      "3.3+5ms",
+      "4.4+5ms"
+     ],
+     "peak_spacing_ms": [
+      2500
+     ],
+     "same_on_every_head": true
+    }
+   },
+   "provenance": "rendered",
+   "status": "recorded",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py:21-40 (intensity onto every step)",
+    "packages/twinklr/core/sequencer/moving_heads/libraries/dimmer.py:50-59 (DEFAULT_DIMMER_PARAMS)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/dimmers/default.py:110-123,151-192 (period in bars to cycles; a pattern with its own table, HOLD or BLACKOUT, ignores intensity)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/movement/default.py:80-88 (movement ignores it)"
+   ],
+   "parity_target": null,
+   "owner_view": "W5",
+   "not_a_parity_target": [
+    "an explicit SMOOTH calmed an energetic template: fan_pulse as authored (DRAMATIC) pulses 131-255 every 5 beats; with SMOOTH it became a 51-153 swell over 4 bars. The revised plan makes SMOOTH the identity so the accepted look is not dimmed. For the owner to judge at W5's view, not a target"
+   ]
+  },
+  {
+   "id": "color_explicit_blue",
+   "intent": {
+    "color": {
+     "explicit": "blue"
+    }
+   },
+   "neutral_intent": null,
+   "facts": {
+    "set": {
+     "channel": 7,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "blue"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "blue",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "channel": 7,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "white"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "white",
+       "dimmer": 255
+      }
+     ],
+     "same_on_every_head": true
+    }
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W4",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:2362-2373",
+    "packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py:36-37",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/wheels.py:31-59 (name through the fixture's color_map; absent name: 'open')"
+   ],
+   "parity_target": "Every lit frame of the section, on every head, shows the colour wheel state for blue; the wheel changes only while the head is dark and settles before the reveal; the dark frames differ from the neutral render's only in the window before the section's reveal (close latency + wheel settle + half a beat).",
+   "not_a_parity_target": [
+    "the colour is present from the section's first frame, so inside one section nothing turns; the wheel turns lit only at a boundary between sections of different colours (color_change_between_sections)"
+   ]
+  },
+  {
+   "id": "color_palette_primary",
+   "intent": {
+    "color": {
+     "palette_role": "PRIMARY"
+    },
+    "macro_palette": "core.rgb_primary"
+   },
+   "neutral_intent": null,
+   "facts": {
+    "set": {
+     "channel": 7,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "red"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "red",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "channel": 7,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "white"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "white",
+       "dimmer": 255
+      }
+     ],
+     "same_on_every_head": true
+    }
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W4",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:146-157 (PALETTE_ROLE_TO_COLOR)",
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:2362-2373 (no palette input)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/wheels.py:31-59"
+   ],
+   "parity_target": "With the song's macro palette core.rgb_primary in `twinklr run`, every lit frame of the section, on every head, shows the rig state nearest the palette's first stop (red), not ACCENT's; the wheel changes only while dark; dark frames differ from neutral only before the reveal, as for an explicit colour.",
+   "not_a_parity_target": [
+    "the fixed role table (PRIMARY -> red) whatever the song's palette; the revised plan resolves a role through the macro palette's stops",
+    "the colour is present from the section's first frame, so inside one section nothing turns; the wheel turns lit only at a boundary between sections of different colours (color_change_between_sections)"
+   ]
+  },
+  {
+   "id": "color_palette_accent",
+   "intent": {
+    "color": {
+     "palette_role": "ACCENT"
+    },
+    "macro_palette": "core.rgb_primary"
+   },
+   "neutral_intent": null,
+   "facts": {
+    "set": {
+     "channel": 7,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "magenta"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "magenta",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "channel": 7,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "white"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "white",
+       "dimmer": 255
+      }
+     ],
+     "same_on_every_head": true
+    }
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W4",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:146-157 (PALETTE_ROLE_TO_COLOR)",
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:2362-2373 (no palette input)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/wheels.py:31-59"
+   ],
+   "parity_target": "With the song's macro palette core.rgb_primary in `twinklr run`, every lit frame of the section, on every head, shows the rig state nearest the palette's second stop (green), not PRIMARY's; the wheel changes only while dark; dark frames differ from neutral only before the reveal, as for an explicit colour.",
+   "not_a_parity_target": [
+    "the fixed role table (ACCENT -> magenta) whatever the song's palette; the revised plan resolves a role through the macro palette's stops",
+    "the colour is present from the section's first frame, so inside one section nothing turns; the wheel turns lit only at a boundary between sections of different colours (color_change_between_sections)"
+   ]
+  },
+  {
+   "id": "color_palette_warm",
+   "intent": {
+    "color": {
+     "palette_role": "WARM"
+    },
+    "macro_palette": "core.rgb_primary"
+   },
+   "neutral_intent": null,
+   "facts": {
+    "set": {
+     "channel": 7,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "amber"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "amber",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "channel": 7,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "white"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "white",
+       "dimmer": 255
+      }
+     ],
+     "same_on_every_head": true
+    }
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W4",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:146-157 (PALETTE_ROLE_TO_COLOR)",
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:2362-2373 (no palette input)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/wheels.py:31-59"
+   ],
+   "parity_target": "With the song's macro palette core.rgb_primary in `twinklr run`, every lit frame of the section, on every head, shows one state other than the rig default and other than COOL's; the wheel changes only while dark; dark frames differ from neutral only before the reveal, as for an explicit colour.",
+   "not_a_parity_target": [
+    "the fixed role table (WARM -> amber) whatever the song's palette; the revised plan resolves a role through the macro palette's stops",
+    "the colour is present from the section's first frame, so inside one section nothing turns; the wheel turns lit only at a boundary between sections of different colours (color_change_between_sections)"
+   ]
+  },
+  {
+   "id": "color_palette_cool",
+   "intent": {
+    "color": {
+     "palette_role": "COOL"
+    },
+    "macro_palette": "core.rgb_primary"
+   },
+   "neutral_intent": null,
+   "facts": {
+    "set": {
+     "channel": 7,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "cyan"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "cyan",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "channel": 7,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "white"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "white",
+       "dimmer": 255
+      }
+     ],
+     "same_on_every_head": true
+    }
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W4",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:146-157 (PALETTE_ROLE_TO_COLOR)",
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:2362-2373 (no palette input)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/wheels.py:31-59"
+   ],
+   "parity_target": "With the song's macro palette core.rgb_primary in `twinklr run`, every lit frame of the section, on every head, shows one state other than the rig default and other than WARM's; the wheel changes only while dark; dark frames differ from neutral only before the reveal, as for an explicit colour.",
+   "not_a_parity_target": [
+    "the fixed role table (COOL -> cyan) whatever the song's palette; the revised plan resolves a role through the macro palette's stops",
+    "the colour is present from the section's first frame, so inside one section nothing turns; the wheel turns lit only at a boundary between sections of different colours (color_change_between_sections)"
+   ]
+  },
+  {
+   "id": "color_palette_neutral",
+   "intent": {
+    "color": {
+     "palette_role": "NEUTRAL"
+    },
+    "macro_palette": "core.rgb_primary"
+   },
+   "neutral_intent": null,
+   "facts": {
+    "set": {
+     "channel": 7,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "white"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "white",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "channel": 7,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "white"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "white",
+       "dimmer": 255
+      }
+     ],
+     "same_on_every_head": true
+    }
+   },
+   "provenance": "rendered",
+   "status": "recorded",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:146-157"
+   ],
+   "parity_target": null,
+   "not_a_parity_target": [
+    "NEUTRAL resolved to white, which is also the rig's default colour here; nothing observable distinguishes it from no colour intent on this rig"
+   ]
+  },
+  {
+   "id": "color_change_between_sections",
+   "intent": {
+    "sections": [
+     {
+      "color": {
+       "explicit": "red"
+      }
+     },
+     {
+      "color": {
+       "explicit": "blue"
+      }
+     }
+    ]
+   },
+   "neutral_intent": null,
+   "facts": {
+    "runs": [
+     [
+      0,
+      20,
+      null
+     ],
+     [
+      20,
+      8020,
+      "red"
+     ],
+     [
+      8020,
+      16020,
+      "blue"
+     ],
+     [
+      16020,
+      16040,
+      null
+     ]
+    ],
+    "changes": [
+     {
+      "ms": 20,
+      "after_beat": "1.1+5ms",
+      "to": "red",
+      "dimmer": 153,
+      "dimmer_frame_before": null
+     },
+     {
+      "ms": 8020,
+      "after_beat": "5.1+5ms",
+      "to": "blue",
+      "dimmer": 153,
+      "dimmer_frame_before": 51
+     }
+    ]
+   },
+   "provenance": "rendered",
+   "status": "recorded",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/handlers/wheels.py:31-59",
+    "packages/twinklr/core/config/models.py:587-637"
+   ],
+   "parity_target": null,
+   "not_a_parity_target": [
+    "the wheel turned from red to blue at the boundary with the head lit (dimmer nonzero on both sides); W4 owns colour changes at boundaries (the revised plan's timing rule forces a dark dip there)"
+   ]
+  },
+  {
+   "id": "shutter_closed_open",
+   "intent": {
+    "shutter_events": [
+     {
+      "bar": 2,
+      "beat": 1,
+      "pattern": "closed"
+     },
+     {
+      "bar": 2,
+      "beat": 3,
+      "pattern": "open"
+     }
+    ]
+   },
+   "neutral_intent": {},
+   "facts": {
+    "set": {
+     "channel": 6,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       2020,
+       "open"
+      ],
+      [
+       2020,
+       3020,
+       "closed"
+      ],
+      [
+       3020,
+       8020,
+       "open"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      },
+      {
+       "ms": 2020,
+       "after_beat": "2.1+5ms",
+       "to": "closed",
+       "dimmer": 153
+      },
+      {
+       "ms": 3020,
+       "after_beat": "2.3+5ms",
+       "to": "open",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "channel": 6,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "open"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "handler_traces": [
+     "resolved:color red=14",
+     "resolved:shutter closed=64",
+     "resolved:shutter open=8"
+    ]
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W6",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:2362-2410 (events placed at the bar/beat's grid time)",
+    "packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py:43-117 (segment split at the event, the event's value held until the next event or the section end)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/wheels.py:62-119"
+   ],
+   "parity_target": "The head is dark from the frame at bar 2 beat 1 (within one frame) until bar 2 beat 3, and lit again from then on (within one frame) as in the neutral render; every frame before the event equals the neutral render; the same on every head.",
+   "not_a_parity_target": []
+  },
+  {
+   "id": "shutter_strobe_slow",
+   "intent": {
+    "shutter_events": [
+     {
+      "bar": 2,
+      "beat": 1,
+      "pattern": "strobe_slow"
+     }
+    ]
+   },
+   "neutral_intent": {},
+   "facts": {
+    "set": {
+     "channel": 6,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       2020,
+       "open"
+      ],
+      [
+       2020,
+       8020,
+       "strobe_slow"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      },
+      {
+       "ms": 2020,
+       "after_beat": "2.1+5ms",
+       "to": "strobe_slow",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "channel": 6,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "open"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "handler_traces": [
+     "resolved:color red=14",
+     "resolved:shutter strobe_slow=100"
+    ]
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W6",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:2362-2410 (events placed at the bar/beat's grid time)",
+    "packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py:43-117 (segment split at the event, the event's value held until the next event or the section end)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/wheels.py:118-119 (shutter_map byte)"
+   ],
+   "parity_target": "The first dark frame is within one frame of bar 2 beat 1; from then the head goes dark and lit again at least twice in the following bar and keeps strobing to the section end; before that it equals the neutral render. Strobe speeds are ordered: more dark-lit alternations per bar for fast than medium than slow.",
+   "not_a_parity_target": [
+    "the strobe rate was the fixture's own (one static shutter byte); the plan of record renders it as a dimmer or shutter pulse, or a state tagged strobe"
+   ]
+  },
+  {
+   "id": "shutter_strobe_medium",
+   "intent": {
+    "shutter_events": [
+     {
+      "bar": 2,
+      "beat": 1,
+      "pattern": "strobe_medium"
+     }
+    ]
+   },
+   "neutral_intent": {},
+   "facts": {
+    "set": {
+     "channel": 6,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       2020,
+       "open"
+      ],
+      [
+       2020,
+       8020,
+       "strobe_medium"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      },
+      {
+       "ms": 2020,
+       "after_beat": "2.1+5ms",
+       "to": "strobe_medium",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "channel": 6,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "open"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "handler_traces": [
+     "resolved:color red=14",
+     "resolved:shutter strobe_medium=140"
+    ]
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W6",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:2362-2410 (events placed at the bar/beat's grid time)",
+    "packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py:43-117 (segment split at the event, the event's value held until the next event or the section end)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/wheels.py:118-119 (shutter_map byte)"
+   ],
+   "parity_target": "The first dark frame is within one frame of bar 2 beat 1; from then the head goes dark and lit again at least twice in the following bar and keeps strobing to the section end; before that it equals the neutral render. Strobe speeds are ordered: more dark-lit alternations per bar for fast than medium than slow.",
+   "not_a_parity_target": [
+    "the strobe rate was the fixture's own (one static shutter byte); the plan of record renders it as a dimmer or shutter pulse, or a state tagged strobe"
+   ]
+  },
+  {
+   "id": "shutter_strobe_fast",
+   "intent": {
+    "shutter_events": [
+     {
+      "bar": 2,
+      "beat": 1,
+      "pattern": "strobe_fast"
+     }
+    ]
+   },
+   "neutral_intent": {},
+   "facts": {
+    "set": {
+     "channel": 6,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       2020,
+       "open"
+      ],
+      [
+       2020,
+       8020,
+       "strobe_fast"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      },
+      {
+       "ms": 2020,
+       "after_beat": "2.1+5ms",
+       "to": "strobe_fast",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "channel": 6,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "open"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "handler_traces": [
+     "resolved:color red=14",
+     "resolved:shutter strobe_fast=190"
+    ]
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W6",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:2362-2410 (events placed at the bar/beat's grid time)",
+    "packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py:43-117 (segment split at the event, the event's value held until the next event or the section end)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/wheels.py:118-119 (shutter_map byte)"
+   ],
+   "parity_target": "The first dark frame is within one frame of bar 2 beat 1; from then the head goes dark and lit again at least twice in the following bar and keeps strobing to the section end; before that it equals the neutral render. Strobe speeds are ordered: more dark-lit alternations per bar for fast than medium than slow.",
+   "not_a_parity_target": [
+    "the strobe rate was the fixture's own (one static shutter byte); the plan of record renders it as a dimmer or shutter pulse, or a state tagged strobe"
+   ]
+  },
+  {
+   "id": "shutter_pulse",
+   "intent": {
+    "shutter_events": [
+     {
+      "bar": 2,
+      "beat": 1,
+      "pattern": "pulse"
+     }
+    ]
+   },
+   "neutral_intent": {},
+   "facts": {
+    "set": {
+     "channel": 6,
+     "curve_effect_ms": [
+      2015,
+      8015
+     ],
+     "curve_points": 64,
+     "curve_point_bytes": [
+      8,
+      64
+     ],
+     "alternation_period_ms": 190.5,
+     "frames_after_event": 300,
+     "frames_on_a_byte_naming_no_state": 295
+    },
+    "neutral": {
+     "channel": 6,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "open"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    }
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W6",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:2362-2410 (events placed at the bar/beat's grid time)",
+    "packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py:43-117 (segment split at the event, the event's value held until the next event or the section end)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/wheels.py:95-112 (closed/open alternate by sample index)"
+   ],
+   "parity_target": "From the frame at bar 2 beat 1 (within one frame) to the section end the head pulses with the beat: it is revealed once per beat, each reveal within one frame after the beat, and dark between reveals; before that it equals the neutral render.",
+   "not_a_parity_target": [
+    "the period: the curve alternated closed/open by sample index (64 samples over the remaining segment), not by beat, so its rate depended on the segment's length",
+    "xLights interpolates the curve linearly, so most frames sent a byte between the closed and open values that names no shutter state"
+   ]
+  },
+  {
+   "id": "shutter_event_on_channel_17",
+   "intent": {
+    "shutter_events": [
+     {
+      "bar": 2,
+      "beat": 1,
+      "pattern": "closed"
+     }
+    ]
+   },
+   "neutral_intent": {},
+   "facts": {
+    "set": {
+     "channel": 17,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "open"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "channel": 17,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "open"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "handler_traces": [
+     "resolved:color red=14",
+     "warning:shutter channel 17 outside plan-intent window 1-16; dropped"
+    ]
+   },
+   "provenance": "rendered",
+   "status": "recorded",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/handlers/wheels.py:16-22,85-92 (PLAN_INTENT_CHANNEL_WINDOW_MAX = 16)"
+   ],
+   "parity_target": null,
+   "not_a_parity_target": [
+    "a shutter above channel 16 dropped every shutter event (handler trace says so); a limit of the old exporter's 16-slider window, not intent. The rows above hold on the current rigs, whose shutter is on channel 17 or 6"
+   ]
+  },
+  {
+   "id": "gobo_event",
+   "intent": {
+    "gobo_events": [
+     {
+      "bar": 2,
+      "beat": 3,
+      "pattern": "dots"
+     }
+    ]
+   },
+   "neutral_intent": {},
+   "facts": {
+    "set": {
+     "channel": 8,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       3020,
+       "open"
+      ],
+      [
+       3020,
+       8020,
+       "dots"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      },
+      {
+       "ms": 3020,
+       "after_beat": "2.3+5ms",
+       "to": "dots",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "channel": 8,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "open"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "handler_traces": [
+     "resolved:color red=14",
+     "resolved:gobo dots=10"
+    ]
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W7",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:2362-2410 (events placed at the bar/beat's grid time)",
+    "packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py:43-117 (segment split at the event, the event's value held until the next event or the section end)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/wheels.py:122-150"
+   ],
+   "parity_target": "The head is lit on the frame at bar 2 beat 3 (within one frame) showing gobo dots, and every lit frame from then to the section end shows dots; the frames lit in the neutral render before the event stay lit and show the neutral gobo; dark frames differ from neutral only in the window before the reveal (close latency + wheel settle + half a beat); the wheel changes only while dark; on every head.",
+   "not_a_parity_target": [
+    "the wheel byte changes on a frame whose dimmer is nonzero: the old renderer had no dark transaction; the new path turns wheels only while dark"
+   ]
+  },
+  {
+   "id": "gobo_two_events",
+   "intent": {
+    "gobo_events": [
+     {
+      "bar": 2,
+      "beat": 1,
+      "pattern": "dots"
+     },
+     {
+      "bar": 3,
+      "beat": 1,
+      "pattern": "open"
+     }
+    ]
+   },
+   "neutral_intent": {},
+   "facts": {
+    "set": {
+     "channel": 8,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       2020,
+       "open"
+      ],
+      [
+       2020,
+       4020,
+       "dots"
+      ],
+      [
+       4020,
+       8020,
+       "open"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      },
+      {
+       "ms": 2020,
+       "after_beat": "2.1+5ms",
+       "to": "dots",
+       "dimmer": 153
+      },
+      {
+       "ms": 4020,
+       "after_beat": "3.1+5ms",
+       "to": "open",
+       "dimmer": 51
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "channel": 8,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "open"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "handler_traces": [
+     "resolved:color red=14",
+     "resolved:gobo dots=10",
+     "resolved:gobo open=0"
+    ]
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W7",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:2362-2410 (events placed at the bar/beat's grid time)",
+    "packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py:43-117 (segment split at the event, the event's value held until the next event or the section end)",
+    "packages/twinklr/core/sequencer/moving_heads/handlers/wheels.py:122-150"
+   ],
+   "parity_target": "Gobo dots from bar 2 beat 1 is held on every lit frame until bar 3 beat 1, then open from that beat to the section end; each reveal lands within one frame of its beat; dark frames differ from neutral only in the windows before the two reveals; the wheel changes only while dark; on every head.",
+   "not_a_parity_target": [
+    "the wheel byte changes on a frame whose dimmer is nonzero: the old renderer had no dark transaction; the new path turns wheels only while dark"
+   ]
+  },
+  {
+   "id": "cue_bound_shutter_event",
+   "intent": {
+    "shutter_events": [
+     {
+      "bar": 1,
+      "beat": 1,
+      "moment_cue_id": "hook",
+      "pattern": "closed"
+     }
+    ]
+   },
+   "neutral_intent": {},
+   "facts": {
+    "set": {
+     "channel": 6,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       2520,
+       "open"
+      ],
+      [
+       2520,
+       8020,
+       "closed"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      },
+      {
+       "ms": 2520,
+       "after_beat": "2.2+5ms",
+       "to": "closed",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "channel": 6,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "open"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "handler_traces": [
+     "resolved:color red=14",
+     "resolved:shutter closed=64"
+    ],
+    "bound_event": {
+     "bar": 2,
+     "beat": 2
+    },
+    "cue_snapped_beat_ms": 2515.0
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W6",
+   "code": [
+    "packages/twinklr/core/agents/sequencer/moving_heads/moment_cues.py:35-66,151-173",
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:2362-2410 (events placed at the bar/beat's grid time)",
+    "packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py:43-117 (segment split at the event, the event's value held until the next event or the section end)"
+   ],
+   "parity_target": "With the plan bound to the lyric cues, the CLOSED event bound to cue 'hook' darkens the head from the cue's snapped beat (bar 2 beat 2, first dark frame within one frame) to the section end; before that it equals the neutral render.",
+   "not_a_parity_target": []
+  },
+  {
+   "id": "cue_bound_gobo_event",
+   "intent": {
+    "gobo_events": [
+     {
+      "bar": 1,
+      "beat": 1,
+      "moment_cue_id": "hook",
+      "pattern": "dots"
+     }
+    ]
+   },
+   "neutral_intent": {},
+   "facts": {
+    "set": {
+     "channel": 8,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       2520,
+       "open"
+      ],
+      [
+       2520,
+       8020,
+       "dots"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      },
+      {
+       "ms": 2520,
+       "after_beat": "2.2+5ms",
+       "to": "dots",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "neutral": {
+     "channel": 8,
+     "runs": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "open"
+      ]
+     ],
+     "changes": [
+      {
+       "ms": 20,
+       "after_beat": "1.1+5ms",
+       "to": "open",
+       "dimmer": 153
+      }
+     ],
+     "same_on_every_head": true
+    },
+    "handler_traces": [
+     "resolved:color red=14",
+     "resolved:gobo dots=10"
+    ],
+    "bound_event": {
+     "bar": 2,
+     "beat": 2
+    },
+    "cue_snapped_beat_ms": 2515.0
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W7",
+   "code": [
+    "packages/twinklr/core/agents/sequencer/moving_heads/moment_cues.py:35-66,151-173",
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:2362-2410 (events placed at the bar/beat's grid time)",
+    "packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py:43-117 (segment split at the event, the event's value held until the next event or the section end)"
+   ],
+   "parity_target": "With the plan bound to the lyric cues, the gobo event bound to cue 'hook' behaves as gobo_event at the cue's snapped beat (bar 2 beat 2).",
+   "not_a_parity_target": [
+    "the wheel byte changes on a frame whose dimmer is nonzero: the old renderer had no dark transaction; the new path turns wheels only while dark"
+   ]
+  },
+  {
+   "id": "transition_in_null",
+   "intent": {
+    "transition_in": null
+   },
+   "neutral_intent": {
+    "transitions_enabled": false
+   },
+   "facts": {
+    "set": {
+     "boundary_ms": 8015.0,
+     "transition_effect_ms": [
+      [
+       7515,
+       8515
+      ]
+     ],
+     "transition_effect_from_boundary_ms": [
+      [
+       -500.0,
+       500.0
+      ]
+     ],
+     "transition_dimmer": {
+      "first": 53,
+      "last": 255,
+      "min": 53,
+      "max": 255,
+      "monotonic": true,
+      "at_boundary": 217
+     },
+     "transition_pan": {
+      "first": 70,
+      "last": 121,
+      "min": 70,
+      "max": 121,
+      "monotonic": true,
+      "at_boundary": 95
+     },
+     "base_dimmer_before_after": [
+      51,
+      255
+     ],
+     "base_pan_before_after": [
+      70,
+      61
+     ]
+    },
+    "neutral": {
+     "boundary_ms": 8015.0,
+     "transition_effect_ms": [],
+     "transition_effect_from_boundary_ms": [],
+     "transition_dimmer": null,
+     "transition_pan": null,
+     "base_dimmer_before_after": [
+      51,
+      255
+     ],
+     "base_pan_before_after": [
+      70,
+      61
+     ]
+    }
+   },
+   "provenance": "rendered",
+   "status": "recorded",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:1760-1763,2428-2513,2515-2563",
+    "packages/twinklr/core/sequencer/moving_heads/compile/transition_planner.py:130-190 (overlap; only CROSSFADE splits it by fade_out_ratio), 192-245 (strategies from the job's per-channel defaults; the mode is read only for SNAP)",
+    "packages/twinklr/core/sequencer/moving_heads/compile/channel_blender.py:38-80",
+    "packages/twinklr/core/config/models.py:587-637 (TransitionConfig: enabled, 0.5-bar CROSSFADE default)",
+    "packages/twinklr/core/sequencer/moving_heads/export/xsq_adapter.py:272-292 (transitions on a second layer)"
+   ],
+   "parity_target": null,
+   "not_a_parity_target": [
+    "with no hint the old renderer still wrote a blend at every boundary (the job's default 0.5-bar crossfade), which xLights did not show (LAYER_PLAYBACK); null keeps today's render, the regression anchor"
+   ]
+  },
+  {
+   "id": "transition_in_snap",
+   "intent": {
+    "transition_in": {
+     "mode": "snap",
+     "duration_bars": 0.0,
+     "curve": "linear",
+     "fade_out_ratio": 0.25,
+     "per_channel_overrides": null
+    }
+   },
+   "neutral_intent": {
+    "transition_in": null
+   },
+   "facts": {
+    "set": {
+     "boundary_ms": 8015.0,
+     "transition_effect_ms": [],
+     "transition_effect_from_boundary_ms": [],
+     "transition_dimmer": null,
+     "transition_pan": null,
+     "base_dimmer_before_after": [
+      51,
+      255
+     ],
+     "base_pan_before_after": [
+      70,
+      61
+     ]
+    },
+    "neutral": {
+     "boundary_ms": 8015.0,
+     "transition_effect_ms": [
+      [
+       7515,
+       8515
+      ]
+     ],
+     "transition_effect_from_boundary_ms": [
+      [
+       -500.0,
+       500.0
+      ]
+     ],
+     "transition_dimmer": {
+      "first": 53,
+      "last": 255,
+      "min": 53,
+      "max": 255,
+      "monotonic": true,
+      "at_boundary": 217
+     },
+     "transition_pan": {
+      "first": 70,
+      "last": 121,
+      "min": 70,
+      "max": 121,
+      "monotonic": true,
+      "at_boundary": 95
+     },
+     "base_dimmer_before_after": [
+      51,
+      255
+     ],
+     "base_pan_before_after": [
+      70,
+      61
+     ]
+    }
+   },
+   "provenance": "rendered",
+   "status": "recorded",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:1760-1763,2428-2513,2515-2563",
+    "packages/twinklr/core/sequencer/moving_heads/compile/transition_planner.py:130-190 (overlap; only CROSSFADE splits it by fade_out_ratio), 192-245 (strategies from the job's per-channel defaults; the mode is read only for SNAP)",
+    "packages/twinklr/core/sequencer/moving_heads/compile/channel_blender.py:38-80",
+    "packages/twinklr/core/config/models.py:587-637 (TransitionConfig: enabled, 0.5-bar CROSSFADE default)",
+    "packages/twinklr/core/sequencer/moving_heads/export/xsq_adapter.py:272-292 (transitions on a second layer)"
+   ],
+   "parity_target": null,
+   "not_a_parity_target": [
+    "SNAP placed no transition: the outgoing section cut to the incoming one at the boundary, the aim jumping while lit. The current renderer already starts the incoming look at the boundary (behind its entry dip); the lit jump is a defect"
+   ]
+  },
+  {
+   "id": "transition_in_crossfade",
+   "intent": {
+    "transition_in": {
+     "mode": "crossfade",
+     "duration_bars": 1.0,
+     "curve": "linear",
+     "fade_out_ratio": 0.25,
+     "per_channel_overrides": null
+    }
+   },
+   "neutral_intent": {
+    "transition_in": null
+   },
+   "facts": {
+    "set": {
+     "boundary_ms": 8015.0,
+     "transition_effect_ms": [
+      [
+       7515,
+       9515
+      ]
+     ],
+     "transition_effect_from_boundary_ms": [
+      [
+       -500.0,
+       1500.0
+      ]
+     ],
+     "transition_dimmer": {
+      "first": 52,
+      "last": 255,
+      "min": 52,
+      "max": 255,
+      "monotonic": true,
+      "at_boundary": 145
+     },
+     "transition_pan": {
+      "first": 70,
+      "last": 120,
+      "min": 70,
+      "max": 120,
+      "monotonic": true,
+      "at_boundary": 83
+     },
+     "base_dimmer_before_after": [
+      51,
+      255
+     ],
+     "base_pan_before_after": [
+      70,
+      61
+     ]
+    },
+    "neutral": {
+     "boundary_ms": 8015.0,
+     "transition_effect_ms": [
+      [
+       7515,
+       8515
+      ]
+     ],
+     "transition_effect_from_boundary_ms": [
+      [
+       -500.0,
+       500.0
+      ]
+     ],
+     "transition_dimmer": {
+      "first": 53,
+      "last": 255,
+      "min": 53,
+      "max": 255,
+      "monotonic": true,
+      "at_boundary": 217
+     },
+     "transition_pan": {
+      "first": 70,
+      "last": 121,
+      "min": 70,
+      "max": 121,
+      "monotonic": true,
+      "at_boundary": 95
+     },
+     "base_dimmer_before_after": [
+      51,
+      255
+     ],
+     "base_pan_before_after": [
+      70,
+      61
+     ]
+    }
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W8",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:1760-1763,2428-2513,2515-2563",
+    "packages/twinklr/core/sequencer/moving_heads/compile/transition_planner.py:130-190 (overlap; only CROSSFADE splits it by fade_out_ratio), 192-245 (strategies from the job's per-channel defaults; the mode is read only for SNAP)",
+    "packages/twinklr/core/sequencer/moving_heads/compile/channel_blender.py:38-80",
+    "packages/twinklr/core/config/models.py:587-637 (TransitionConfig: enabled, 0.5-bar CROSSFADE default)",
+    "packages/twinklr/core/sequencer/moving_heads/export/xsq_adapter.py:272-292 (transitions on a second layer)"
+   ],
+   "parity_target": "Across the transition window (one bar centred on the boundary; for crossfade, a quarter before and three quarters after) the head is never dark; on lit frames pan and tilt move no faster than the profile's travel speed; from the window's end the aim is the neutral render's (the incoming section's); on every head.",
+   "not_a_parity_target": [
+    "the transition was written on a second xLights layer under the untrimmed base layer, and xLights played the base wherever it had an effect (LAYER_PLAYBACK): the blend in these facts was not what played, the boundary played as a cut. The target is the planner's intent, a smooth lit change between sections",
+    "the curve, duration_bars and fade_out_ratio numbers are the planner's categories in the revised plan (Transition{mode, length, curve}); this row fixes none of them"
+   ]
+  },
+  {
+   "id": "transition_in_morph",
+   "intent": {
+    "transition_in": {
+     "mode": "morph",
+     "duration_bars": 1.0,
+     "curve": "linear",
+     "fade_out_ratio": 0.25,
+     "per_channel_overrides": null
+    }
+   },
+   "neutral_intent": {
+    "transition_in": null
+   },
+   "facts": {
+    "set": {
+     "boundary_ms": 8015.0,
+     "transition_effect_ms": [
+      [
+       7015,
+       9015
+      ]
+     ],
+     "transition_effect_from_boundary_ms": [
+      [
+       -1000.0,
+       1000.0
+      ]
+     ],
+     "transition_dimmer": {
+      "first": 52,
+      "last": 255,
+      "min": 52,
+      "max": 255,
+      "monotonic": true,
+      "at_boundary": 217
+     },
+     "transition_pan": {
+      "first": 70,
+      "last": 120,
+      "min": 70,
+      "max": 120,
+      "monotonic": true,
+      "at_boundary": 96
+     },
+     "base_dimmer_before_after": [
+      51,
+      255
+     ],
+     "base_pan_before_after": [
+      70,
+      61
+     ]
+    },
+    "neutral": {
+     "boundary_ms": 8015.0,
+     "transition_effect_ms": [
+      [
+       7515,
+       8515
+      ]
+     ],
+     "transition_effect_from_boundary_ms": [
+      [
+       -500.0,
+       500.0
+      ]
+     ],
+     "transition_dimmer": {
+      "first": 53,
+      "last": 255,
+      "min": 53,
+      "max": 255,
+      "monotonic": true,
+      "at_boundary": 217
+     },
+     "transition_pan": {
+      "first": 70,
+      "last": 121,
+      "min": 70,
+      "max": 121,
+      "monotonic": true,
+      "at_boundary": 95
+     },
+     "base_dimmer_before_after": [
+      51,
+      255
+     ],
+     "base_pan_before_after": [
+      70,
+      61
+     ]
+    }
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W8",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:1760-1763,2428-2513,2515-2563",
+    "packages/twinklr/core/sequencer/moving_heads/compile/transition_planner.py:130-190 (overlap; only CROSSFADE splits it by fade_out_ratio), 192-245 (strategies from the job's per-channel defaults; the mode is read only for SNAP)",
+    "packages/twinklr/core/sequencer/moving_heads/compile/channel_blender.py:38-80",
+    "packages/twinklr/core/config/models.py:587-637 (TransitionConfig: enabled, 0.5-bar CROSSFADE default)",
+    "packages/twinklr/core/sequencer/moving_heads/export/xsq_adapter.py:272-292 (transitions on a second layer)"
+   ],
+   "parity_target": "Across the transition window (one bar centred on the boundary; for crossfade, a quarter before and three quarters after) the head is never dark; on lit frames pan and tilt move no faster than the profile's travel speed; from the window's end the aim is the neutral render's (the incoming section's); on every head. MORPH and SWEEP render differently from each other (W8 defines how).",
+   "not_a_parity_target": [
+    "the transition was written on a second xLights layer under the untrimmed base layer, and xLights played the base wherever it had an effect (LAYER_PLAYBACK): the blend in these facts was not what played, the boundary played as a cut. The target is the planner's intent, a smooth lit change between sections",
+    "MORPH, SWEEP and FADE_VIA_BLACK wrote the same blend as a symmetric CROSSFADE: the mode was read only for SNAP and CROSSFADE's split",
+    "the curve, duration_bars and fade_out_ratio numbers are the planner's categories in the revised plan (Transition{mode, length, curve}); this row fixes none of them"
+   ]
+  },
+  {
+   "id": "transition_in_fade_via_black",
+   "intent": {
+    "transition_in": {
+     "mode": "fade_via_black",
+     "duration_bars": 1.0,
+     "curve": "linear",
+     "fade_out_ratio": 0.25,
+     "per_channel_overrides": null
+    }
+   },
+   "neutral_intent": {
+    "transition_in": null
+   },
+   "facts": {
+    "set": {
+     "boundary_ms": 8015.0,
+     "transition_effect_ms": [
+      [
+       7015,
+       9015
+      ]
+     ],
+     "transition_effect_from_boundary_ms": [
+      [
+       -1000.0,
+       1000.0
+      ]
+     ],
+     "transition_dimmer": {
+      "first": 52,
+      "last": 255,
+      "min": 52,
+      "max": 255,
+      "monotonic": true,
+      "at_boundary": 217
+     },
+     "transition_pan": {
+      "first": 70,
+      "last": 120,
+      "min": 70,
+      "max": 120,
+      "monotonic": true,
+      "at_boundary": 96
+     },
+     "base_dimmer_before_after": [
+      51,
+      255
+     ],
+     "base_pan_before_after": [
+      70,
+      61
+     ]
+    },
+    "neutral": {
+     "boundary_ms": 8015.0,
+     "transition_effect_ms": [
+      [
+       7515,
+       8515
+      ]
+     ],
+     "transition_effect_from_boundary_ms": [
+      [
+       -500.0,
+       500.0
+      ]
+     ],
+     "transition_dimmer": {
+      "first": 53,
+      "last": 255,
+      "min": 53,
+      "max": 255,
+      "monotonic": true,
+      "at_boundary": 217
+     },
+     "transition_pan": {
+      "first": 70,
+      "last": 121,
+      "min": 70,
+      "max": 121,
+      "monotonic": true,
+      "at_boundary": 95
+     },
+     "base_dimmer_before_after": [
+      51,
+      255
+     ],
+     "base_pan_before_after": [
+      70,
+      61
+     ]
+    }
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W8",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:1760-1763,2428-2513,2515-2563",
+    "packages/twinklr/core/sequencer/moving_heads/compile/transition_planner.py:130-190 (overlap; only CROSSFADE splits it by fade_out_ratio), 192-245 (strategies from the job's per-channel defaults; the mode is read only for SNAP)",
+    "packages/twinklr/core/sequencer/moving_heads/compile/channel_blender.py:38-80",
+    "packages/twinklr/core/config/models.py:587-637 (TransitionConfig: enabled, 0.5-bar CROSSFADE default)",
+    "packages/twinklr/core/sequencer/moving_heads/export/xsq_adapter.py:272-292 (transitions on a second layer)"
+   ],
+   "parity_target": "Across the transition window the dimmer fades down through at least two intermediate levels to dark at the boundary and up through at least two after it, on every head.",
+   "not_a_parity_target": [
+    "the transition was written on a second xLights layer under the untrimmed base layer, and xLights played the base wherever it had an effect (LAYER_PLAYBACK): the blend in these facts was not what played, the boundary played as a cut. The target is the planner's intent, a smooth lit change between sections",
+    "the old renderer ignored the mode and wrote a lit blend like a symmetric crossfade; the intent (fade through black) is the target, not that blend"
+   ]
+  },
+  {
+   "id": "transition_in_sweep",
+   "intent": {
+    "transition_in": {
+     "mode": "sweep",
+     "duration_bars": 1.0,
+     "curve": "linear",
+     "fade_out_ratio": 0.25,
+     "per_channel_overrides": null
+    }
+   },
+   "neutral_intent": {
+    "transition_in": null
+   },
+   "facts": {
+    "set": {
+     "boundary_ms": 8015.0,
+     "transition_effect_ms": [
+      [
+       7015,
+       9015
+      ]
+     ],
+     "transition_effect_from_boundary_ms": [
+      [
+       -1000.0,
+       1000.0
+      ]
+     ],
+     "transition_dimmer": {
+      "first": 52,
+      "last": 255,
+      "min": 52,
+      "max": 255,
+      "monotonic": true,
+      "at_boundary": 217
+     },
+     "transition_pan": {
+      "first": 70,
+      "last": 120,
+      "min": 70,
+      "max": 120,
+      "monotonic": true,
+      "at_boundary": 96
+     },
+     "base_dimmer_before_after": [
+      51,
+      255
+     ],
+     "base_pan_before_after": [
+      70,
+      61
+     ]
+    },
+    "neutral": {
+     "boundary_ms": 8015.0,
+     "transition_effect_ms": [
+      [
+       7515,
+       8515
+      ]
+     ],
+     "transition_effect_from_boundary_ms": [
+      [
+       -500.0,
+       500.0
+      ]
+     ],
+     "transition_dimmer": {
+      "first": 53,
+      "last": 255,
+      "min": 53,
+      "max": 255,
+      "monotonic": true,
+      "at_boundary": 217
+     },
+     "transition_pan": {
+      "first": 70,
+      "last": 121,
+      "min": 70,
+      "max": 121,
+      "monotonic": true,
+      "at_boundary": 95
+     },
+     "base_dimmer_before_after": [
+      51,
+      255
+     ],
+     "base_pan_before_after": [
+      70,
+      61
+     ]
+    }
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W8",
+   "code": [
+    "packages/twinklr/core/sequencer/moving_heads/pipeline.py:1760-1763,2428-2513,2515-2563",
+    "packages/twinklr/core/sequencer/moving_heads/compile/transition_planner.py:130-190 (overlap; only CROSSFADE splits it by fade_out_ratio), 192-245 (strategies from the job's per-channel defaults; the mode is read only for SNAP)",
+    "packages/twinklr/core/sequencer/moving_heads/compile/channel_blender.py:38-80",
+    "packages/twinklr/core/config/models.py:587-637 (TransitionConfig: enabled, 0.5-bar CROSSFADE default)",
+    "packages/twinklr/core/sequencer/moving_heads/export/xsq_adapter.py:272-292 (transitions on a second layer)"
+   ],
+   "parity_target": "Across the transition window (one bar centred on the boundary; for crossfade, a quarter before and three quarters after) the head is never dark; on lit frames pan and tilt move no faster than the profile's travel speed; from the window's end the aim is the neutral render's (the incoming section's); on every head. MORPH and SWEEP render differently from each other (W8 defines how).",
+   "not_a_parity_target": [
+    "the transition was written on a second xLights layer under the untrimmed base layer, and xLights played the base wherever it had an effect (LAYER_PLAYBACK): the blend in these facts was not what played, the boundary played as a cut. The target is the planner's intent, a smooth lit change between sections",
+    "MORPH, SWEEP and FADE_VIA_BLACK wrote the same blend as a symmetric CROSSFADE: the mode was read only for SNAP and CROSSFADE's split",
+    "the curve, duration_bars and fade_out_ratio numbers are the planner's categories in the revised plan (Transition{mode, length, curve}); this row fixes none of them"
+   ]
+  },
+  {
+   "id": "show_focal_lead",
+   "intent": {
+    "show": {
+     "focal_role": "LEAD",
+     "palette_id": "spec.cosmic_night"
+    }
+   },
+   "neutral_intent": null,
+   "facts": {
+    "palette_colors": [
+     "#0D47A1",
+     "#2979FF",
+     "#00E5FF",
+     "#D500F9",
+     "#FFFFFF"
+    ],
+    "projected_intensity": "INTENSE",
+    "projected_color": "blue",
+    "set": {
+     "dimmer_min": 171,
+     "dimmer_max": 255,
+     "dimmer_distinct_levels": 16,
+     "peak_onsets_ms": [
+      20,
+      520,
+      1020,
+      1520,
+      2020,
+      2520,
+      3020,
+      3520,
+      4020,
+      4520,
+      5020,
+      5520,
+      6020,
+      6520,
+      7020,
+      7520
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms",
+      "1.2+5ms",
+      "1.3+5ms",
+      "1.4+5ms",
+      "2.1+5ms",
+      "2.2+5ms",
+      "2.3+5ms",
+      "2.4+5ms",
+      "3.1+5ms",
+      "3.2+5ms",
+      "3.3+5ms",
+      "3.4+5ms",
+      "4.1+5ms",
+      "4.2+5ms",
+      "4.3+5ms",
+      "4.4+5ms"
+     ],
+     "peak_spacing_ms": [
+      500
+     ],
+     "same_on_every_head": true,
+     "color": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "blue"
+      ]
+     ]
+    }
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W9",
+   "code": [
+    "packages/twinklr/core/sequencer/show_coordination.py:69-73 (_ROLE_MH_INTENSITY), 83-98 (_PRESET_RGB), 503-553 (_closest_preset, coordinate_moving_head_plan)",
+    "packages/twinklr/core/pipeline/show_stages.py:224-262 (legacy show render projects the macro plan)"
+   ],
+   "parity_target": "Under `twinklr show`, with the same plan (intensity null), a section whose macro focal role for the heads is LEAD renders hotter than with SUPPORT: no lit frame dimmer, some lit frame brighter (a raised floor or a beat pulse, per the W5 table); with REST no lit frame is brighter than with SUPPORT (as authored); on every head.",
+   "not_a_parity_target": [
+    "the old projection overwrote the plan's intensity (LEAD INTENSE, SUPPORT SMOOTH, REST SLOW) whatever the plan said. The revised plan also states the focal role as a validator rule on the planner's intensity; W9 owns both and may satisfy this row either way"
+   ]
+  },
+  {
+   "id": "show_focal_support",
+   "intent": {
+    "show": {
+     "focal_role": "SUPPORT",
+     "palette_id": "spec.cosmic_night"
+    }
+   },
+   "neutral_intent": null,
+   "facts": {
+    "palette_colors": [
+     "#0D47A1",
+     "#2979FF",
+     "#00E5FF",
+     "#D500F9",
+     "#FFFFFF"
+    ],
+    "projected_intensity": "SMOOTH",
+    "projected_color": "blue",
+    "set": {
+     "dimmer_min": 51,
+     "dimmer_max": 153,
+     "dimmer_distinct_levels": 8,
+     "peak_onsets_ms": [
+      20
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms"
+     ],
+     "peak_spacing_ms": [],
+     "same_on_every_head": true,
+     "color": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "blue"
+      ]
+     ]
+    }
+   },
+   "provenance": "rendered",
+   "status": "recorded",
+   "code": [
+    "packages/twinklr/core/sequencer/show_coordination.py:69-73 (_ROLE_MH_INTENSITY), 83-98 (_PRESET_RGB), 503-553 (_closest_preset, coordinate_moving_head_plan)",
+    "packages/twinklr/core/pipeline/show_stages.py:224-262 (legacy show render projects the macro plan)"
+   ],
+   "parity_target": null,
+   "not_a_parity_target": [
+    "SUPPORT projected SMOOTH; show_focal_lead tests the roles"
+   ]
+  },
+  {
+   "id": "show_focal_rest",
+   "intent": {
+    "show": {
+     "focal_role": "REST",
+     "palette_id": "spec.cosmic_night"
+    }
+   },
+   "neutral_intent": null,
+   "facts": {
+    "palette_colors": [
+     "#0D47A1",
+     "#2979FF",
+     "#00E5FF",
+     "#D500F9",
+     "#FFFFFF"
+    ],
+    "projected_intensity": "SLOW",
+    "projected_color": "blue",
+    "set": {
+     "dimmer_min": 51,
+     "dimmer_max": 153,
+     "dimmer_distinct_levels": 8,
+     "peak_onsets_ms": [
+      20
+     ],
+     "peak_onset_beats": [
+      "1.1+5ms"
+     ],
+     "peak_spacing_ms": [],
+     "same_on_every_head": true,
+     "color": [
+      [
+       0,
+       20,
+       null
+      ],
+      [
+       20,
+       8020,
+       "blue"
+      ]
+     ]
+    }
+   },
+   "provenance": "rendered",
+   "status": "recorded",
+   "code": [
+    "packages/twinklr/core/sequencer/show_coordination.py:69-73 (_ROLE_MH_INTENSITY), 83-98 (_PRESET_RGB), 503-553 (_closest_preset, coordinate_moving_head_plan)",
+    "packages/twinklr/core/pipeline/show_stages.py:224-262 (legacy show render projects the macro plan)"
+   ],
+   "parity_target": null,
+   "not_a_parity_target": [
+    "REST projected SLOW, which rendered as SMOOTH; show_focal_lead tests the roles"
+   ]
+  },
+  {
+   "id": "show_palette_color",
+   "intent": {
+    "show": {
+     "palette_id": "spec.cosmic_night"
+    },
+    "color": {
+     "palette_role": "PRIMARY"
+    }
+   },
+   "neutral_intent": null,
+   "facts": {
+    "plan_color": null,
+    "palette_colors": [
+     "#0D47A1",
+     "#2979FF",
+     "#00E5FF",
+     "#D500F9",
+     "#FFFFFF"
+    ],
+    "projected_color": "blue",
+    "color_runs": [
+     [
+      0,
+      20,
+      null
+     ],
+     [
+      20,
+      8020,
+      "blue"
+     ]
+    ],
+    "same_for_every_focal_role": true
+   },
+   "provenance": "rendered",
+   "status": "regression",
+   "task": "W9",
+   "code": [
+    "packages/twinklr/core/sequencer/show_coordination.py:69-73 (_ROLE_MH_INTENSITY), 83-98 (_PRESET_RGB), 503-553 (_closest_preset, coordinate_moving_head_plan)",
+    "packages/twinklr/core/pipeline/show_stages.py:224-262 (legacy show render projects the macro plan)"
+   ],
+   "parity_target": "Under `twinklr show` with macro palette spec.cosmic_night, a section whose colour intent is palette role PRIMARY shows, on every lit frame and every head, the rig state nearest the palette's first stop (#0D47A1: blue on these rigs, not red).",
+   "not_a_parity_target": [
+    "the old input carried no colour (plan_color null): the projection overwrote it with the preset nearest the first stop whatever the plan said; the revised plan resolves the plan's palette role through the macro palette instead",
+    "the colour is present from the section's first frame, so inside one section nothing turns; the wheel turns lit only at a boundary between sections of different colours (color_change_between_sections)"
+   ]
+  }
+ ]
+}

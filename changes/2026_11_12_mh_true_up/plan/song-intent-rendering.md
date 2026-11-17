@@ -43,24 +43,38 @@ do not change", and no check compared what the two renderers did with the same p
 ### W0 result
 
 The W0 harness (`tests/regression/test_mh_intent_parity.py`, facts in
-`tests/regression/baselines/mh_intent_parity.json`) turns the regression rows into
-**20 strict xfails**, each failing on its own target assertion today, mapped to tasks:
+`tests/regression/baselines/mh_intent_parity.json`, reproducible with
+`scripts/extract_mh_intent_parity.py`) holds 34 rows: 10 recorded only and **24 strict
+xfails**, each failing on its own target assertion today:
 
 | Task | Rows |
 |---|---|
-| W4 | 5 (explicit colour; palette roles PRIMARY, ACCENT, WARM, COOL) |
-| W5 | 2 (DRAMATIC, INTENSE) |
-| W6 | 5 shutter events (CLOSED/OPEN, three strobes, PULSE) + the cue-bound shutter event |
-| W7 | the gobo event + the cue-bound gobo event |
-| W8 | 4 (`transition_in` CROSSFADE, MORPH, SWEEP, FADE_VIA_BLACK) |
-| W9 | 1 (show palette colour) |
+| W4 | 5 (explicit colour; palette roles PRIMARY, ACCENT, WARM, COOL resolved through a supplied macro palette, PRIMARY ≠ ACCENT) |
+| W5 | 4 (DRAMATIC, INTENSE; each also on a template that authors its own pulse) |
+| W6 | 6 (CLOSED/OPEN, three strobes, PULSE, the cue-bound shutter event) |
+| W7 | 3 (gobo event, two successive gobo events, the cue-bound gobo event) |
+| W8 | 4 (entry CROSSFADE, MORPH, SWEEP, FADE_VIA_BLACK; MORPH and SWEEP must differ) |
+| W9 | 2 (show palette colour from a palette whose answer differs from the old fixed table; a LEAD section renders hotter than SUPPORT, REST no hotter) |
 
-The `twinklr show` focal-role effect has no render-level row (it becomes a validator
-rule on intensity): **W9 needs its own check for it**. Old behaviour deliberately not
-carried over: lit wheel turns, the fixed palette-role table, the shutter PULSE by sample
-index (unnamed bytes, a period unrelated to the beat), and a SNAP transition as a lit
-cut. Each task removes its rows from `PENDING`; a row that starts passing early turns
-the suite red.
+Findings that change the tasks:
+
+- **The old section transitions never played.** The old renderer wrote its crossfades
+  on a second xLights layer under untrimmed section effects. The xLights-rendered
+  `.fseq` of the old renderer's output (the 2026-11-16 viewing-render reference) shows
+  the section layer played wherever a section effect existed: every boundary between
+  two sections played as a lit cut, including the default crossfade on a null hint.
+  Frame data is in the W0 record. W8's target is therefore the planner's intent — a
+  smooth lit change between sections — and is new visible behaviour, judged by the
+  owner at the W8 view, not a restoration.
+- **Intensity has no headroom on the catalog families.** They hold the dimmer at full.
+  With "never below the authored look", DRAMATIC and INTENSE cannot raise a floor or add
+  a pulse there. W5 must decide how intensity shows on a full-level template (for
+  example a beat-locked dip-and-return pulse whose depth grows with the level, or
+  authored levels in the families that leave headroom) and the owner judges it at the
+  W5 view. Recorded for that view: the old renderer's SMOOTH turned an energetic
+  template's 131–255 five-beat pulse into a 51–153 four-bar swell.
+- **Old defects not carried over:** wheel turns while lit at section boundaries, the
+  fixed palette-role table, the sample-index pulse, SNAP as a lit cut.
 
 ## What the renderer already has to build on
 

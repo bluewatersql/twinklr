@@ -20,6 +20,25 @@ The validation implementation package consists of `validation/__init__.py`,
 `validation/_core/reporting.py`. Together with the top-level `scripts/__init__.py`, these
 seven package/internal modules are library support, not standalone commands.
 
+## Moving-head intent parity reference
+
+`extract_mh_intent_parity.py` writes `tests/regression/baselines/mh_intent_parity.json`:
+what the deleted moving-head renderer (tag `mh-last-with-legacy-renderer`, mode
+`legacy_v1`) did with each piece of planner intent on synthetic inputs, as
+renderer-independent facts, with each row's parity target and the task that restores
+it. It extracts `git archive` of the tag into a temporary directory itself (recording the
+commit `git get-tar-commit-id` reads from the archive) and runs that tree's own code (no
+owner data, network, provider or xLights); `tests/regression/test_mh_intent_parity.py`
+asserts the targets on the current renderer. To regenerate it:
+
+```bash
+uv run python -I scripts/extract_mh_intent_parity.py \
+  --out tests/regression/baselines/mh_intent_parity.json
+```
+
+`-I` keeps the working tree off the import path; the script removes the editable install's
+finder and imports `twinklr` from the archive. The output is byte-identical across runs.
+
 ## Make-wired tools
 
 | File | Purpose and status |
