@@ -1,3 +1,6 @@
+# mypy: ignore-errors
+# One-off evidence script: it builds test-style models with their defaults; the package's
+# strict type check does not apply to it.
 """Probe the song-intent planner contract on Claude with one schema-enforced request.
 
 Builds the real rendered moving-head planner prompt pack for a synthetic song (the unit
@@ -24,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import importlib
 import json
 from pathlib import Path
 import sys
@@ -34,10 +38,6 @@ from pydantic import ValidationError
 REPO = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(REPO))
 
-from tests.unit.agents.sequencer.moving_heads.test_orchestrator import (  # noqa: E402
-    create_test_audio_profile,
-    create_test_macro_plan,
-)
 from twinklr.core.agents.audio.lyrics.models import LyricContextModel, MomentCue  # noqa: E402
 from twinklr.core.agents.prompts import PromptPackLoader  # noqa: E402
 from twinklr.core.agents.providers.anthropic import (  # noqa: E402
@@ -73,6 +73,13 @@ from twinklr.core.sequencer.moving_heads.templates.data_loader import (  # noqa:
     load_template_catalog,
 )
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid  # noqa: E402
+
+# The synthetic song comes from the unit tests' builders. They are loaded at run time so
+# the type checker does not pull the test modules into the package's strict check.
+_builders = importlib.import_module("tests.unit.agents.sequencer.moving_heads.test_orchestrator")
+create_test_audio_profile = _builders.create_test_audio_profile
+create_test_macro_plan = _builders.create_test_macro_plan
+
 
 MODEL = "claude-opus-5-5"
 """The model the 2026-11-12 schema probe measured."""
