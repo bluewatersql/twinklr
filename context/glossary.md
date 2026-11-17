@@ -42,11 +42,12 @@ updated: 2026-11-17
 - **ChoreographyPlan** — the structured Pydantic plan the moving-head planner produces:
   per song section, 1-3 parts (template + preset over bars) and the section's **song
   intent** (intensity, colour, gobo, timed events tied to lyric moment cues, motif
-  variation, density, entry/exit transitions; null = as the template is authored). Not
+  variation, density, entry/exit transitions; a null keeps the template's own look and
+  needs a reason). Not
   rendered yet beyond the parts: a known regression being fixed.
 - **Plan repair** — deterministic normalisation that drops or adjusts one planned item
-  the song cannot hold (an unknown cue, an event outside its section) instead of
-  refusing the plan; recorded in the plan's `repairs`, the trace's `plan_repairs` and the
+  the song cannot hold (an unknown cue is dropped; an event outside its section is moved
+  into it) instead of refusing the plan, keeping as much of it as the song allows; recorded in the plan's `repairs`, the trace's `plan_repairs` and the
   next refinement prompt.
 - **Judge** — the LLM agent scoring plans 0–10; the bar comes from
   `agent.success_threshold` (configured 0–100, converted once to the planners' 0–10).

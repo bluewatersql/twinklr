@@ -193,24 +193,38 @@ _LENGTHS = {
     0.25: "BEAT",
     0.5: "HALF_BAR",
     1.0: "BAR",
+    1.5: "ONE_AND_HALF_BARS",
     2.0: "TWO_BARS",
+    3.0: "THREE_BARS",
     4.0: "FOUR_BARS",
+    6.0: "SIX_BARS",
     8.0: "EIGHT_BARS",
 }
 """The transition lengths by their bars on the reference grid's 4/4."""
 
+_SPLITS = {
+    1 / 4: "QUARTER",
+    1 / 3: "THIRD",
+    1 / 2: "HALF",
+    2 / 3: "TWO_THIRDS",
+    3 / 4: "THREE_QUARTERS",
+}
+"""The transition splits by the fade-out share they name."""
+
+
+def _nearest(table: dict[float, str], value: float) -> str:
+    return table[min(table, key=lambda key: abs(key - value))]
+
 
 def _transition(edge: str, hint: dict[str, Any]) -> dict[str, Any]:
     """A fixture row's old-renderer `TransitionHint` as the contract's categorical
-    transition: the same mode and curve, the nearest length, and the split of its
-    fade-out ratio."""
-    ratio = hint["fade_out_ratio"]
+    transition: the same mode and curve, the nearest length and the nearest split."""
     return {
         "edge": edge,
         "mode": hint["mode"],
-        "length": _LENGTHS[min(_LENGTHS, key=lambda bars: abs(bars - hint["duration_bars"]))],
+        "length": _nearest(_LENGTHS, hint["duration_bars"]),
         "curve": hint["curve"],
-        "split": "EARLY" if ratio < 1 / 3 else "LATE" if ratio > 2 / 3 else "EVEN",
+        "split": _nearest(_SPLITS, hint["fade_out_ratio"]),
         "channels": [],
     }
 
@@ -257,6 +271,7 @@ def plan_section(
                     "template_id": template_id,
                     "preset_id": None,
                     "modifiers": [],
+                    "label": None,
                     "reasoning": "",
                 }
             ],

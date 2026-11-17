@@ -399,7 +399,7 @@ def test_the_judge_reads_every_song_intent_field_as_planned() -> None:
                 "mode": "sweep",
                 "length": "TWO_BARS",
                 "curve": "linear",
-                "split": "EVEN",
+                "split": "HALF",
                 "channels": [],
             }
         ],
@@ -417,7 +417,7 @@ def test_the_judge_reads_every_song_intent_field_as_planned() -> None:
         "events=bar 2 beat 1: gobo dots on cue 'hook'",
         "moment_cues=hook",
         "motif=pulse; variation=WIDEN; density=BUSY",
-        "entry=sweep over TWO_BARS, curve linear, split EVEN; exit=default",
+        "entry=sweep over TWO_BARS, curve linear, split HALF; exit=default",
         "not_rendered_yet=color,gobo,moment_cues,events,motif_id,variation,density,entry",
     ):
         assert fragment in intent, fragment

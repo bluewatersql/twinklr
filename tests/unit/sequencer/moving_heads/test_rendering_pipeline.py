@@ -23,10 +23,10 @@ from tests.support.moving_heads import (
     p1_templates,
     sections_plan,
 )
-from twinklr.core.agents.sequencer.moving_heads.models import PlanSection
+from twinklr.core.agents.sequencer.moving_heads.models import Density, PlanColor, PlanSection
 from twinklr.core.config.models import JobConfig
 from twinklr.core.formats.xlights.sequence.models.xsq import TimingTrack
-from twinklr.core.sequencer.models.enum import TemplateRole
+from twinklr.core.sequencer.models.enum import Intensity, TemplateRole
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
     UnsupportedRigShapeError,
 )
@@ -114,7 +114,7 @@ def test_set_intent_is_reported_unrendered_per_section_and_renders_as_authored()
         update={
             "sections": [
                 plan.sections[0].model_copy(
-                    update={"intensity": "DRAMATIC", "color": "PALETTE_ACCENT"}
+                    update={"intensity": Intensity.DRAMATIC, "color": PlanColor.PALETTE_ACCENT}
                 ),
                 plan.sections[1],
             ]
@@ -131,9 +131,29 @@ def test_set_intent_is_reported_unrendered_per_section_and_renders_as_authored()
     assert pipeline.frames == neutral.frames
     (diagnostic,) = _unrendered(pipeline)
     assert diagnostic["section_id"] == "s1"
-    assert "(intensity, color)" in diagnostic["message"]
-    assert "known regression" in diagnostic["message"]
+    assert "intensity, colour: a known regression" in diagnostic["message"]
+    assert "not rendered by any renderer" not in diagnostic["message"]
     assert "plan/song-intent-rendering.md" in diagnostic["message"]
+
+
+def test_intent_no_renderer_rendered_yet_is_not_called_a_regression() -> None:
+    """Fields the renderer before the cutover never rendered are named apart from the
+    regressed ones."""
+    plan = sections_plan(("mirror_wings", 1, 4))
+    section = plan.sections[0].model_copy(
+        update={"density": Density.BUSY, "motif_id": "pulse", "intensity": Intensity.FAST}
+    )
+    pipeline = RenderingPipeline(
+        choreography_plan=plan.model_copy(update={"sections": [section]}),
+        beat_grid=_make_beat_grid(),
+        fixture_group=family_rig(HEADS),
+        job_config=_job(),
+    )
+    pipeline.render()
+
+    (diagnostic,) = _unrendered(pipeline)
+    assert "intensity: a known regression" in diagnostic["message"]
+    assert "motif, density: not rendered by any renderer yet" in diagnostic["message"]
 
 
 def test_plan_repairs_reach_the_render_record_only_when_there_are_any() -> None:

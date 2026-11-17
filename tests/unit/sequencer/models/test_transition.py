@@ -40,9 +40,22 @@ def test_lengths_span_a_beat_to_eight_bars() -> None:
         "BEAT",
         "HALF_BAR",
         "BAR",
+        "ONE_AND_HALF_BARS",
         "TWO_BARS",
+        "THREE_BARS",
         "FOUR_BARS",
+        "SIX_BARS",
         "EIGHT_BARS",
+    ]
+
+
+def test_splits_name_the_fade_out_share_from_a_quarter_to_three_quarters() -> None:
+    assert [split.value for split in TransitionSplit] == [
+        "QUARTER",
+        "THIRD",
+        "HALF",
+        "TWO_THIRDS",
+        "THREE_QUARTERS",
     ]
 
 
@@ -53,7 +66,7 @@ def _transition(**fields: object) -> PlanTransition:
             "mode": "crossfade",
             "length": "BAR",
             "curve": "linear",
-            "split": "EARLY",
+            "split": "QUARTER",
             "channels": [],
             **fields,
         }
@@ -71,7 +84,7 @@ def test_a_crossfade_with_channel_strategies() -> None:
     assert transition.edge is TransitionEdge.ENTRY
     assert transition.mode is TransitionMode.CROSSFADE
     assert transition.curve is CurveLibrary.LINEAR
-    assert transition.split is TransitionSplit.EARLY
+    assert transition.split is TransitionSplit.QUARTER
     assert transition.channels == [
         ChannelTransition(
             channel=TransitionChannel.DIMMER, strategy=TransitionStrategy.FADE_VIA_BLACK
@@ -79,7 +92,7 @@ def test_a_crossfade_with_channel_strategies() -> None:
         ChannelTransition(channel=TransitionChannel.COLOR, strategy=TransitionStrategy.SNAP),
     ]
     assert transition.describe() == (
-        "crossfade over BAR, curve linear, split EARLY; dimmer fade_via_black, color snap"
+        "crossfade over BAR, curve linear, split QUARTER; dimmer fade_via_black, color snap"
     )
 
 

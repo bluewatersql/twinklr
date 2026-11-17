@@ -32,6 +32,7 @@ def part(start_bar: int, template_id: str = "fan", **fields: Any) -> dict[str, A
         "template_id": template_id,
         "preset_id": None,
         "modifiers": [],
+        "label": None,
         "reasoning": "",
         **fields,
     }
@@ -55,7 +56,7 @@ def transition(edge: str, mode: str = "crossfade", **fields: Any) -> dict[str, A
         "mode": mode,
         "length": "BAR",
         "curve": "linear",
-        "split": "EVEN",
+        "split": "HALF",
         "channels": [],
         **fields,
     }
@@ -142,7 +143,7 @@ def test_a_full_section_round_trips_every_intent() -> None:
         density="BUSY",
         transitions=[
             transition("ENTRY", "morph", channels=[{"channel": "pan", "strategy": "smooth"}]),
-            transition("EXIT", "blackout", length="EIGHT_BARS", split="LATE"),
+            transition("EXIT", "blackout", length="EIGHT_BARS", split="THREE_QUARTERS"),
         ],
     )
     planned = plan(full)
@@ -219,7 +220,7 @@ def test_parts_start_at_the_section_and_are_ordered_inside_it(
 
 
 @pytest.mark.parametrize(
-    "bad",
+    "unpaired",
     [
         event(2, 1, "color"),
         event(2, 1, "gobo"),
@@ -228,9 +229,25 @@ def test_parts_start_at_the_section_and_are_ordered_inside_it(
         event(2, 1, "closed", gobo="dots"),
     ],
 )
-def test_an_event_carries_exactly_the_field_its_action_needs(bad: dict[str, Any]) -> None:
-    with pytest.raises(ValidationError, match="event"):
-        plan(section(events=[bad]))
+def test_an_unpaired_event_is_accepted_for_repair_not_refused(unpaired: dict[str, Any]) -> None:
+    """Pairing an event's colour and gobo with its action is repair's job
+    (`bind_lyric_moment_cues`): a paid response is never refused for one event."""
+    assert plan(section(events=[unpaired])).sections[0].events[0].action == unpaired["action"]
+
+
+def test_event_cue_ids_and_part_labels_are_stripped() -> None:
+    planned = plan(
+        section(
+            parts=[part(1, label="  pickup "), part(3, label="   ")],
+            events=[
+                event(2, 1, "hit", moment_cue_id=" hook "),
+                event(3, 1, "hit", moment_cue_id=" "),
+            ],
+        )
+    ).sections[0]
+
+    assert [p.label for p in planned.parts] == ["pickup", None]
+    assert [e.moment_cue_id for e in planned.events] == ["hook", None]
 
 
 def test_moment_cue_ids_are_unique_and_not_blank() -> None:
@@ -317,6 +334,20 @@ def test_parts_flatten_to_derived_ids_with_their_events_and_edges() -> None:
         (False, True),
     ]
     assert {u.intensity for u in units} == {Intensity.FAST}
+
+
+def test_part_labels_name_the_flattened_parts() -> None:
+    """A labelled part is named by its label; an unlabelled one by its letter; a single
+    labelled part is a named part of its section; a clash takes the first free letter."""
+
+    def ids(*parts: dict[str, Any]) -> list[str]:
+        return [u.section_id for u in flatten_section(plan(section(parts=list(parts))).sections[0])]
+
+    assert ids(part(1, label="pickup"), part(3, label="drop")) == ["verse_1|pickup", "verse_1|drop"]
+    assert ids(part(1, label="pickup"), part(3)) == ["verse_1|pickup", "verse_1|B"]
+    assert ids(part(1, label="drop")) == ["verse_1|drop"]
+    assert ids(part(1)) == ["verse_1"]
+    assert ids(part(1, label="B"), part(3)) == ["verse_1|B", "verse_1|A"]
 
 
 # --- old saved plans ----------------------------------------------------------------------

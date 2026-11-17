@@ -54,17 +54,23 @@ class TransitionLength(StrEnum):
     BEAT = "BEAT"
     HALF_BAR = "HALF_BAR"
     BAR = "BAR"
+    ONE_AND_HALF_BARS = "ONE_AND_HALF_BARS"
     TWO_BARS = "TWO_BARS"
+    THREE_BARS = "THREE_BARS"
     FOUR_BARS = "FOUR_BARS"
+    SIX_BARS = "SIX_BARS"
     EIGHT_BARS = "EIGHT_BARS"
 
 
 class TransitionSplit(StrEnum):
-    """Where a crossfade hands over from the outgoing to the incoming look."""
+    """How much of a crossfade the outgoing look takes to fade out before the incoming
+    look takes over: a quarter, a third, half, two thirds or three quarters of it."""
 
-    EARLY = "EARLY"
-    EVEN = "EVEN"
-    LATE = "LATE"
+    QUARTER = "QUARTER"
+    THIRD = "THIRD"
+    HALF = "HALF"
+    TWO_THIRDS = "TWO_THIRDS"
+    THREE_QUARTERS = "THREE_QUARTERS"
 
 
 class TransitionChannel(StrEnum):
@@ -96,7 +102,7 @@ class PlanTransition(BaseModel):
         ...     mode=TransitionMode.CROSSFADE,
         ...     length=TransitionLength.BAR,
         ...     curve=CurveLibrary.EASE_IN_OUT_SINE,
-        ...     split=TransitionSplit.EVEN,
+        ...     split=TransitionSplit.HALF,
         ...     channels=[],
         ... ).length
         <TransitionLength.BAR: 'BAR'>
@@ -107,7 +113,7 @@ class PlanTransition(BaseModel):
     length: TransitionLength = Field(description="How long the change lasts")
     curve: CurveLibrary = Field(description="The easing of the change")
     split: TransitionSplit = Field(
-        description="Where a crossfade hands over: early, halfway, or late"
+        description="The share of the change the outgoing look takes to fade out"
     )
     channels: list[ChannelTransition] = Field(
         description="Per-channel strategies overriding the mode; empty when none",

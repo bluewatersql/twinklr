@@ -32,8 +32,8 @@ Before evaluating creative quality, verify the plan is **technically sound**:
 - All required fields are present
 - Each section has 1-3 `parts` in bar order, the first starting at the section's
   `start_bar`; a part plays until the next part starts (one part covers the section)
-- Song-intent fields that are null or empty mean "as the template is authored"; that is
-  valid, not missing
+- A song-intent field that is null or empty keeps the template's own look: schema-valid,
+  but judged in Phase 2 as a choice that needs a reason
 
 **Timing**:
 - Bar ranges are valid (`end_bar >= start_bar`)
@@ -48,7 +48,8 @@ Before evaluating creative quality, verify the plan is **technically sound**:
 - A `color` event carries a colour, a `gobo` event a gobo, and no other event either
 - `repairs`, when present, lists what deterministic code dropped or adjusted in the
   planner's response before you saw it (an unknown lyric cue, an event outside its
-  section); the plan you judge is the repaired one
+  section); the plan you judge is the repaired one. A repair is not a technical failure;
+  a repair that left a lyric cue unanswered counts against Musical Synchronization
 
 **Coverage**:
 - Plan must cover the intended choreography range (typically bars 1 through `total_bars`)
@@ -68,11 +69,28 @@ with detailed, schema-valid issues.
 
 Once technical validation passes, evaluate **artistic merit** across these dimensions:
 
-1. **Musical Synchronization** (30%): Does choreography match song energy? Are key moments highlighted - drops and hits with accents, lyric moment cues answered by cue-bound events that suit their emphasis?
+1. **Musical Synchronization** (30%): Does the light answer this song? Every HIGH lyric
+   moment cue needs a cue-bound event that suits its emphasis (MED cues should have one);
+   drops and hits need accents; intensity must follow the energy targets.
 2. **Visual Interest** (25%): Appropriate variety? Clear focal points? Avoids monotony?
-3. **Flow and Transitions** (20%): Do entries and exits suit their boundaries? Visual continuity?
-4. **Creative Use of Templates and Song Intent** (15%): Templates used effectively? Intensity, colour (palette roles that follow the song's palette, fixed colours only for deliberate contrast), gobos, motif variation and density chosen with purpose, and left as authored where the template already serves?
+3. **Flow and Transitions** (20%): Do entries and exits suit their musical boundaries (a
+   cut into a drop, a fade into a quiet bridge, a hand-over between related sections)?
+4. **Song Intent and Templates** (15%): Is the colour a palette role from the section's
+   palette (a named colour only for a stated contrast)? Do motif variation and density
+   shape the arc across repeated sections? Templates used effectively?
 5. **Energy Arc** (10%): Overall energy builds appropriately? Climaxes impactful?
+
+**Penalise** (in Musical Synchronization, as issues of warning or error severity naming the section and
+cue named):
+- a high-emphasis lyric moment cue with no event (unanswered), and medium-emphasis cues
+  left unanswered;
+- intensity that stays flat across a clear change of energy target;
+- colour that ignores the section's palette (null, or a named colour with no reason);
+- a plan whose sections are mostly null song intent: the templates alone do not follow
+  the song, so such a plan cannot score above the soft-fail band.
+
+**Reward** plans whose `reasoning` cites the lyrics (cue ids and text), the energy
+targets and the palette colours each choice answers.
 
 Return a single overall score from 0-10 using these dimensions as the rubric.
 

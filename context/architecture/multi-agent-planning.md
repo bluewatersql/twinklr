@@ -16,8 +16,12 @@ The choreography planner is an iterative refinement loop over structured Pydanti
    preset over its bars) and categorical song intent: intensity, colour (a role in the
    song's palette, whose colours the prompt shows, or a named colour), gobo, timed events
    (open/closed, strobes, pulse, hit, colour, gobo) bound optionally to lyric MomentCues,
-   motif and variation, density, and ENTRY/EXIT transitions; null means as authored. The
-   schema is small enough for Claude to enforce (5 unions, 57 nodes; pinned in
+   motif and variation, density, and ENTRY/EXIT transitions. The planner is asked to
+   answer the song in every section and to give a reason for any field it leaves to the
+   template; the judge penalises unanswered lyric cues, flat intensity and an ignored
+   palette, and a valid plan leaving a high-emphasis cue unanswered is sent back once
+   more while a planning round remains. The
+   schema is within Claude's measured limits (11 unions, 60 nodes; pinned in
    `tests/unit/agents/test_structured_outputs.py`).
 2. **Normalisation and heuristic validation**: on the moving-head path, single items the
    song cannot hold are repaired, recorded in the plan's `repairs` (and the render
@@ -90,9 +94,11 @@ are not decision evidence.
   ([evidence](../../changes/twinklr-reactivation-review/evidence/2026-11-12-p4-t2-ollama-cloud-pipeline/README.md)).
   Ollama Cloud does not enforce `response_format`, so the schema travels in the prompt. Claude
   (`llm_provider: anthropic`, default `claude-opus-5-5`) uses `output_config.format`
-  structured outputs. Claude refuses to compile the planner schemas ("compiled grammar
-  is too large"), so the adapter sends those requests with the schema carried only by the
-  prompt, decided before sending, and validates them client-side. The first Claude live run passed on 2026-11-12
+  structured outputs. Claude refuses to compile the larger planner schemas ("compiled
+  grammar is too large"), so the adapter sends those requests with the schema carried only
+  by the prompt, decided before sending, and validates them client-side. The moving-head
+  planner's schema is within the measured limits and is sent as an enforced format; its
+  live compile is pending the W2 probe. The first Claude live run passed on 2026-11-12
   ([evaluation](../../evaluations/2026-11-12-claude-baseline-live-run/README.md)).
 - Runtime prompt packs: `packages/twinklr/core/**/prompts/` (Jinja2 — application source,
   distinct from the root `prompts/` agent-workflow library)

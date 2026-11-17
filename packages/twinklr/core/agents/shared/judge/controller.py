@@ -354,6 +354,7 @@ class StandardIterationController[TPlan]:
         | None = None,
         plan_normalizer: Callable[[TPlan], TPlan] | None = None,
         plan_repairs: Callable[[TPlan], list[str]] | None = None,
+        plan_advisories: Callable[[TPlan], list[str]] | None = None,
     ) -> IterationResult[TPlan]:
         """Run iteration loop until approval or termination.
 
@@ -373,6 +374,11 @@ class StandardIterationController[TPlan]:
                 planner result before heuristic validation and judging.
             plan_repairs: Optional reader of what normalization repaired in a plan; the
                 next planning iteration's prompt receives it as `plan_repairs`.
+            plan_advisories: Optional reader of what a valid plan should still revise.
+                While a later planning iteration remains, a non-empty list sends the plan
+                back to the planner (with the advisories as its fixes) before judging; on
+                the last iteration it is ignored and the plan is judged, so an advisory
+                never fails a run.
 
         Returns:
             IterationResult with final plan and metadata
@@ -497,6 +503,30 @@ class StandardIterationController[TPlan]:
                     context_for_planner=f"Fix validation errors ({len(validation_errors)} total) before judging",
                 )
                 context.add_revision_request(revision)
+                continue
+
+            advisories = plan_advisories(plan) if plan_advisories is not None else []
+            if advisories and iteration < planning_attempts - 1:
+                self.logger.info(
+                    f"Plan revision advised (iteration {iteration + 1}): "
+                    f"{len(advisories)} item(s); re-planning before judging"
+                )
+                self.feedback.add_validation_failure(
+                    message="Advised revisions (not errors): " + "; ".join(advisories),
+                    iteration=iteration,
+                    metadata={"advisory": True},
+                )
+                context.add_revision_request(
+                    RevisionRequest(
+                        priority=RevisionPriority.HIGH,
+                        focus_areas=["Song Responsiveness"],
+                        specific_fixes=advisories[:20],
+                        avoid=[],
+                        context_for_planner=(
+                            "The plan is valid; revise it so it answers these moments of the song"
+                        ),
+                    )
+                )
                 continue
 
             # === JUDGING STAGE ===

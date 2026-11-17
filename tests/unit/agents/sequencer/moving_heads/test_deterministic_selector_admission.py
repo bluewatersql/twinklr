@@ -86,7 +86,7 @@ def test_selects_only_admitted_families_with_their_effective_variant() -> None:
             entry = next(t for t in admission.templates if t.template_id == part.template_id)
             assert part.preset_id == entry.effective_preset
             assert part.preset_id in (None, *entry.admitted_presets)
-            assert planned.set_intent_fields() == ()
+            assert planned.intensity is not None and planned.color is not None
 
 
 def test_the_whole_registry_is_not_the_candidate_set() -> None:
@@ -231,11 +231,13 @@ def test_admission_from_the_gate_keeps_order_variants_and_exclusions() -> None:
 
 
 @pytest.mark.parametrize("template_id", CATALOG_IDS)
-def test_a_family_section_leaves_every_song_intent_as_authored(template_id: str) -> None:
-    """The selector chooses templates only: each section is one part naming the family
-    with its effective variant, and its song intent is neutral (null intensity, colour
-    and gobo, no events, cues or transitions, variation NONE, density BALANCED), so the
-    family renders as authored."""
+def test_a_family_yields_the_palette_role_intent_and_no_step_derived_events(
+    template_id: str,
+) -> None:
+    """The step colour, shutter and gobo derivation has nothing to read on a family
+    (family steps carry none of those fields), so a family's section always gets the
+    role's palette colour and no events: removing that derivation with the old
+    templates (C1.2) cannot change a plan."""
     metadata = REGISTRY.get(template_id).template.metadata
     assert metadata is not None and metadata.energy_range is not None
     section = _section(metadata.recommended_sections[0], metadata.energy_range[0], 1)
@@ -243,10 +245,60 @@ def test_a_family_section_leaves_every_song_intent_as_authored(template_id: str)
 
     [planned] = result.plan.sections
     assert [part.template_id for part in planned.parts] == [template_id]
-    assert (planned.intensity, planned.color, planned.gobo, planned.motif_id) == (None,) * 4
-    assert planned.events == [] and planned.moment_cues == [] and planned.transitions == []
-    assert (planned.variation.value, planned.density.value) == ("NONE", "BALANCED")
-    assert planned.set_intent_fields() == ()
+    assert planned.color is not None and planned.color.name.startswith("PALETTE_")
+    assert planned.events == [] and planned.gobo is None
+    assert result.traces[0].unresolved_intent_fields == (
+        "gobo",
+        "moment_cues",
+        "events",
+        "motif_id",
+        "variation",
+        "density",
+        "transitions",
+    )
+
+
+@pytest.mark.parametrize(
+    ("energy", "intensity"),
+    [
+        (0, "SLOW"),
+        (25, "SLOW"),
+        (26, "SMOOTH"),
+        (50, "SMOOTH"),
+        (51, "FAST"),
+        (70, "FAST"),
+        (71, "DRAMATIC"),
+        (85, "DRAMATIC"),
+        (86, "INTENSE"),
+        (100, "INTENSE"),
+    ],
+)
+def test_intensity_follows_the_section_energy(energy: int, intensity: str) -> None:
+    admission = _admission(tuple(CATALOG_IDS))
+    result = DeterministicSelector(seed=1, admission=admission).select(
+        [_section("verse", energy, 1)]
+    )
+
+    assert result.plan.sections[0].intensity == intensity
+
+
+@pytest.mark.parametrize(
+    ("role", "color"),
+    [
+        ("chorus", "PALETTE_ACCENT"),
+        ("Drop", "PALETTE_ACCENT"),
+        ("build", "PALETTE_ACCENT"),
+        ("intro", "PALETTE_NEUTRAL"),
+        ("outro", "PALETTE_NEUTRAL"),
+        ("verse", "PALETTE_PRIMARY"),
+        ("bridge", "PALETTE_PRIMARY"),
+    ],
+)
+def test_the_palette_role_follows_the_section_role(role: str, color: str) -> None:
+    admission = _admission(tuple(CATALOG_IDS))
+    result = DeterministicSelector(seed=1, admission=admission).select([_section(role, 50, 1)])
+
+    assert result.plan.sections[0].color == color
 
 
 def test_admission_rejects_an_unadmitted_effective_variant_and_duplicates() -> None:
@@ -281,7 +333,7 @@ def test_the_repeat_cap_relaxes_when_the_admission_leaves_too_few_families() -> 
 
 def test_a_selector_plan_round_trips_through_the_plan_schema() -> None:
     """The plan the selector builds is a complete plan: its JSON dump reads back as the
-    same plan."""
+    same plan, its intensity and colour set."""
     admitted = ("finite_snap_hold", "mirror_wings", "target_orbit")
     admission = _admission(admitted, {"mirror_wings": "narrow"})
     result = DeterministicSelector(seed=3, admission=admission).select(
@@ -291,3 +343,6 @@ def test_a_selector_plan_round_trips_through_the_plan_schema() -> None:
     restored = ChoreographyPlan.model_validate_json(result.plan.model_dump_json())
     assert restored == result.plan
     assert restored.model_dump(mode="json") == result.plan.model_dump(mode="json")
+    assert all(
+        section.set_intent_fields()[:2] == ("intensity", "color") for section in restored.sections
+    )

@@ -1703,6 +1703,7 @@ def _family_llm_plan(
                 "template_id": part_template,
                 "preset_id": part_preset,
                 "modifiers": [],
+                "label": None,
                 "reasoning": "",
             }
             for index, (part_template, part_preset) in enumerate(parts)

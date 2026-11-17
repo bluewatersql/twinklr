@@ -11,9 +11,13 @@ prints its size and the schema statistics; it calls nothing.
 
     uv run python changes/2026_11_12_mh_true_up/evidence/2026-11-17-w2-planner-contract/probe_planner.py
 
-Paid (owner-authorized, minimum only; needs ANTHROPIC_API_KEY): add `--live`. It prints
-the response's usage, the plan's song intent per section, and what normalisation
-repaired; with `--out FILE` it also writes the raw response and the normalised plan.
+Paid (owner-authorized, minimum only; needs ANTHROPIC_API_KEY): add `--live`. It sends one
+request with the production planner's reasoning effort and token budget, SDK retries off,
+and prints the response's usage, the plan's song intent per section, the repair count and
+each repair; with `--out FILE` it also writes the raw response and the normalised plan.
+It exits non-zero unless the response was provider-enforced (`json_schema`), validates as
+a `ChoreographyPlan`, and has no validator errors (the dry run: unless the schema would be
+sent enforced).
 """
 
 from __future__ import annotations
@@ -24,6 +28,8 @@ import json
 from pathlib import Path
 import sys
 import time
+
+from pydantic import ValidationError
 
 REPO = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(REPO))
@@ -55,6 +61,7 @@ from twinklr.core.agents.sequencer.moving_heads.heuristic_validator import (  # 
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan  # noqa: E402
 from twinklr.core.agents.sequencer.moving_heads.moment_cues import (  # noqa: E402
     bind_lyric_moment_cues,
+    unanswered_high_cues,
 )
 from twinklr.core.agents.sequencer.moving_heads.orchestrator import (  # noqa: E402
     build_planner_variables,
@@ -145,7 +152,6 @@ def describe_schema() -> None:
 async def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--live", action="store_true", help="send the one paid request")
-    parser.add_argument("--effort", default="low", choices=("low", "medium", "high"))
     parser.add_argument("--out", type=Path, help="write the response and plan here (JSON)")
     args = parser.parse_args()
 
@@ -156,54 +162,83 @@ async def main() -> int:
     for message in messages:
         print(f"message {message['role']:9} chars={len(message['content'])}")
 
+    # The production planner's effort and token budget, so the probe measures what a run
+    # sends; only the model is Claude's.
     request_kwargs = {
         "response_model": ChoreographyPlan,
-        "reasoning_effort": args.effort,
+        "reasoning_effort": spec.reasoning_effort,
         "max_tokens": spec.max_tokens,
         "allow_json_object_fallback": False,
     }
     provider = AnthropicProvider(api_key=None if args.live else "dry-run-not-sent")
+    # One request only: no SDK retry may send a second, paid one.
+    provider._sync_client = provider._sync_client.with_options(max_retries=0)
+    provider._async_client = provider._async_client.with_options(max_retries=0)
     request = provider._build_request(messages, MODEL, None, dict(request_kwargs))
     params = request.params
-    print("model", MODEL, "effort", args.effort, "max_tokens", params["max_tokens"])
-    print("schema_enforced", "format" in params.get("output_config", {}))
+    enforced = "format" in params.get("output_config", {})
+    print("model", MODEL, "effort", spec.reasoning_effort, "max_tokens", params["max_tokens"])
+    print("schema_enforced", enforced)
     print("request_bytes", len(json.dumps(params)))
     if not args.live:
         print("dry run: no request sent (add --live to send the one paid request)")
-        return 0
+        return 0 if enforced else 1
 
     print("utc_start", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
     started = time.time()
     response = await provider.generate_json_async(messages=messages, model=MODEL, **request_kwargs)
     print("utc_end", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
-    usage = response.metadata.token_usage
+    mode = response.metadata.structured_output_mode
     print(
-        f"seconds={time.time() - started:.1f} mode={response.metadata.structured_output_mode} "
-        f"finish={response.metadata.finish_reason} usage={usage}"
+        f"seconds={time.time() - started:.1f} mode={mode} effort={spec.reasoning_effort} "
+        f"finish={response.metadata.finish_reason} usage={response.metadata.token_usage}"
     )
-    plan = ChoreographyPlan.model_validate(response.content)
-    normalised = bind_lyric_moment_cues(
-        plan, context.lyric_context, context.beat_grid, context.sections
-    )
-    validation = HeuristicValidator.from_context(context).validate(normalised)
-    for section in normalised.sections:
+    failures: list[str] = []
+    if mode != "json_schema":
+        failures.append(f"the response was not provider-enforced (mode {mode})")
+    try:
+        plan = ChoreographyPlan.model_validate(response.content)
+    except ValidationError as error:
+        failures.append(f"the response does not validate: {error}")
+        plan = None
+    if plan is not None:
+        normalised = bind_lyric_moment_cues(
+            plan, context.lyric_context, context.beat_grid, context.sections
+        )
+        validation = HeuristicValidator.from_context(context).validate(normalised)
+        for section in normalised.sections:
+            print(
+                f"section {section.section_id}: parts={[p.template_id for p in section.parts]} "
+                f"set={list(section.set_intent_fields())} "
+                f"events={[event.describe() for event in section.events]}"
+            )
+        print("repair_count", len(normalised.repairs))
+        for repair in normalised.repairs:
+            print("repair", repair.describe())
         print(
-            f"section {section.section_id}: parts={[p.template_id for p in section.parts]} "
-            f"set={list(section.set_intent_fields())} "
-            f"events={[event.describe() for event in section.events]}"
+            "unanswered_high_cues",
+            unanswered_high_cues(normalised, context.lyric_context, context.sections),
         )
-    print("repairs", [repair.describe() for repair in normalised.repairs])
-    print("validator_errors", validation.errors)
-    if args.out is not None:
-        args.out.write_text(
-            json.dumps(
-                {"response": response.content, "plan": normalised.model_dump(mode="json")},
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-        print("wrote", args.out)
-    return 0
+        print("validator_errors", validation.errors)
+        if validation.errors:
+            failures.append(f"{len(validation.errors)} validator error(s)")
+        if args.out is not None:
+            args.out.write_text(
+                json.dumps(
+                    {
+                        "model": MODEL,
+                        "effort": spec.reasoning_effort,
+                        "response": response.content,
+                        "plan": normalised.model_dump(mode="json"),
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            print("wrote", args.out)
+    for failure in failures:
+        print("PROBE FAILED:", failure)
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":

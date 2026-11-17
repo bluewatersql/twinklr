@@ -526,3 +526,86 @@ class TestV2JudgePrompts:
 
         assert "Learning Context" in rendered
         assert "TIMING" in rendered
+
+
+# =============================================================================
+# Song-first instructions (the planner answers the song; null needs a reason)
+# =============================================================================
+
+
+def _pack_text(name: str) -> str:
+    return "\n".join(path.read_text() for path in sorted((PROMPTS_BASE / name).glob("*.j2")))
+
+
+def _flat(text: str) -> str:
+    return " ".join(text.split())
+
+
+def test_the_planner_is_told_to_answer_the_song_in_every_section() -> None:
+    developer = _flat((PROMPTS_BASE / "planner" / "developer.j2").read_text())
+    user = _flat((PROMPTS_BASE / "planner" / "user.j2").read_text())
+
+    for instruction in (
+        "Every section answers the song.",
+        "Set `intensity` from its energy target, a palette-role `color` from its palette, "
+        "and an accent (an event) on every high- and medium-emphasis lyric moment cue and on "
+        "the drops and hits.",
+        "Leave a field null only when you can say in `reasoning` why the template's own "
+        "look already answers this moment.",
+        "Intensity that stays flat across a clear change of energy ignores the song.",
+        "Answer every high- and medium-emphasis cue of a section",
+        "`section_role`: what the section does in the song",
+        "`energy_level`: 0-100, how much energy this section's light answers with",
+    ):
+        assert instruction in developer, instruction
+    for target, intensities in (
+        ("LOW", "`SLOW` or `SMOOTH`"),
+        ("MED", "`SMOOTH` or `FAST`"),
+        ("HIGH", "`FAST` or `DRAMATIC`"),
+        ("PEAK", "`DRAMATIC` or `INTENSE`"),
+    ):
+        assert f"an energy target of `{target}`: {intensities}" in developer, target
+    for mode, boundary in (
+        ("snap", "into a drop"),
+        ("fade_via_black", "into a quiet bridge or outro"),
+        ("crossfade", "between related sections"),
+        ("morph", "between related sections"),
+        ("sweep", "on builds and lifts"),
+    ):
+        line = next(item for item in developer.split("- `") if item.startswith(f"{mode}`"))
+        assert boundary in line, mode
+    assert "Put an event on every high- and medium-emphasis lyric moment cue" in user
+    assert "A field left null needs a reason there." in user
+
+
+def test_the_judge_penalises_a_plan_that_ignores_the_song() -> None:
+    developer = _flat((PROMPTS_BASE / "judge" / "developer.j2").read_text())
+
+    for instruction in (
+        "a high-emphasis lyric moment cue with no event (unanswered)",
+        "intensity that stays flat across a clear change of energy target",
+        "colour that ignores the section's palette",
+        "a plan whose sections are mostly null song intent",
+        "cannot score above the soft-fail band",
+        "**Reward** plans whose `reasoning` cites the lyrics (cue ids and text), the energy "
+        "targets and the palette colours",
+    ):
+        assert instruction in developer, instruction
+    assert "Lyric Moment Cues" in (PROMPTS_BASE / "judge" / "user.j2").read_text()
+
+
+@pytest.mark.parametrize("pack", ["planner", "judge"])
+def test_no_pack_nudges_the_model_toward_leaving_the_song_unanswered(pack: str) -> None:
+    text = _flat(_pack_text(pack)).lower()
+
+    for nudge in (
+        "valid, deliberate choice",
+        "leaving it null is",
+        "leave a field null (or a list empty) wherever",
+        "unless a choice serves the music",
+        "left as authored where",
+        "as authored where the template already serves",
+        "null, or an empty list, means",
+        "that is valid, not missing",
+    ):
+        assert nudge not in text, nudge

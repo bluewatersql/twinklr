@@ -121,6 +121,7 @@ def _section_payload() -> dict[str, Any]:
                 "template_id": "sweep_lr_fan_pulse",
                 "preset_id": None,
                 "modifiers": [PlanModifier(key="movement_scale", value="wide")],
+                "label": None,
                 "reasoning": "First half.",
             },
             {
@@ -128,6 +129,7 @@ def _section_payload() -> dict[str, Any]:
                 "template_id": "circle_fan_hold",
                 "preset_id": None,
                 "modifiers": [],
+                "label": None,
                 "reasoning": "Second half.",
             },
         ],

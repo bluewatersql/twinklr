@@ -140,7 +140,7 @@ GoboChoice = Literal[
 ]
 
 PART_IDS = ("A", "B", "C")
-"""The ids code gives a section's parts, in order, when it has more than one."""
+"""The ids code gives a section's unlabelled parts, by position, when it has more than one."""
 
 
 class PlanModifier(BaseModel):
@@ -157,13 +157,19 @@ class PlanPart(BaseModel):
 
     start_bar: int = Field(ge=1, description="First bar of this part (1-indexed)")
     template_id: str = Field(description="Template from the Template Library")
-    preset_id: str | None = Field(
-        description="A preset the template declares, or null for the template as authored"
-    )
+    preset_id: str | None = Field(description="A preset the template declares, or null")
     modifiers: list[PlanModifier] = Field(description="Modifier entries; empty when unused")
+    label: str | None = Field(
+        description="A short name for this part of the section (e.g. 'pickup', 'drop'), or null"
+    )
     reasoning: str = Field(description="Why this template here")
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    @field_validator("label")
+    @classmethod
+    def _strip_label(cls, value: str | None) -> str | None:
+        return value.strip() or None if value is not None else None
 
 
 class PlanEvent(BaseModel):
@@ -180,22 +186,10 @@ class PlanEvent(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    @model_validator(mode="after")
-    def _action_carries_its_field(self) -> PlanEvent:
-        needs_color = self.action is EventAction.COLOR
-        needs_gobo = self.action is EventAction.GOBO
-        if (self.color is not None) != needs_color or (self.gobo is not None) != needs_gobo:
-            raise ValueError(
-                f"a {self.action.value} event at bar {self.bar} beat {self.beat} sets "
-                + (
-                    "color and no gobo"
-                    if needs_color
-                    else "gobo and no color"
-                    if needs_gobo
-                    else "neither color nor gobo"
-                )
-            )
-        return self
+    @field_validator("moment_cue_id")
+    @classmethod
+    def _strip_cue_id(cls, value: str | None) -> str | None:
+        return value.strip() or None if value is not None else None
 
     def describe(self) -> str:
         """One line: where, what, and the cue it lands on."""
@@ -215,24 +209,33 @@ class PlanSection(BaseModel):
     start_bar: int = Field(ge=1, description="Start bar (1-indexed)")
     end_bar: int = Field(ge=1, description="End bar (1-indexed, inclusive)")
     section_role: str | None = Field(
-        description="Section role (verse, chorus, bridge, build, drop, ...) or null"
+        description="What the section does in the song (verse, chorus, bridge, build, drop, ...)"
     )
-    energy_level: int | None = Field(ge=0, le=100, description="Energy 0-100 or null")
+    energy_level: int | None = Field(
+        ge=0, le=100, description="How much energy the light answers with here, 0-100"
+    )
     parts: list[PlanPart] = Field(
         description="One to three templates in bar order; one part covers the whole section",
         min_length=1,
         max_length=len(PART_IDS),
     )
-    intensity: IntensityChoice = Field(description="How hard the light drives; null = as authored")
-    color: ColorChoice = Field(description="The section's colour; null = as authored")
-    gobo: GoboChoice = Field(description="The section's gobo pattern; null = as authored")
+    intensity: IntensityChoice = Field(
+        description="How hard the light drives, from the section's energy (null: the template's own)"
+    )
+    color: ColorChoice = Field(
+        description="The section's colour, a role in its palette or a named colour "
+        "(null: the template's own)"
+    )
+    gobo: GoboChoice = Field(description="The section's beam pattern (null: the template's own)")
     moment_cues: list[str] = Field(description="Lyric moment cue ids this section answers")
-    events: list[PlanEvent] = Field(description="Timed accents in the section; empty when none")
+    events: list[PlanEvent] = Field(
+        description="Timed accents on the section's lyric cues and musical moments"
+    )
     motif_id: str | None = Field(description="The macro motif this section carries, or null")
     variation: Variation = Field(description="How this section varies its motif")
     density: Density = Field(description="How busy the movement is")
     transitions: list[PlanTransition] = Field(
-        description="At most one ENTRY and one EXIT transition; empty for the default",
+        description="At most one ENTRY and one EXIT transition, chosen for the boundary",
         max_length=len(TransitionEdge),
     )
     reasoning: str = Field(description="Why these choices serve the song here")
@@ -336,17 +339,32 @@ class ChoreographyPlan(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
+def part_ids(section: PlanSection) -> list[str]:
+    """The id of each of the section's parts in timing labels and the trace: its label,
+    else `A`, `B`, `C` by position; a label or letter already taken in the section gives
+    way to the first free letter."""
+    ids: list[str] = []
+    for index, part in enumerate(section.parts):
+        candidate = part.label or PART_IDS[index]
+        if candidate in ids:
+            candidate = next(letter for letter in PART_IDS if letter not in ids)
+        ids.append(candidate)
+    return ids
+
+
 def flatten_section(section: PlanSection) -> list[PlanSection]:
     """The section as the renderer places it: one section per part.
 
-    One part is the section itself. Several parts become sections named
-    `<section_id>|A`, `|B`, `|C` over their own bars; each keeps the section's intent,
-    with the events on its bars (event bars are absolute), the moment cues (untimed, so
-    on every part), the entry transition on the first part and the exit on the last.
+    One unlabelled part is the section itself. Otherwise each part becomes a section
+    named `<section_id>|<part id>` (`part_ids`) over its own bars, carrying the section's
+    intent, with the events on its bars (event bars are absolute), the moment cues
+    (untimed, so on every part), the entry transition on the first part and the exit on
+    the last.
     """
-    if len(section.parts) == 1:
+    if len(section.parts) == 1 and section.parts[0].label is None:
         return [section]
     bars = section.part_bars()
+    ids = part_ids(section)
     flattened: list[PlanSection] = []
     for index, (part, start, end) in enumerate(bars):
         edges = {TransitionEdge.ENTRY} if index == 0 else set()
@@ -355,7 +373,7 @@ def flatten_section(section: PlanSection) -> list[PlanSection]:
         flattened.append(
             section.model_copy(
                 update={
-                    "section_id": f"{section.section_id}|{PART_IDS[index]}",
+                    "section_id": f"{section.section_id}|{ids[index]}",
                     "start_bar": start,
                     "end_bar": end,
                     "parts": [part],

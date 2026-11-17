@@ -23,7 +23,10 @@ from twinklr.core.agents.sequencer.moving_heads.heuristic_validator import (
     create_validator_function,
 )
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
-from twinklr.core.agents.sequencer.moving_heads.moment_cues import bind_lyric_moment_cues
+from twinklr.core.agents.sequencer.moving_heads.moment_cues import (
+    bind_lyric_moment_cues,
+    unanswered_high_cues,
+)
 from twinklr.core.agents.sequencer.moving_heads.specs import (
     get_judge_spec,
     get_planner_spec,
@@ -133,6 +136,8 @@ def build_judge_variables(
         "iteration": iteration,
         # Audio profile (for context, including planner_hints)
         "audio_profile": context.audio_profile,
+        # Lyric moment cues, so the judge can see which the plan answers
+        "lyric_context": context.lyric_context,
         # Macro plan guidance (enriched with palette/motifs for alignment validation)
         "macro_plan": prompt_context["macro_plan"],
         "macro_palette_arc": prompt_context["macro_palette_arc"],
@@ -295,7 +300,9 @@ class MovingHeadPlannerOrchestrator:
            hold, lyric cues bound to their beats (`bind_lyric_moment_cues`)
         3. Validate plan (heuristic validator)
         4. Evaluate plan (judge agent)
-        5. Refine if needed (repeat with feedback, including what was repaired)
+        5. Refine if needed (repeat with feedback, including what was repaired); a valid
+           plan that leaves a HIGH lyric cue without an event is sent back once more before
+           judging while iterations remain
         6. Return final plan or best attempt
 
         Args:
@@ -354,6 +361,9 @@ class MovingHeadPlannerOrchestrator:
                 context.sections,
             ),
             plan_repairs=lambda plan: [repair.describe() for repair in plan.repairs],
+            plan_advisories=lambda plan: unanswered_high_cues(
+                plan, context.lyric_context, context.sections
+            ),
         )
 
         if result.success:

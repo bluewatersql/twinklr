@@ -946,6 +946,102 @@ class TestOrchestratorIntegration:
         # The judge sees the repaired plan and its repairs; "ghost" survives only there.
         assert '"repairs"' in judge_messages[0] and "ghost" in judge_messages[0]
         assert "section 'chorus_1': moment cue 'ghost' dropped" in planner_messages[1]
-        assert "section 'chorus_1': closed event at bar 5 beat 1 dropped" in planner_messages[1]
+        assert (
+            "section 'chorus_1': closed event at bar 5 beat 1 adjusted: after the section"
+            in planner_messages[1]
+        )
         assert "ghost" not in planner_messages[0]
         assert result.plan is not None and result.plan.repairs == []
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("max_iterations", [2, 1])
+    async def test_an_unanswered_high_cue_sends_a_valid_plan_back_while_rounds_remain(
+        self, max_iterations: int
+    ) -> None:
+        """A valid plan that leaves a HIGH lyric cue unanswered is re-planned before any
+        judge call while a planning round remains; on the last round it is judged as is,
+        never failed for it."""
+        section = SongSectionRef(section_id="chorus_1", name="chorus", start_ms=0, end_ms=4_000)
+        profile = create_test_audio_profile().model_copy(
+            update={
+                "song_identity": SongIdentity(
+                    title="Cue Song",
+                    artist="Test Artist",
+                    duration_ms=4_000,
+                    bpm=120.0,
+                    time_signature="4/4",
+                ),
+                "structure": Structure(sections=[section], structure_confidence=0.9),
+            }
+        )
+        cue = MomentCue(
+            cue_id="hook",
+            timestamp_ms=1_500,
+            section_id="chorus_1",
+            emphasis="HIGH",
+            text="light it up",
+            visual_hint="A bright hit.",
+        )
+        silent = ChoreographyPlan(
+            sections=[plan_section("chorus_1", 1, 2, "sweep_lr_fan_pulse")],
+            overall_strategy="x",
+        )
+        answered = ChoreographyPlan(
+            sections=[
+                plan_section(
+                    "chorus_1",
+                    1,
+                    2,
+                    "sweep_lr_fan_pulse",
+                    moment_cues=["hook"],
+                    events=[_event(1, 4, "hit", "hook")],
+                )
+            ],
+            overall_strategy="x",
+        )
+        verdict = JudgeVerdict(
+            status=VerdictStatus.APPROVE,
+            score=8.0,
+            confidence=0.9,
+            strengths=["Answers the hook"],
+            issues=[],
+            feedback_for_planner="Good.",
+            iteration=0,
+        )
+        planner_messages: list[str] = []
+
+        async def planner_call(*, user_message: str, **kwargs: object) -> LLMResponse:
+            planner_messages.append(user_message)
+            plan = silent if len(planner_messages) == 1 else answered
+            return LLMResponse(content=plan.model_dump(mode="json"), metadata=ResponseMetadata())
+
+        provider = MagicMock()
+        provider.provider_type = ProviderType.ANTHROPIC
+        provider.generate_json_with_conversation_async = AsyncMock(side_effect=planner_call)
+        provider.generate_json_async = AsyncMock(
+            return_value=LLMResponse(
+                content=verdict.model_dump(mode="json"), metadata=ResponseMetadata()
+            )
+        )
+        context = MovingHeadPlanningContext(
+            audio_profile=profile,
+            lyric_context=LyricContextModel(
+                has_lyrics=True, vocal_coverage_pct=0.25, moment_cues=[cue]
+            ),
+            fixtures=FixtureContext(count=4, groups=[]),
+            beat_grid=BeatGrid.from_tempo(tempo_bpm=120, total_bars=2),
+            available_templates=["sweep_lr_fan_pulse"],
+        )
+
+        result = await MovingHeadPlannerOrchestrator(
+            provider=provider, max_iterations=max_iterations
+        ).run(context)
+
+        assert result.success
+        assert provider.generate_json_async.await_count == 1
+        assert len(planner_messages) == max_iterations
+        if max_iterations == 2:
+            assert "the HIGH lyric moment cue 'hook'" in planner_messages[1]
+            assert result.plan is not None and result.plan.sections[0].events
+        else:
+            assert result.plan is not None and result.plan.sections[0].events == []

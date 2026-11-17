@@ -220,6 +220,7 @@ def _two_parts(second_template: str):
                 "template_id": "sweep_lr_fan_pulse",
                 "preset_id": None,
                 "modifiers": [],
+                "label": None,
                 "reasoning": "",
             },
             {
@@ -227,6 +228,7 @@ def _two_parts(second_template: str):
                 "template_id": second_template,
                 "preset_id": None,
                 "modifiers": [],
+                "label": None,
                 "reasoning": "",
             },
         ],

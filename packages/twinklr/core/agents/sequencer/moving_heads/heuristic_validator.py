@@ -18,9 +18,9 @@ import logging
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from twinklr.core.agents.sequencer.moving_heads.models import (
-    PART_IDS,
     ChoreographyPlan,
     PlanSection,
+    part_ids,
 )
 
 if TYPE_CHECKING:
@@ -220,8 +220,9 @@ class HeuristicValidator:
         # 3) each part: an offered template over its own bars
         units: list[_PlanUnit] = []
         parts = section.part_bars()
+        ids = part_ids(section)
         for index, (part, start_bar, end_bar) in enumerate(parts):
-            location = name if len(parts) == 1 else f"{name}|{PART_IDS[index]}"
+            location = name if len(parts) == 1 else f"{name}|{ids[index]}"
             if part.template_id not in self.available_templates:
                 errors.append(f"Section '{location}': template '{part.template_id}' not in library")
             if end_bar - start_bar < 1:

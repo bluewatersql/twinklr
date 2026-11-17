@@ -199,6 +199,19 @@ def _normalize_supported_schema(value: Any, _path: tuple[str, ...] = ()) -> Any:
             )
         del normalized["prefixItems"]
         normalized["items"] = prefix_items[0]
+
+    # Pydantic emits a `Literal[..., None]` of strings as a bare `enum` with no `type`;
+    # OpenAI strict mode requires a type on every value schema.  Name the type the
+    # values already have: a string, or a string or null.
+    enum = normalized.get("enum")
+    if (
+        isinstance(enum, list)
+        and enum
+        and "type" not in normalized
+        and _path[-1:] not in (("properties",), ("$defs",))
+        and all(item is None or isinstance(item, str) for item in enum)
+    ):
+        normalized["type"] = ["string", "null"] if None in enum else "string"
     return normalized
 
 

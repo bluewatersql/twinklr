@@ -685,10 +685,12 @@ def plan_section(
     end_bar: int,
     template_id: str,
     preset_id: str | None = None,
+    *,
+    label: str | None = None,
     **fields: Any,
 ) -> PlanSection:
-    """One section of one part (`template_id`, `preset_id`), its song intent neutral (as
-    authored) unless `fields` sets any of the section's fields."""
+    """One section of one part (`template_id`, `preset_id`, `label`), its song intent
+    neutral (as authored) unless `fields` sets any of the section's fields."""
     return PlanSection.model_validate(
         {
             "section_id": section_id,
@@ -702,6 +704,7 @@ def plan_section(
                     "template_id": template_id,
                     "preset_id": preset_id,
                     "modifiers": [],
+                    "label": label,
                     "reasoning": "",
                 }
             ],

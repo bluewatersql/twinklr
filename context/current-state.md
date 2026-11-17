@@ -31,8 +31,8 @@ See [product/overview.md](product/overview.md).
   planning, deterministic heuristic repair, and a judge whose verdicts feed the next
   revision. Moving-head sections carry 1-3 template parts and categorical song intent
   (intensity, colour, gobo, timed events tied to lyric MomentCues, motif variation,
-  density, entry/exit transitions; contract of 2026-11-17, enforced by Claude as a
-  structured output); the moving-head renderer does not yet render the intent, a known
+  density, entry/exit transitions; contract of 2026-11-17, sent to Claude as an enforced
+  structured output, its live compile pending the W2 probe); the moving-head renderer does not yet render the intent, a known
   regression (below).
   [architecture/multi-agent-planning.md](architecture/multi-agent-planning.md)
 - **Providers** — OpenAI (default; Responses API strict structured outputs), Claude

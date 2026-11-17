@@ -287,7 +287,10 @@ def test_all_registered_strict_roots_stay_within_openai_schema_ceilings() -> Non
 # Live evidence for Claude's grammar limit: the 2026-11-12 probe of every registered
 # schema (changes/twinklr-reactivation-review/evidence/2026-11-12-claude-provider-live/
 # README.md). Apart from descriptions and titles, the schemas Claude receives for the
-# registered specs are byte-identical to the probed ones.
+# registered specs are byte-identical to the probed ones, except `mh_planner`: its
+# song-intent contract (2026-11-17) is within the limits by measure and is sent as an
+# enforced format, but its live compile is pending the W2 probe
+# (changes/2026_11_12_mh_true_up/evidence/2026-11-17-w2-planner-contract/).
 _CLAUDE_COMPILED_SPECS = frozenset(
     {
         "asset_prompt_enricher",
@@ -328,15 +331,38 @@ def test_moving_head_plan_schema_size_is_pinned() -> None:
     """The moving-head plan fits one Claude-enforced call with margin; a change that grows
     it moves these figures and must be re-measured here.
 
-    Claude: 5 union parameters of 16, 57 nodes of 68 (every $ref expanded where used;
-    the transition is one list of ENTRY/EXIT items, so it is counted once). OpenAI strict
-    mode: 39 properties, depth 7, 161 enum values.
+    Claude: 11 union parameters of 16, 60 nodes of 68 (every $ref expanded where used;
+    the transition is one list of ENTRY/EXIT items, so it is counted once; the five
+    nullable enums carry `type: ["string", "null"]`, one union each). OpenAI strict mode:
+    40 properties, depth 7, 166 enum values.
     """
     assert claude_schema_size(claude_json_schema(ChoreographyPlan)) == ClaudeSchemaSize(
-        union_parameters=5, nodes=57
+        union_parameters=11, nodes=60
     )
     stats = strict_schema_stats(strict_json_schema(ChoreographyPlan))
-    assert (stats.property_count, stats.max_depth, stats.enum_value_count) == (39, 7, 161)
+    assert (stats.property_count, stats.max_depth, stats.enum_value_count) == (40, 7, 166)
+
+
+def test_no_registered_strict_schema_has_an_untyped_enum() -> None:
+    """OpenAI strict mode needs a type on every value schema: a nullable `Literal` enum
+    carries `type: ["string", "null"]`, not a bare `enum`."""
+    for spec in _registered_specs():
+        for node in _walk_json(strict_json_schema(spec.response_model)):
+            if "enum" in node:
+                assert "type" in node, (spec.name, node)
+
+
+def test_a_nullable_literal_enum_is_typed_string_or_null() -> None:
+    class Choice(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+
+        pick: Literal["a", "b", None]
+        must: Literal["a", "b"]
+
+    properties = strict_json_schema(Choice)["properties"]
+    assert properties["pick"]["type"] == ["string", "null"]
+    assert properties["pick"]["enum"] == ["a", "b", None]
+    assert properties["must"]["type"] == "string"
 
 
 def test_shipped_full_response_examples_match_registered_strict_models() -> None:

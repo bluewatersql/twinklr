@@ -24,28 +24,44 @@ You must return a `ChoreographyPlan` that matches this JSON schema:
 ### Plan Structure
 
 A choreography plan has one entry in `sections` per song section, plus an
-`overall_strategy` (1-3 sentences). Each section names its song section, its bars, the
-templates that play over it (`parts`), and its **song intent**: how the light should
-answer this moment of the song.
+`overall_strategy` (1-3 sentences on how the light follows this song). Each section names
+its song section, its bars, the templates that play over it (`parts`), and its **song
+intent**: how the light answers this moment of the song.
 
-`section_id` is the unique Section ID from the Song Structure table (for example
-`chorus_1` or `chorus_2`), never the repeatable display Name (`chorus`).
+**Every section answers the song.** Set `intensity` from its energy target, a
+palette-role `color` from its palette, and an accent (an event) on every high- and
+medium-emphasis lyric moment cue and on the drops and hits. Leave a field null only when
+you can say in `reasoning` why the template's own look already answers this moment. A
+plan whose sections are mostly null ignores the song.
+
+- `section_id`: the unique Section ID from the Song Structure table (for example
+  `chorus_1` or `chorus_2`), never the repeatable display Name (`chorus`).
+- `section_role`: what the section does in the song (verse, chorus, bridge, build, drop,
+  breakdown, outro...). Start from the song structure's name and sharpen it where the
+  music says more (a chorus that is the song's peak, a verse that builds).
+- `energy_level`: 0-100, how much energy this section's light answers with, from the
+  section's energy target and the audio profile. Keep `intensity`, `density` and the
+  template's energy range consistent with it.
+- `reasoning`: say which moments of this section you answered and how: the energy, the
+  palette colour, the lyric cues and musical moments the events land on, the boundary.
 
 ### Parts: Which Templates Play
 
 `parts` lists 1 to 3 templates in bar order.
 
-- **One part** covers the whole section. This is the default and the usual choice.
+- **One part** covers the whole section; most sections need only one.
 - **Two or three parts** split the section where the music clearly changes inside it.
 - The first part's `start_bar` is the section's `start_bar`. Each later part starts on a
   later bar inside the section. A part plays until the next part starts; the last part
   plays to the section's `end_bar`.
 - `template_id`: a template from the Template Library, exactly as written.
-- `preset_id`: a preset the template declares, or null for the template as authored.
+- `preset_id`: a preset the template declares, or null for its base.
 - `modifiers`: a list of `{key, value}` entries; an empty list when unused.
+- `label`: a short name for the part in the sequence's timing marks (`pickup`, `drop`,
+  `tail`), or null for a letter.
 - `reasoning`: why this template here.
 
-**Split a section only for a clear musical reason**:
+**Split a section for a clear musical reason**:
 - **Pickup before drop**: a short buildup (1-2 bars) followed by the main hit
 - **Build into hit**: gradual intensification into a climactic moment
 - **Verse A-B structure**: distinct musical phrases within one section
@@ -60,69 +76,94 @@ answer this moment of the song.
 ### Song Intent
 
 Templates are complete choreography units: each already defines movement, geometry and
-dimmer effects. Song intent says how a section should answer the song on top of that.
-**Null, or an empty list, means "as the template is authored."** Set a field only when it
-serves the music; leaving it null is a valid, deliberate choice.
+dimmer effects. Song intent makes them follow this song: its energy, its colours, its
+lyrics, its boundaries.
 
-**`intensity`**: how hard the light drives.
-- `SLOW`: gentle and unhurried, for quiet or reflective passages
-- `SMOOTH`: flowing and even, the template's own feel
+**`intensity`**: how hard the light drives, from the section's energy target.
+- `SLOW`: gentle and unhurried
+- `SMOOTH`: flowing and even
 - `FAST`: brisk and lively
-- `DRAMATIC`: bold, punchy accents on the strong beats, for big moments
-- `INTENSE`: maximum drive, accenting every beat, for the peaks
+- `DRAMATIC`: bold, punchy accents on the strong beats
+- `INTENSE`: maximum drive, accenting every beat
 
-**`color`**: the section's colour.
-- Palette roles follow the song's palette for the section (the Macro Strategy table
-  lists each section's palette and its colours): `PALETTE_PRIMARY` is the palette's main
-  colour, `PALETTE_ACCENT` its highlight colour, `PALETTE_WARM` and `PALETTE_COOL` its
-  warm and cool sides, `PALETTE_NEUTRAL` its whitest, least saturated colour. A role keeps
-  the heads in the same colour story as the rest of the show, and it follows the palette
-  when the palette changes between sections.
-- Named colours (`red`, `blue`, ..., `uv`) are fixed colours whatever the palette; use
-  them for a deliberate contrast with the palette.
+Read it from the Macro Strategy energy target:
+- an energy target of `LOW`: `SLOW` or `SMOOTH`
+- an energy target of `MED`: `SMOOTH` or `FAST`
+- an energy target of `HIGH`: `FAST` or `DRAMATIC`
+- an energy target of `BUILD`: one step above the section before it, and the section after it higher still
+- an energy target of `PEAK`: `DRAMATIC` or `INTENSE`
+- an energy target of `RELEASE`: a step or two below the section before it
 
-**`gobo`**: the beam's pattern for the whole section (`open` is a plain beam).
+Without a macro plan, read the energy from the audio profile and the section objectives.
+Intensity that stays flat across a clear change of energy ignores the song.
+
+**`color`**: the section's colour, from the song's palette. The Section palettes list
+gives each section's palette and its colours.
+- `PALETTE_PRIMARY` is the palette's main colour (its first), `PALETTE_ACCENT` its
+  highlight colour (its second), `PALETTE_WARM` and `PALETTE_COOL` its warmest and coolest
+  colours, `PALETTE_NEUTRAL` its whitest, least saturated colour. Choose by what the
+  section needs: the main colour for verses, the accent for choruses and peaks, neutral
+  for intros, outros and quiet breaks, warm or cool to follow the mood.
+- A palette role keeps the heads in the same colour story as the rest of the show and
+  follows the palette when it changes between sections. A named colour (`red`, `blue`,
+  ..., `uv`) is fixed whatever the palette: use one only for a deliberate contrast, and
+  say why.
+
+**`gobo`**: the beam's pattern for the whole section (`open` is a plain beam): a texture
+that suits the section's imagery (stars for a night sky, flame for warmth).
 
 **`events`**: timed accents at an absolute bar and beat (both 1-indexed) inside the
 section.
-- `open` / `closed`: the beam opens / shuts
-- `strobe_slow`, `strobe_medium`, `strobe_fast`: the beam strobes
+- `open` / `closed`: the beam opens / shuts (a stop, a breath)
+- `strobe_slow`, `strobe_medium`, `strobe_fast`: the beam strobes (a build, a peak)
 - `pulse`: the beam pulses on each beat
-- `hit`: a single brightness accent
+- `hit`: a single brightness accent (a drop, a hit, a lyric peak)
 - `color`: a colour change; set the event's `color` (same vocabulary as above)
 - `gobo`: a pattern change; set the event's `gobo`
 
-Every other action leaves `color` and `gobo` null. Use accents for musical moments (a
-drop, a hit, a stop, the first beat of a chorus) and for lyric moments.
+Every other action leaves `color` and `gobo` null. Put an event on every drop, hit and
+stop the song has, and on the lyric moment cues below.
 
 **`moment_cues`** and **`moment_cue_id`**: tie light to the lyrics. The Lyric Context
-lists moment cues, each with its section, time, emphasis and a visual hint. To answer a
-cue, list its id in the section's `moment_cues` and give an event that `moment_cue_id`;
-deterministic code places that event exactly on the cue's beat, so its own bar and beat
-need only be close. Match the action to the cue's emphasis: a high-emphasis cue suits a
-`hit` or a strobe, a medium one a `color` or `gobo` change, a low one something gentle;
-follow the cue's visual hint. Only ids from the Lyric Context of the same section are
-valid; use an empty list and null when there are none.
+lists moment cues, each with its section, time, emphasis and a visual hint. Answer every
+high- and medium-emphasis cue of a section: list its id in the section's `moment_cues`
+and give an event that `moment_cue_id`. Deterministic code places that event exactly on the cue's
+beat, so its own bar and beat need only be close. Match the action to the cue's emphasis
+and visual hint: a high-emphasis cue suits a `hit` or a strobe, a medium one a `color` or
+`gobo` change; a low one may take something gentle. Only ids from the Lyric Context of
+the same section are valid.
 
 **`motif_id`** and **`variation`**: carry a macro motif (from the Macro Strategy motifs)
-through the song. `motif_id` names the motif this section carries, or null. `variation`
-says how this section treats it relative to where it appeared before: `NONE` (the same),
-`NARROW` (tighter), `WIDEN` (broader), `SLOWER`, `FASTER`.
+through the song and shape the arc across repeated sections. `motif_id` names the motif a
+section carries. `variation` says how a section treats it relative to where it appeared
+before: `NONE` (the same), `NARROW` (tighter), `WIDEN` (broader), `SLOWER`, `FASTER`. A
+second chorus widens or quickens the first, a last chorus goes furthest, a bridge narrows
+or slows.
 
-**`density`**: how busy the movement is: `REST` (the heads mostly hold), `SPARSE`,
-`BALANCED` (as authored), `BUSY`.
+**`density`**: how busy the movement is, shaping the arc with intensity:
+- `REST`: the heads mostly hold (a breakdown, a held note)
+- `SPARSE`: few, spaced moves (intros, quiet verses)
+- `BALANCED`: the template's own pace
+- `BUSY`: dense movement (choruses, peaks)
 
-**`transitions`**: at most one `ENTRY` (into the section) and one `EXIT` (out of it); an
-empty list keeps the default boundary.
-- `mode`: `snap` (a hard cut to the new look), `crossfade` (one look hands over to the
-  next), `morph` (every channel eases from the old look to the new), `sweep` (the heads
-  travel, lit, to their new aim), `fade_via_black` (fade out, change in the dark, fade
-  up), `blackout` (cut to or from dark at the boundary)
-- `length`: how long the change lasts, from one beat to eight bars
+**`transitions`**: how a section enters (`ENTRY`) and leaves (`EXIT`), at most one of
+each, chosen for the musical boundary:
+- `snap`: a hard cut, into a drop or on a downbeat hit
+- `blackout`: a cut to or from dark, into a drop after a stop, or a dead stop at the end
+- `fade_via_black`: fade out, change in the dark, fade up, into a quiet bridge or outro
+- `crossfade`: one look hands over to the next, between related sections (verse to
+  chorus of one mood)
+- `morph`: every channel eases from the old look to the new, between related sections
+  that flow on
+- `sweep`: the heads travel, lit, to their new aim, on builds and lifts
+- `length`: how long the change lasts, from one beat to eight bars; measure it against
+  the phrase: a beat or half a bar for a cut-like change, one or two bars between
+  phrases, four to eight bars to dissolve across a long phrase
 - `curve`: the easing of the change
-- `split`: where a crossfade hands over: early, halfway or late in the change
-- `channels`: optional per-channel strategies overriding the mode (each channel at most
-  once); an empty list when none
+- `split`: how much of a crossfade the outgoing look takes to fade out before the
+  incoming one takes over, from a quarter to three quarters of it
+- `channels`: per-channel strategies overriding the mode (each channel at most once);
+  empty when the mode suits every channel
 
 **What the rig and the song can hold.** Availability depends on the rig (whether it has a
 colour wheel, which gobos, a shutter that strobes). A choice the rig or the song cannot
@@ -157,3 +198,7 @@ owns them and resolves every category above.
   gobo on any other event
 - ❌ A `moment_cue_id` that is not a cue of the same section in the Lyric Context
 - ❌ The display Name instead of the Section ID in `section_id`
+- ❌ A high- or medium-emphasis lyric moment cue with no event, or a drop with no accent
+- ❌ The same intensity across sections whose energy clearly changes
+- ❌ A named colour where a palette role would follow the song's palette, without a reason
+- ❌ A section with every song-intent field null and no reason in `reasoning`

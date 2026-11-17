@@ -12,7 +12,10 @@ from twinklr.core.agents.sequencer.moving_heads.models import (
     PlanRepair,
     RepairAction,
 )
-from twinklr.core.agents.sequencer.moving_heads.moment_cues import bind_lyric_moment_cues
+from twinklr.core.agents.sequencer.moving_heads.moment_cues import (
+    bind_lyric_moment_cues,
+    unanswered_high_cues,
+)
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 
@@ -69,8 +72,7 @@ def _plan(
 ) -> ChoreographyPlan:
     if events is None:
         events = [
-            _event(start_bar, 1, action, "chorus-home")
-            for action in ("strobe_fast", "hit", "closed")
+            _event(start_bar, 1, action, "chorus-home") for action in ("strobe_fast", "hit")
         ] + [
             _event(start_bar, 1, "gobo", "chorus-home", gobo="stars"),
             _event(start_bar, 1, "color", "chorus-home", color="PALETTE_ACCENT"),
@@ -116,7 +118,7 @@ def test_every_event_action_bound_to_a_cue_moves_to_its_snapped_beat() -> None:
     bound = _bind(_plan())
 
     assert {(e.action.value, e.bar, e.beat) for e in bound.sections[0].events} == {
-        (action, 1, 4) for action in ("strobe_fast", "hit", "closed", "gobo", "color")
+        (action, 1, 4) for action in ("strobe_fast", "hit", "gobo", "color")
     }
     assert bound.repairs == []
 
@@ -242,34 +244,117 @@ def test_an_event_on_an_unlisted_cue_of_the_section_adds_the_reference() -> None
     assert _repairs(bound) == [("moment cue 'chorus-home'", RepairAction.ADJUSTED)]
 
 
-def test_an_event_whose_cue_snaps_outside_the_section_is_dropped() -> None:
+def test_a_cue_nearest_a_beat_of_the_next_section_lands_on_this_sections_last_beat() -> None:
+    """A cue late in its section can be nearest the next section's downbeat: the accent
+    stays in its own section, on its last beat, instead of being lost."""
     bound = _bind(
         _plan(start_bar=1, end_bar=1, events=[_event(1, 1, "hit", "chorus-home")]),
-        _lyrics(_cue(timestamp_ms=2_000)),
+        _lyrics(_cue(timestamp_ms=1_900)),
+        sections=[_section(end_ms=2_000)],
     )
 
-    (section,) = bound.sections
-    assert section.events == []
-    assert _repairs(bound) == [
-        ("hit event at bar 1 beat 1", RepairAction.DROPPED),
-        ("moment cue 'chorus-home'", RepairAction.RECORDED),
-    ]
-    assert "snaps to bar 2" in bound.repairs[0].reason
+    (event,) = bound.sections[0].events
+    assert (event.bar, event.beat, event.moment_cue_id) == (1, 4, "chorus-home")
+    assert _repairs(bound) == [("hit event at bar 1 beat 1", RepairAction.ADJUSTED)]
+    assert "placed on the section's last beat (bar 1 beat 4)" in bound.repairs[0].reason
 
 
-def test_an_event_outside_the_section_or_its_bar_is_dropped() -> None:
+def test_a_cue_bound_event_is_dropped_only_when_its_section_has_no_beat() -> None:
+    grid = BeatGrid.from_tempo(tempo_bpm=120, total_bars=2)
+    bound = _bind(
+        _plan(
+            section_id="chorus_1",
+            start_bar=3,
+            end_bar=3,
+            events=[_event(3, 1, "hit", "chorus-home")],
+        ),
+        grid=grid,
+    )
+
+    assert bound.sections[0].events == []
+    assert ("hit event at bar 3 beat 1", RepairAction.DROPPED) in _repairs(bound)
+
+
+def test_an_event_outside_the_section_or_its_bar_is_moved_into_it() -> None:
     bound = _bind(
         _plan(
             moment_cues=(),
-            events=[_event(3, 1, "closed"), _event(2, 5, "open"), _event(2, 4, "pulse")],
+            start_bar=2,
+            end_bar=2,
+            events=[_event(3, 1, "closed"), _event(1, 3, "gobo", gobo="dots"), _event(2, 5, "hit")],
         )
     )
 
-    assert [(e.bar, e.beat) for e in bound.sections[0].events] == [(2, 4)]
-    assert _repairs(bound) == [
-        ("closed event at bar 3 beat 1", RepairAction.DROPPED),
-        ("open event at bar 2 beat 5", RepairAction.DROPPED),
+    assert [(e.action.value, e.bar, e.beat) for e in bound.sections[0].events] == [
+        ("closed", 2, 4),
+        ("gobo", 2, 1),
+        ("hit", 2, 4),
     ]
+    assert [action for _, action in _repairs(bound)] == [RepairAction.ADJUSTED] * 3
+
+
+def test_an_event_missing_the_value_its_action_needs_is_dropped_and_a_stray_value_cleared() -> None:
+    bound = _bind(
+        _plan(
+            moment_cues=(),
+            events=[
+                _event(1, 1, "color"),
+                _event(1, 2, "gobo", color="red", gobo="dots"),
+                _event(1, 3, "hit", color="red"),
+            ],
+        )
+    )
+
+    assert [(e.action.value, e.color, e.gobo) for e in bound.sections[0].events] == [
+        ("gobo", None, "dots"),
+        ("hit", None, None),
+    ]
+    assert _repairs(bound) == [
+        ("color event at bar 1 beat 1", RepairAction.DROPPED),
+        ("gobo event at bar 1 beat 2", RepairAction.ADJUSTED),
+        ("hit event at bar 1 beat 3", RepairAction.ADJUSTED),
+    ]
+
+
+def test_one_event_of_a_kind_per_beat_the_cue_bound_one_first() -> None:
+    """Two shutter events on one beat conflict: the cue-bound one is kept; an identical
+    duplicate is dropped too; events of other kinds on the beat stay."""
+    bound = _bind(
+        _plan(
+            events=[
+                _event(1, 4, "closed"),
+                _event(2, 1, "strobe_fast", "chorus-home"),
+                _event(1, 4, "hit"),
+                _event(1, 4, "hit"),
+            ],
+        )
+    )
+
+    assert [(e.action.value, e.bar, e.beat) for e in bound.sections[0].events] == [
+        ("strobe_fast", 1, 4),
+        ("hit", 1, 4),
+    ]
+    reasons = [repair.reason for repair in bound.repairs]
+    assert (
+        "another shutter event on this beat is kept (strobe_fast on cue 'chorus-home')" in reasons
+    )
+    assert "a duplicate of another event on this beat" in reasons
+
+
+def test_a_repeated_part_label_is_cleared() -> None:
+    plan = _plan(events=[])
+    section = plan.sections[0].model_copy(
+        update={
+            "parts": [
+                plan.sections[0].parts[0].model_copy(update={"label": "drop"}),
+                plan.sections[0].parts[0].model_copy(update={"start_bar": 2, "label": "drop"}),
+            ]
+        }
+    )
+    bound = _bind(plan.model_copy(update={"sections": [section]}))
+
+    assert [part.label for part in bound.sections[0].parts] == ["drop", None]
+    assert ("part 2 label 'drop'", RepairAction.ADJUSTED) in _repairs(bound)
 
 
 def test_a_referenced_cue_no_event_lands_on_is_recorded_not_synthesised() -> None:
@@ -278,9 +363,10 @@ def test_a_referenced_cue_no_event_lands_on_is_recorded_not_synthesised() -> Non
     assert bound.sections[0].moment_cues == ["chorus-home"]
     assert bound.sections[0].events == []
     assert _repairs(bound) == [("moment cue 'chorus-home'", RepairAction.RECORDED)]
+    assert "add an event with moment_cue_id 'chorus-home'" in bound.repairs[0].reason
 
 
-def test_a_cue_bound_event_without_a_beat_grid_keeps_its_own_beat() -> None:
+def test_a_cue_bound_event_without_a_beat_grid_keeps_its_binding_and_beat() -> None:
     plan = _plan(events=[_event(2, 2, "hit", "chorus-home")])
     empty = BeatGrid.from_tempo(tempo_bpm=120, total_bars=2).model_copy(
         update={"beat_boundaries": []}
@@ -288,7 +374,10 @@ def test_a_cue_bound_event_without_a_beat_grid_keeps_its_own_beat() -> None:
 
     bound = _bind(plan, grid=empty)
 
-    assert [(e.bar, e.beat, e.moment_cue_id) for e in bound.sections[0].events] == [(2, 2, None)]
+    assert [(e.bar, e.beat, e.moment_cue_id) for e in bound.sections[0].events] == [
+        (2, 2, "chorus-home")
+    ]
+    assert _repairs(bound) == [("hit event at bar 2 beat 2", RepairAction.RECORDED)]
     assert "no beat grid" in bound.repairs[0].reason
 
 
@@ -296,3 +385,17 @@ def test_repairs_replace_those_of_an_earlier_normalisation() -> None:
     once = _bind(_plan(events=[]))
 
     assert _bind(once).repairs == once.repairs
+
+
+def test_an_unanswered_high_cue_is_advised_and_an_answered_one_is_not() -> None:
+    lyrics = _lyrics(
+        _cue("high-1", 500, "chorus_1").model_copy(update={"emphasis": "HIGH"}),
+        _cue("high-2", 900, "chorus_1").model_copy(update={"emphasis": "HIGH"}),
+        _cue("med", 1_200, "chorus_1").model_copy(update={"emphasis": "MED"}),
+    )
+    plan = _bind(_plan(moment_cues=("high-1",), events=[_event(1, 1, "hit", "high-1")]), lyrics)
+
+    assert unanswered_high_cues(plan, lyrics, [_section()]) == [
+        "section 'chorus_1': the HIGH lyric moment cue 'high-2' (\"light the way home\") has "
+        "no event; add one with moment_cue_id 'high-2' (a hit or a strobe suits it)"
+    ]

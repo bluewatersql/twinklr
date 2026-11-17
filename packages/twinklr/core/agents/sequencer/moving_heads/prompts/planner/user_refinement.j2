@@ -57,7 +57,9 @@ Token Optimization: ~80% reduction vs full context on refinement iterations.
 ## What Deterministic Repair Changed in Your Last Plan
 
 These items could not stand as planned on this song or rig, so code dropped or adjusted
-them. Re-plan them in a form the song can hold, or leave them out:
+them. Re-plan each in a form the song can hold. A cue listed in `moment_cues` with no
+event: add an event with that `moment_cue_id` (matching its emphasis) or remove the
+reference.
 {% for repair in plan_repairs[:20] %}
 - {{ repair }}
 {% endfor %}

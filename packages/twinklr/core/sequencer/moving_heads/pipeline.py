@@ -1349,6 +1349,63 @@ def _section_preset(
     return None if fallback is None else declared[fallback]
 
 
+_SHUTTER_AND_GOBO_ACTIONS = frozenset(
+    {"open", "closed", "strobe_slow", "strobe_medium", "strobe_fast", "pulse", "gobo"}
+)
+"""Event actions the renderer before the single-renderer cutover rendered."""
+
+
+def _unrendered_intent_message(section: PlanSection) -> str | None:
+    """What of the section's song intent the renderer does not render yet, split into
+    what the renderer before the cutover rendered (a regression) and what no renderer
+    has rendered yet; None for a section whose intent is all neutral."""
+    regressed: list[str] = []
+    new: list[str] = []
+    if section.intensity is not None:
+        regressed.append("intensity")
+    if section.color is not None:
+        regressed.append("colour")
+    if section.gobo is not None:
+        new.append("section gobo")
+    old_events = [e for e in section.events if e.action.value in _SHUTTER_AND_GOBO_ACTIONS]
+    if old_events:
+        regressed.append("shutter and gobo events")
+    if any(e.moment_cue_id is not None for e in old_events):
+        regressed.append("their lyric cue binding")
+    if any(e.action.value not in _SHUTTER_AND_GOBO_ACTIONS for e in section.events):
+        new.append("hit and colour events")
+    if section.moment_cues and not any(e.moment_cue_id for e in old_events):
+        new.append("moment cues")
+    if section.entry is not None:
+        regressed.append("entry transition")
+    for name, is_set in (
+        ("exit transition", section.exit is not None),
+        ("motif", section.motif_id is not None),
+        ("variation", section.variation.value != "NONE"),
+        ("density", section.density.value != "BALANCED"),
+        ("modifiers", any(part.modifiers for part in section.parts)),
+    ):
+        if is_set:
+            new.append(name)
+    if not regressed and not new:
+        return None
+    said = []
+    if regressed:
+        said.append(
+            f"{', '.join(regressed)}: a known regression (the renderer before the "
+            "single-renderer cutover rendered them)"
+        )
+    if new:
+        said.append(f"{', '.join(new)}: not rendered by any renderer yet")
+    return (
+        f"section {section.section_id!r}: the planner's song intent is not rendered yet; "
+        + "; ".join(said)
+        + ". Both are being fixed under "
+        "changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md; the template renders "
+        "as authored"
+    )
+
+
 class RenderRefusedError(ValueError):
     """The transaction pass refused a render; nothing was delivered."""
 
@@ -1708,19 +1765,13 @@ class RenderingPipeline:
                     name=section.section_id, time_ms=context.start_ms, end_time_ms=context.end_ms
                 )
             )
-            unrendered = section.set_intent_fields()
-            if unrendered:
+            message = _unrendered_intent_message(section)
+            if message is not None:
                 diagnostics.append(
                     MHDiagnostic(
                         code="unsupported_attribute",
                         severity="warning",
-                        message=(
-                            f"section {section.section_id!r}: the planner's song intent "
-                            f"({', '.join(unrendered)}) is not rendered yet, a known "
-                            "regression being fixed under "
-                            "changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md; "
-                            "the template renders as authored"
-                        ),
+                        message=message,
                         section_id=section.section_id,
                         action="unchanged",
                     )
