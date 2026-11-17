@@ -181,10 +181,10 @@ release.
 - **Display catalog drift:** plans are bound to the recipe catalog at generation time.
 - **Moving-head song intent is only partly rendered (known regression).** The renderer
   applies each section's template, preset and bars, its colour and gobo on heads whose
-  wheel states are tagged, and its intensity on the dimmer (adjusted under `twinklr
-  show` by the heads' focal role); the planner's shutter and gobo events, lyric moment
-  cues, section transitions, motif variation and density are ignored until the
-  song-intent work lands
+  wheel states are tagged, its intensity on the dimmer (adjusted under `twinklr
+  show` by the heads' focal role), and its timed events with the lyric moment cues they
+  land on; the planner's section transitions, motif variation and density are ignored
+  until the song-intent work lands
   ([plan](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 - **Owner-local inputs** (audio, layout, `config.json`/`fixture_config.json`/`job_config.json`,
   `.env`, local `data/templates/` overlay) are gitignored and not part of CI.

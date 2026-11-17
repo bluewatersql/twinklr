@@ -79,6 +79,17 @@ from twinklr.core.sequencer.moving_heads.delivery import (
     export_delivery,
 )
 from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
+from twinklr.core.sequencer.moving_heads.events import (
+    WHEEL_ACTIONS,
+    EventsPlayed,
+    SectionEvents,
+    apply_hits,
+    apply_section_events,
+    carried_states,
+    cue_summary,
+    events_message,
+    section_events,
+)
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     ENCODER_VERSION,
     EncodedFixtureFrame,
@@ -86,6 +97,7 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     coalesce_frames,
     encode_fixture_frames,
     frame_times,
+    quantize_cue,
     quantized_cues,
 )
 from twinklr.core.sequencer.moving_heads.export.xsq_adapter import (
@@ -2197,29 +2209,14 @@ def _section_preset(
     return None if fallback is None else declared[fallback]
 
 
-_SHUTTER_AND_GOBO_ACTIONS = frozenset(
-    {"open", "closed", "strobe_slow", "strobe_medium", "strobe_fast", "pulse", "gobo"}
-)
-"""Event actions the renderer before the single-renderer cutover rendered."""
-
-
 def _unrendered_intent_message(section: PlanSection) -> str | None:
     """What of the section's song intent the renderer does not render yet, split into
     what the renderer before the cutover rendered (a regression) and what no renderer
     has rendered yet; None for a section that sets none of it. Its colour and gobo
-    (`song_intent.resolve_section_look`) and its intensity (`intensity.shape_section`)
-    render, so they are never listed."""
+    (`song_intent.resolve_section_look`), its intensity (`intensity.shape_section`), its
+    events and their lyric cues (`events`) render, so they are never listed."""
     regressed: list[str] = []
     new: list[str] = []
-    old_events = [e for e in section.events if e.action.value in _SHUTTER_AND_GOBO_ACTIONS]
-    if old_events:
-        regressed.append("shutter and gobo events")
-    if any(e.moment_cue_id is not None for e in old_events):
-        regressed.append("their lyric cue binding")
-    if any(e.action.value not in _SHUTTER_AND_GOBO_ACTIONS for e in section.events):
-        new.append("hit and colour events")
-    if section.moment_cues and not any(e.moment_cue_id for e in old_events):
-        new.append("moment cues")
     if section.entry is not None:
         regressed.append("entry transition")
     for name, is_set in (
@@ -2490,15 +2487,17 @@ class RenderingPipeline:
         )
 
     def rendered_palettes(self) -> dict[str, SectionPalette]:
-        """The macro palette each plan section whose colour is a palette role resolves it
-        through (of `palettes`), by section id: render identity, since the stop it takes
-        decides the wheel state."""
+        """The macro palette each plan section whose colour, or a colour event's, is a
+        palette role resolves it through (of `palettes`), by section id: render identity,
+        since the stop it takes decides the wheel state."""
         return {
             section.section_id: self.palettes[section.section_id]
             for section in self.choreography_plan.sections
-            if section.color is not None
-            and section.color.value.startswith("PALETTE_")
-            and section.section_id in self.palettes
+            if section.section_id in self.palettes
+            and any(
+                color is not None and color.value.startswith("PALETTE_")
+                for color in (section.color, *(event.color for event in section.events))
+            )
         }
 
     def rendered_focal_roles(self) -> dict[str, str]:
@@ -2642,6 +2641,13 @@ class RenderingPipeline:
         section_looks: list[dict[str, Any]] = []
         shaping: list[tuple[str, str | None, float, int, dict[str, Any]]] = []
         """Per section a shaped intensity plays in: its id, level, bounds, trace entry."""
+        plan_sections = {s.section_id: s for s in self.choreography_plan.sections}
+        timed: dict[str, SectionEvents] = {}
+        """Per plan section, its events on the grid (`events.section_events`)."""
+        hitting: list[tuple[str, tuple[int, int], SectionEvents, dict[str, Any]]] = []
+        """Per part with hits: its id, frame window, its plan section's events, trace entry."""
+        event_records: dict[tuple[str, int], dict[str, Any]] = {}
+        """Per plan section and event index, the event's trace entry."""
         for section in self.iterate_plan_sections(self.choreography_plan):
             (part,) = section.parts
             try:
@@ -2684,10 +2690,35 @@ class RenderingPipeline:
                     self.admission.offer.for_templates({template_doc.template.template_id}).heads
                 )
             )
-            look = resolve_section_look(
-                section, template_heads, section_palette_for(self.palettes, section.section_id)
-            )
+            palette = section_palette_for(self.palettes, section.section_id)
+            look = resolve_section_look(section, template_heads, palette)
             held = look.states
+            base_id = section.section_id.split("|")[0]
+            events = timed.setdefault(
+                base_id, section_events(plan_sections[base_id], self.beat_grid)
+            )
+            window = (
+                quantize_cue(context.start_ms).actual_ms,
+                quantize_cue(context.end_ms).actual_ms,
+            )
+            # A colour or gobo an earlier part's event left the heads holding: this part
+            # holds it from its start, as a section colour.
+            for fixture_id, states in carried_states(
+                events, window[0], template_heads, palette
+            ).items():
+                held = {**held, fixture_id: {**held.get(fixture_id, {}), **states}}
+            part_events = [e for e in events.events if window[0] <= e.frame_ms < window[1]]
+            plays_events = bool(
+                [
+                    span
+                    for span in events.shutter_spans()
+                    if span[1] < window[1] and span[2] > window[0]
+                ]
+                or [e for e in part_events if e.action in WHEEL_ACTIONS]
+            )
+            played_box: list[EventsPlayed] = [EventsPlayed()]
+            authored_states: dict[str, dict[ChannelName, str]] = {}
+            """The held states of the authored compile `_unplayable_holds` compares with."""
             refused = 0 if unplayable is None else len(unplayable)
             compiled_steps: list[dict[str, str | int]] = []
             asked = None if section.intensity is None else section.intensity.value
@@ -2703,6 +2734,13 @@ class RenderingPipeline:
                 preset: TemplatePreset | None = preset,
                 refused: int = refused,
                 compiled_steps: list[dict[str, str | int]] = compiled_steps,
+                events: SectionEvents = events,
+                window: tuple[int, int] = window,
+                plays_events: bool = plays_events,
+                played_box: list[EventsPlayed] = played_box,
+                template_heads: list[HeadWheels] = template_heads,
+                palette: SectionPalette | None = palette,
+                authored_states: dict[str, dict[ChannelName, str]] = authored_states,
             ) -> list[FixtureSegment]:
                 if unplayable is not None:
                     del unplayable[refused:]  # a recompile records its refusals again
@@ -2717,12 +2755,45 @@ class RenderingPipeline:
                     held_states=held_states,
                 )
                 compiled_steps[:] = result.dropped_steps
-                return _dark_over_spans(
+                spanned = _dark_over_spans(
                     result.segments,
                     self.dark_spans,
                     profiles,
                     shortest_lit_ms=self._shortest_lit_ms,
                 )
+                if not plays_events:
+                    return spanned
+                # The plan's closed, strobe, pulse, colour and gobo events, after the
+                # template, the section's held states and the show's rests.
+                played, events_played = apply_section_events(
+                    spanned,
+                    events,
+                    window=window,
+                    profiles=profiles,
+                    heads=template_heads,
+                    palette=palette,
+                    phase_map=phase_map,
+                    beat_grid=self.beat_grid,
+                    darken=lambda cues, spans: _dark_over_spans(
+                        cues, spans, profiles, shortest_lit_ms=self._shortest_lit_ms
+                    ),
+                    dip_span=_dip_span,
+                    dark_runs=_commanded_dark_runs,
+                    dark_windows=_dark_windows,
+                    gap_ok=lambda head_id, head_cues, gap_index: entry_feasible(
+                        head_cues[gap_index],
+                        profiles[head_id],
+                        after=follow_cues(
+                            head_cues[:gap_index], profiles[head_id], frame_ms=EFFECT_GRID_MS
+                        )[-1],
+                        initial=policy.initial_states.get(head_id),
+                        locks=self.locks,
+                        frame_ms=EFFECT_GRID_MS,
+                    ),
+                )
+                if held_states is not authored_states:
+                    played_box[0] = events_played  # what the section plays, not the probe
+                return played
 
             section_cues = compile_section(held)
             key = (template_doc.template.template_id, context.preset_id)
@@ -2759,7 +2830,7 @@ class RenderingPipeline:
             if template_doc.template.overlays and held:
                 fallback = _unplayable_holds(
                     section_cues,
-                    compile_section({}),
+                    compile_section(authored_states),
                     held,
                     {overlay.channel for overlay in template_doc.template.overlays},
                     profiles,
@@ -2801,6 +2872,11 @@ class RenderingPipeline:
                     intent_channels={
                         *held.get(fixture_id, {}),
                         *held_by_fixture.get(fixture_id, {}),
+                        *(
+                            WHEEL_ACTIONS[e.action]
+                            for e in part_events
+                            if e.action in WHEEL_ACTIONS
+                        ),
                     },
                     half_beat_ms=half_beat,
                     shortest_lit_ms=self._shortest_lit_ms,
@@ -2882,10 +2958,22 @@ class RenderingPipeline:
                 cues[next(i for i, cue in enumerate(cues) if cue is replaced)] = dipped
                 kept[fixture_id][-1] = follow
             for fixture_id in {cue.fixture_id for cue in section_cues}:
-                held_by_fixture[fixture_id] = dict(held.get(fixture_id, {}))
+                held_by_fixture[fixture_id] = {
+                    **held.get(fixture_id, {}),
+                    **played_box[0].final.get(fixture_id, {}),
+                }
             record = _played_record(look.record(), outcomes)
             if boundaries:
                 record["boundaries"] = boundaries
+            first_part = section.start_bar == plan_sections[base_id].start_bar
+            if part_events or (events.unplaced and first_part):
+                entries = [played_box[0].records.get(e.index, e.record()) for e in part_events]
+                for event, event_entry in zip(part_events, entries, strict=True):
+                    event_records[(base_id, event.index)] = event_entry
+                # An event beyond the beat grid is recorded on the section's first part.
+                record["events"] = entries + (list(events.unplaced) if first_part else [])
+                if any(e.action == "hit" for e in part_events):
+                    hitting.append((section.section_id, window, events, record))
             if asked is not None or focal_role is not None or shape_for(level) is not None:
                 record["intensity"] = {
                     "asked": asked,
@@ -3006,6 +3094,73 @@ class RenderingPipeline:
                             "have no dimmer axis; they play the template's own level"
                         ),
                         section_id=section_id,
+                        action="unchanged",
+                    )
+                )
+
+        for section_id, window, events, record in hitting:
+            # Hits play on the level the section plays, after intensity: one accent where
+            # an intensity accent lands on the hit's beat, a rise above a level below full.
+            base, _, segment = section_id.partition("|")
+            index = [
+                i
+                for i, cue in enumerate(cues)
+                if cue.section_id == base and cue.segment_id == (segment or "A")
+            ]
+            hits = [e for e in events.hits() if window[0] <= e.frame_ms < window[1]]
+            struck, hit_outcomes = apply_hits(
+                [cues[i] for i in index],
+                hits,
+                window=window,
+                profiles=profiles,
+                phase_map=phase_map,
+                beat_grid=self.beat_grid,
+                dark_spans=self.dark_spans,
+            )
+            for i, cue in zip(index, struck, strict=True):
+                cues[i] = cue
+            for event_entry in record["events"]:
+                for event in hits:
+                    if event_entry is event_records.get((base, event.index)):
+                        event_entry.update(hit_outcomes.get(event.index, {}))
+
+        lyric_cues: list[dict[str, Any]] = []
+        """Per lyric moment cue a plan section references, what played it, or why not."""
+        for plan_section in self.choreography_plan.sections:
+            for cue_id in plan_section.moment_cues:
+                bound = [
+                    (i, e) for i, e in enumerate(plan_section.events) if e.moment_cue_id == cue_id
+                ]
+                cue_entry: dict[str, Any] = {
+                    "cue_id": cue_id,
+                    "section_id": plan_section.section_id,
+                }
+                if not bound:
+                    cue_entry["not_played"] = "no event lands on it (the planner was told)"
+                else:
+                    cue_entry["emphasis"] = bound[0][1].cue_emphasis
+                    cue_entry["events"] = [
+                        cue_summary(event_records[(plan_section.section_id, i)])
+                        if (plan_section.section_id, i) in event_records
+                        else {
+                            "action": e.action.value,
+                            "bar": e.bar,
+                            "beat": e.beat,
+                            "played": {},
+                            "not_played": "its beat lies beyond the detected beat grid",
+                        }
+                        for i, e in bound
+                    ]
+                lyric_cues.append(cue_entry)
+        for section_look in section_looks:
+            message = events_message(section_look["section_id"], section_look.get("events", []))
+            if message is not None:
+                diagnostics.append(
+                    MHDiagnostic(
+                        code="unsupported_attribute",
+                        severity="warning",
+                        message=message,
+                        section_id=section_look["section_id"],
                         action="unchanged",
                     )
                 )
@@ -3153,9 +3308,14 @@ class RenderingPipeline:
             # Left out when no focal role changes a section's intensity (`twinklr run`).
             self.render_record["focal_roles"] = dict(sorted(focal_roles.items()))
         if section_looks:
-            # What each section's colour, gobo and intensity play on each head, and the
-            # wheel changes they make at boundaries; left out when no section sets any.
+            # What each section's colour, gobo, intensity and events play on each head,
+            # and the wheel changes they make at boundaries; left out when no section
+            # sets any.
             self.render_record["section_looks"] = section_looks
+        if lyric_cues:
+            # What each lyric moment cue the plan references played, or why not; left out
+            # when the plan references none.
+            self.render_record["lyric_cues"] = lyric_cues
         if self.choreography_plan.repairs:
             # What repair changed in the planner's response; left out when nothing was.
             self.render_record["plan_repairs"] = [

@@ -331,3 +331,42 @@ def test_intensity_a_rig_cannot_pulse_is_recorded_not_shaped() -> None:
     assert "events or colour" in none.repairs[0].reason
     some = repair_rig_intent(plan, _offer(profile).model_copy(update={"hit": "some"}), {})
     assert "only some heads of this rig have a dimmer axis" in some.repairs[0].reason
+
+
+def test_events_the_render_plays_otherwise_are_recorded_and_kept() -> None:
+    """At 120 BPM on a rig whose darkness follows 40 ms phases a fast strobe plays
+    sixteenths, recorded; a hit on a beat where the template is dark on every head is
+    recorded as moving; a colour change 150 ms after the previous one (a 180 ms wheel
+    change) is recorded. The plan keeps every event (the render decides)."""
+    grid = m.bars_grid(*([500.0] * 4), *([150.0] * 4))
+    templates = {
+        "fly_out_cascade": TemplateOffer(
+            variants={"base": DarkPhases(cycle_beats=8.0, heads={"MH1": ((6.0, 9.0),)})}
+        )
+    }
+    offer = _offer(_slow(), flash_ms=40, beat_ms=500.0, templates=templates)
+    events = [
+        _event(EventAction.STROBE_FAST, bar=1, beat=2),
+        _event(EventAction.HIT, bar=3, beat=1),
+        _event(EventAction.COLOR, bar=6, beat=1, color=PlanColor.RED),
+        _event(EventAction.COLOR, bar=6, beat=2, color=PlanColor.BLUE),
+    ]
+    plan = ChoreographyPlan(
+        sections=[_section("s1", (1, 8), template="fly_out_cascade", events=events)],
+        overall_strategy="",
+    )
+
+    with m.family_catalog():
+        repaired = repair_rig_intent(plan, offer, {}, grid)
+
+    assert repaired.sections[0].events == events
+    reasons = {r.item: r.reason for r in repaired.repairs if r.action is RepairAction.RECORDED}
+    assert reasons == {
+        "event at bar 1 beat 2: strobe_fast": "at this tempo it plays 4 flash(es) a beat, not "
+        "8: the darkness follows 40 ms phases",
+        "event at bar 3 beat 1: hit": "template 'fly_out_cascade' is dark on this beat on every "
+        "head (between its cues): the hit moves to the nearest beat the heads show, within a bar",
+        "event at bar 6 beat 2: color blue": "it comes 150 ms after the previous color change, "
+        "and a wheel change needs 180 ms of darkness: it turns late or does not play; space "
+        "wheel changes further apart",
+    }

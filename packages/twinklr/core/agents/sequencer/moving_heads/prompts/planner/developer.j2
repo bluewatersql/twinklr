@@ -96,12 +96,12 @@ Deterministic code plays it on the dimmer, locked to the beat:
 - `DRAMATIC`: a bold pulse on the strong beats (every half bar in 4/4, every bar in
   3/4)
 - `INTENSE`: maximum drive, a harder pulse on every beat
+- `as_authored`: the template's own level, when it already fits (say why)
 
 On a template that already holds its light at full (most do), `DRAMATIC` and `INTENSE`
 add movement, not brightness: the light is at the template's level on each accent and
 eases below it between accents (to about 75% for `DRAMATIC`, 60% for `INTENSE`). On a
 template that plays below full, they raise the light and peak it on the beat.
-- `as_authored`: the template's own level, when it already fits (say why)
 
 Read it from the Macro Strategy energy target:
 - an energy target of `LOW`: `SLOW` or `SMOOTH`
@@ -132,12 +132,18 @@ keeps the template's own.
 
 **`events`**: timed accents at an absolute bar and beat (both 1-indexed) inside the
 section.
-- `open` / `closed`: the beam opens / shuts (a stop, a breath)
-- `strobe_slow`, `strobe_medium`, `strobe_fast`: the beam strobes (a build, a peak)
-- `pulse`: the beam pulses on each beat
-- `hit`: a single brightness accent (a drop, a hit, a lyric peak)
-- `color`: a colour change; set the event's `color` (same vocabulary as above)
-- `gobo`: a pattern change; set the event's `gobo`
+- `closed` / `open`: the beam shuts from the beat until `open`, another strobe or pulse,
+  or the section's end (a stop, a breath); `open` brings back the template's own light
+- `strobe_slow`, `strobe_medium`, `strobe_fast`: the beam strobes from the beat (two,
+  four or eight flashes a beat where the rig can follow) until the next shutter event or
+  the section's end (a build, a peak)
+- `pulse`: the beam lights on each beat and goes dark for its second half, until the next
+  shutter event or the section's end
+- `hit`: a single brightness accent on the beat (a drop, a hit, a lyric peak): full on the
+  beat and back; a high-emphasis cue cuts deeper and rings longer
+- `color`: a colour change revealed on the beat, held to the next colour event or the
+  section's end; set the event's `color` (same vocabulary as above)
+- `gobo`: a pattern change, as `color`; set the event's `gobo`
 
 Every other action sets `color` and `gobo` to `none`. Answer the song's drops, hits and
 stops and the lyric moment cues below, in proportion to the section.
@@ -187,10 +193,13 @@ each, chosen for the musical boundary:
 **What the rig and the song can hold.** Availability depends on the rig (whether it has a
 colour wheel, which gobos, a shutter that strobes); the prompt's What This Rig Can Show
 says which colours it shows faithfully, which approximately and as what, which palette
-role of each section lands on which wheel colour, its gobos and strobe speeds, and how
-long a wheel change takes. A choice the rig or the song cannot hold (a colour or gobo no
-head shows, an unknown cue, an event outside its section) is repaired by deterministic
-code and reported back to you; it never fails the plan.
+role of each section lands on which wheel colour, its gobos, what each event plays at
+this song's tempo, and how long a wheel change takes. A choice the rig or the song cannot
+hold (a colour or gobo no head shows, an unknown cue, an event outside its section) is
+repaired by deterministic code and reported back to you; an event that will play other
+than asked (a strobe slowed to what the rig can follow, a hit on a beat the template is
+dark on, a wheel change too soon after the last) is kept and reported too. Neither ever
+fails the plan.
 
 **Never emit DMX values, milliseconds, angles or numeric durations**: deterministic code
 owns them and resolves every category above.

@@ -898,7 +898,7 @@ def test_rig_tag_guidance_is_empty_for_a_fully_tagged_rig() -> None:
     assert rig_tag_guidance(tagged_p1_rig().expand_fixtures()) == ()
 
 
-# --- Ledger evidence: identity only until W3/W4 -----------------------------------------
+# --- Ledger evidence: what each tag changes ------------------------------------------------
 
 _INSTANCE_PREFIX = "fixture.fixtures[FixtureInstance].config.physical_profile"
 _BASE_PREFIX = "fixture.base_config.physical_profile"
@@ -955,14 +955,14 @@ def test_every_tag_path_is_registered_to_its_evidence() -> None:
     }
 
     assert set(TAG_PATHS) == expected
-    assert {path.rsplit(".", 1)[1] for path in PLAYED_TAG_PATHS} == {"hex", "pattern"}
-    assert {path.rsplit(".", 1)[1] for path in IDENTITY_TAG_PATHS} == {"strobe", "offer"}
+    assert {path.rsplit(".", 1)[1] for path in PLAYED_TAG_PATHS} == {"hex", "pattern", "strobe"}
+    assert {path.rsplit(".", 1)[1] for path in IDENTITY_TAG_PATHS} == {"offer"}
 
 
 @pytest.mark.parametrize("config_path", IDENTITY_TAG_PATHS, ids=IDENTITY_TAG_PATHS)
 def test_state_tag_changes_identity_not_output(config_path: str) -> None:
-    """A strobe tag or an opt-out enters the render fingerprint (it is rig data) and
-    changes no frame: no strobe renders until W6, and an opted-out state is not offered."""
+    """An opt-out enters the render fingerprint (it is rig data) and changes no frame: an
+    opted-out state is not offered."""
     prefix, _, suffix = config_path.partition(".discrete.")
     plan = m.sections_plan(("masked_wheel_flick", 1, 8))
 
@@ -988,13 +988,24 @@ def test_state_tag_changes_identity_not_output(config_path: str) -> None:
 
 @pytest.mark.parametrize("config_path", PLAYED_TAG_PATHS, ids=PLAYED_TAG_PATHS)
 def test_state_tag_changes_what_a_section_plays(config_path: str) -> None:
-    """A colour or gobo tag decides the state a section's colour (red) or gobo (stars)
-    plays: untagged, the section plays the template's own; tagged, the tagged state."""
+    """A colour, gobo or strobe tag decides the state a section's colour (red), gobo
+    (stars) or strobe event (fast) plays: untagged, the template's own (or, for the strobe,
+    a dimmer strobe); tagged, the tagged state."""
     prefix, _, suffix = config_path.partition(".discrete.")
     channel, state, _ = _TAG_MUTATIONS[f"discrete.{suffix}"]
+    strobe = {
+        "bar": 2,
+        "beat": 1,
+        "moment_cue_id": None,
+        "action": "strobe_fast",
+        "color": None,
+        "gobo": None,
+    }
 
     def render(tag: str | None) -> RenderingPipeline:
-        section = m.plan_section("s1", 1, 8, "mirror_wings", color="red", gobo="stars")
+        section = m.plan_section(
+            "s1", 1, 8, "mirror_wings", color="red", gobo="stars", events=[strobe]
+        )
         pipeline = RenderingPipeline(
             choreography_plan=ChoreographyPlan(sections=[section], overall_strategy=""),
             beat_grid=m.bars_grid(*([500.0] * 8)),

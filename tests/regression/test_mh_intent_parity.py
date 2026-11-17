@@ -103,15 +103,6 @@ PREFIXES = (
 """Row-id prefix of each test below; together they cover every regression row."""
 
 PENDING: dict[str, tuple[str, str]] = {
-    "shutter_closed_open": ("W6", "shutter CLOSED/OPEN events"),
-    "shutter_strobe_slow": ("W6", "shutter STROBE_SLOW event"),
-    "shutter_strobe_medium": ("W6", "shutter STROBE_MEDIUM event"),
-    "shutter_strobe_fast": ("W6", "shutter STROBE_FAST event"),
-    "shutter_pulse": ("W6", "shutter PULSE event"),
-    "cue_bound_shutter_event": ("W6", "lyric-cue-bound shutter event"),
-    "gobo_event": ("W7", "gobo event"),
-    "gobo_two_events": ("W7", "successive gobo events"),
-    "cue_bound_gobo_event": ("W7", "lyric-cue-bound gobo event"),
     "transition_in_crossfade": ("W8", "transition_in CROSSFADE"),
     "transition_in_morph": ("W8", "transition_in MORPH"),
     "transition_in_sweep": ("W8", "transition_in SWEEP"),
@@ -149,14 +140,18 @@ def _rows(prefix: str) -> list[Any]:
 
 def parity_rig() -> FixtureGroup:
     """`m.family_rig` with a green colour state added, so a palette's first two stops can
-    land on different states, and every colour state tagged with the colour it is named
-    for (white, red, blue, green: W1's `hex` tags)."""
+    land on different states, every colour state tagged with the colour it is named for
+    (white, red, blue, green: W1's `hex` tags) and every gobo state with its pattern
+    (open, dots, stars: W1's `pattern` tags), as the old rig's `gobo_map` named them."""
     payload = m.family_rig(HEADS).model_dump(mode="json")
     for fixture in payload["fixtures"]:
-        states = fixture["config"]["physical_profile"]["discrete"]["color"]["states"]
+        discrete = fixture["config"]["physical_profile"]["discrete"]
+        states = discrete["color"]["states"]
         states["green"] = {"range_min": 30, "range_max": 39, "value": 34, "settle_ms": 120}
         for name, state in states.items():
             state["hex"] = name
+        for name, state in discrete["gobo"]["states"].items():
+            state["pattern"] = {"star": "stars"}.get(name, name)
     return FixtureGroup.model_validate(payload)
 
 

@@ -22,12 +22,14 @@ updated: 2026-11-17
   shutter state may carry a **meaning tag** (`hex`, `pattern`, `strobe`): what it shows,
   for the planner's colour, gobo and strobe choices, or `offer: false` when it has
   none; never defaulted. Tagged states with a known settle make up the **rig offer**
-  (what the planner is told the rig can show), and a section's colour and gobo play
-  them.
+  (what the planner is told the rig can show); a section's colour and gobo, and its
+  colour, gobo and strobe events, play them.
 - **Rig offer** — what the pre-planning gate tells the planner a rig can show of its
   song intent: each colour (faithfully, approximately, on some heads, not at all), each
-  section's palette roles on the wheel, gobos, strobe speeds, hit, wheel change time,
-  and per template its dark phases and the states its overlay masks cannot reach
+  section's palette roles on the wheel, gobos, strobe speeds, hit, whether the heads can
+  go dark and how fast they can flash (what each strobe and the pulse play at the
+  song's tempo), wheel change time, and per template its dark phases and the states its
+  overlay masks cannot reach
   (`TemplateAdmission.offer`, `sequencer/moving_heads/song_intent.py`).
 - **Template** — a moving-head choreography unit, a JSON `TemplateDoc` whose steps state
   motion, dimmer or shutter pulse, wheel states and phase spread across the heads. The

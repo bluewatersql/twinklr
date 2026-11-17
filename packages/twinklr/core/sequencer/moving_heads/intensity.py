@@ -1,7 +1,7 @@
 """The planner's section intensity, played on the dimmer (song-intent rendering W5).
 
 The planner names a category; this module turns it into dimmer levels on musical phase.
-Everything that decides how intensity looks is the table (`SHAPES`, `HEADROOM_BELOW`,
+Everything that decides how intensity looks is the table (`SHAPES`, `FULL_BLEND`,
 `ACCENT`, `dramatic_period_beats`), the curve (`accent`) and the focal mapping
 (`effective_intensity`). The values are a first proposal for the owner to judge on a
 render (W5 view), not measured or accepted looks.
@@ -13,17 +13,21 @@ render (W5 view), not measured or accepted looks.
   by a gain that follows a beat-locked accent `e` (`accent`: 1 where an accent starts,
   easing to 0 over `ACCENT.decay_beats`, 0 until the next). The accents fall on every
   beat (`INTENSE`) or the strong beats (`DRAMATIC`, `dramatic_period_beats`), and on the
-  first lit frame of every lit run, so a head revealed after any darkness (a dark phase,
-  a show's rest, a colour change's dip) comes in on an accent. Per lit run, by the run's
-  highest authored level `M`:
-  - **headroom** (`M` below `HEADROOM_BELOW` of the dimmer's top): gain `1 + g * (floor
-    + peak * e)`, `g` scaling the table's gains down just enough that the run's peak
+  first lit frame of a lit run after enough darkness, so a head revealed after a dark
+  phase, a show's rest or a colour change's dip comes in on an accent (`accent_starts`:
+  a beat accent just after the reveal takes its place; short gaps follow the beat; no
+  accent starts on a run's last frames). Per lit run, by the run's highest authored
+  level `M`:
+  - **headroom** (`M` at or below the low end of `FULL_BLEND`): gain `1 + g * (floor +
+    peak * e)`, `g` scaling the table's gains down just enough that the run's peak
     reaches the top at most. The light rises and peaks on the beat; the template's own
     shape (a held level, its own pulse, a ramp) stays readable under it;
-  - **full** (`M` at or above it, every catalog family): gain `full_peak - (full_peak -
-    full_floor) * (1 - e)`, a dip-and-return on the run's own shape: the authored level
-    on the accent, easing down to `full_floor` of it between accents. More movement in
-    the light, not more light: the only case where frames play below the template.
+  - **full** (`M` at or above the high end, every catalog family): gain `full_peak -
+    (full_peak - full_floor) * (1 - e)`, a dip-and-return on the run's own shape: the
+    authored level on the accent, easing down to `full_floor` of it between accents.
+    More movement in the light, not more light: the only case where frames play below
+    the template;
+  - between them the two gains are blended in proportion (`full_weight`).
   A frame the template commands dark (dimmer zero, or an extinguishing shutter state) is
   never touched, and no lit frame goes to zero, so the dark frames are the template's.
 - **Physical limits.** A head without a dimmer axis cannot pulse: it plays as authored,
@@ -100,25 +104,43 @@ family the mean lit level is about 0.80 of the authored light under DRAMATIC (0.
 cascade, whose short lit windows each start on an accent) and 0.74 under INTENSE (owner
 question H2 of the W5 review)."""
 
-HEADROOM_BELOW = 0.85
-"""A lit run whose highest authored level is below this share of the dimmer's top is
-shaped with headroom (it brightens and peaks on the beat); at or above it, with the
-dip-and-return. Below it a pulse up to the top is at least 18% of the level; at 0.85 and
-above too little room is left for one to read. Proposed (W5 review fix round)."""
+FULL_BLEND = (0.8, 1.0)
+"""Shares of the dimmer's top: a lit run whose highest authored level is at or below the
+first is shaped with headroom (it brightens and peaks on the beat), at or above the
+second with the dip-and-return; between them the two gains are blended in proportion to
+where the level lies, so the shaped level never jumps as an authored level crosses a
+threshold. Proposed (W5 re-review, replacing one threshold at 0.85)."""
 
 
 @dataclass(frozen=True)
 class AccentCurve:
-    """The accent's shape over musical phase (`accent`)."""
+    """The accent's shape over musical phase (`accent`) and where accents start."""
 
     decay_beats: float
     """The accent eases from 1 on the beat to 0 over this many beats (or the period,
     whichever is shorter), then holds 0 until the next accent."""
+    reopen_after_beats: float
+    """A lit run starts on its own accent only after at least this much darkness; after a
+    shorter gap it follows the beat accents, so short flicks keep the beat."""
+    near_beat_beats: float
+    """A run whose first frame lies at most this much before a beat accent takes that
+    accent, on the beat, in place of its own: one accent, not two."""
+    tail_beats: float
+    """A beat accent starts only where at least this much of the lit run follows it (and
+    `tail_frames` frames), so a run never flashes on its last frames before going dark."""
+    tail_frames: int
 
 
-ACCENT = AccentCurve(decay_beats=1.0)
-"""Proposed (W5). One beat: short enough to read as a pulse, not a fade, at every
-tempo; DRAMATIC's longer period therefore holds its floor for the rest of the period."""
+ACCENT = AccentCurve(
+    decay_beats=1.0,
+    reopen_after_beats=0.5,
+    near_beat_beats=0.25,
+    tail_beats=0.25,
+    tail_frames=3,
+)
+"""Proposed (W5; the start rules from the W5 re-review). One beat of decay: short enough to
+read as a pulse, not a fade, at every tempo; DRAMATIC's longer period therefore holds its
+floor for the rest of the period."""
 
 
 def dramatic_period_beats(beats_per_bar: int) -> int:
@@ -277,31 +299,86 @@ def _lit_runs(
     return runs
 
 
+def accent_starts(
+    times: Sequence[int], grid: _Grid, dark_before_beats: float | None
+) -> tuple[list[int], int | None]:
+    """Where the accents of one lit run (its frame times) start, and the last beat accent
+    before the run, which its frames follow until the first start (`ACCENT`):
+
+    - a beat accent inside the run, unless fewer than `tail_beats` (or `tail_frames`
+      frames) of the run follow it: no flash on a run's last frames;
+    - the run's first frame, after at least `reopen_after_beats` of darkness (or as the
+      section's first lit run, `dark_before_beats` None), unless a beat accent lies at
+      most `near_beat_beats` after it: that one, on the beat, is the run's accent."""
+    first, last = times[0], times[-1]
+    end = _beats(grid, last + EFFECT_GRID_MS) or grid.beats(last)
+    kept = [
+        f
+        for f in grid.accents
+        if first <= f <= last
+        and (last - f) // EFFECT_GRID_MS + 1 >= ACCENT.tail_frames
+        and end - grid.beats(f) >= Fraction(ACCENT.tail_beats)
+    ]
+    starts = list(kept)
+    reopens = dark_before_beats is None or dark_before_beats >= ACCENT.reopen_after_beats
+    near = any(grid.beats(f) - grid.beats(first) <= Fraction(ACCENT.near_beat_beats) for f in kept)
+    if reopens and not near:
+        starts.insert(0, first)
+    before = [f for f in grid.accents if f < first]
+    return starts, before[-1] if before else None
+
+
+def _beats(grid: _Grid, time_ms: int) -> Fraction | None:
+    """`grid.beats(time_ms)`, or None past the phase map's covered span."""
+    try:
+        return grid.beats(time_ms)
+    except MusicalPhaseError:
+        return None
+
+
+def full_weight(highest: Fraction, top: Fraction) -> Fraction:
+    """How much of the full (dip-and-return) gain a run with this highest authored level
+    takes, the rest the headroom gain (`FULL_BLEND`): 0 at or below the band, 1 at or
+    above it, linear between."""
+    low, high = (Fraction(share) for share in FULL_BLEND)
+    return min(Fraction(1), max(Fraction(0), (highest / top - low) / (high - low)))
+
+
 def _gains(
-    run: _Run, shape: IntensityShape, grid: _Grid, period: int, top: Fraction
+    run: _Run,
+    shape: IntensityShape,
+    grid: _Grid,
+    period: int,
+    top: Fraction,
+    dark_before_beats: float | None,
 ) -> tuple[str, list[tuple[float, float]]]:
     """The run's shape name and, per frame, its gain as `(fixed, moving)`: the gain is
     `fixed + scale * moving` (`scale` 1, or less for a slow dimmer, shrinking the accent
-    and the dip together)."""
+    and the dip together). The headroom and full gains are blended by `full_weight`."""
     times = [time_ms for time_ms, _, _ in run.frames]
     highest = max(Fraction(level) for _, level, _ in run.frames)
-    # The run starts on an accent; a beat accent one frame after it is the same one.
-    starts = [times[0]] + [f for f in grid.accents if times[0] + EFFECT_GRID_MS < f <= times[-1]]
-    start, gains = 0, []
+    starts, previous = accent_starts(times, grid, dark_before_beats)
+    weight = float(full_weight(highest, top))
+    room = float(top / highest) - 1
+    total = shape.floor_gain + shape.peak_gain
+    g = min(1.0, room / total) if total > 0 else 1.0
+    depth = shape.full_peak - shape.full_floor
+    index, gains = 0, []
     for time_ms in times:
-        while start + 1 < len(starts) and starts[start + 1] <= time_ms:
-            start += 1
-        e = accent(float(grid.beats(time_ms) - grid.beats(starts[start])), period)
-        if highest >= top * Fraction(HEADROOM_BELOW):
-            depth = shape.full_peak - shape.full_floor
-            gains.append((shape.full_peak, -depth * (1 - e)))
-            continue
-        room = float(top / highest) - 1
-        total = shape.floor_gain + shape.peak_gain
-        g = min(1.0, room / total) if total > 0 else 1.0
-        gains.append((1 + g * shape.floor_gain, g * shape.peak_gain * e))
-    if highest >= top * Fraction(HEADROOM_BELOW):
+        while index < len(starts) and starts[index] <= time_ms:
+            index += 1
+        since = starts[index - 1] if index else previous
+        e = 0.0 if since is None else accent(float(grid.beats(time_ms) - grid.beats(since)), period)
+        gains.append(
+            (
+                (1 - weight) * (1 + g * shape.floor_gain) + weight * shape.full_peak,
+                (1 - weight) * g * shape.peak_gain * e - weight * depth * (1 - e),
+            )
+        )
+    if weight == 1:
         return "dip_and_return", gains
+    if weight > 0:
+        return "blended", gains
     held = len({level for _, level, _ in run.frames}) == 1
     return ("headroom_pulse" if held else "authored_pulse_accent"), gains
 
@@ -326,7 +403,26 @@ def _shape_head(
     """One head's cues of a section (in time order) under `shape` (`shape_section`)."""
     top = Fraction(axis.operable_range[1])
     head = _HeadShape(lead_ms=grid.lead_ms)
-    runs = [(run, *_gains(run, shape, grid, period, top)) for run in _lit_runs(cues, profile, axis)]
+    lit = _lit_runs(cues, profile, axis)
+    runs = [
+        (
+            run,
+            *_gains(
+                run,
+                shape,
+                grid,
+                period,
+                top,
+                None
+                if index == 0
+                else float(
+                    grid.beats(run.frames[0][0])
+                    - grid.beats(lit[index - 1].frames[-1][0] + EFFECT_GRID_MS)
+                ),
+            ),
+        )
+        for index, run in enumerate(lit)
+    ]
     for _, name, _ in runs:
         head.shapes.add(name)
     if axis.travel_speed_per_s is not None:
@@ -423,7 +519,7 @@ def shape_section(
         "peak_gain": shape.peak_gain,
         "full_floor": shape.full_floor,
         "full_peak": shape.full_peak,
-        "headroom_below": HEADROOM_BELOW,
+        "full_blend": list(FULL_BLEND),
         "applied": applied,
     }
     degraded = {f: round(h.scale, 4) for f, h in sorted(heads.items()) if h.scale < 1}
@@ -453,6 +549,7 @@ def describe_intensity(record: Mapping[str, Any]) -> str:
         "the accent",
         "dip_and_return": f"{shape['full_peak']:.0%} of the authored level on the accent, "
         f"easing to {shape['full_floor']:.0%} of it between",
+        "blended": "a level near full, between the two shapes in proportion to how near",
     }
     parts = [f"{names[label]} on {', '.join(heads)}" for label, heads in shape["applied"].items()]
     parts += [

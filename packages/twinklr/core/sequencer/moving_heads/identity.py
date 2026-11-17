@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 BACKEND_ID = "xlights_dmx"
 """The backend the renderer writes: xLights DMX effects in an `.xsq`."""
 
-RENDERER_REVISION = "7"
+RENDERER_REVISION = "8"
 """Bumped by hand in the commit that intentionally changes the renderer's output; the
 render identity also carries the frame encoder's own version. 3: a section's colour and
 gobo are rendered (song-intent rendering W4), so a plan that sets them renders
@@ -44,7 +44,12 @@ change the dip adds less, or plays where revision 5 deferred or kept the change.
 review fix round): intensity is shaped per lit run once every darkness is placed, every
 run starting on an accent, accents on the frame nearest the beat, a run reaching 85% of
 full shaped as full (the authored shape scaled), headroom gains capped so the peak
-reaches full, and the dimmer latency lead capped under half a beat."""
+reaches full, and the dimmer latency lead capped under half a beat. 8 (W6/W7, and the W5
+re-review): the plan's events play (`events`: closed/open, strobes, pulse, hits, colour and
+gobo events, their lyric cues' emphasis), so a plan with events renders differently from
+revision 7; and intensity's accents start no flash on a lit run's last frames, take a beat
+just after a reveal in place of the reveal's own, start a run's own only after half a beat
+of darkness, and blend the headroom and full shapes between 0.8 and 1.0 of full."""
 
 
 def render_fingerprint(

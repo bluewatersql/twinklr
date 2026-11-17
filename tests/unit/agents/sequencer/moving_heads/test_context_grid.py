@@ -457,6 +457,6 @@ class TestThePlannerIsNotShownASectionBeyondTheGrid:
         (tail,) = [r for r in bound.repairs if "beyond the detected beat grid" in r.reason]
         assert tail.action is RepairAction.ADJUSTED
         assert "'tail' at 189000 ms" in tail.reason
-        assert "dark from 182750 ms" in tail.reason
+        assert "dark from 182740 ms" in tail.reason  # the renderer's cue limits
         assert "(bar 61 beat 1)" in tail.reason
         assert not [r for r in bound.repairs if "'inside'" in r.reason]

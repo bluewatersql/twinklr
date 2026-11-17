@@ -13,7 +13,7 @@ import pytest
 from tests.support import moving_heads as m
 from tests.support.moving_heads import discrete_profile_payload, plan_section
 from twinklr.core.agents.sequencer.moving_heads.models import PlanColor
-from twinklr.core.config.fixtures import FixtureCapabilities
+from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup
 from twinklr.core.config.fixtures.state_tags import NEUTRAL_CHROMA, oklch
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.models.enum import ChannelName
@@ -319,6 +319,8 @@ def test_the_rig_offer_lists_gobos_strobes_hit_and_the_wheel_change() -> None:
         ("slow", "medium", "fast"), "none"
     )
     assert offer.hit == "all"
+    # Darkness through the dimmer, which follows one frame each way.
+    assert (offer.dark, offer.flash_ms) == ("all", 20)
     # Dark at once (close latency 0, the dimmer extinguishes), then the slowest offered
     # state's settle: the star gobo's 160 ms.
     assert offer.wheel_change_ms == 160
@@ -595,3 +597,31 @@ def test_each_module_imports_first_in_a_fresh_interpreter(module: str) -> None:
     )
 
     assert result.returncode == 0, result.stderr
+
+
+def test_the_offer_says_how_fast_the_heads_can_flash_and_what_each_strobe_plays() -> None:
+    """Through the dimmer at 8 units/s a flash phase takes 140 ms: at 120 BPM no strobe
+    rate fits but one a beat, and the pulse every beat; through the shutter, its 40 ms
+    latency each way allows sixteenths."""
+    payload = m.tagged_family_rig(("MH1",)).model_dump(mode="json")
+    payload["fixtures"][0]["config"]["physical_profile"]["axes"]["dimmer"]["travel_speed_per_s"] = (
+        8.0
+    )
+    slow = rig_offer(FixtureGroup.model_validate(payload), m.bars_grid(500.0, 500.0))
+    shutter = m.tagged_family_rig(("MH1",)).model_dump(mode="json")
+    profile = shutter["fixtures"][0]["config"]["physical_profile"]
+    profile["visibility"].update(
+        dimmer_zero_extinguishes=False, close_latency_ms=40, open_latency_ms=40
+    )
+    closed = rig_offer(FixtureGroup.model_validate(shutter), m.bars_grid(500.0, 500.0))
+
+    assert slow.flash_ms == 140
+    events = offer_for_prompt(slow, {}, ["s1"])["events"]
+    assert [s["plays"] for s in events["strobes"]] == [1, 1, 1]
+    assert events["pulse_beats"] == 1
+    assert (closed.dark, closed.flash_ms) == ("all", 40)
+    assert [s["plays"] for s in offer_for_prompt(closed, {}, ["s1"])["events"]["strobes"]] == [
+        2,
+        4,
+        4,
+    ]

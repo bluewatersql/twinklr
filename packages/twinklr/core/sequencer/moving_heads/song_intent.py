@@ -61,9 +61,10 @@ if TYPE_CHECKING:
     from twinklr.core.sequencer.planning import MacroPlan
     from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
-RENDERED_INTENT_FIELDS = frozenset({"intensity", "color", "gobo"})
+RENDERED_INTENT_FIELDS = frozenset({"intensity", "color", "gobo", "events", "moment_cues"})
 """The section song-intent fields (`PlanSection.set_intent_fields`) the renderer plays:
-colour and gobo here, intensity in `intensity.py`."""
+colour and gobo here, intensity in `intensity.py`, events and the lyric cues they land on
+in `events.py`."""
 
 FIXED_ROLE_COLORS: dict[PaletteRole, ColorPreset] = {
     PaletteRole.PRIMARY: ColorPreset.RED,
@@ -395,6 +396,84 @@ def darkness_ms(profile: FixtureCapabilities) -> int | None:
     return dark
 
 
+STROBE_FLASHES_PER_BEAT = {"strobe_slow": 2, "strobe_medium": 4, "strobe_fast": 8}
+"""Proposed (W6, `events`). Flashes per beat of the square-wave strobe: eighths, sixteenths and
+thirty-seconds. A rate the darkness path cannot follow halves until it fits (down to one
+flash a beat)."""
+
+PULSE_PERIODS_BEATS = (1, 2, 4)
+"""Proposed (W6, `events`). The pulse's period, in beats: lit for the first half, dark for the
+second; the first that the darkness path can follow plays."""
+
+
+def flash_widths(profile: FixtureCapabilities) -> tuple[str, int, int] | None:
+    """How a head flashes (its darkness path: `dimmer` or `shutter`) and the shortest
+    dark and lit phases it can follow, each on the frame grid: one frame, or the dimmer's
+    full swing at its declared speed; through the shutter, the close latency plus the
+    closed state's settle and the open latency plus the open state's settle. None when
+    it has no darkness to flash with or a term is unknown."""
+    visibility = profile.visibility
+    dimmer = profile.axes.get("dimmer")
+    if visibility.dimmer_zero_extinguishes and dimmer is not None:
+        swing = (
+            EFFECT_GRID_MS
+            if dimmer.travel_speed_per_s is None
+            else frames_ms(1000 / dimmer.travel_speed_per_s)
+        )
+        width = max(EFFECT_GRID_MS, swing)
+        return "dimmer", width, width
+    shutter = profile.discrete.get("shutter")
+    if (
+        shutter is None
+        or shutter.closed_state is None
+        or shutter.closed_state not in visibility.extinguishing_shutter_states
+    ):
+        return None
+    opened = shutter.open_state or shutter.default_state
+    close, open_ = visibility.close_latency_ms, visibility.open_latency_ms
+    closing, opening = (
+        shutter.states[shutter.closed_state].settle_ms,
+        shutter.states[opened].settle_ms,
+    )
+    if None in (close, open_, closing, opening):
+        return None
+    assert close is not None and open_ is not None and closing is not None and opening is not None
+    return (
+        "shutter",
+        max(EFFECT_GRID_MS, frames_ms(close + closing)),
+        max(EFFECT_GRID_MS, frames_ms(open_ + opening)),
+    )
+
+
+def can_darken(profile: FixtureCapabilities) -> bool:
+    """Whether a head can be commanded dark on its cue's path: its dimmer's zero
+    extinguishes, or its closed shutter state does."""
+    visibility = profile.visibility
+    if visibility.dimmer_zero_extinguishes and "dimmer" in profile.axes:
+        return True
+    shutter = profile.discrete.get("shutter")
+    return (
+        shutter is not None
+        and shutter.closed_state is not None
+        and shutter.closed_state in visibility.extinguishing_shutter_states
+    )
+
+
+def strobe_flashes(action: str, beat_ms: float, widest_ms: int) -> int | None:
+    """The flashes per beat a strobe plays where the darkness path follows phases of
+    `widest_ms`: the asked rate (`STROBE_FLASHES_PER_BEAT`), halved until a half period of
+    the beat fits, down to one; None when even that does not."""
+    asked = STROBE_FLASHES_PER_BEAT[action]
+    rates = [asked >> i for i in range(asked.bit_length())]
+    return next((n for n in rates if beat_ms / (2 * n) >= widest_ms), None)
+
+
+def pulse_period(beat_ms: float, widest_ms: int) -> int | None:
+    """The pulse's period in beats (`PULSE_PERIODS_BEATS`) the darkness path can follow;
+    None when none."""
+    return next((p for p in PULSE_PERIODS_BEATS if beat_ms * p / 2 >= widest_ms), None)
+
+
 def wheel_change_ms(profile: FixtureCapabilities, settle_ms: int) -> int | None:
     """The time a wheel change into a state with `settle_ms` needs from a lit head: its
     darkness (`darkness_ms`), then the turn and settle (at least one frame), each rounded
@@ -451,6 +530,13 @@ class RigOffer(BaseModel):
     """Each strobe speed, over the heads with a shutter: the shutter state tagged with it."""
     hit: Availability
     """The heads with a dimmer axis, which a hit (raising the dimmer on lit frames) needs."""
+    dark: Availability = "all"
+    """The heads that can be commanded dark (a zero dimmer that extinguishes, or a closed
+    shutter state that does), which `closed`, strobe and `pulse` events need."""
+    flash_ms: int | None = None
+    """The longest of the shortest dark and lit phases any head's darkness path can follow
+    (`flash_widths`), which bounds a square-wave strobe or pulse; None when no head can
+    flash."""
     wheel_change_ms: int | None
     """The longest wheel change of any head into any offered state (`wheel_change_ms`):
     dark, turn and settle. None when no state is offered, or a head's is unknown."""
@@ -542,6 +628,8 @@ def rig_offer(
         for speed in get_args(StrobeSpeed)
     }
     dimmers = [f for f, p in profiles.items() if "dimmer" in p.axes]
+    darkens = [f for f, p in profiles.items() if can_darken(p)]
+    widths = [w for p in profiles.values() if (w := flash_widths(p)) is not None]
     changes: list[int | None] = []
     for head in heads:
         profile = profiles[head.fixture_id]
@@ -560,6 +648,8 @@ def rig_offer(
         gobos={pattern.value: gobo_offer(heads, pattern) for pattern in GoboPattern},
         strobes=strobes,
         hit="none" if not dimmers else "all" if len(dimmers) == len(profiles) else "some",
+        dark="none" if not darkens else "all" if len(darkens) == len(profiles) else "some",
+        flash_ms=max((max(dark, lit) for _, dark, lit in widths), default=None),
         wheel_change_ms=None
         if not changes or None in changes
         else max(change for change in changes if change is not None),
@@ -850,6 +940,37 @@ def offer_for_prompt(
         },
         "dark_windows": windows,
         "exclusions": exclusions,
+        "events": _events_for_prompt(offer),
+    }
+
+
+def _events_for_prompt(offer: RigOffer) -> dict[str, Any]:
+    """What `closed`/`open`, the strobes and `pulse` play on this rig at the song's median
+    beat: each strobe's flashes per beat (the fixture's own where every head has a state
+    tagged for it), the pulse's period, and whether the heads can go dark at all."""
+    strobes = []
+    for speed, asked in STROBE_FLASHES_PER_BEAT.items():
+        tagged = offer.strobes.get(speed.removeprefix("strobe_"))
+        plays = (
+            None
+            if offer.flash_ms is None or offer.beat_ms is None
+            else strobe_flashes(speed, offer.beat_ms, offer.flash_ms)
+        )
+        strobes.append(
+            {
+                "action": speed,
+                "asked": asked,
+                "plays": plays,
+                "tagged": "none" if tagged is None else tagged.available,
+            }
+        )
+    return {
+        "dark": offer.dark,
+        "flash_ms": offer.flash_ms,
+        "strobes": strobes,
+        "pulse_beats": None
+        if offer.flash_ms is None or offer.beat_ms is None
+        else pulse_period(offer.beat_ms, offer.flash_ms),
     }
 
 
@@ -857,8 +978,8 @@ def describe_look(record: Mapping[str, Any]) -> list[str]:
     """A section's trace entry (`SectionLook.record`, as the renderer leaves it) as lines
     for a reader: what each asked colour and gobo plays on which heads from the
     section's start, where a head turns to it later or keeps the previous or authored
-    state, each boundary's dark dip, and what its intensity plays
-    (`intensity.describe_intensity`)."""
+    state, each boundary's dark dip, what its intensity plays
+    (`intensity.describe_intensity`) and what each event played (`events.describe_events`)."""
     lines = []
     for key, noun in (("color", "colour"), ("gobo", "gobo")):
         entry = record.get(key)
@@ -909,4 +1030,7 @@ def describe_look(record: Mapping[str, Any]) -> list[str]:
         lines.append(f"{boundary['fixture_id']} at {boundary['boundary_ms']} ms: {wheels}: {what}")
     if "intensity" in record:
         lines.append(describe_intensity(record["intensity"]))
+    from twinklr.core.sequencer.moving_heads.events import describe_events
+
+    lines += describe_events(record.get("events", []))
     return lines

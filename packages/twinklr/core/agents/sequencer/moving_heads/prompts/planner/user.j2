@@ -99,8 +99,13 @@ plays as its wheel colour, not darker or paler (`intensity` shapes the dimmer).
 {% else %}
 - **Gobos**: {% if rig_offer.gobos.all %}on every head: {{ rig_offer.gobos.all | join(', ') }}{% else %}none on every head{% endif %}{% if rig_offer.gobos.some %}; on some heads: {{ rig_offer.gobos.some | join(', ') }}{% endif %}{% if rig_offer.gobos.none %}; not shown: {{ rig_offer.gobos.none | join(', ') }}{% endif +%}
 {% endif %}
-- **Strobe speeds**: {% if rig_offer.strobes.all or rig_offer.strobes.some %}{{ (rig_offer.strobes.all + rig_offer.strobes.some) | join(', ') }}{% else %}none tagged{% endif +%}
-- **Hit** (a dimmer accent): {{ {"all": "every head", "some": "some heads", "none": "no head"}[rig_offer.hit] }}
+{% set ev = rig_offer.events %}
+- **Events** (what deterministic code plays, at this song's median beat):
+  - `closed` / `open`: {% if ev.dark == "none" %}no head can go dark, so neither plays{% else %}{% if ev.dark == "some" %}the heads that can go dark{% else %}the heads{% endif %} go dark from the beat until `open`, another shutter event or the section's end{% endif +%}
+  - Strobes{% if rig_offer.strobes.all or rig_offer.strobes.some %} (the fixture's own strobe on the heads tagged for it: {{ (rig_offer.strobes.all + rig_offer.strobes.some) | join(', ') }}){% endif %}: {% for s in ev.strobes %}`{{ s.action }}` {% if s.plays is none %}cannot flash here{% elif s.plays == s.asked %}{{ s.plays }} flashes a beat{% else %}{{ s.plays }} flash{% if s.plays != 1 %}es{% endif %} a beat (not {{ s.asked }}: the darkness cannot follow faster){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}, from the beat until the next shutter event or the section's end
+  - `pulse`: {% if ev.pulse_beats is none %}cannot pulse here{% else %}lit for the first half of {% if ev.pulse_beats == 1 %}every beat{% else %}every {{ ev.pulse_beats }} beats{% endif %}, dark for the second{% endif +%}
+  - `hit` (a dimmer accent): {{ {"all": "every head", "some": "some heads", "none": "no head"}[rig_offer.hit] }}{% if rig_offer.hit != "none" %}: full on the beat and easing back, cut deeper into the beat and longer for a high-emphasis lyric cue. Only the heads lit on its beat play it (a cascade lights a few at a time); where every head is dark there (a section's first beats while the heads reposition, a colour change's dark dip, a show's rest) it moves to the nearest beat they show, within a bar{% endif +%}
+  - `color` / `gobo` events: revealed on the beat after the wheel turns in the dark (as below); a head dark on that beat shows it from its next reveal
 {% if rig_offer.hit == "none" %}
 - **Intensity**: no head has a dimmer axis, so `DRAMATIC` and `INTENSE` cannot pulse here: every head plays its template's own level. Give emphasis with events or colour instead.
 {% elif rig_offer.hit == "some" %}
@@ -219,7 +224,7 @@ The MacroPlanner has defined the following strategic guidance for each section. 
 {% endfor %}
 {% endif %}
 {% if head_focal_roles is defined and head_focal_roles %}
-**The moving heads' focal role** (deterministic code applies it to each section's `intensity` when the show renders): LEAD plays one step hotter (`as_authored`, `SLOW`, `SMOOTH` and `FAST` play as `DRAMATIC`; `DRAMATIC` as `INTENSE`), SUPPORT plays your choice, REST at most the template's own level (`DRAMATIC` and `INTENSE` play as authored). Still set `intensity` from the section's energy; the role is applied on top of it.
+**The moving heads' focal role** (deterministic code applies it to each section's `intensity` when the show renders): LEAD plays one step up the intensity ladder (`as_authored`, `SLOW`, `SMOOTH` and `FAST` play as `DRAMATIC`; `DRAMATIC` as `INTENSE`; on a template at full level that is more movement in the light, not more light), SUPPORT plays your choice, REST at most the template's own level (`DRAMATIC` and `INTENSE` play as authored). Still set `intensity` from the section's energy; the role is applied on top of it.
 {% for section_id, role in head_focal_roles.items() %}
 - `{{ section_id }}`: {{ role }}
 {% endfor %}

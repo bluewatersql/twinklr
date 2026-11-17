@@ -20,8 +20,9 @@ Repair rules, per section:
   reference;
 - an event bound to a usable cue moves to the beat of the section nearest the cue's
   timestamp (the cue's own nearest beat, or the section's first or last beat when that
-  lies in a neighbouring section); it is dropped only when the section has no beat on
-  the grid; with no beat grid it keeps its binding and its own position;
+  lies in a neighbouring section) and carries the cue's emphasis (`cue_emphasis`, which
+  scales a hit); it is dropped only when the section has no beat on the grid; with no
+  beat grid it keeps its binding and its own position;
 - an unbound event before the section moves to its first beat, one after it to its last
   beat, and one on a beat its bar does not have to the bar's last beat;
 - of events of one kind (shutter, hit, colour, gobo) on the same beat, one is kept: a
@@ -214,6 +215,7 @@ def _repair_section(
     for event in section["events"]:
         item = f"{event['action']} event at bar {event['bar']} beat {event['beat']}"
         first_record = len(repairs)
+        event["cue_emphasis"] = None  # code-owned: set below for a bound event
         if not _repair_fields(event, item, record):
             continue
         cue_id = event["moment_cue_id"]
@@ -302,17 +304,25 @@ def _bind(
     beats: range,
     record: _Record,
 ) -> None:
-    """Move the event to the section's beat nearest the cue. A cue past the beat grid's
-    covered span (its last beat plus one beat interval, where the render goes dark), in
-    the clamped part of a section the grid ends inside, lands on the grid's last beat,
-    recorded so the planner sees the accent is not where the lyric is."""
+    """Move the event to the section's beat nearest the cue. A cue past where the render
+    goes dark at the song's end (the renderer's `cue_limits`: the beat grid's covered
+    span, clamped to the song and the frame grid), in the clamped part of a section the
+    grid ends inside, lands on the grid's last beat, recorded so the planner sees the
+    accent is not where the lyric is."""
+    from twinklr.core.sequencer.moving_heads.pipeline import cue_limits
+    from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map
+
     snapped_ms = grid.snap_to_nearest_beat(float(cue.timestamp_ms))
     nearest = bisect_left(grid.beat_boundaries, snapped_ms)
     index = min(max(nearest, beats.start), beats.stop - 1)
     bpb = grid.beats_per_bar
     event["bar"], event["beat"] = index // bpb + 1, index % bpb + 1
-    boundaries = grid.beat_boundaries
-    covered_end = boundaries[-1] + boundaries[-1] - boundaries[-2] if len(boundaries) >= 2 else None
+    event["cue_emphasis"] = str(cue.emphasis)
+    covered_end = (
+        cue_limits(build_musical_phase_map(grid), int(grid.duration_ms))[1]
+        if len(grid.beat_boundaries) >= 2
+        else None
+    )
     if covered_end is not None and cue.timestamp_ms > covered_end:
         record(
             item,

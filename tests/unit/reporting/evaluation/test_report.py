@@ -309,12 +309,13 @@ async def test_the_report_carries_each_sections_song_intent_and_the_plan_repairs
     tmp_path: Path,
 ) -> None:
     """The planner's song intent is reported per section as planned, with what the render
-    played of its colour and intensity and the fields the renderer does not render yet;
-    the plan's repairs are reported from the trace."""
+    played of its colour, intensity and events and the fields the renderer does not render
+    yet; the plan's repairs are reported from the trace."""
     accented = PLAN.sections[0].model_copy(
         update={
             "intensity": Intensity.DRAMATIC,
             "color": PlanColor.PALETTE_ACCENT,
+            "motif_id": "m1",
             "events": [
                 PlanEvent(
                     bar=2,
@@ -342,9 +343,10 @@ async def test_the_report_carries_each_sections_song_intent_and_the_plan_repairs
     assert first is not None and second is not None
     assert (first.intensity, first.color, first.gobo) == ("DRAMATIC", "PALETTE_ACCENT", None)
     assert first.events == ["bar 2 beat 3: hit"]
-    assert first.not_rendered == ["events"]
+    assert first.not_rendered == ["motif_id"]
     # The family rig's colour wheel carries no tags: the colour plays on no head.
-    played, intensity = first.played
+    played, intensity, hit = first.played
+    assert hit.startswith("event hit at bar 2 beat 3: a hit at ")
     # The family holds the dimmer full: DRAMATIC dips and returns every half bar.
     assert intensity == (
         "intensity DRAMATIC: a pulse on the beat every 2 beats: 100% of the authored level "
@@ -357,7 +359,8 @@ async def test_the_report_carries_each_sections_song_intent_and_the_plan_repairs
     markdown = (tmp_path / "report" / "report.md").read_text(encoding="utf-8")
     assert "**Song intent** (as planned):" in markdown
     assert "- intensity: DRAMATIC" in markdown and "- intensity: as authored" in markdown
-    assert "not rendered yet (events): a known regression" in markdown
+    assert "not rendered yet (motif_id): a known regression" in markdown
+    assert f"- played: {hit}" in markdown
     assert f"- played: {played}" in markdown and f"- played: {intensity}" in markdown
     assert "**Plan repair** (section `s1`): moment cue 'ghost' dropped" in markdown
 

@@ -698,8 +698,13 @@ class TestPlannerUserPromptRendering:
             "PALETTE_COOL #43A047 → not shown; PALETTE_NEUTRAL #FFFFFF → white\n",
             "- **Gobos**: on every head: open, stars, dots; not shown: circles, triangles, "
             "diamonds, clouds, prism, shatter, flame, water, foliage, abstract\n",
-            "- **Strobe speeds**: none tagged\n",
-            "- **Hit** (a dimmer accent): every head\n",
+            "  - `closed` / `open`: the heads go dark from the beat until `open`, another "
+            "shutter event or the section's end\n",
+            "  - Strobes: `strobe_slow` 2 flashes a beat, `strobe_medium` 4 flashes a beat, "
+            "`strobe_fast` 8 flashes a beat, from the beat until the next shutter event or the "
+            "section's end\n",
+            "  - `pulse`: lit for the first half of every beat, dark for the second\n",
+            "  - `hit` (a dimmer accent): every head: full on the beat and easing back",
             "- **A wheel change** takes 160 ms of darkness (about 0.4 beat). Where the heads "
             "play straight from one section into the next and its colour or gobo changes, "
             "they go dark for that long just before the new section's first beat",
@@ -745,7 +750,7 @@ class TestPlannerUserPromptRendering:
         rendered = self._render(head_focal_roles=roles)
 
         assert "**The moving heads' focal role** (deterministic code applies it" in rendered
-        assert "LEAD plays one step hotter" in rendered
+        assert "LEAD plays one step up the intensity ladder" in rendered
         assert "REST at most the template's own level" in rendered
         for section_id, role in roles.items():
             assert f"- `{section_id}`: {role}\n" in rendered

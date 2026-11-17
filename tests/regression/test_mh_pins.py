@@ -30,7 +30,10 @@ unchanged, no pinned plan setting an intensity, and added the intensity pins
 span); every frame and `.xsq` hash is unchanged, the gated plan's dark span meeting no
 colour change. The W5 review fix round re-recorded every fingerprint again (revision 7:
 intensity shaped per lit run); every frame and `.xsq` hash is unchanged but two of the
-intensity pins'. An intended
+intensity pins'. W6/W7 re-recorded every fingerprint again (revision 8: the plan's events
+play, and the W5 re-review's accent rules); every frame and `.xsq` hash is unchanged, no
+pinned plan having events and the pins' steady grid meeting none of those rules, and
+added the event pins (`EVENT_PINS`). An intended
 output change bumps `RENDERER_REVISION` and re-records these pins in the same commit,
 saying why.
 """
@@ -59,178 +62,178 @@ HEADS = ("MH1", "MH2", "MH3", "MH4")
 
 PINS: dict[str, tuple[str, str]] = {
     "steady/finite_snap_hold/base": (
-        "2792d0683d4b415c88915778c7a355e44ae89c9a2da9787fc825887a424f7977",
+        "82e238635d3392576d330fce5f448e700ffba0724ebd279c0022015fb5106868",
         "8dc76627bbfb3e4e0a170d097e491277cdb571b09c41198381db8cbcc374e120",
     ),
     "steady/finite_snap_hold/narrow": (
-        "3669ad16e5703306d4902c08e5d7f32d0ee7e2c0e678629444994ea5b39b3592",
+        "f7b7a740a9bda86bd6d6a4c73b2e27fc10b5107f85c3c654680b95f57196ca41",
         "c0d8292c375a952740fbbb4fdec44ca69ed99c1bc90decfe2f2f22b57387ccce",
     ),
     "steady/finite_snap_hold/slow": (
-        "9b157c68e00b2883d5d3f15f81f43422c886ea5985298ef6810c963dc6001d37",
+        "d85475286c26c42e020e5ed5b1c63a00490e224baa872f740ec677c170a0519f",
         "4d455965979b705ad9af8136e4fd229c7b5374635e1786d07b8cab7636861b9d",
     ),
     "steady/fly_in_cascade/base": (
-        "3370d7ace3ed00785c132dd4d1654b0d239553df62dafb99f8bf466116cdddaa",
+        "9fdc874c1d31e74532155f7120b8521a3be142518b4a891a6dc777836816078c",
         "ffdfb044c11edf3040dd81744d17558a2d46c21181071367cca5f752a8413b0d",
     ),
     "steady/fly_in_cascade/narrow": (
-        "b5d40e600d6f8349f2f73ab25d680b9558780689f6ad1cc0901546cc03bcd6f6",
+        "5dd23051754892245b1aa9e9d92675db6ae581d5760a9897e241e76ce8766c5d",
         "0280d85aaf1e832fc23b428e311b24ccb67dac720116f25f71d147261f88f310",
     ),
     "steady/fly_in_cascade/slow": (
-        "233fd51866f37b240b63977db4ec07243be08d2cf47c89fa26b80d4d6d34c4c9",
+        "287110543153af1c06e1a30780a70c57fa6d41495019c8151db62b8eeea3a1b2",
         "dd49563a5956e1e52f4a2c01e8f005a64a297ff28f9155f3eb05d10a29312433",
     ),
     "steady/fly_out_cascade/base": (
-        "b3d75ebd545dc58429cca2dc84ae49b843a746dff2ad793ba75de0bdfcd950de",
+        "808b560bf5a84aca580ee8227b038536f1263c68c90d22bafbdf5b322ef11804",
         "4235e01012dddfdae05f050fa904a9efa2e8eb4cf4f3b7e2ddd06b23951c733e",
     ),
     "steady/fly_out_cascade/narrow": (
-        "32a1d5563e6dbb6df00d3824a29d0270b2faa441dc9788e82121b7ed1981cca6",
+        "1c71c087b29d7697b9884f88df3954116922a221ea13ce72fd5d58c037ef4557",
         "150edd82e9273731bd9ab781ab5c6caf420cf5d1129cddb637915687dab01a88",
     ),
     "steady/fly_out_cascade/slow": (
-        "7e0de417ab2d402bb2c244b5508548207068d746a3cda19a607bccc32c058b53",
+        "d7a8e5f32ad3903bfabf40d315f43deba3dfa688a1311e6a217f7358357e41c0",
         "c7e91342cab3b42a868f59ab824961da433ac89db0c5646f1fd41e29b0444a70",
     ),
     "steady/masked_wheel_flick/base": (
-        "a179c289c31d728d37c06cd77bef5a54f8840b8e3fe47c7bc083e1906f4a6f9f",
+        "14982b2138c90afa05a29662e38d5769373d4e51568a7f930de2974043e02f49",
         "08ce9090980dbfefa79b6d78c90ef0f0b0c8ef3a19bb47d193d9af34805cd2de",
     ),
     "steady/masked_wheel_flick/narrow": (
-        "c62bcded86ba5f81a42c051fba46b6a2649b262ed5eb7a8cdd76bf427d1f40c7",
+        "1ff329fa4c8787a2b0eda5891b0f32b6f160e67aa3f089650c2029b77f236012",
         "2537e7e6cf39dad19aadb07a271b223f83c2af7fbbe52b4732f6416cee5993ad",
     ),
     "steady/masked_wheel_flick/slow": (
-        "3c9e480be4b3052f9121057cf969615c3fee7f27f0ddce794c26f60630768e9f",
+        "d6c5ddbdce4f8250a208b9bcede21c8c24107868e3ac699d51203c6058fb2897",
         "56a758e57a37773c558bff6f8134843cf45c76d005021a6e882374d16d96431a",
     ),
     "steady/mirror_wings/base": (
-        "e5335bde18366881fe0df91a76438e43d87057513e91042599c28d056c5bbeba",
+        "148447b50d22628c7e46430eaa7d05dcfed70f907268baa5f65a11407820cbcf",
         "8e3cb9be3de61f968b065d8d0442ac5551becdbbf4624afb76b13a58e0f000fd",
     ),
     "steady/mirror_wings/narrow": (
-        "264d4f1f20ef7b9869dbaa2e3de6f991f09e2fe7c24ddf090b53f3041b0ea17a",
+        "d40dc78c84984011d5e1072f905de9e66a64fa70ab26b211fe4aa70bf3dae81c",
         "d83a23f4fea33e3e6f1b2bbfabdc0b5c26f605b673861c0021a1cc1c8bd36a1b",
     ),
     "steady/mirror_wings/slow": (
-        "ddc1ec26be1092e5deec5228af6e9242d7d8e7721bb99ff44214ebbeb2ea9f27",
+        "6582dcb235fc15a692c34d1c1d415c6c9a077f5f5582d7906c0d52657eac5f1e",
         "bbcdbab3564fa3d0a7f107562326940ef92fa3f38130a37ac9d8b43f68bdd3b6",
     ),
     "steady/target_orbit/base": (
-        "14e46e33dc14a3237775149593b0d64dc342d71ec9a5db4c86aa4facd2ea3631",
+        "6463eb842487cd818ef64a87ea718295c96032c107ca265be094bd6146655af8",
         "78d35ed327d359ca0cc456a151ae19f800a20b80ac1cc040ea4448be4d014ed1",
     ),
     "steady/target_orbit/narrow": (
-        "d98e4a1b2fc602062cc6068623b3c03d3fef6dd09cdd759037c4a52d912561bb",
+        "df5451018db35212810950e15ccdf72874a3ef17a36a8b69839aca09f92fe865",
         "a35e080540356862ecfe8738414c7cef0d781b639b869db97bc27ff0db5f180b",
     ),
     "steady/target_orbit/slow": (
-        "dc6686cedec73490c05bcc882c4b9b1922e39f49519f4886ef6703817ced2f04",
+        "16cb450ec47298f0234d696c07e592f5854951ad3b1507b42fe809d2abaeb924",
         "a2eb0bf1f4d04307af57da96941f9d02e8c47ffcc583db3361b0a754975c7d36",
     ),
     "steady/zoom_wave/base": (
-        "2bfbe0cc3401d960c7491c3af1c247eb4e24c3d8761323f888d049d4ba0a93d3",
+        "0e71caa00c946d6b168b8570e947edc6ba5604c192e6056c7a88731e278f7e69",
         "bfa3f5ef5efd80d8f801f76ab412044d35161bb606288fc35f6fbeaf6970675a",
     ),
     "steady/zoom_wave/narrow": (
-        "625e1886926a85e25e93761e87913cf19a1e7436ce1a9cf621b9986867e1e08f",
+        "fdb7ccb2eaf04eaacacb8ba5c5a379f69d871edab65c3bcbde6e4192c5f58265",
         "0ddc62b56b92e1af2deedbc6b9bf47570bbe82663ff559091f3883f32e20169b",
     ),
     "steady/zoom_wave/slow": (
-        "db1e01d0d2c5d783216c67b0017e12528468f5ec139bbe0e45f524ea21f45c1d",
+        "a7d53901626976f6aa97c7b4baea31b190fefe2a743589f49850db9709b2c916",
         "394aa7ae9fb0cc8e948e2c1b68264b9652edbddd44bcefd9d5ac0dea8e5cdb2c",
     ),
     "variable/finite_snap_hold/base": (
-        "d1a7ddd0c8e45947f5674b917bdafe5d6b89b5bcab65f804fedf77b15c5f5326",
+        "c4ca8244e4355a6e29fd2266e678d4ea7370c2630c173994e0182d0666d00db3",
         "d03e6f47159bc26621e835d36e191f370e0f90955ddac4b356afb477e613ba0f",
     ),
     "variable/finite_snap_hold/narrow": (
-        "827cb5c584c81643cb9e03fdd1af02bc4ff745ce0545a6d625cb74826614b277",
+        "eb647b01c42cfa1244d3da0d8901b3925b7943a7ec37a8aa5e174a1bb3495a72",
         "9af804ac9d4aa9765aba26e095a80714399942811724696373cc015653545af6",
     ),
     "variable/finite_snap_hold/slow": (
-        "f3002bffb06d62eb513857029eac643d34d188f4bb37482349c8fad2dac65b18",
+        "a829cc3380977537c87758156bbe960eb1e13f2bcc88337e81174ebbcd2b5b9c",
         "e4f7f3d9a0863c4f423dae91e481e8874d5971308aa2196a93e6fca84a6d8930",
     ),
     "variable/fly_in_cascade/base": (
-        "04b4d23edb64e8c36d2144608d8cbaa1687ec9a1dacb4255017f7d9d0ec8ae04",
+        "fc8d0d24f9da6cbd068779e74301320d8eec11740cd7f113575e27985c1967e1",
         "34f9987fa593584b7894352d13944905315dd6c260035971de447db3c121fd7a",
     ),
     "variable/fly_in_cascade/narrow": (
-        "ad74a2a0b8a5d9c9a659b49a087a2f836db91d3f584b92d00f841616060397bf",
+        "f082eb09ba2051392ff7f57c33f5b12689083b90550eba7826c181f3d7adf50f",
         "f2d02f0c7cdbcda887bcd350188338a8bfe0ae583b2b5e092c64b921985f1a9e",
     ),
     "variable/fly_in_cascade/slow": (
-        "6e0f19238c30951978a6bca39e9ef92902053b09aed7a57673350ec15baf2d7e",
+        "019a9a7d03c1c18b428d2c2eeadd9abbb337293e54d3ae8b312e08439fe8359f",
         "49c484a8585d159fc61d0989eef1cc2a35fc22a5e46cf202f789736c8dd37ebe",
     ),
     "variable/fly_out_cascade/base": (
-        "9c5d86344d02dce0d92f42299ddcca19b47a8e67359208a0b15d5ab47b6abb60",
+        "aee10c0112fee662c37456e650c8d99484f0bb63cd0843efa01110c429352daa",
         "36f29b21188085c76c462a8cfd73f3e10f21f7adfdbca525a674c4960aca28d2",
     ),
     "variable/fly_out_cascade/narrow": (
-        "7675306c70aeefa3cc10872167295c918f9d180fee7222610117e1de939baa3f",
+        "8a518caba8b7d40948532554681b07f77d0f09d1ff339655ae5b4999dfbba2c1",
         "c773f3be51097dd3ec2c309f6149f76e6c3bb7f6d1ea24416aba4662a10cb420",
     ),
     "variable/fly_out_cascade/slow": (
-        "94e52944f65da3a102771589aa49726e5c4e8965a89e28ef2d8b787e7c64ef5b",
+        "adf17be7764bfaaf5a8588c15846b9ef49fb34d1a84ac8d5cd0e1cab48d54d7b",
         "de6e5fb69f6beeeb43df051367101bd88d3d75b61e811bab2ac3e69d2edd499a",
     ),
     "variable/masked_wheel_flick/base": (
-        "2f6f62066f19c5bad8cfa11d393c1e571bff675090ba5900e0e8d699af822723",
+        "258d88f5153dc3d6ba72ae83f3ef7599e4050fcbb1cb3e065a2510412751ef3a",
         "a628fb0ca672aba2a7c36e3ecfafcf1003b8d9c8a06adc5edcf0840004981f3f",
     ),
     "variable/masked_wheel_flick/narrow": (
-        "788b02858199a166d715811112c94a49e27a7a48ec24238e24929969e11ef965",
+        "c96f164c2e64fc1a6a4d89a4b734b14f17293ee198efed099df5bb1952063f7b",
         "a8b2c6b2cf905f657c6993dca020c6aa14bbfacc10f89bfb97491860bc81a6c3",
     ),
     "variable/masked_wheel_flick/slow": (
-        "7af7b800d70e0e95f02c24ac7c4bf4db64a1ea12f5e32759aaf54c1d489af637",
+        "ac50dba7feef727e4fcae4e32c8b2aac1c00ae93630021f3ed5dada35fecb972",
         "058ed1d9cbdde981fa5213dd23654d42fc86a9ebd6150fc50b089e07f85825f8",
     ),
     "variable/mirror_wings/base": (
-        "771105949c60d12faf207fe464a14d0c18aa76df6c06882149cfb09effbdc196",
+        "934ef013b3b90c41ee9cffa965cc82b6c9d496d1bec488b197446ab9672eca6b",
         "a59b343515d159c1603c1a0ed576afa3b6721178a643ad1c5fbc02d6bb706dde",
     ),
     "variable/mirror_wings/narrow": (
-        "a14e0eaafce82b36d3694e91763a29097908d157e780d6793bfcda721cc8a0f3",
+        "f86161c2ea2e98dea68dafd46fd138a69862c11980a0bc1127e4a9d1085e6f60",
         "4d326471bc6af0e6f429bd8e5d5b7e374587d3f545a2fe3d2ad3ef908ab6f801",
     ),
     "variable/mirror_wings/slow": (
-        "9d8678dc828462ed0a624e537aec3f42b646e62072d421ebdbc4df3ad7a10e4d",
+        "afe997bafa5ec25047fae6435d8a7618d842dedd4dafd52ffc855a2f17e5e980",
         "cee179ea21422e5e6f268664dd79981055afedfd98c5849c5dbfd44f5b80904e",
     ),
     "variable/target_orbit/base": (
-        "817a835a2fdf2ea8f37c68681329fe62796b162647c6dc2dd82809d95beb645c",
+        "fcd98e44301e11f7b36bb78e460f031d916f5e54035cd337538154ae1328c784",
         "2bfe8b5bd75f0097dd6fb8011e38a11578764984050474ddf0ee402ae3c85fa1",
     ),
     "variable/target_orbit/narrow": (
-        "dcbad7fbbf2fd807cf8925ae22ee68c9478fce49758b2aeb86e2befee12751db",
+        "18654e3bf74ad6c713aba62e01bb428bdc41b867f63043ab26c929a0a32ded59",
         "9f453dce2badb89d745c808896a8fe6d3b9feafacf5d122371d75d0a6377b4a6",
     ),
     "variable/target_orbit/slow": (
-        "054edc34d9a578d3d9048b48ec6ae30d8bd97e89e8e2fbd8d3446dce4cde6d88",
+        "e3ef0c77d58cf91ffe596592676a09c97e476c998286b6fbc5edfd63bd8263b4",
         "ac930585ef5e3f15f79cc7267d407f586e99f71923c67b287415b69ec32365c5",
     ),
     "variable/zoom_wave/base": (
-        "1c7c35eb87d4311d1f1b295ea0f0f7f812882cc69ce6fac261403b2f54cbf049",
+        "3aef08eac45b01a1431c2ab82526e01b382ce7e7a7628678399837e0fdf95c5f",
         "0020b12393f7dd4cf89bb4c4bbf3cd942ed5aa0de2abde665b3caffefdc751a7",
     ),
     "variable/zoom_wave/narrow": (
-        "86427b7c964880c7f4ad254e68a3d9ab705b5622bb8aced5cae4a62a20c5f7e2",
+        "ace8bb7b46e9f372b655756b9c0994b556866073275d0831372d7dcd20cead8f",
         "a39df6ddbe83086edd4664152946711a1b5a24a927837fd366218594215ce44a",
     ),
     "variable/zoom_wave/slow": (
-        "2d0e34748b21e70fe2b9cbbf33b3b6af135a9b8f1d51915afae14f8e6e2877fc",
+        "d4b28efd84bfa2820be10dc1fab0a56d95c9d9a7e4fdac1fa4277e4cc71d8bc9",
         "503a36b0d6d9b85cfa6e5518367e787f835571fbc02f9f44e09f96f2c6689561",
     ),
 }
 """`grid/template/variant`: (render fingerprint, SHA-256 of the encoded frames)."""
 
 MULTI_PIN = (
-    "b34e7fa5af8806dc3e96c58b9ee3ac0aef29766760f573fe7f8401dc58073019",
+    "7ebf2bf1decc8fb1f6e81513b1724946d3b0deec3f774634b1ad35f03f83d296",
     "3ea6b3fca42f7ea4bbed6068c580331ce3649c6ef4c49f77f7b23fff7599fba7",
     "9ef5b7a162ca49079bb1a5261223b9ebcd399f8b7bb48463942ba4271861c6fb",
 )
@@ -239,7 +242,7 @@ MULTI_PIN = (
 MULTI_SECTIONS = ("mirror_wings", "target_orbit", "finite_snap_hold", "fly_in_cascade")
 
 GATED_PIN = (
-    "efe23150fe8be95294b1bda2e3bbe6b2312cd5081f9f0b71d477a37f674e2765",
+    "93e0b0472c26773bef8e7de909a86f61399eeae745e6f3bc8400ac6611a52438",
     "b971080b47c7c7b20e2466c76bfa187b6bb1872a5ec4ac6c316b9d0c614c96bd",
     "7f2d1e3bf22d121835f2c586bdea34718958dc234d6c2577fed66900fc4be14d",
 )
@@ -402,7 +405,7 @@ def test_gated_render_with_dark_spans_and_a_fallback_is_pinned(tmp_path: Path) -
 
 
 INTENT_PIN = (
-    "c4a7faa8e1abafca07b6bed5a0aa1e06612d8aa753d036cae87b4cbc74c9613c",
+    "35609e80eda9d07d7eff325d7db2f614c8899d30f69b0b788397e69259f730ba",
     "ad91f4f2da8e0fc5bca0e07a7a9d9003d7880d59dee2499b30389be403e36d3b",
     "9968e9a4b0d5892d7891177fbdab9a0dca7d300d09998a946a5b908a51c17c46",
 )
@@ -456,7 +459,7 @@ def section_palettes_of(palette_id: str) -> SectionPalette:
 
 
 FAST_INTENT_PIN = (
-    "f4760a8867ff4c4f7e23f1ff853b48ddc6c3f3dee6140886b9ff15afe764c76c",
+    "a0160229651ede6ab166f5879cef71dd902114987249de825105adfccb9e3518",
     "2785d278f4341c611a0aaf60b9e22ee2e6e1accc8f70252442f7402bfd308a54",
 )
 """The fast song-intent plan: (render fingerprint, frames SHA-256). Recorded in the W3/W4
@@ -508,15 +511,15 @@ def test_colour_changes_that_cannot_dip_at_170_bpm_are_pinned() -> None:
 
 INTENSITY_PINS: dict[str, tuple[str, str]] = {
     "full/mirror_wings/INTENSE": (
-        "e01e0d7102ca4ffb3a1de5a363c8199c714085917cddc54a6e066e283d9587e1",
+        "5d6178d89fa856ccae7a55f039615e6537545c7e35c6e421e4362579cfd6f5bc",
         "448dd5edb8649aa4e4a1d31725c6de92a9e1d8d3be740297a0de11dd76a8c57a",
     ),
     "headroom/intensity_half_hold/DRAMATIC": (
-        "e598c3e0b7d2a35dc5ee2ecf8a3c7579d15d3989fa548c6d4f9937032906b461",
+        "24b6942b06fb7ca6bd83dc345e0e57d9668762cabc0217dd0dd6585f0871250a",
         "13d0f907cfcf370c2e250c959632c3a7ce26d446b11afad12082f1748bc10e0d",
     ),
     "authored_pulse/intensity_authored_pulse/INTENSE": (
-        "8f800388eb14009f9940b50e50742ab1304a5d25b70a2a482d4a99712da252c1",
+        "558ef3fc178c46d521fcb5d3c5ba6ba7b9596ceaec6ed0103a1b980b006135a7",
         "906a48806b8986bd1c2d0d72401d9838a2f46d5b910df9aed6064b169ba28ceb",
     ),
 }
@@ -554,3 +557,96 @@ def test_intensity_on_each_kind_of_authored_level_is_pinned(case: str) -> None:
         )
         pipeline.render()
         assert (pipeline.fingerprint(), _frames_sha256(pipeline.frames)) == INTENSITY_PINS[case]
+
+
+EVENT_PINS: dict[str, tuple[str, str, str]] = {
+    "dimmer_strobe": (
+        "936770283447b592c83ff6b0fc0ae42c1544a46b2cfcebea474b3278dbfd90b7",
+        "333612f5883a237ac0cc060f9bc61359a6fac33074652dd6c1229c4c2feb2a5c",
+        "762065faa15acee37673175bd4a816550a061061e04391784ee0b8176d94be1a",
+    ),
+    "tagged_strobe": (
+        "42eed5e78a436d4bacc35fe09d0d8124373616a818393abb285d75ad78f0f4c6",
+        "8c46d4a5295f80c10c8f8762389d5fefee876710e9ae7d4bdb0b044121481c71",
+        "e456c91ea716d34d2246238abb75881e1ec31989104a9dc984bf0ea4e43826c4",
+    ),
+}
+"""`rig`: (render fingerprint, frames SHA-256, delivered `.xsq` SHA-256) of the event-rich
+plan (`test_events_on_a_tagged_rig_are_pinned`) on the tagged family rig without strobe
+states (the strobe plays on the dimmer) and with a state tagged for each speed (the
+fixture strobes itself). Recorded in W6/W7 (2026-11-17), when the plan's events started
+to play; no earlier tree renders them, so these guard the new behaviour from here on."""
+
+
+def _event(bar: int, beat: int, action: str, **fields: object) -> dict[str, object]:
+    return {
+        "bar": bar,
+        "beat": beat,
+        "moment_cue_id": None,
+        "action": action,
+        "color": None,
+        "gobo": None,
+        **fields,
+    }
+
+
+@pytest.mark.parametrize("case", sorted(EVENT_PINS))
+def test_events_on_a_tagged_rig_are_pinned(case: str, tmp_path: Path) -> None:
+    """Two sections on the steady grid: over `mirror_wings` a hit bound to a HIGH lyric
+    cue, a colour event, a gobo event, a fast strobe ended by `open`; over
+    `masked_wheel_flick` at INTENSE a hit, a pulse and a closed event the section ends
+    in."""
+    payload = m.tagged_family_rig(HEADS).model_dump(mode="json")
+    if case == "tagged_strobe":
+        for fixture in payload["fixtures"]:
+            states = fixture["config"]["physical_profile"]["discrete"]["shutter"]["states"]
+            for speed, low in (("slow", 100), ("medium", 140), ("fast", 180)):
+                states[f"strobe_{speed}"] = {
+                    "range_min": low,
+                    "range_max": low + 39,
+                    "value": low + 10,
+                    "settle_ms": 0,
+                    "strobe": speed,
+                }
+    output_path = tmp_path / "song.xsq"
+    sections = [
+        m.plan_section(
+            "s1",
+            1,
+            4,
+            "mirror_wings",
+            moment_cues=["hook"],
+            events=[
+                _event(1, 3, "hit", moment_cue_id="hook", cue_emphasis="HIGH"),
+                _event(2, 1, "color", color="red"),
+                _event(2, 3, "gobo", gobo="dots"),
+                _event(3, 1, "strobe_fast"),
+                _event(3, 3, "open"),
+            ],
+        ),
+        m.plan_section(
+            "s2",
+            5,
+            8,
+            "masked_wheel_flick",
+            intensity="INTENSE",
+            events=[_event(6, 1, "hit"), _event(7, 1, "pulse"), _event(8, 1, "closed")],
+        ),
+    ]
+    pipeline = RenderingPipeline(
+        choreography_plan=ChoreographyPlan(sections=sections, overall_strategy=""),
+        beat_grid=_grid("steady"),
+        fixture_group=FixtureGroup.model_validate(payload),
+        job_config=m.family_job(HEADS),
+        output_path=output_path,
+        media_file="silence.wav",
+    )
+    pipeline.render()
+
+    assert pipeline.render_record is not None
+    assert [len(look["events"]) for look in pipeline.render_record["section_looks"]] == [5, 3]
+    assert (
+        pipeline.fingerprint(),
+        _frames_sha256(pipeline.frames),
+        hashlib.sha256(output_path.read_bytes()).hexdigest(),
+    ) == EVENT_PINS[case]

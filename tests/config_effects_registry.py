@@ -2105,10 +2105,10 @@ for _profile_root in (
             _note,
         )
 # Song-intent meaning tags on discrete states (W1) and the `offer: false` opt-out. `hex`
-# and `pattern` decide the wheel state a section's colour and gobo play (W4): each path
-# must change the frames of a plan that sets one. `strobe` is part of render identity and
-# the planner's rig offer (W3) but changes no frame until strobe events render (W6);
-# `offer: false` is identity only (an opted-out state is not offered, as an untagged one).
+# and `pattern` decide the wheel state a section's colour and gobo play (W4), `strobe` the
+# shutter state a strobe event plays (W6): each path must change the frames of a plan
+# that sets one. `offer: false` is identity only (an opted-out state is not offered, as an
+# untagged one).
 _TAG_EFFECTS = {
     "hex": (
         "test_state_tag_changes_what_a_section_plays",
@@ -2119,8 +2119,8 @@ _TAG_EFFECTS = {
         "a section's gobo plays the tagged state (song-intent W4)",
     ),
     "strobe": (
-        "test_state_tag_changes_identity_not_output",
-        "identity and the rig offer's strobe speeds (W3); no frame until strobe events (W6)",
+        "test_state_tag_changes_what_a_section_plays",
+        "a strobe event plays the tagged shutter state (song-intent W6)",
     ),
     "offer": (
         "test_state_tag_changes_identity_not_output",

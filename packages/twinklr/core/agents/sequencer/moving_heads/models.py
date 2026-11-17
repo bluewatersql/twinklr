@@ -11,7 +11,7 @@ neutral renders exactly as its templates are authored.
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import (
     BaseModel,
@@ -191,6 +191,11 @@ class PlanEvent(BaseModel):
     )
     gobo: EventGoboChoice = Field(
         description="The pattern for a gobo event; `none` for every other action"
+    )
+    cue_emphasis: SkipJsonSchema[Literal["LOW", "MED", "HIGH"] | None] = Field(
+        default=None,
+        description="The bound lyric moment cue's emphasis, set by the cue binder (code-owned, "
+        "not planned): it scales a hit",
     )
 
     model_config = ConfigDict(extra="forbid", frozen=True)

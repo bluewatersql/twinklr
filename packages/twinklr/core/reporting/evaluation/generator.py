@@ -63,6 +63,7 @@ from twinklr.core.reporting.evaluation.validate import (
 )
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import AXIS_KEYS
+from twinklr.core.sequencer.moving_heads.events import describe_lyric_cue
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import quantize_cue
 from twinklr.core.sequencer.moving_heads.song_intent import RENDERED_INTENT_FIELDS, describe_look
 
@@ -93,7 +94,13 @@ def _song_intent(section: PlanSection, record: Mapping[str, Any]) -> SongIntentR
         not_rendered=[
             name for name in section.set_intent_fields() if name not in RENDERED_INTENT_FIELDS
         ],
-        played=[] if look is None else describe_look(look),
+        played=([] if look is None else describe_look(look))
+        + [
+            describe_lyric_cue(cue)
+            for cue in record.get("lyric_cues", [])
+            if cue["section_id"] == section.section_id.split("|")[0]
+            and cue["cue_id"] in section.moment_cues
+        ],
     )
 
 

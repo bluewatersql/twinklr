@@ -20,7 +20,8 @@ from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import quantize_cue
 from twinklr.core.sequencer.moving_heads.intensity import (
-    HEADROOM_BELOW,
+    ACCENT,
+    FULL_BLEND,
     SHAPES,
     dramatic_period_beats,
     effective_intensity,
@@ -392,7 +393,7 @@ def test_the_trace_records_what_intensity_played() -> None:
             "peak_gain": SHAPES["DRAMATIC"].peak_gain,
             "full_floor": SHAPES["DRAMATIC"].full_floor,
             "full_peak": SHAPES["DRAMATIC"].full_peak,
-            "headroom_below": HEADROOM_BELOW,
+            "full_blend": list(FULL_BLEND),
             "applied": {"dip_and_return": list(HEADS)},
         },
     }
@@ -436,23 +437,127 @@ def lit_runs(heads: Heads, head: str) -> list[range]:
     return runs
 
 
+def variable_grid(bars: int = 8) -> BeatGrid:
+    """A 4/4 grid whose tempo drifts beat by beat between 90 and 150 BPM (the W5
+    re-review's variable grid), the first beat 7 ms off the frame grid."""
+    beats = [7.0]
+    for i in range(4 * bars):
+        beats.append(beats[-1] + 60_000 / (120 + 30 * math.sin(i / (4 * bars) * 2 * math.pi)))
+    return BeatGrid(
+        bar_boundaries=beats[::4],
+        beat_boundaries=beats,
+        eighth_boundaries=BeatGrid._calculate_eighth_boundaries(beats),
+        sixteenth_boundaries=BeatGrid._calculate_sixteenth_boundaries(beats),
+        tempo_bpm=120.0,
+        beats_per_bar=4,
+        duration_ms=beats[-1] + 15.0,
+    )
+
+
+GRIDS = {
+    "120": lambda: grid(120),
+    "78": lambda: grid(78),
+    "140": lambda: grid(140),
+    "170": lambda: grid(170),
+    "variable": variable_grid,
+}
+
+
+@pytest.mark.parametrize("tempo", list(GRIDS))
 @pytest.mark.parametrize("level", ["DRAMATIC", "INTENSE"])
 @pytest.mark.parametrize("template_id", ["fly_in_cascade", "fly_out_cascade"])
-def test_every_lit_window_of_a_cascade_comes_in_on_an_accent(level: str, template_id: str) -> None:
-    """A cascade lights each head for one beat in four, often on a beat DRAMATIC does not
-    accent: every lit window still starts full and eases off, on every head."""
-    authored = Heads(render(None, template_id=template_id))
-    shaped = Heads(render(level, template_id=template_id))
+def test_every_lit_window_of_a_cascade_comes_in_on_an_accent(
+    level: str, template_id: str, tempo: str
+) -> None:
+    """A cascade lights each head for about a beat in four, often on a beat DRAMATIC does
+    not accent: every lit window comes in full (on its first frame, or on a beat a few
+    frames after it) and eases off, on every head, and never rises on its last two frames
+    (no flash just before it goes dark), at any tempo."""
+    beat_grid = GRIDS[tempo]()
+    authored = Heads(render(None, template_id=template_id, beat_grid=beat_grid))
+    shaped = Heads(render(level, template_id=template_id, beat_grid=beat_grid))
 
     assert_same_but_dimmer(shaped, authored)
     floor = math.floor(SHAPES[level].full_floor * 255)
+    shortest = min(b - a for a, b in pairwise(beat_grid.beat_boundaries))
+    near = math.floor(shortest * ACCENT.near_beat_beats / FRAME) + 1
     for head in HEADS:
         dimmer = shaped.dimmer(head)
         runs = lit_runs(shaped, head)
         assert len(runs) >= 6, head
         for run in runs:
-            assert dimmer[run[0]] == 255, (head, run[0] * FRAME)
-            assert dimmer[run[-1]] < 255 and min(dimmer[i] for i in run) >= floor, head
+            assert max(dimmer[i] for i in run[:near]) == 255, (head, run[0] * FRAME)
+            assert min(dimmer[i] for i in run) >= floor, head
+            assert dimmer[run[-1]] <= dimmer[run[-2]] <= dimmer[run[-3]], (head, run[-1] * FRAME)
+
+
+def test_a_reveal_just_before_a_beat_takes_the_beat_accent() -> None:
+    """A head revealed two frames before a beat comes in on that beat's accent: one hit on
+    the beat, not one on the reveal and another two frames later."""
+    beat_grid = grid(120)
+    shaped = Heads(render("INTENSE", beat_grid=beat_grid, dark_spans=((2000, 2480),)))
+
+    beat = accent_frame(beat_grid.beat_boundaries[5])  # 2515 ms: frame 2520
+    assert beat * FRAME == 2520
+    for head in HEADS:
+        dimmer, dark = shaped.dimmer(head), shaped.dark(head)
+        reveal = next(i for i in range(100, len(dark)) if dark[i - 1] and not dark[i])
+        assert reveal * FRAME == 2480
+        assert dimmer[reveal] < 255 and dimmer[reveal + 1] < 255 and dimmer[beat] == 255
+        after = [dimmer[i] for i in range(beat, beat + 20)]
+        assert after == sorted(after, reverse=True), head
+
+
+FLICKS = "intensity_flicks"
+"""Test-only: lit for a quarter beat, dark for a quarter beat, at full."""
+
+
+def test_short_flicks_keep_the_beat() -> None:
+    """Lit runs shorter than a beat with short gaps between follow the beat accents: the
+    level is full only on the beats, not at the start of every flick."""
+    beat_grid = grid(120)
+    with m.registered_templates(m.loop_template_doc(FLICKS, [_held("f", 0.0, 1.0, 0.5, 0.5)])):
+        authored = Heads(render(None, template_id=FLICKS, beat_grid=beat_grid))
+        shaped = Heads(render("INTENSE", template_id=FLICKS, beat_grid=beat_grid))
+
+    assert_same_but_dimmer(shaped, authored)
+    beats = {accent_frame(beat) for beat in beat_grid.beat_boundaries}
+    for head in HEADS:
+        dimmer = shaped.dimmer(head)
+        runs = lit_runs(shaped, head)
+        assert len(runs) >= 40, head
+        full = {i for run in runs for i in run if dimmer[i] == 255}
+        assert full and full <= beats, (head, sorted(full - beats)[:5])
+        assert sum(1 for run in runs if dimmer[run[0]] < 255) >= len(runs) // 3, head
+
+
+SWEEP = [round(0.5 + 0.05 * i, 2) for i in range(11)]
+"""Held authored levels from 0.5 to 1.0."""
+
+
+@pytest.mark.parametrize("level", ["DRAMATIC", "INTENSE"])
+def test_the_shaped_level_has_no_jump_as_the_authored_level_nears_full(level: str) -> None:
+    """Held levels from 0.5 to 1.0: below the blend band the light never plays under the
+    template, at full it plays the dip-and-return, and the mean lit level moves by at most
+    0.07 per 0.05 of authored level: no jump where a single threshold used to be (W5
+    re-review N3: 0.84 → 0.917 and 0.86 → 0.638 under INTENSE)."""
+    docs = [
+        m.loop_template_doc(f"held_{held}", [_held("h", 0.0, held, 4.0, 1.0)]) for held in SWEEP
+    ]
+    means: list[float] = []
+    with m.registered_templates(*docs):
+        for held, doc in zip(SWEEP, docs, strict=True):
+            template_id = doc.template.template_id
+            authored = Heads(render(None, template_id=template_id))
+            shaped = Heads(render(level, template_id=template_id))
+            assert_same_but_dimmer(shaped, authored)
+            dimmer, base = shaped.dimmer("MH1"), authored.dimmer("MH1")
+            lit = [i for run in lit_runs(shaped, "MH1") for i in run]
+            if held <= FULL_BLEND[0]:
+                assert all(dimmer[i] >= base[i] for i in lit), held
+            means.append(sum(dimmer[i] for i in lit) / len(lit) / 255)
+    assert all(abs(b - a) <= 0.07 for a, b in pairwise(means)), [round(v, 3) for v in means]
+    assert SHAPES[level].full_floor <= means[-1] < means[SWEEP.index(FULL_BLEND[0])]
 
 
 @pytest.mark.parametrize("level", ["DRAMATIC", "INTENSE"])
@@ -549,15 +654,15 @@ def test_a_template_pulse_at_full_is_not_inverted() -> None:
 
 
 def test_a_level_just_below_full_still_pulses() -> None:
-    """Held at 0.9 there is too little room to rise: the run is shaped as at full and
-    pulses on the beat."""
+    """Held at 0.9, inside the blend band: the run pulses on the beat, peaking a little
+    above its level and dipping below it between beats."""
     shaped = Heads(render("INTENSE", template_id=NEAR_FULL))
 
     for head in HEADS:
         dimmer = shaped.dimmer(head)
         lit = list(lit_runs(shaped, head)[0])
-        assert max(dimmer[i] for i in lit) == round(0.9 * 255)
-        assert min(dimmer[i] for i in lit) <= round(0.9 * 255 * 0.62)
+        assert round(0.9 * 255) < max(dimmer[i] for i in lit) < 255
+        assert min(dimmer[i] for i in lit) < round(0.9 * 255 * 0.85)
 
 
 def test_a_long_dimmer_latency_leads_by_under_half_a_beat_and_never_before_the_section() -> None:

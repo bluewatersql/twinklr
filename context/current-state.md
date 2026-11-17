@@ -88,19 +88,38 @@ See [product/overview.md](product/overview.md).
     (more movement, not more light: about 0.80 / 0.74 of it on average); dark frames and
     every other channel untouched; a slow dimmer gets a smaller pulse, a dimmer latency
     an earlier one, a head without a dimmer none. Under `twinklr show` the heads' macro
-    focal role moves a section's intensity a step (LEAD hotter, REST at most as
+    focal role moves a section's intensity a step (LEAD up, REST at most as
     authored) where every moving-head target holds it. The values are a proposal for the
     owner's W5 view; whether peak and LEAD sections should be brighter on average (a
     headroom variant is prepared for comparison) is the owner's open question. Renderer
     revision 7.
     ([user guide](../docs/user-guide.md#how-a-sections-intensity-reaches-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w5-intensity/README.md))
+    The W5 re-review fixes (W6/W7 round) start no accent on a lit run's last frames,
+    take a beat accent just after a reveal in place of the reveal's own, give a run its
+    own accent only after half a beat of darkness, and blend the headroom and full
+    shapes between 80% and 100% of full.
+  - **Events and lyric cues** (W6/W7, 2026-11-17, not yet seen by the owner). Each
+    section's events play on its frames, per head, on the frame nearest the beat:
+    `closed` dark to the next shutter event or the section's end, `open` ends it;
+    strobes (the fixture's own where every head's shutter has a state tagged for the
+    speed, else 2 / 4 / 8 flashes a beat on musical time through the dimmer, or the
+    shutter, slowed where the darkness cannot follow); `pulse` lit the first half of
+    each beat; `hit` the dimmer's top on the beat easing back to the section's level, a
+    pre-dip into the beat at full, scaled by the bound lyric cue's emphasis, lit from a
+    dimmer dark phase, moved only where every head is dark; colour and gobo changes
+    revealed on the beat after a dark lead of at most half a beat, else late, else not
+    played. The trace records every event per head and every lyric cue; the offer says
+    what each event plays at the song's tempo; repair records what will play otherwise.
+    Renderer revision 8.
+    ([user guide](../docs/user-guide.md#how-a-sections-events-reach-the-lights),
+    [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w6-w7-events/README.md))
   - **Known regression: the rest of the song intent is not rendered yet.** The planner's
-    shutter and gobo events, lyric moment cues bound to events, section transitions,
-    motif variation, density and modifiers are accepted and ignored (a per-section trace
-    diagnostic says so). The renderer deleted in the cutover rendered events and entry
-    transitions. The owner has directed that all of it be rendered on this renderer,
-    with nothing cut from the planner contract; the remaining work is W6–W9 ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)). The renderer is not
+    section transitions, motif variation, density and modifiers are accepted and
+    ignored (a per-section trace diagnostic says so). The renderer deleted in the
+    cutover rendered entry transitions. The owner has directed that all of it be
+    rendered on this renderer, with nothing cut from the planner contract; the remaining
+    work is W8–W9 and motif, variation and density ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)). The renderer is not
     complete until then.
 
   `twinklr run`, `show`, `eval-report`, `inject` and `regenerate` all use it;
