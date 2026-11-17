@@ -2,7 +2,7 @@
 type: decision
 status: accepted
 created: 2026-08-13
-updated: 2026-08-14
+updated: 2026-11-17
 ---
 
 # LLMs Plan Intent; Deterministic Code Implements Precision
@@ -51,6 +51,16 @@ preserved baseline observation, not a statement about the current renderer. See
 and roadmap RM-2.3 for the original finding.
 
 ## Implementation resolution (2026-08-14, integrated snapshot `6b2b34a`)
+
+> **Superseded for moving heads on 2026-11-16.** The handlers described in this section
+> belonged to the moving-head renderer deleted in the single-renderer cutover
+> ([decision](mh-single-renderer.md)). The current moving-head renderer renders the
+> selected template and preset and does not yet render the plan's intensity, color,
+> shutter, gobo or MomentCue intent: a regression of the cutover. On 2026-11-17 the owner
+> directed that all of it be rendered on the current renderer
+> ([song-intent rendering](../../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
+> The decision above (LLM plans intent; deterministic code implements precision) stands.
+> The section is kept as history.
 
 Phase 2P widened the shipped moving-head channel to match this decision. Schema-v2
 sections carry categorical intensity, color, shutter, gobo, segmentation, and lyric

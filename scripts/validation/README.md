@@ -2,12 +2,13 @@
 
 This directory contains the unified validation entrypoints for both sequencer pipelines:
 
-- `validate_artifacts.py` — validates generated plan/evaluation/XSQ artifacts for:
-  - `mh` (moving heads)
+- `validate_artifacts.py` — validates generated artifacts for:
   - `display` (group-plan + holistic + xLights XSQ)
+  - `mh` (moving heads: the xLights XSQ only)
 - `validate_agent_artifacts.py` — validates agent schemas and prompt artifacts
 
-Legacy MH-only wrappers (`plan.py`, `xsq.py`) were removed. Use `validate_artifacts.py` directly.
+A moving-head plan is not validated here: `twinklr eval-report` re-renders a run's plan
+checkpoint and reports on it (see the user guide).
 
 ## Quick Start
 
@@ -20,7 +21,7 @@ uv run python scripts/validation/validate_artifacts.py --pipeline display --mode
 ### Moving-head pipeline
 
 ```bash
-uv run python scripts/validation/validate_artifacts.py --pipeline mh --mode all need_a_favor
+uv run python scripts/validation/validate_artifacts.py --pipeline mh --mode xsq need_a_favor
 ```
 
 ### Auto-detect pipeline
@@ -47,9 +48,12 @@ uv run python scripts/validation/validate_artifacts.py --pipeline auto --mode al
 - `--pipeline display`
   - Uses display-specific plan/evaluation checks and display XSQ checks
 - `--pipeline mh`
-  - Uses in-process extracted MH plan/XSQ validators (deep parity path)
+  - Checks the moving-head XSQ. `--mode plan` exits with status 2; `--mode all` runs the
+    XSQ checks only
 - `--pipeline auto`
-  - Attempts JSON-shape detection, then XSQ filename heuristics
+  - Detects display from its plan or evaluation JSON, then from the XSQ filename
+    (`_display.xsq` / `_twinklr_mh.xsq`); otherwise display when its default artifacts
+    exist, else `mh`
 
 ## Artifact Discovery (default paths)
 
@@ -64,9 +68,6 @@ Given `sequence_name`, the validator looks under `artifacts/<sequence_name>/`.
 
 ### MH
 
-- `plan_raw_<sequence_name>.json`
-- `plan_<sequence_name>.json` (or `final_<sequence_name>.json` fallback)
-- `evaluation_<sequence_name>.json`
 - `<sequence_name>_twinklr_mh.xsq`
 
 You can override any path with explicit CLI flags.
@@ -77,19 +78,19 @@ You can override any path with explicit CLI flags.
 
 - `--mode {plan,xsq,all}`
 - `--pipeline {auto,display,mh}`
-- `--plan-path <path>`
-- `--evaluation-path <path>`
 - `--xsq-path <path>`
-- `--quality-only` (skip deeper plan-vs-XSQ checks)
 
 ### MH-only flags
 
-- `--raw-plan-path <path>`
-- `--fixture-config-path <path>`
+- `--fixture-config-path <path>` (check only the effects on the fixtures' xLights models
+  and the group)
 - `--output-json <path>` (MH XSQ issue export)
 
 ### Display-only flags
 
+- `--plan-path <path>`
+- `--evaluation-path <path>`
+- `--quality-only` (skip plan-vs-XSQ checks)
 - `--display-target-map <path>`
   - JSON map of semantic target IDs -> xLights element aliases
   - reduces false positives in target matching
@@ -197,20 +198,19 @@ This map is used for both section-level target coverage and placement-level side
 
 ## MH Validation Details
 
-MH validation is now unified but still deep (in-process):
+A moving-head `.xsq` holds one constant DMX effect per run of identical 20 ms frames, each
+setting every channel of the head's profile footprint. The XSQ checks read the file
+alone:
 
-- plan validation:
-  - raw plan structure/timing/channels
-  - implementation plan structure/timing/template refs
-  - beat alignment
-  - evaluation schema/scoring
-  - raw↔implementation cross-validation
-- XSQ validation:
-  - DMX parsing and quality checks
-  - duplicates/overlaps/gaps/missing refs
-  - DMX data presence thresholds
-  - value curve checks
-  - section coverage and channel usage vs plan/fixture config
+- `ref`s that name no EffectDB entry (an effect's `ref` is the entry's zero-based
+  position)
+- overlaps, identical timings and gaps longer than 100 ms per model
+- DMX data presence: effects with no channel data, all-zero effects, values outside
+  0-255
+
+What the render planned (cues, dark repositioning, dropped cues) is in the
+`.xsq.trace.json` beside the `.xsq`; `twinklr eval-report` re-renders the run and reports
+per-channel motion.
 
 ## Agent Artifact Validator (`validate_agent_artifacts.py`)
 
@@ -250,16 +250,14 @@ uv run python scripts/validation/validate_artifacts.py \
   11_need_a_favor
 ```
 
-- Full MH validation with explicit paths:
+- MH XSQ validation with explicit paths:
 
 ```bash
 uv run python scripts/validation/validate_artifacts.py \
   --pipeline mh \
-  --mode all \
-  --raw-plan-path artifacts/need_a_favor/plan_raw_need_a_favor.json \
-  --plan-path artifacts/need_a_favor/plan_need_a_favor.json \
-  --evaluation-path artifacts/need_a_favor/evaluation_need_a_favor.json \
+  --mode xsq \
   --xsq-path artifacts/need_a_favor/need_a_favor_twinklr_mh.xsq \
+  --fixture-config-path fixture_config.json \
   need_a_favor
 ```
 
@@ -274,14 +272,5 @@ uv run python scripts/validation/validate_artifacts.py \
 - no placement-level display checks running
   - verify `<xsq>.trace.json` exists (or pass `--display-xsq-trace-path`)
   - rerun display export using updated demos
-- MH fixture-related XSQ warnings
-  - provide `--fixture-config-path` for deeper channel/fixture checks
-
-## Migration Summary
-
-- Removed:
-  - `scripts/validation/plan.py`
-  - `scripts/validation/xsq.py`
-- Use:
-  - `scripts/validation/validate_artifacts.py`
-- Legacy MH and display flows are both supported via the `--pipeline` flag.
+- MH effects from other models counted
+  - provide `--fixture-config-path` so only the fixtures' models are checked

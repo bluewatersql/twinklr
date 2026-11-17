@@ -644,11 +644,14 @@ built on three core types:
 ### DAG Diagram — Moving Heads Pipeline
 
 ```
-audio ──┬──► profile ──┬──► macro ──► moving_heads ──► render
-        │              │
-        └──► lyrics ───┘
-             (conditional)
+audio ──► render_preflight ──┬──► profile ──┬──► macro ──► moving_heads ──► render
+                             │              │
+                             └──► lyrics ───┘
+                                  (conditional)
 ```
+
+`render_preflight` is the moving-head gate: it refuses a rig or song the renderer cannot
+render and decides which templates the planner is offered, before any planner runs.
 
 ### Building a Pipeline
 
@@ -733,7 +736,8 @@ uv run twinklr run \
 ### What Happens
 
 1. **Audio Analysis** — Extracts tempo, beats, bars, energy, structure,
-   harmonic content, and optionally lyrics.
+   harmonic content, and optionally lyrics. The `render_preflight` gate then checks
+   the rig and song and fixes the templates the planner is offered.
 
 2. **Audio Profile** — LLM generates musical analysis and creative
    guidance from the audio features.
@@ -751,8 +755,11 @@ uv run twinklr run \
    - **Judge**: LLM scores the plan (0-10) and provides feedback
    - **Iterate**: If score < threshold, planner revises with feedback
 
-6. **Render** — Compiles the plan into DMX channel data and writes the
-   `.xsq` output file.
+6. **Render** — Compiles the plan's templates against each fixture's profile into
+   complete 20 ms DMX frames and writes the `.xsq` output file. It does not yet render
+   the planner's intensity, section colour, shutter and gobo events, lyric moment cues
+   or section transitions: a known regression from the single-renderer cutover, being
+   fixed ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 
 ### Demo Scripts
 
@@ -797,8 +804,8 @@ Structured local calls use `/v1/chat/completions`; cloud OpenAI retains
 ### Job Config (`job_config.json`)
 
 The live schema accepts only version 3.1, the default; a job naming `schema_version`
-"3.0", `moving_heads.mode` or `transitions` (keys of the removed second moving-head
-renderer) is refused when it loads. A job is refused when its fixtures load, before any
+"3.0", `moving_heads.mode` or `transitions` (keys Twinklr no longer has) is refused when
+it loads. A job is refused when its fixtures load, before any
 analysis, unless every fixture declares a `physical_profile` and has a usable
 `moving_heads.initial_states` entry, and the planner is offered the seven families
 in `catalog/templates/moving_heads` (six
@@ -842,8 +849,8 @@ and reports each channel's metrics in its own unit
 ([user guide](user-guide.md#evaluation-report-twinklr-eval-report)).
 With `twinklr run --layout`, a job's fixture models are checked against
 the xLights layout before analysis; without it that check is skipped with a warning.
-`twinklr display` renders no moving heads and ignores the mode. Do not reuse the
-removed version-2 examples from this guide's history.
+`twinklr display` renders no moving heads and does not read the `moving_heads` block.
+Do not reuse the removed version-2 examples from this guide's history.
 
 ### FE Pipeline Options
 

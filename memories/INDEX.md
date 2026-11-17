@@ -15,15 +15,16 @@ in `context/`; memories explain why, and what we learned.
 
 ## Decisions
 
-- [llm-plans-intent-renderer-implements-precision.md](decisions/llm-plans-intent-renderer-implements-precision.md) — accepted boundary; includes the dated narrow-channel baseline and the 2026-08-14 schema-v2 implementation resolution (D1 comparison still pending)
+- [llm-plans-intent-renderer-implements-precision.md](decisions/llm-plans-intent-renderer-implements-precision.md) — accepted boundary; includes the dated narrow-channel baseline and the 2026-08-14 schema-v2 implementation resolution, superseded for moving heads on 2026-11-16 (D1 comparison still pending)
 - [keep-dsp-after-mir-ab.md](decisions/keep-dsp-after-mir-ab.md) — accepted P2P-T8 decision: retain the current DSP rhythm/structure default because model arms did not produce complete local evidence
 - [lane-blend-mode-overrides-recipe.md](decisions/lane-blend-mode-overrides-recipe.md) — accepted P3-T2 precedence: lane blend intent uniformly overrides recipe blend metadata in the emitted sub-layer space
 - [typed-macro-coordination-contract.md](decisions/typed-macro-coordination-contract.md) — accepted P3-T4 decision: exact four-field typed macro contract, palette/focal precedence, amended AC2 typed-reader boundary, and P3-T5 behavioral-consumption ownership
-- [coordinated-show-contract.md](decisions/coordinated-show-contract.md) — accepted P3-T5 decisions: one combined command/graph/BeatGrid, concrete-target focal budgets, strict ownership and call/response policy, shared palette projection, safe registry preservation, and the retained P3-T3 catalog edge
+- [coordinated-show-contract.md](decisions/coordinated-show-contract.md) — accepted P3-T5 decisions: one combined command/graph/BeatGrid, concrete-target focal budgets, strict ownership and call/response policy, shared palette projection, safe registry preservation, and the retained P3-T3 catalog edge; the moving-head focal and palette projection was superseded on 2026-11-16
 - [unified-xlights-emission-contract.md](decisions/unified-xlights-emission-contract.md) — confirmed P3-T6 decision: display and moving heads share one renderer-neutral xLights emission core; exact rules remain in its specification
 - [p3-t4-live-acceptance-superseded.md](decisions/p3-t4-live-acceptance-superseded.md) — owner decision 2026-11-12: P3-T4 live macro acceptance is closed by the 2026-08 OpenAI and 2026-11-12 Claude live runs; the sealed ledger stays untouched
 - [display-stays-lit.md](decisions/display-stays-lit.md) — owner direction 2026-11-12: every section keeps the display lit; brightness floor, beat grid extended to song end, and a foundation-coverage rule in the group planner
-- [mh-render-matches-pre-cleanup-look.md](decisions/mh-render-matches-pre-cleanup-look.md) — owner direction 2026-11-12: the pre-clean-up moving-head look is the reference; seven clean-up render changes reverted after an old-vs-new comparison in xLights
+- [mh-single-renderer.md](decisions/mh-single-renderer.md) — owner direction and look acceptance 2026-11-16: one moving-head renderer (profile-based, complete DMX frames); the old renderer, its templates and switches deleted; the accepted look, guarded by the output pins, is the reference; the cutover regressed the planner's song intent, which the owner directed be rendered (2026-11-17)
+- [mh-render-matches-pre-cleanup-look.md](decisions/mh-render-matches-pre-cleanup-look.md) — **superseded 2026-11-16** by `mh-single-renderer.md`; was: the pre-clean-up look of the deleted renderer is the reference (history)
 
 ## Learnings
 
@@ -31,6 +32,8 @@ in `context/`; memories explain why, and what we learned.
 - [known-test-failures.md](learnings/known-test-failures.md) — historical gate baseline at `aa8d325` (2026-08-13): 120 failures classified; superseded by the green integrated campaign gate
 - [live-provider-run-lessons.md](learnings/live-provider-run-lessons.md) — live provider lessons: reasoning models reject temperature, 300 s timeout, config schema drift, degenerate-segment aborts, Claude rejects planner schemas as too large to compile, Ollama Cloud ignores `response_format`, proxy TLS
 - [simplification-pass-2026-02.md](learnings/simplification-pass-2026-02.md) — stale auto-memory case study: a claimed simplification pass that never landed on `main`
+- [prove-parity-before-deleting.md](learnings/prove-parity-before-deleting.md) — before deleting a replaced implementation, compare old and new on the same inputs; unchanged bytes on the surviving path did not show that the moving-head cutover lost the planner's song intent (2026-11-17)
+- [model-dump-hashes-rekey-caches.md](learnings/model-dump-hashes-rekey-caches.md) — removing or renaming a hashed model field changes session ids, planner cache keys, live-plan digests and fingerprints: paid re-plans and `regenerate` refusals to tell the owner about
 
 ## Constraints
 
@@ -38,7 +41,8 @@ in `context/`; memories explain why, and what we learned.
 
 ## Patterns
 
-- [code-patterns.md](patterns/code-patterns.md) — codebase idioms verified against `main` with source citations
+- [code-patterns.md](patterns/code-patterns.md) — codebase idioms verified against `main` with source citations, including refusing removed config keys by name
+- [render-output-proof.md](patterns/render-output-proof.md) — proving a refactor leaves render output unchanged: a byte matrix against a baseline commit, then committed pins; not a proof of parity with a deleted implementation
 
 ## Rules
 

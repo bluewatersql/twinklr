@@ -112,7 +112,7 @@ uv run --frozen twinklr run \
   --out artifacts/qa-run/<song>
 ```
 
-Expected console tail: `Overall Success: ✅`, `Stages Completed: 6/6`, and an emitted
+Expected console tail: `Overall Success: ✅`, `Stages Completed: 7/7`, and an emitted
 `*_twinklr_mh.xsq` plus `.xtiming`/`.xmap`/trace sidecars under `--out`.
 
 ### 3c. Run the display pipeline (optional; needs a layout)
@@ -134,11 +134,10 @@ uv run --frozen twinklr display \
 
 ## 4. Verify output sophistication
 
-The moving-head metrics baseline (`11_need_a_favor`) pinned the output of the removed
-second renderer and was deleted with it. A moving-head `.xsq` now holds constant DMX
-frame runs, not value curves, so there is no moving-head metrics reference to compare a
-live run against; its trace (`.xsq.trace.json`) and `twinklr eval-report` describe what
-it rendered.
+There is no moving-head metrics baseline. A moving-head `.xsq` holds constant DMX
+effects, one per run of identical 20 ms frames, not value curves, so effect counts and
+curve density say little about it; its trace (`.xsq.trace.json`) and `twinklr eval-report`
+describe what it rendered, and the pins in §8 catch unintended output change.
 
 ---
 

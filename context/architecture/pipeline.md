@@ -1,7 +1,7 @@
 ---
 type: context
 area: architecture
-updated: 2026-08-16
+updated: 2026-11-17
 ---
 
 # Pipeline Architecture
@@ -27,7 +27,7 @@ Delivery: fresh .xsq + .xtiming tracks + .xmap mapping hint
 |---|---|---|
 | Audio analysis | `audio/` | rhythm, energy, structure, harmonic, lyrics, phonemes |
 | Agents | `agents/` | orchestration: audio/lyrics profiling, sequencer planners, judge, providers |
-| Sequencer | `sequencer/` | moving-heads template compiler & DMX export; display effects; template registry |
+| Sequencer | `sequencer/` | moving-head template registry, compiler, frame encoder and DMX export; display effects |
 | Curves | `curves/` | native + custom curve generation |
 | Pipeline | `pipeline/` | declarative stage framework; fail-fast policy, stage caching |
 | Feature engineering | `feature_engineering/`, `feature_store/` | corpus mining → profiles, recipes (SQLite store) |
@@ -46,6 +46,10 @@ palette, call/response, and catalog policy is recorded in the
 ## Execution semantics
 
 - **Fail-fast**: non-judge stage failures abort the run; no partial render output.
+- **Pre-planning gate**: every moving-head pipeline (`run`, `show`, `inject`,
+  `regenerate`) runs `render_preflight` right after `audio`, before any planner. It
+  refuses a rig or song the renderer cannot render and fixes the templates the planner
+  is offered, so a refusal costs no LLM request.
 - **Restartability**: successful-stage results are cached and reused on rerun.
 - **Store-driven FE**: the feature-engineering pipeline is incremental — already-processed
   sequences are skipped ([Pipeline Guide](../../docs/pipeline_guide.md)).

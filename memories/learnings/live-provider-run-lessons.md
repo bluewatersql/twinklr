@@ -2,7 +2,7 @@
 type: learning
 status: active
 created: 2026-11-01
-updated: 2026-11-16
+updated: 2026-11-17
 confidence: confirmed
 tags: [live-run, providers]
 ---
@@ -30,7 +30,9 @@ own date.
   rejects. Re-validate them before every live run; schema errors surface before any spend.
 - **Degenerate geometry can abort a whole render.** Zero-width transitions and
   zero-duration emission segments are now dropped upstream (`a8ce12b`) and skipped
-  defensively at the adapter (`08ce6d5`).
+  defensively at the adapter (`08ce6d5`). (2026-11-17: the transition path in
+  `pipeline.py` and the `XsqAdapter` these fixes touched were deleted with the old
+  moving-head renderer on 2026-11-16; this item is history for moving heads.)
 - **Claude cannot compile Twinklr's planner schemas (2026-11-12).** Claude's structured
   outputs return HTTP 400 `The compiled grammar is too large` for every planner schema
   (audio_profile, macro, group, holistic corrector, moving-head). It happens even for

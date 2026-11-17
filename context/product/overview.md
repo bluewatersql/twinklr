@@ -1,7 +1,7 @@
 ---
 type: context
 area: product
-updated: 2026-08-26
+updated: 2026-11-17
 ---
 
 # Product Overview
@@ -21,8 +21,9 @@ protocol in
 
 ## Current scope
 
-- **Moving head fixtures** — pan, tilt, dimmer, and optional mapped shutter, color, and
-  gobo output (primary CLI workflow).
+- **Moving head fixtures** — pan, tilt, dimmer, optional zoom, and shutter, color and
+  gobo states, rendered from each fixture's declared profile as complete DMX frames
+  (primary CLI workflow).
 - **Display sequencer** — RGB/pixel effects for outline, tree, and other display elements.
 - **Feature engineering** — offline corpus analysis feeding style profiles and recipes
   into generation.

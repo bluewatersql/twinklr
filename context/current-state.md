@@ -2,7 +2,7 @@
 type: context
 status: active
 area: overview
-updated: 2026-11-16
+updated: 2026-11-17
 ---
 
 # Twinklr — Current State
@@ -30,33 +30,62 @@ See [product/overview.md](product/overview.md).
 - **Multi-agent planning** — macro planning plus iterative moving-head and display
   planning, deterministic heuristic repair, and a judge whose verdicts feed the next
   revision. Schema-v2 sections carry categorical intensity, color, shutter, gobo, and
-  lyric MomentCue intent.
+  lyric MomentCue intent; the moving-head renderer does not yet render it, a known
+  regression (below).
   [architecture/multi-agent-planning.md](architecture/multi-agent-planning.md)
 - **Providers** — OpenAI (default; Responses API strict structured outputs), Claude
   (`llm_provider: anthropic`), and Ollama cloud (`glm-5.3:cloud` through the loopback
   daemon; by owner policy no local model is used). All three have completed a live moving-head run; see
   [Live evidence](#live-evidence).
-- **Rendering and compilation** — moving-head templates resolve schema-v2 intent into
-  exact fixture behavior; Python factories and validated JSON `TemplateDoc` files share
-  one collision-safe registry. The display sequencer renders RGB/pixel effects with
-  BeatGrid-exact coordination, and lane blend intent overrides recipe blend metadata
+- **Moving-head rendering** — one renderer
+  ([decision](../memories/decisions/mh-single-renderer.md)). It compiles JSON
+  `TemplateDoc` templates against each fixture's `physical_profile` into complete 20 ms
+  frames, written as constant DMX effects over model-relative channels 1–48, and plans
+  dark repositioning between cues. What it requires and refuses:
+  - Job schema `3.1` only. `moving_heads.mode`, `transitions` and schema `"3.0"`, and
+    every fixture or template key Twinklr no longer reads, are refused by name when the
+    file loads; there are no aliases.
+  - Every fixture needs a `physical_profile` and a settled `moving_heads.initial_states`
+    entry, and its own xLights model; otherwise the job is refused when its fixtures
+    load, before analysis. Profiles default what is safe; timings and initial states are
+    never defaulted.
+  - The `render_preflight` gate, right after audio analysis and before any planner,
+    dry-compiles every offered template and preset on the rig over the song. A family
+    is offered through its first passing variant; a run with nothing left is refused.
+  - Seven families in `catalog/templates/moving_heads/` load on every run (six plus the
+    `zoom_wave` pilot, which needs a zoom axis); `--template-dir` adds JSON templates.
+    Families play in any meter (a repeating cycle grows to whole periods).
+  - Silent song edges are held dark; a cue it cannot play honestly is kept dark
+    (`on_unplayable`, default `"dark"`).
+  - **Known regression: the song intent is not rendered yet.** The renderer applies
+    each section's template, preset and bars only. The planner's intensity, section
+    colour, shutter and gobo events, lyric moment cues bound to events and section
+    transitions are accepted and ignored (a per-section trace diagnostic says so), and
+    `twinklr show` does not project the macro palette or focal role onto the heads. The
+    renderer deleted in the cutover rendered these. The owner has directed that all of
+    them be rendered on this renderer, with nothing cut from the planner contract; the
+    work is planned as W0–W9 ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)). The renderer is not
+    complete until then.
+
+  `twinklr run`, `show`, `eval-report`, `inject` and `regenerate` all use it;
+  `regenerate` re-renders the whole song. Gate time on eight heads and a four-minute
+  song: about 12–13 s in 4/4, 27–31 s in 3/4 (measured 2026-11-16). Output is guarded by
+  `tests/regression/test_mh_pins.py`, which pins the render fingerprint and encoded
+  frames of every family variant and one delivered `.xsq`. xLights reproduces its bytes.
+  The owner accepted its look for one song on their rig in the house preview on
+  2026-11-16; there is no hardware result, and the profile timings used were chosen,
+  not measured ([record](../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p3-viewing-render/README.md)).
+  `inject` and `regenerate` have been run only against a fake xLights client.
+  Reference: [user guide](../docs/user-guide.md#job_configjson-job-config),
+  [catalog README](../catalog/templates/moving_heads/README.md).
+  `packages/twinklr/core/sequencer/moving_heads/`
+- **Display rendering** — RGB/pixel effects with BeatGrid-exact coordination; lane blend
+  intent overrides recipe blend metadata
   ([decision](../memories/decisions/lane-blend-mode-overrides-recipe.md)).
-  Moving-head pan, tilt and dimmer output is held to the look the owner accepted before
-  the 2026-08 clean-up; seven clean-up render changes were reverted on 2026-11-12
-  ([decision](../memories/decisions/mh-render-matches-pre-cleanup-look.md)).
-  An opt-in `physical_v2` moving-head mode (job schema `3.1`) renders calibrated
-  fixture profiles to complete DMX frames with dark repositioning. It offers the planner
-  seven physical template families, each only on a rig that can render it, holds silent
-  song edges dark, and renders a cue it cannot play honestly as dark. Its pre-planning
-  check is slow (36–62 s on eight heads) and its families are written for 4/4. xLights
-  reproduces its bytes; no hardware or look result exists, and no full run with a live
-  planner or real audio has used it
-  ([evidence](../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p2-exit/README.md),
-  [xLights result](../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p2-xlights-result/README.md)).
   Display output keeps every section lit: a brightness floor, a beat grid extended to the
   end of the song, and a foundation-coverage rule in the group planner
   ([decision](../memories/decisions/display-stays-lit.md)).
-  `packages/twinklr/core/sequencer/`, `packages/twinklr/core/curves/`
+  `packages/twinklr/core/sequencer/display/`, `packages/twinklr/core/curves/`
 - **xLights delivery and iteration** — self-contained `.xsq`, `.xtiming`, and `.xmap`
   output; a pinned automation client for preview rendering; guarded `inject` and
   `regenerate` workflows that own only reserved Twinklr layers. Display and moving-head
@@ -86,7 +115,9 @@ This page owns the rolling gate snapshot. Latest recorded full gate: `6f2a9f6`
 ([record](../changes/2026_11_12_knowledge_optimization/handoff.md)); the skips are
 optional or local-only boundaries. Last recorded coverage: 89% at `03b75e9` (2026-08-30).
 There are no accepted failures. The gate includes an offline regression harness (`tests/regression/`):
-moving-head replay-render parity and a hermetic display replay.
+the moving-head output pins and a hermetic display replay. The unmerged
+`feat/mh-true-up-p3` branch has its own gate record in its
+[change handoff](../changes/2026_11_12_mh_true_up/plan/handoff.md).
 
 ## Live evidence
 
@@ -95,6 +126,10 @@ moving-head replay-render parity and a hermetic display replay.
 | 2026-08-29 | OpenAI, `Need A Favor`, owner 4-head rig | Valid `.xsq`; meets or exceeds the pre-refactor baseline (396 effects vs 262) | [run notes](../changes/post-refactor-validation/notes/live-run-prereqs.md), [QA runbook](../docs/qa-runbook.md) |
 | 2026-11-12 | Claude `claude-opus-5-5`, every role | 6/6 stages, about $0.95; on par with the baseline (251 effects vs 262; indicative, different song); human judgment PENDING-OWNER | [evaluation](../evaluations/2026-11-12-claude-baseline-live-run/README.md) |
 | 2026-11-12 | Ollama cloud `glm-5.3:cloud`, every role | 6/6 stages, 0 schema repairs; on par with the baseline (256 effects vs 262; indicative, different song) | [evidence](../changes/twinklr-reactivation-review/evidence/2026-11-12-p4-t2-ollama-cloud-pipeline/README.md) |
+| 2026-11-16 | Claude `claude-opus-5-5`, `Need A Favor`, owner 4-head rig, the current moving-head renderer | 29,631 effects; xLights reproduced every moving-head byte; look accepted by the owner for this song, rig and house preview (not a hardware result) | [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p3-viewing-render/README.md) |
+
+The three earlier runs rendered moving heads with the renderer deleted on 2026-11-16;
+their effect counts are not comparable with the current renderer's.
 
 Provider behavior learned from these runs is in
 [live-provider-run-lessons.md](../memories/learnings/live-provider-run-lessons.md). The
@@ -110,15 +145,19 @@ points that shape current behavior:
 
 ## Active work
 
-One change is active: the
-[twinklr-reactivation-review build campaign](../changes/ACTIVE.md). Its code and tooling
-are merged and independently verified. What remains is empirical evidence and owner
-decisions, not implementation.
+Active changes are listed in [changes/ACTIVE.md](../changes/ACTIVE.md). The moving-head
+true-up's single-renderer cutover is complete on the unmerged branch `feat/mh-true-up-p3`
+([handoff](../changes/2026_11_12_mh_true_up/plan/handoff.md)), with a known regression:
+the planner's song intent is not rendered. Its next work is rendering it, tasks W0–W9 of
+[song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md). The table below is the
+twinklr-reactivation-review build campaign: its code and tooling are merged and
+independently verified, and what remains is empirical evidence and owner decisions, not
+implementation.
 
 | Phase | Implementation | Exit still needs |
 |---|---|---|
 | 0 Foundation, 1K Knowledge edges | Complete | — |
-| 1P Render truth | 12/12 merged | Human judgment on the golden fixture; xLights import acceptance |
+| 1P Render truth | 12/12 merged | Human judgment on the golden fixture (it rendered the moving-head renderer deleted on 2026-11-16, and its golden files went with it; whether this exit still applies is the owner's call); xLights import acceptance |
 | 2P Creative quality | 13/13 merged | Vision-judge calibration (T6); three-arm experiment and D1 verdict (T13); preview and injection checks against a real xLights (T5, T12); owner decision on the T10 live-smoke gap; T11 strict mode for `audio_profile` |
 | 2K Catalog growth | 4/4 merged | Real layout coverage, owner-corpus mining with eight threshold decisions (T2), curation sessions, style fingerprints |
 | 3 Show convergence | 8/8 merged | xLights GUI acceptance (T6); combined-show preview, live judge, human review, calibration, and a real completed record (T8) |

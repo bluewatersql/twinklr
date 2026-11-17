@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Unified artifact validator for moving-head and display pipelines.
 
+Display: plan, holistic evaluation and `.xsq`. Moving heads: the `.xsq` only; a run's
+plan is checked by `twinklr eval-report`, which re-renders its checkpoint.
+
 Examples:
-    uv run python scripts/validation/validate_artifacts.py --mode plan 11_need_a_favor
+    uv run python scripts/validation/validate_artifacts.py --mode plan --pipeline display 11_need_a_favor
     uv run python scripts/validation/validate_artifacts.py --mode xsq --pipeline display 11_need_a_favor
-    uv run python scripts/validation/validate_artifacts.py --mode all --pipeline auto 11_need_a_favor
+    uv run python scripts/validation/validate_artifacts.py --mode xsq --pipeline mh 11_need_a_favor
 """
 
 from __future__ import annotations
@@ -60,17 +63,6 @@ def detect_pipeline_from_json(payload: dict[str, Any]) -> PipelineName | None:
     if "cross_section_issues" in payload and "score" in payload and "summary" in payload:
         return "display"
 
-    if "overall_score" in payload or "channel_scoring" in payload:
-        return "mh"
-
-    sections = payload.get("sections")
-    if isinstance(sections, list) and sections:
-        first = sections[0]
-        if isinstance(first, dict) and (
-            "template_id" in first or "channels" in first or "instructions" in first
-        ):
-            return "mh"
-
     return None
 
 
@@ -84,20 +76,9 @@ def resolve_sequence_paths(repo_root: Path, sequence_name: str) -> dict[str, dic
             "xsq": artifact_dir / f"{sequence_name}_display.xsq",
         },
         "mh": {
-            "raw_plan": artifact_dir / f"plan_raw_{sequence_name}.json",
-            "plan": artifact_dir / f"plan_{sequence_name}.json",
-            "final_plan": artifact_dir / f"final_{sequence_name}.json",
-            "evaluation": artifact_dir / f"evaluation_{sequence_name}.json",
             "xsq": artifact_dir / f"{sequence_name}_twinklr_mh.xsq",
         },
     }
-
-
-def _effective_mh_plan_path(paths: dict[str, Path]) -> Path:
-    plan_path = paths["plan"]
-    if not plan_path.exists() and paths["final_plan"].exists():
-        return paths["final_plan"]
-    return plan_path
 
 
 def validate_display_plan_structure(plan_set: dict[str, Any]) -> list[str]:
@@ -814,7 +795,6 @@ def _guess_pipeline_from_files(
     sequence_name: str,
     repo_root: Path,
     plan_path: Path | None,
-    raw_plan_path: Path | None,
     evaluation_path: Path | None,
     xsq_path: Path | None,
 ) -> PipelineName:
@@ -822,21 +802,13 @@ def _guess_pipeline_from_files(
         return requested_pipeline  # type: ignore[return-value]
 
     candidate_paths: list[Path] = []
-    for path in (plan_path, raw_plan_path, evaluation_path):
+    for path in (plan_path, evaluation_path):
         if path is not None and path.exists():
             candidate_paths.append(path)
 
     paths = resolve_sequence_paths(repo_root, sequence_name)
     candidate_paths.extend(
-        path
-        for path in (
-            paths["display"]["plan"],
-            paths["display"]["evaluation"],
-            paths["mh"]["raw_plan"],
-            _effective_mh_plan_path(paths["mh"]),
-            paths["mh"]["evaluation"],
-        )
-        if path.exists()
+        path for path in (paths["display"]["plan"], paths["display"]["evaluation"]) if path.exists()
     )
 
     for path in candidate_paths:
@@ -939,64 +911,12 @@ def _run_display_xsq_mode(
     return _summarize_issues(issues, "Display XSQ Validation")
 
 
-def _run_mh_plan_mode(*, sequence_name: str, repo_root: Path) -> int:
-    if str(repo_root) not in sys.path:
-        sys.path.insert(0, str(repo_root))
-    from scripts.validation._core.mh_plan_validation import (
-        MHPlanValidationPaths,
-        run_mh_plan_validation,
-    )
-    from scripts.validation._core.reporting import print_text_summary
-
-    paths = resolve_sequence_paths(repo_root, sequence_name)["mh"]
-    result = run_mh_plan_validation(
-        MHPlanValidationPaths(
-            raw_plan_path=paths["raw_plan"],
-            implementation_path=_effective_mh_plan_path(paths),
-            evaluation_path=paths["evaluation"],
-        )
-    )
-    print_text_summary("MH Plan Validation", result)
-    return result.exit_code
-
-
-def _run_mh_plan_mode_with_paths(
-    *,
-    sequence_name: str,
-    repo_root: Path,
-    raw_plan_path: Path | None,
-    plan_path: Path | None,
-    evaluation_path: Path | None,
-) -> int:
-    if str(repo_root) not in sys.path:
-        sys.path.insert(0, str(repo_root))
-    from scripts.validation._core.mh_plan_validation import (
-        MHPlanValidationPaths,
-        run_mh_plan_validation,
-    )
-    from scripts.validation._core.reporting import print_text_summary
-
-    paths = resolve_sequence_paths(repo_root, sequence_name)["mh"]
-    result = run_mh_plan_validation(
-        MHPlanValidationPaths(
-            raw_plan_path=raw_plan_path or paths["raw_plan"],
-            implementation_path=plan_path or _effective_mh_plan_path(paths),
-            evaluation_path=evaluation_path or paths["evaluation"],
-        )
-    )
-    print_text_summary("MH Plan Validation", result)
-    return result.exit_code
-
-
 def _run_mh_xsq_mode(
     *,
     sequence_name: str,
     repo_root: Path,
     xsq_path: Path | None,
-    plan_path: Path | None,
-    raw_plan_path: Path | None,
     fixture_config_path: Path | None,
-    quality_only: bool,
     output_json: Path | None,
 ) -> int:
     if str(repo_root) not in sys.path:
@@ -1011,12 +931,9 @@ def _run_mh_xsq_mode(
     result = run_mh_xsq_validation(
         MHXSQValidationPaths(
             xsq_path=xsq_path or paths["xsq"],
-            implementation_path=plan_path or _effective_mh_plan_path(paths),
-            raw_plan_path=raw_plan_path or paths["raw_plan"],
             fixture_config_path=fixture_config_path,
             output_json_path=output_json,
-        ),
-        quality_only=quality_only,
+        )
     )
     print_text_summary("MH XSQ Validation", result)
     return result.exit_code
@@ -1043,9 +960,10 @@ def parse_args() -> argparse.Namespace:
         default="auto",
         help="Pipeline artifact format (auto-detect by default)",
     )
-    parser.add_argument("--plan-path", type=Path, help="Explicit implementation/group-plan path")
-    parser.add_argument("--raw-plan-path", type=Path, help="Explicit raw MH plan path")
-    parser.add_argument("--evaluation-path", type=Path, help="Explicit evaluation path")
+    parser.add_argument("--plan-path", type=Path, help="Explicit display group-plan path")
+    parser.add_argument(
+        "--evaluation-path", type=Path, help="Explicit display holistic evaluation path"
+    )
     parser.add_argument("--xsq-path", type=Path, help="Explicit XSQ path")
     parser.add_argument("--fixture-config-path", type=Path, help="MH fixture config path")
     parser.add_argument(
@@ -1059,7 +977,7 @@ def parse_args() -> argparse.Namespace:
         help="Optional display XSQ trace sidecar JSON (defaults to <xsq>.trace.json)",
     )
     parser.add_argument(
-        "--quality-only", action="store_true", help="Skip deeper plan-vs-XSQ checks"
+        "--quality-only", action="store_true", help="Display: skip plan-vs-XSQ checks"
     )
     parser.add_argument("--output-json", type=Path, help="MH XSQ issue JSON output path")
     return parser.parse_args()
@@ -1074,7 +992,6 @@ def main() -> int:
         sequence_name=args.sequence_name,
         repo_root=repo_root,
         plan_path=args.plan_path,
-        raw_plan_path=args.raw_plan_path,
         evaluation_path=args.evaluation_path,
         xsq_path=args.xsq_path,
     )
@@ -1091,15 +1008,14 @@ def main() -> int:
                 plan_path=args.plan_path,
                 evaluation_path=args.evaluation_path,
             )
+            exit_code = max(exit_code, result)
         else:
-            result = _run_mh_plan_mode_with_paths(
-                sequence_name=args.sequence_name,
-                repo_root=repo_root,
-                raw_plan_path=args.raw_plan_path,
-                plan_path=args.plan_path,
-                evaluation_path=args.evaluation_path,
+            print(
+                "Moving-head plans are not validated here: `twinklr eval-report` re-renders "
+                "a run's plan checkpoint. Use --mode xsq for the moving-head .xsq."
             )
-        exit_code = max(exit_code, result)
+            if args.mode == "plan":
+                return 2
 
     if args.mode in {"xsq", "all"}:
         if pipeline == "display":
@@ -1117,10 +1033,7 @@ def main() -> int:
                 sequence_name=args.sequence_name,
                 repo_root=repo_root,
                 xsq_path=args.xsq_path,
-                plan_path=args.plan_path,
-                raw_plan_path=args.raw_plan_path,
                 fixture_config_path=args.fixture_config_path,
-                quality_only=args.quality_only,
                 output_json=args.output_json,
             )
         exit_code = max(exit_code, result)

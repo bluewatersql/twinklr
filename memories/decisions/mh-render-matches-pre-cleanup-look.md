@@ -1,13 +1,23 @@
 ---
 type: decision
-status: accepted
+status: historical
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-17
 confidence: confirmed
 tags: [moving-heads, rendering, xlights, regression, owner-acceptance]
 ---
 
 # Moving-Head Rendering Matches the Pre-Clean-Up Look
+
+> **Superseded 2026-11-16.** The renderer this decision governs was deleted in the
+> single-renderer cutover after the owner accepted the profile-based renderer's look
+> ("Look accepted, start the cutover",
+> [record](../../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p3-viewing-render/README.md);
+> deletion: [C1.2](../../changes/2026_11_12_mh_true_up/evidence/2026-11-16-c1-2-deletion/README.md)).
+> The moving-head reference is now that accepted look, guarded by
+> `tests/regression/test_mh_pins.py`: see
+> [mh-single-renderer.md](mh-single-renderer.md). The templates, curves, limits and
+> intensity behaviour described below no longer exist; the text is kept as history.
 
 _Directed by the owner on 2026-11-12: the moving-head output was tested and accepted in
 xLights before the 2026-08 clean-up and must render at that level again._

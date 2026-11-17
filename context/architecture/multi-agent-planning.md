@@ -1,7 +1,7 @@
 ---
 type: context
 area: architecture
-updated: 2026-08-26
+updated: 2026-11-17
 ---
 
 # Multi-Agent Planning
@@ -21,30 +21,40 @@ The choreography planner is an iterative refinement loop over structured Pydanti
    or hard-fail (redo). `JudgeVerdict` validation reconciles verdict status to score.
    Structured feedback loops back to the planner. Up to 3 iterations by default.
 
-The moving-head renderer now resolves schema-v2 intensity, color, shutter, gobo, and
-MomentCue intent deterministically. The earlier `template_id` + `preset_id`-only
-bottleneck is preserved as a dated baseline and resolution record in
+**Known regression.** The moving-head renderer applies only the selected template,
+preset and section bars. It does not yet render the plan's intensity, section colour,
+shutter and gobo events, lyric MomentCues bound to events, or section transitions, which
+the renderer deleted in the single-renderer cutover did render. The owner has ruled that
+all of it is rendered on the single path and that nothing leaves the planner contract
+without the owner's word ([song-intent rendering](../../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md),
+[decision](../../memories/decisions/mh-single-renderer.md)). The dated history of that
+channel is in
 [llm-plans-intent-renderer-implements-precision.md](../../memories/decisions/llm-plans-intent-renderer-implements-precision.md).
-The implemented three-arm harness will test the standing default against a deterministic
-selector and a macro-ablated LLM arm, but the owner experiment and D1 verdict are still
-pending; implementation fixtures are not decision evidence.
+The planner is offered only the templates the pre-planning gate admitted for the rig and
+song. The implemented three-arm harness will test the standing default against a
+deterministic selector (choosing among the admitted families) and a macro-ablated LLM
+arm, but the owner experiment and D1 verdict are still pending; implementation fixtures
+are not decision evidence.
 
 ## Design principles
 
 - **LLM plans intent; renderer implements precision** — the foundational decision; see
   [memories/decisions/llm-plans-intent-renderer-implements-precision.md](../../memories/decisions/llm-plans-intent-renderer-implements-precision.md).
 - **Categorical over numeric** — intensity is WHISPER/SOFT/MED/STRONG/PEAK; duration is
-  HIT/BURST/PHRASE/EXTENDED/SECTION. The renderer resolves categories to DMX values.
-- **Templates as complete units** — geometry + movement + dimmer as tested, self-contained
-  choreography units. The LLM selects templates and expresses typed categorical intent;
-  it never invents fixture math or direct DMX values.
-- **Data-first template loading** — moving-head `TemplateDoc` JSON and Python factories
-  share one validating registry. Python builtins load first; configured data loads second,
-  and normalized ID/name/alias collisions fail unless an explicit override targets the
-  exact incumbent ID. The two forms coexist for progressive migration. Moving-head
-  templates and display recipes now share the
-  tracked `catalog/templates/` data home but not yet a schema: one catalog with two
-  renderers is the recorded convergence direction, not current behavior.
+  HIT/BURST/PHRASE/EXTENDED/SECTION. The display renderer resolves categories to precise
+  values; the moving-head renderer does not yet render planner intensity (the known
+  regression above).
+- **Templates as complete units** — each moving-head template states its steps' motion,
+  pulses, wheel states and phase spread as data, checked on the rig before it is offered.
+  The LLM selects templates and expresses typed categorical intent; it never invents
+  fixture math or direct DMX values.
+- **Data-only template loading** — moving-head templates are JSON `TemplateDoc` files in
+  one validating registry. The seven-family catalog (`catalog/templates/moving_heads/`)
+  loads first and `--template-dir` documents second; normalized ID/name/alias collisions
+  fail unless an explicit override targets the exact incumbent ID. Moving-head templates
+  and display recipes share the tracked `catalog/templates/` data home but not a schema:
+  one catalog for the moving-head and display renderers is the recorded convergence
+  direction, not current behavior.
 - **Schema auto-injection and enforcement** — Pydantic response models generate both the
   JSON schemas embedded in prompts and provider requests. OpenAI uses the Responses API
   strict `json_schema` path; opt-in loopback Ollama uses Chat Completions with JSON-schema

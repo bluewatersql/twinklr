@@ -28,8 +28,11 @@ reposition into dark. Each declares two variants as presets: `narrow` (less reac
 `slow` (half the rate). Both ask for less speed than the base, so on a head too slow for
 the base at the song's tempo, or a beat too short for the flick's mask, the family
 usually still plays through one of them; a variant can also fail where the base plays,
-and is then left out on its own. How any family looks is `PENDING-OWNER`; these are
-synthetic designs, not accepted looks.
+and is then left out on its own. The owner accepted the look of the six zoomless
+families, each on its base variant, as rendered for one song on their rig in the xLights
+house preview on 2026-11-16
+([record](../../../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p3-viewing-render/README.md)).
+The presets and `zoom_wave` have not been viewed, and no family has run on hardware.
 
 ## Meter
 

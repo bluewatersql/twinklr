@@ -30,20 +30,6 @@ def test_detect_pipeline_from_display_group_plan_set() -> None:
     assert pipeline == "display"
 
 
-def test_detect_pipeline_from_mh_plan_shape() -> None:
-    module = _load_module()
-
-    pipeline = module.detect_pipeline_from_json(
-        {
-            "sections": [
-                {"name": "Intro", "start_ms": 0, "end_ms": 1000, "template_id": "tmpl_1"},
-            ]
-        }
-    )
-
-    assert pipeline == "mh"
-
-
 def test_resolve_sequence_paths_for_display() -> None:
     module = _load_module()
     repo_root = Path("/repo")

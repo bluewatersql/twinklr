@@ -8,7 +8,7 @@ Commands below assume the repository root and `uv run python`.
 
 | File | Purpose and status |
 |---|---|
-| `validation/validate_artifacts.py` | Validates moving-head/display plans and XSQ artifacts. See [`validation/README.md`](validation/README.md). It is tested, but neither Make nor CI invokes the entry point. |
+| `validation/validate_artifacts.py` | Validates display plans and XSQ artifacts and moving-head XSQ artifacts. See [`validation/README.md`](validation/README.md). It is tested, but neither Make nor CI invokes the entry point. |
 | `validation/validate_agent_artifacts.py` | Runs saved-response schema and prompt checks. It is tested, but neither Make nor CI invokes the entry point. |
 | `validate_mh_corpus_manifest.py` | Validates the owner-local P4-T7 corpus prerequisite and emits redacted hash/count evidence; it never parses sequence content. |
 | `validation/test_prompt_validation.py` | Manual prompt-validation harness invoked by `validate_agent_artifacts.py`. Despite its filename, pytest collects no tests from it. |
@@ -16,10 +16,9 @@ Commands below assume the repository root and `uv run python`.
 
 The validation implementation package consists of `validation/__init__.py`,
 `validation/_core/__init__.py`, `validation/_core/io.py`,
-`validation/_core/mh_plan_validation.py`, `validation/_core/mh_xsq_validation.py`,
-`validation/_core/models.py`, and `validation/_core/reporting.py`. Together with the
-top-level `scripts/__init__.py`, these eight package/internal modules are library support,
-not standalone commands.
+`validation/_core/mh_xsq_validation.py`, `validation/_core/models.py`, and
+`validation/_core/reporting.py`. Together with the top-level `scripts/__init__.py`, these
+seven package/internal modules are library support, not standalone commands.
 
 ## Make-wired tools
 

@@ -1,12 +1,108 @@
 ---
 type: handoff
-status: complete
+status: active
 area: research-and-planning
 change: 2026_11_12_mh_true_up
-updated: 2026-11-12
+updated: 2026-11-17
 ---
 
 # Handoff — Moving-head technical design and implementation plans
+
+## Start here — current state, 2026-11-17
+
+Status: **single-renderer cutover C1.1–C1.5 complete on `feat/mh-true-up-p3` (not
+merged, not pushed), with a known regression: the planner's song intent is not rendered.
+Next: song-intent rendering, tasks W0–W9 of
+[song-intent-rendering.md](song-intent-rendering.md) (plan of record; it replaces T1),
+then motif, variation and density.** Worktree
+`/Users/ondeck/work/github/twinklr-mh-true-up`, cut from `main` at `7356b376`. The dated
+log below this section is history; the plan of record is
+[phase-3-arrangement.md](phase-3-arrangement.md) (read its dated sections from
+"Single-path direction" on).
+
+Moving heads now have one renderer: the profile-based renderer that `physical_v2` used to
+select. The old renderer, its 37 built-in templates, `moving_heads.mode`, `transitions`,
+schema `3.0`, `template-export`, the old fixture and template keys and the old goldens
+are gone; a job or file naming a removed key is refused by name.
+
+**Known regression.** The renderer applies each section's template, preset and bars
+only. The planner's intensity, section colour, shutter and gobo events, lyric moment cues
+bound to events and section transitions are not applied
+(`sequencer/moving_heads/pipeline.py:1713-1726`), and `twinklr show` does not project the
+macro palette or focal role onto the heads (`pipeline/show_stages.py:63-68`). The
+renderer deleted in `0ec65d47` rendered them; the cutover regressed them. The owner
+directed on 2026-11-17 that all of it be rendered on the single path and that nothing be
+cut from the planner contract
+([plan](phase-3-arrangement.md#2026-11-17-owner-direction--the-planners-song-intent-must-be-rendered-not-cut)).
+The T1 design draft of 2026-11-16, which cut the unread fields, and decision D7 are
+withdrawn. What is true now is in
+[context/current-state.md](../../../context/current-state.md#implemented) and the
+decision [mh-single-renderer](../../../memories/decisions/mh-single-renderer.md).
+
+Commits on the branch since `main`:
+
+| Work | Commits | Record |
+|---|---|---|
+| Gate-time cut | `3113d062`, `512ae0cc` | [plan](phase-3-arrangement.md#gate-time-cut--2026-11-16-commits-3113d062-and-the-test-follow-up) |
+| Cutover inventory and owner decisions | `f476bb2b`, `a8d621d9`, `4fd507e9`, `b0942c0b` | [inventory](cutover-inventory.md) |
+| Per-preset admission (D9) | `647eed83` | plan |
+| Beat-grid fix | `5145fb3d`, `8b23a36d`, `16b3e170`, `3431c7ba`, `9e956fd7` | [record](../evidence/2026-11-16-p3-beat-grid-fix/README.md) |
+| Family adaptation; profile defaults (C1.0) | `068f9971`, `dcc14ddf`, `d2f49251` | plan |
+| Viewing render; look accepted | `824dce1d`, `b5cbc658` | [record](../evidence/2026-11-16-p3-viewing-render/README.md) |
+| Claude schema decided before sending | `10dbd93f` | viewing-render record, follow-up |
+| C1.1d selector and three-arm port | `c1f3023e`, `1f74d63f`, `fd087908` | [record](../evidence/2026-11-16-c1-1d-selector-port/README.md) |
+| C1.1c live `inject`/`regenerate` | `19f0a9c2` | [record](../evidence/2026-11-16-c1-1c-live-port/README.md) |
+| C1.1b `eval-report` | `12e9f83a` | [record](../evidence/2026-11-16-c1-1b-eval-port/README.md) |
+| C1.1a `twinklr show` | `6fe8b0ba`, `5d50580c` | [record](../evidence/2026-11-16-c1-1a-show-port/README.md) |
+| C1.2 old renderer deleted | `0ec65d47` (tag `mh-last-with-legacy-renderer` = `5d50580c`, local) | [record](../evidence/2026-11-16-c1-2-deletion/README.md) |
+| C1.3 shared models narrowed | `079831df` | [record](../evidence/2026-11-16-c1-3-model-narrowing/README.md) |
+| C1.4 names of the second path removed | `24c22b79` | [record](../evidence/2026-11-17-c1-4-renames/README.md) |
+| C1.5 documents, context, memories, scripts | uncommitted at hand-off; the integrator commits | [record](../evidence/2026-11-17-c1-5-docs-context/README.md) |
+
+Validation: `uv run pytest tests -q --no-cov` on `24c22b79`: 6,515 passed, 30 skipped
+([C1.4 record](../evidence/2026-11-17-c1-4-renames/README.md#46-checks-run-on-the-final-tree-this-session));
+the integrator reported `make validate` green on `24c22b79` with the same counts. C1.5's
+checks are in its record. `make validate` has not been run on the C1.5 tree.
+
+Owner-gated, not done:
+
+- **Merge and push** `feat/mh-true-up-p3`.
+- **Hardware:** no real fixture has been driven; every profile timing is chosen, not
+  measured.
+- **Live `inject`/`regenerate`** against a running xLights with a scratch sequence: the
+  sixteen checks in the [C1.1c record](../evidence/2026-11-16-c1-1c-live-port/README.md)
+  (proven against a fake client only).
+- **Paid provider requests:** authorized on 2026-11-13 at the minimum that answers the
+  question, logged in the evidence record (W2's one live schema probe falls under it).
+- Any look verdict beyond the one given for Need A Favor on 2026-11-16, including the
+  views that end W4–W9.
+
+Answered on 2026-11-17: palette-role colour and lyric moment cues stay in the planner
+contract and are rendered; `variation` stays a planner choice
+([song-intent rendering](song-intent-rendering.md)).
+
+Open owner questions:
+
+1. The integrator decisions listed in
+   [song-intent rendering](song-intent-rendering.md) (reversible; the owner may overrule
+   any).
+2. **Three-arm experiment and Phase 5 (inventory F6):** `reference_policy.py` and its
+   arm were deleted in C1.2 under the integrator's note, without an owner ruling; after
+   the selector port the experiment's preconditions are probably unmet and arm A can
+   fail ([plan](phase-3-arrangement.md#three-arm-experiment-after-the-selector-port-what-the-owner-must-know--2026-11-16)).
+   The owner decides whether to rescope Phase 5's comparison.
+3. **Open items from the plan:** the three songs still analysed at 147.7 BPM; whether to
+   keep a tempo-change output (removed as unused); commanding darkness early to cover
+   the profile's close latency at rest-span edges in `twinklr show` (not built); the
+   sixteen real-xLights checks for live `inject`; the four other planner schemas (audio
+   profile, macro plan, group planner, holistic corrector) not provider-enforced on
+   Claude.
+
+Also for the owner: after this branch is merged, the first `twinklr run` or `show` of
+each song plans again (paid), `twinklr regenerate` refuses sequences injected before
+the cutover until `twinklr inject` runs again, and `eval-report` on an older checkpoint
+reports a fingerprint mismatch
+([learning](../../../memories/learnings/model-dump-hashes-rekey-caches.md)).
 
 Status: **planning deliverable complete; all implementation remains proposed**.
 Branch/worktree: `chore/knowledge-optimization`, `/Users/ondeck/work/github/twinklr`.
@@ -434,3 +530,19 @@ Next action after acceptance: the cutover, in the order
 [cutover-inventory.md](cutover-inventory.md) gives. Work that could proceed without
 it: the four findings in the viewing-render record (the provider rejecting the plan
 schema is the one with a cost).
+
+## Cutover — 2026-11-16 to 2026-11-17
+
+The owner accepted the look on 2026-11-16 and the cutover ran in five steps: the four
+consumer ports (C1.1), the deletion of the old renderer (C1.2), the model narrowing
+(C1.3), the renames (C1.4), and documents, context, memories and scripts (C1.5).
+C1.1–C1.4 were each written by one agent and reviewed by another; C1.5 awaits its
+review. Byte matrices against the commit before each of
+C1.2–C1.4 found no change to frames or delivered files. The commits, records, validation,
+owner-gated items and open questions are in "Start here" at the top of this file.
+
+Knowledge promotion (C1.5): `context/` describes the one renderer; the decision
+[mh-single-renderer](../../../memories/decisions/mh-single-renderer.md) supersedes
+[mh-render-matches-pre-cleanup-look](../../../memories/decisions/mh-render-matches-pre-cleanup-look.md);
+one pattern and one learning were added
+([record](../evidence/2026-11-17-c1-5-docs-context/README.md)).

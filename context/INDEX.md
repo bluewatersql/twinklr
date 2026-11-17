@@ -19,6 +19,7 @@ Load only what the task needs.
 | Product | [product/overview.md](product/overview.md) | Goals, scope, what the product is for |
 | Pipeline and subsystems | [architecture/pipeline.md](architecture/pipeline.md) | Stage order, failure policy, caching, where a subsystem lives |
 | Planning agents | [architecture/multi-agent-planning.md](architecture/multi-agent-planning.md) | The planner/heuristics/judge loop, categorical planning, schema injection, providers |
+| Moving-head rendering | [current-state.md](current-state.md#implemented), [../docs/user-guide.md](../docs/user-guide.md#job_configjson-job-config), [../catalog/templates/moving_heads/README.md](../catalog/templates/moving_heads/README.md), [../memories/decisions/mh-single-renderer.md](../memories/decisions/mh-single-renderer.md) | Rig and profile requirements, the pre-planning gate, the template families, what is refused |
 | Engineering conventions | [engineering/conventions.md](engineering/conventions.md) | Toolchain, commands, quality gates, local config files |
 | Terminology | [glossary.md](glossary.md) | xLights, DMX, templates, BeatGrid, recipes, FE |
 | Live and owner-gated runs | [../changes/twinklr-reactivation-review/runbooks/README.md](../changes/twinklr-reactivation-review/runbooks/README.md), [../docs/qa-runbook.md](../docs/qa-runbook.md) | Before any paid, live, xLights, or owner-data step |

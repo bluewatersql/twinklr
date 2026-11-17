@@ -1,7 +1,7 @@
 ---
 type: context
 area: engineering
-updated: 2026-11-12
+updated: 2026-11-17
 ---
 
 # Engineering Conventions
@@ -51,8 +51,8 @@ check, lint, mypy, the tests not marked `local_only` (without coverage), and
 |---|---|
 | Shell environment (`.env.example` is reference only) | API keys: `OPENAI_API_KEY` for the default cloud path; optional `GENIUS_ACCESS_TOKEN`, `ACOUSTID_API_KEY`, `HF_TOKEN`. Twinklr does not auto-load `.env`. |
 | `config.json` | App settings — cache dirs, audio processing, logging |
-| `job_config.json` | Job settings — agent iterations/models, fixture config path, assets, transitions, timing tracks, and final-plan checkpoint writing |
-| `fixture_config.json` | Moving-head definitions — names, DMX channels, physical positions |
+| `job_config.json` | Job settings — agent iterations/models, fixture config path, assets, the moving-head render policy (initial states, fallbacks, output budgets), timing tracks, and final-plan checkpoint writing |
+| `fixture_config.json` | Moving-head definitions — each fixture's `physical_profile`, xLights model, `dmx_mapping` channels listed to the planner, position, and the group's presets and topology |
 
 ## Documentation conventions
 

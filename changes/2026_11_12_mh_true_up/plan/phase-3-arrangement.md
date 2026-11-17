@@ -777,3 +777,60 @@ Record: [evidence/2026-11-17-c1-4-renames](../evidence/2026-11-17-c1-4-renames/R
 
 Carried into C1.5: `context/current-state.md:47,49`, `scripts/validation/README.md:287`,
 `docs/pipeline_guide.md:845` (says `display` "ignores the mode"), plus the C1.3 list.
+
+## 2026-11-17: C1.5 done — documents, context, memories and scripts
+
+Record: [evidence/2026-11-17-c1-5-docs-context](../evidence/2026-11-17-c1-5-docs-context/README.md).
+Not yet reviewed; uncommitted at hand-off.
+
+- **`docs/`, `README.md`, the catalog README:** describe one moving-head renderer; the
+  carried items (`README.md:175`, `docs/overview.md:147`, `docs/pipeline_guide.md:845`,
+  the user guide's re-inject and re-plan notes) are done, and the `render_preflight`
+  stage is shown in the stage lists.
+- **`context/`:** `current-state.md` states what the renderer requires and refuses, the
+  gate, the catalog, the pins and the accepted look; glossary, architecture, engineering
+  and product pages corrected.
+- **`memories/`:** `mh-render-matches-pre-cleanup-look` superseded by the new decision
+  `mh-single-renderer`; dated notes on the intent and coordinated-show decisions and one
+  lesson; a pattern (byte matrix against a baseline) and a learning (model dumps re-key
+  caches) added; refusal by name added to the code patterns.
+- **Scripts:** `scripts/validation/_core/mh_plan_validation.py` and its test deleted (its
+  artifacts are no longer produced); `mh_xsq_validation.py` reduced to checks that hold
+  for the current `.xsq`, with an EffectDB off-by-one fixed, and proven on a rendered
+  `.xsq` equal to the pinned one.
+
+Revised the same day after the owner's direction below: the documents, context and
+memories state the unrendered song intent as a known regression with a link to
+[song-intent-rendering.md](song-intent-rendering.md), and a learning on proving
+behaviour parity before deleting a replaced implementation was added.
+
+## 2026-11-17: owner direction — the planner's song intent must be rendered, not cut
+
+The integrator asked the owner whether palette-role colour and lyric moment-cue
+references should leave the planner contract, and whether `variation` should be derived
+in code. The owner rejected both, in their words: "no color and nothing ties to the
+lyrics....hard fail....and misses the whole intent of an ai sequencer" and "dropping
+functions left and right ... basically trying to turn this into [a] beat mapper that
+doesnt take the actual song into any context".
+
+What this changes:
+
+- **The T1 design draft of 2026-11-16 is withdrawn.** It cut every planner field the
+  renderer does not read. That is the wrong direction: where the renderer does not read
+  a piece of song intent, the renderer is what is incomplete.
+- **D7 is withdrawn** ("intensity and colour stay unapplied").
+- **Known gap on this branch, stated plainly:** the renderer applies the planner's
+  template, bars and preset only. The planner's intensity, colour intent, shutter and
+  gobo events, lyric moment cues and transitions are not applied
+  (`pipeline.py:~1720` says so in a diagnostic). The deleted renderer applied at least
+  part of them. So the single path today renders less of the song than the path it
+  replaced. The old code is recoverable at tag `mh-last-with-legacy-renderer`.
+- **New requirement for Phase 3:** the planner keeps expressing song-aware intent
+  (colour, intensity, accents tied to lyric and musical moments, variation, transitions
+  between sections) and the renderer applies each of them deterministically within the
+  rig's physical profile. A field leaves the contract only on the owner's word.
+- **Next step:** a gap inventory — for each piece of intent, what the deleted renderer
+  did with it, what the current renderer does, and what it takes to apply it on the
+  current path — before any contract or renderer work.
+
+Nothing is merged or pushed.

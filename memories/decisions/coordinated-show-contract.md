@@ -2,7 +2,7 @@
 type: decision
 status: accepted
 created: 2026-08-16
-updated: 2026-08-16
+updated: 2026-11-17
 confidence: confirmed
 tags: [show, coordination, moving-heads, display, beat-grid, xlights]
 ---
@@ -13,6 +13,18 @@ _The owner accepted all nine P3-T5 decisions on 2026-08-16; the final offline ca
 was integrated at `f006468`. This record does not authorize P3-T6 or live work._
 
 ## Decision
+
+> **Partly superseded on 2026-11-16.** The moving-head halves of items 3 and 4 (focal
+> roles projected to INTENSE/SMOOTH/SLOW, the section palette mapped to a wheel preset)
+> belonged to the moving-head renderer deleted in the single-renderer cutover
+> ([decision](mh-single-renderer.md)) with no counterpart in the surviving renderer.
+> `twinklr show` does not yet project either onto the heads: it rests them dark where the
+> coordination rests them and records a per-section diagnostic saying palette and focal
+> role are not applied. This is a known regression; the owner directed on 2026-11-17 that
+> it be restored (task W9 of
+> [song-intent rendering](../../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md);
+> [show port record](../../changes/2026_11_12_mh_true_up/evidence/2026-11-16-c1-1a-show-port/README.md)).
+> The other items stand.
 
 1. `twinklr show` is the additive combined command; `twinklr run` and `twinklr display`
    retain their branch-only behavior.

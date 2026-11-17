@@ -138,7 +138,7 @@ Pipeline factories compose stages into complete pipelines:
 
 **Moving heads pipeline** (`build_moving_heads_pipeline()` in `moving_heads.py`):
 - Common stages + `moving_heads` (`MovingHeadStage` → `ChoreographyPlan`) + `render` (`MovingHeadRenderingStage` → `Path`)
-- Full chain: `audio → profile + lyrics → macro → moving_heads → render`
+- Full chain: `audio → render_preflight → profile + lyrics → macro → moving_heads → render`; `render_preflight` is the moving-head gate that refuses an unrenderable rig or song and admits the templates the planner is offered
 - Used by the CLI (`twinklr run`)
 
 **Display pipeline** (`build_display_pipeline()` in `display.py`):
@@ -271,7 +271,7 @@ recommended sections, and declared remainder policy.
 
 **Curves** (`packages/twinklr/core/curves/`):
 - `CurveLibrary` enum provides named curves (e.g., `EASE_IN_OUT_SINE`)
-- Used for transition interpolation and DMX value smoothing
+- Used for the display's xLights value curves; the moving-head renderer computes its motion from template data and writes no curves
 
 **xLights format** (`packages/twinklr/core/formats/xlights/`):
 - Native `.xsq` sequence writer; the reader (`parser.py`) is analysis-only, used by
@@ -293,7 +293,7 @@ _Source: `packages/twinklr/core/sequencer/vocabulary/`_
 
 Semantic enums that bridge LLM planning (categorical terms) and rendering (precise values):
 
-- **Intensity**: `WHISPER`, `SOFT`, `MED`, `STRONG`, `PEAK` — mapped to DMX dimmer values
+- **Intensity**: `WHISPER`, `SOFT`, `MED`, `STRONG`, `PEAK` — mapped to per-lane display brightness; the moving-head renderer does not yet render planner intensity, a known regression being fixed ([plan](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md))
 - **Duration**: `HIT`, `BURST`, `PHRASE`, `EXTENDED`, `SECTION` — mapped to timing
 - **Display**: `DisplayElementKind`, `DisplayProminence`, `GroupArrangement`
 - **Spatial**: `DisplayZone`, `HorizontalZone`, `VerticalZone`, `DepthZone`
@@ -361,9 +361,10 @@ Test markers:
 - `@pytest.mark.integration` — integration tests (deselect with `-m "not integration"`)
 - `@pytest.mark.slow` — slow tests (deselect with `-m "not slow"`)
 
-**`.xsq` regression parity.** `tests/regression/` pins pre-refactor `.xsq` sophistication
-metrics and replays saved plans through the current deterministic renderer (moving-head and
-display) to catch drops in emission richness. It runs as part of `make validate`. For the
+**Regression pins.** `tests/regression/` pins the display's pre-refactor `.xsq`
+sophistication metrics and replays its saved plans through the current renderer to catch
+drops in emission richness, and pins the moving-head render fingerprint and encoded frames
+of every catalog family variant and of one delivered `.xsq` (`test_mh_pins.py`). It runs as part of `make validate`. For the
 end-to-end validation procedure and the human-QA checklist, see the
 [QA Runbook](qa-runbook.md).
 
@@ -380,7 +381,7 @@ The complete, category-based inventory and data requirements live in
 
 | Script | Purpose |
 |---|---|
-| `scripts/validation/validate_artifacts.py` | Validate generated moving-head/display plans and XSQ artifacts; not wired into Make or CI |
+| `scripts/validation/validate_artifacts.py` | Validate generated display plans and XSQ artifacts and moving-head XSQ artifacts; not wired into Make or CI |
 | `scripts/validation/validate_agent_artifacts.py` | Run saved-response schema and prompt validation; not wired into Make or CI |
 | `scripts/demo_sequencer_pipeline.py` | Compatibility shim forwarding to the production `twinklr display` CLI path |
 | `scripts/test_audio_pipeline.py` | Manual audio harness used by the `make test-audio*` targets; despite its name, pytest does not collect it |

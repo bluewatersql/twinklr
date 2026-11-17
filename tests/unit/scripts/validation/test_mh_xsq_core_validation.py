@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from scripts.validation._core.mh_xsq_validation import (
     MHXSQEffect,
+    MHXSQValidationPaths,
     ValidationIssue,
     check_missing_refs,
+    load_xsq_effects,
     parse_dmx_settings,
+    run_mh_xsq_validation,
     validate_dmx_data_presence,
 )
+from tests.support import moving_heads as m
+from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
 
 
 def test_parse_dmx_settings_extracts_values_and_curves() -> None:
@@ -65,3 +73,45 @@ def test_validate_dmx_data_presence_flags_all_zero_effects() -> None:
     issues = validate_dmx_data_presence(effects_by_model)
 
     assert any("ALL ZERO values" in issue for issue in issues)
+
+
+def test_an_effect_reads_the_effectdb_entry_its_ref_names(tmp_path: Path) -> None:
+    xsq_path = tmp_path / "song_twinklr_mh.xsq"
+    xsq_path.write_text(
+        "<xsequence><EffectDB><Effect></Effect><Effect>E_SLIDER_DMX1=7</Effect>"
+        "<Effect>E_SLIDER_DMX1=9</Effect></EffectDB><ElementEffects>"
+        '<Element type="model" name="Dmx MH1"><EffectLayer>'
+        '<Effect ref="1" name="DMX" startTime="0" endTime="20"/>'
+        '<Effect ref="2" name="DMX" startTime="20" endTime="40"/>'
+        "</EffectLayer></Element></ElementEffects></xsequence>",
+        encoding="utf-8",
+    )
+
+    effects = load_xsq_effects(xsq_path)["Dmx MH1"]
+
+    assert [effect.dmx_channels for effect in effects] == [{1: 7}, {1: 9}]
+
+
+def test_a_rendered_moving_head_xsq_passes(tmp_path: Path) -> None:
+    heads = ("MH1", "MH2")
+    xsq_path = tmp_path / "song_twinklr_mh.xsq"
+    fixture_path = tmp_path / "fixture_config.json"
+    rig = m.family_rig(heads)
+    with m.family_catalog():
+        RenderingPipeline(
+            choreography_plan=m.sections_plan(("target_orbit", 1, 2), ("finite_snap_hold", 3, 4)),
+            beat_grid=m.bars_grid(*([500.0] * 4)),
+            fixture_group=rig,
+            job_config=m.family_job(heads),
+            output_path=xsq_path,
+            media_file="silence.wav",
+        ).render()
+    fixture_path.write_text(json.dumps(rig.model_dump(mode="json")), encoding="utf-8")
+
+    result = run_mh_xsq_validation(
+        MHXSQValidationPaths(xsq_path=xsq_path, fixture_config_path=fixture_path)
+    )
+
+    assert result.issues == []
+    assert result.stats["models_with_effects"] == len(heads)
+    assert result.stats["total_effects"] > 0

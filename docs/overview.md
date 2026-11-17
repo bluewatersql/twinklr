@@ -7,7 +7,7 @@ description: "What Twinklr is, how it works, and its major subsystems."
 
 Twinklr is an AI-powered choreography engine that transforms music into coordinated Christmas light shows. It analyzes audio, plans typed choreography intent using multi-agent LLM orchestration, and renders the result as native [xLights](https://xlights.org) sequence files (`.xsq`).
 
-The core design principle: **LLMs plan creative intent; deterministic code handles precision.** The AI selects templates and expresses typed categorical intensity, color, shutter, gobo, and lyric-cue intent. The rendering engine resolves that intent into exact fixture channels, timing, curves, and DMX values.
+The core design principle: **LLMs plan creative intent; deterministic code handles precision.** The AI selects templates and expresses typed categorical intensity, color, shutter, gobo, and lyric-cue intent. Deterministic renderers turn the plan into exact fixture channels, timing, curves, and DMX values. **Known regression:** the moving-head renderer does not yet render the planner's intensity, section colour, shutter and gobo events, lyric moment cues bound to events, and section transitions; it applies only the chosen template, preset and section bars. The single-renderer cutover lost these, and restoring them is planned work ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 
 ---
 
@@ -30,7 +30,7 @@ Twinklr currently supports:
   limit), 16-bit pan/tilt as coarse/fine byte pairs, and dark repositioning planned
   between cues. Every run loads seven families from
   `catalog/templates/moving_heads` (one of them, `zoom_wave`, a synthetic
-  pilot of a zoom axis) and offers the planner those the rig can render. Planner intent is not applied on that path. See
+  pilot of a zoom axis) and offers the planner those the rig can render. The planner's song intent (intensity, section colour, shutter and gobo events, lyric moment cues bound to events, and section transitions) is not rendered yet: a known regression being fixed ([plan](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)). See
   `packages/twinklr/core/sequencer/moving_heads/compile/step.py` and
   `packages/twinklr/core/sequencer/moving_heads/compile/preposition.py`.
 - **Display sequencer** — RGB/pixel effects for outline, tree, and other display elements (`packages/twinklr/core/sequencer/display/`).
@@ -142,11 +142,11 @@ Agent sub-packages:
 
 ### Template Library
 
-_Source: `packages/twinklr/core/sequencer/moving_heads/templates/`_
+_Source: `packages/twinklr/core/sequencer/moving_heads/templates/` (loader and registry), `catalog/templates/moving_heads/` (the families)_
 
-Pre-built choreography units define tested geometry, movement, and channel behavior as self-contained building blocks. The LLM selects templates and typed categorical intent; it never invents movement patterns or fixture math from scratch.
+Moving-head templates are strict JSON `TemplateDoc` documents. Each step states its motion, dimmer or shutter pulse, wheel states, optional zoom, and how its phase spreads across the heads, in physical units; the renderer compiles that data against each fixture's profile. The LLM selects templates and presets; it never invents movement patterns or fixture math.
 
-The validating registry loads the data-form `TemplateDoc` JSON family catalog and any `--template-dir` documents, with explicit collision/override rules. Each template can provide presets and metadata used by LLM and deterministic selection.
+The validating registry loads the seven-family catalog on every run and then any `--template-dir` documents, with explicit collision/override rules. A document that uses a removed or renamed key is refused when it loads. Each template can declare presets (`narrow`, `slow` in the catalog) and metadata used by LLM and deterministic selection. Before planning, the `render_preflight` gate dry-compiles every template and preset on the rig over the song and offers only what passes.
 
 ### Sequencer & Rendering
 
@@ -154,7 +154,7 @@ _Source: `packages/twinklr/core/sequencer/`_
 
 - **Moving heads** (`sequencer/moving_heads/`) — template compiler, pre-planning gate, dark repositioning, frame encoder, XSQ export.
 - **Display** (`sequencer/display/`) — 24 effect handlers for RGB/pixel elements, composition engine.
-- **Curves** (`packages/twinklr/core/curves/`) — curve generation library (native + custom easing functions) used for smooth DMX value transitions.
+- **Curves** (`packages/twinklr/core/curves/`) — curve generation library (native + custom easing functions) used for the display's xLights value curves.
 - **XSQ format** (`packages/twinklr/core/formats/xlights/`) — native xLights `.xsq` file reader/writer with custom value curve support.
 
 ### Configuration System
