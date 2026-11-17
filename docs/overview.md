@@ -7,7 +7,7 @@ description: "What Twinklr is, how it works, and its major subsystems."
 
 Twinklr is an AI-powered choreography engine that transforms music into coordinated Christmas light shows. It analyzes audio, plans typed choreography intent using multi-agent LLM orchestration, and renders the result as native [xLights](https://xlights.org) sequence files (`.xsq`).
 
-The core design principle: **LLMs plan creative intent; deterministic code handles precision.** The AI selects templates and expresses typed categorical intensity, color, shutter, gobo, and lyric-cue intent. Deterministic renderers turn the plan into exact fixture channels, timing, curves, and DMX values. **Known regression:** the moving-head renderer does not yet render the planner's intensity, section colour, shutter and gobo events, lyric moment cues bound to events, and section transitions; it applies only the chosen template, preset and section bars. The single-renderer cutover lost these, and restoring them is planned work ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
+The core design principle: **LLMs plan creative intent; deterministic code handles precision.** The AI selects templates and expresses typed categorical song intent: intensity, colour from the song's palette, gobo, timed accents tied to musical and lyric moments, motif variation, movement density and section transitions. Deterministic renderers turn the plan into exact fixture channels, timing, curves, and DMX values. **Known regression:** the moving-head renderer does not yet render the planner's song intent; it applies only the chosen templates, presets and their bars. The single-renderer cutover lost these, and restoring them is planned work ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 
 ---
 
@@ -30,7 +30,7 @@ Twinklr currently supports:
   limit), 16-bit pan/tilt as coarse/fine byte pairs, and dark repositioning planned
   between cues. Every run loads seven families from
   `catalog/templates/moving_heads` (one of them, `zoom_wave`, a synthetic
-  pilot of a zoom axis) and offers the planner those the rig can render. The planner's song intent (intensity, section colour, shutter and gobo events, lyric moment cues bound to events, and section transitions) is not rendered yet: a known regression being fixed ([plan](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)). See
+  pilot of a zoom axis) and offers the planner those the rig can render. The planner's song intent (intensity, colour, gobo, timed accents including those bound to lyric moment cues, motif variation, density, and entry and exit transitions) is not rendered yet: a known regression being fixed ([plan](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)). See
   `packages/twinklr/core/sequencer/moving_heads/compile/step.py` and
   `packages/twinklr/core/sequencer/moving_heads/compile/preposition.py`.
 - **Display sequencer** — RGB/pixel effects for outline, tree, and other display elements (`packages/twinklr/core/sequencer/display/`).
@@ -116,8 +116,8 @@ _Source: `packages/twinklr/core/agents/`_
 
 Data-driven agent system using `AgentSpec` data objects and an async runner — no agent class hierarchies. The orchestration loop:
 
-1. **Planner** generates a schema-v2 `ChoreographyPlan` (template/preset plus typed categorical intensity, color, shutter, gobo, segmentation, and lyric MomentCue intent)
-2. **Heuristic validation** checks structural validity (fast, free)
+1. **Planner** generates a `ChoreographyPlan`: per song section, one to three templates (with presets) and the section's typed categorical song intent (intensity, colour, gobo, timed events tied to lyric MomentCues, motif variation, density, entry and exit transitions). Claude enforces its schema as a structured output
+2. **Normalisation and heuristic validation**: deterministic code repairs single items the song cannot hold (an unknown cue, an event outside its section), records each repair and shows it to the planner on the next revision; structural errors (a template not offered, sections beyond the song) send the plan back
 3. **Judge** scores the plan (0-10) and decides: approve, soft-fail (revise), or hard-fail (redo)
 4. Structured feedback and the judge's own prior verdict history loop back into the next iteration
 

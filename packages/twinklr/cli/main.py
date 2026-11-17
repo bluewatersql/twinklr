@@ -42,7 +42,7 @@ from twinklr.cli.template_cmd import (
     run_template_validate_command,
 )
 from twinklr.core.agents.providers.factory import validate_llm_provider_config
-from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, load_plan
 from twinklr.core.api.xlights import (
     GetModelsRequest,
     InjectionPartialError,
@@ -202,15 +202,19 @@ def _load_live_plan(
     recorded identity, if any.
 
     Raises:
-        ValueError: If the file or the sequence's record is unreadable, naming the file.
+        ValueError: If the file or the sequence's record is unreadable, naming the file,
+            or the record's plan is in the planner contract before 2026-11-17, saying to
+            re-inject.
     """
     record = _read_live_plans(path).get(str(sequence_path))
     if record is None:
         return None
     try:
-        return ChoreographyPlan.model_validate(record["plan"]), {
-            key: str(record[key]) for key in LIVE_PLAN_IDENTITY
-        }
+        plan = load_plan(
+            record["plan"],
+            remedy=f"run `twinklr inject` to re-plan the whole song into {sequence_path}",
+        )
+        return plan, {key: str(record[key]) for key in LIVE_PLAN_IDENTITY}
     except (KeyError, TypeError, ValidationError) as error:
         raise _unreadable_live_plans(
             path, f"invalid record for {sequence_path}: {error}"

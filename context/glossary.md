@@ -39,8 +39,15 @@ updated: 2026-11-17
   deterministic code resolves to precise values. The moving-head renderer does not yet
   render planner intensity: a known regression being fixed
   ([plan](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
-- **ChoreographyPlan** — the structured Pydantic plan the planner agent produces
-  (template + preset per song section).
+- **ChoreographyPlan** — the structured Pydantic plan the moving-head planner produces:
+  per song section, 1-3 parts (template + preset over bars) and the section's **song
+  intent** (intensity, colour, gobo, timed events tied to lyric moment cues, motif
+  variation, density, entry/exit transitions; null = as the template is authored). Not
+  rendered yet beyond the parts: a known regression being fixed.
+- **Plan repair** — deterministic normalisation that drops or adjusts one planned item
+  the song cannot hold (an unknown cue, an event outside its section) instead of
+  refusing the plan; recorded in the plan's `repairs`, the trace's `plan_repairs` and the
+  next refinement prompt.
 - **Judge** — the LLM agent scoring plans 0–10; the bar comes from
   `agent.success_threshold` (configured 0–100, converted once to the planners' 0–10).
 - **Prompt pack** — a versioned set of Jinja2 templates (system/user/developer) plus

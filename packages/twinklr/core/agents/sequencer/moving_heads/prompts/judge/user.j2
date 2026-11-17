@@ -56,6 +56,13 @@ V2 Migration: Uses iteration number from IterationContext
 {% for mp in macro_plan %}
 | {{ mp.section_id }} | {{ mp.energy_target }} | {{ mp.motion_density }} | {{ mp.choreography_style }} | {{ mp.palette_id | default('-') }} | {{ mp.motif_ids | join(', ') if mp.motif_ids else '-' }} |
 {% endfor %}
+
+**Section palettes** (what a palette-role colour stands for):
+{% for mp in macro_plan %}
+{% if mp.palette_colors is defined and mp.palette_colors %}
+- **{{ mp.section_id }}**: {% for stop in mp.palette_colors %}{{ stop.hex }}{% if stop.name %} {{ stop.name }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %} (`{{ mp.palette_id }}`)
+{% endif %}
+{% endfor %}
 {% endif %}
 
 ## Available Templates
@@ -114,7 +121,7 @@ Evaluate this choreography plan in two phases:
 ### Phase 1: Technical Validation
 
 First verify the plan is technically sound:
-1. **Completeness**: All required fields present, valid section structure
+1. **Completeness**: All required fields present, valid section structure (parts, event fields)
 2. **Timing**: Valid bar ranges, no overlaps, correct coverage
 3. **Templates**: All template IDs exist in the available templates list
 4. **Coverage**: Plan covers bars 1 through {{ total_bars }}
@@ -124,12 +131,12 @@ First verify the plan is technically sound:
 ### Phase 2: Creative Quality (if technically valid)
 
 Score the plan 0-10 across these dimensions:
-1. **Musical Synchronization** (25%): Does choreography match song energy and dynamics?
+1. **Musical Synchronization** (25%): Does choreography match song energy and dynamics? Are drops, hits and lyric moment cues marked with fitting accents?
 2. **Visual Interest** (20%): Appropriate variety? Avoids monotony?
-3. **Flow and Transitions** (15%): Smooth transitions between sections?
-4. **Creative Template Use** (15%): Templates used effectively and appropriately?
+3. **Flow and Transitions** (15%): Do section entries and exits suit their boundaries?
+4. **Creative Template and Song-Intent Use** (15%): Templates, intensity, colour, gobo, motif variation and density used with purpose?
 5. **Energy Arc** (10%): Energy builds appropriately across the song?
-6. **Macro Strategy Alignment** (15%): Do template selections honor macro plan energy targets, motion density, choreography style, and palette/motif guidance?
+6. **Macro Strategy Alignment** (15%): Do templates and song intent honor macro plan energy targets, motion density, choreography style, and palette/motif guidance?
 
 ### Decision
 

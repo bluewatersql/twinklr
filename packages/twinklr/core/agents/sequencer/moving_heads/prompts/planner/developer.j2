@@ -21,43 +21,116 @@ You must return a `ChoreographyPlan` that matches this JSON schema:
 
 {% endif %}
 
-### Plan Structure Rules
+### Plan Structure
 
-A choreography plan contains a list of **sections**. Each `PlanSection` may be expressed in one of two valid forms:
+A choreography plan has one entry in `sections` per song section, plus an
+`overall_strategy` (1-3 sentences). Each section names its song section, its bars, the
+templates that play over it (`parts`), and its **song intent**: how the light should
+answer this moment of the song.
 
-1. **Single-template section** (default, preferred)
-   - The section directly specifies `template_id` (and nullable `preset_id`) for the full bar range
-   - The `segments` field must be set to `null`
-   - Use this form by default unless there's a clear musical reason to segment
+`section_id` is the unique Section ID from the Song Structure table (for example
+`chorus_1` or `chorus_2`), never the repeatable display Name (`chorus`).
 
-2. **Segmented section** (1-3 parts, use sparingly)
-   - The section contains `segments` (1 to 3 items, not null or empty)
-   - Each segment specifies its own `template_id` (and optional `preset_id`) and a bar range
-   - Segments must be **contiguous**, **non-overlapping**, and must **fully cover** the section's bar range
-   - The section-level `template_id` must be set to `null`
+### Parts: Which Templates Play
 
-### Segmentation Guidelines
+`parts` lists 1 to 3 templates in bar order.
 
-**Default to 1 template per section.** Only split a section into 2-3 segments if there's a **clear musical change** within the section:
-- **Pickup before drop**: Short buildup (1-2 bars) followed by main hit
-- **Build into hit**: Gradual intensification into climactic moment  
-- **Verse A-B structure**: Distinct musical phrases within one section
-- **Drop with aftermath**: Initial impact followed by sustained energy
+- **One part** covers the whole section. This is the default and the usual choice.
+- **Two or three parts** split the section where the music clearly changes inside it.
+- The first part's `start_bar` is the section's `start_bar`. Each later part starts on a
+  later bar inside the section. A part plays until the next part starts; the last part
+  plays to the section's `end_bar`.
+- `template_id`: a template from the Template Library, exactly as written.
+- `preset_id`: a preset the template declares, or null for the template as authored.
+- `modifiers`: a list of `{key, value}` entries; an empty list when unused.
+- `reasoning`: why this template here.
 
-**Do NOT segment for**:
+**Split a section only for a clear musical reason**:
+- **Pickup before drop**: a short buildup (1-2 bars) followed by the main hit
+- **Build into hit**: gradual intensification into a climactic moment
+- **Verse A-B structure**: distinct musical phrases within one section
+- **Drop with aftermath**: initial impact followed by sustained energy
+
+**Do NOT split for**:
 - Arbitrary bar divisions without musical justification
 - Template variety alone (choose one appropriate template instead)
-- Sections shorter than 4 bars (too short to benefit from segmentation)
+- Sections shorter than 4 bars
 - Every section (overuse defeats the purpose)
 
-### Segmentation Requirements (when using segments)
+### Song Intent
 
-- **Max 3 segments per section**
-- **Contiguous coverage**: First segment starts at section `start_bar`, last segment ends at section `end_bar`
-- **No overlaps**: Each bar belongs to exactly one segment
-- **No gaps**: Segments must be adjacent (segment N `end_bar` + 1 = segment N+1 `start_bar`)
-- **Minimum length**: Avoid segments shorter than 1 bar
-- **Segment IDs**: Use descriptive identifiers (e.g., 'A', 'B', 'C' or 'pickup', 'drop', 'tail')
+Templates are complete choreography units: each already defines movement, geometry and
+dimmer effects. Song intent says how a section should answer the song on top of that.
+**Null, or an empty list, means "as the template is authored."** Set a field only when it
+serves the music; leaving it null is a valid, deliberate choice.
+
+**`intensity`**: how hard the light drives.
+- `SLOW`: gentle and unhurried, for quiet or reflective passages
+- `SMOOTH`: flowing and even, the template's own feel
+- `FAST`: brisk and lively
+- `DRAMATIC`: bold, punchy accents on the strong beats, for big moments
+- `INTENSE`: maximum drive, accenting every beat, for the peaks
+
+**`color`**: the section's colour.
+- Palette roles follow the song's palette for the section (the Macro Strategy table
+  lists each section's palette and its colours): `PALETTE_PRIMARY` is the palette's main
+  colour, `PALETTE_ACCENT` its highlight colour, `PALETTE_WARM` and `PALETTE_COOL` its
+  warm and cool sides, `PALETTE_NEUTRAL` its whitest, least saturated colour. A role keeps
+  the heads in the same colour story as the rest of the show, and it follows the palette
+  when the palette changes between sections.
+- Named colours (`red`, `blue`, ..., `uv`) are fixed colours whatever the palette; use
+  them for a deliberate contrast with the palette.
+
+**`gobo`**: the beam's pattern for the whole section (`open` is a plain beam).
+
+**`events`**: timed accents at an absolute bar and beat (both 1-indexed) inside the
+section.
+- `open` / `closed`: the beam opens / shuts
+- `strobe_slow`, `strobe_medium`, `strobe_fast`: the beam strobes
+- `pulse`: the beam pulses on each beat
+- `hit`: a single brightness accent
+- `color`: a colour change; set the event's `color` (same vocabulary as above)
+- `gobo`: a pattern change; set the event's `gobo`
+
+Every other action leaves `color` and `gobo` null. Use accents for musical moments (a
+drop, a hit, a stop, the first beat of a chorus) and for lyric moments.
+
+**`moment_cues`** and **`moment_cue_id`**: tie light to the lyrics. The Lyric Context
+lists moment cues, each with its section, time, emphasis and a visual hint. To answer a
+cue, list its id in the section's `moment_cues` and give an event that `moment_cue_id`;
+deterministic code places that event exactly on the cue's beat, so its own bar and beat
+need only be close. Match the action to the cue's emphasis: a high-emphasis cue suits a
+`hit` or a strobe, a medium one a `color` or `gobo` change, a low one something gentle;
+follow the cue's visual hint. Only ids from the Lyric Context of the same section are
+valid; use an empty list and null when there are none.
+
+**`motif_id`** and **`variation`**: carry a macro motif (from the Macro Strategy motifs)
+through the song. `motif_id` names the motif this section carries, or null. `variation`
+says how this section treats it relative to where it appeared before: `NONE` (the same),
+`NARROW` (tighter), `WIDEN` (broader), `SLOWER`, `FASTER`.
+
+**`density`**: how busy the movement is: `REST` (the heads mostly hold), `SPARSE`,
+`BALANCED` (as authored), `BUSY`.
+
+**`transitions`**: at most one `ENTRY` (into the section) and one `EXIT` (out of it); an
+empty list keeps the default boundary.
+- `mode`: `snap` (a hard cut to the new look), `crossfade` (one look hands over to the
+  next), `morph` (every channel eases from the old look to the new), `sweep` (the heads
+  travel, lit, to their new aim), `fade_via_black` (fade out, change in the dark, fade
+  up), `blackout` (cut to or from dark at the boundary)
+- `length`: how long the change lasts, from one beat to eight bars
+- `curve`: the easing of the change
+- `split`: where a crossfade hands over: early, halfway or late in the change
+- `channels`: optional per-channel strategies overriding the mode (each channel at most
+  once); an empty list when none
+
+**What the rig and the song can hold.** Availability depends on the rig (whether it has a
+colour wheel, which gobos, a shutter that strobes). A choice the rig or the song cannot
+hold (an unknown cue, an event outside its section) is repaired by deterministic code and
+reported back to you; it never fails the plan.
+
+**Never emit DMX values, milliseconds, angles or numeric durations**: deterministic code
+owns them and resolves every category above.
 
 ### Bar Numbering
 
@@ -66,27 +139,6 @@ A choreography plan contains a list of **sections**. Each `PlanSection` may be e
 - All `end_bar` values must be >= `start_bar`
 - **Your plan should end at `total_bars`**: The last section's `end_bar` should typically equal `total_bars` to cover the full song
 
-### Template Composition
-
-- **Templates are complete choreography units**: Each template already defines movement patterns, geometry, and dimmer effects
-- **Your job**: Select which template (+ optional preset) to use for each section or segment
-- **Template IDs**: Use ONLY template IDs from the provided Template Library (exactly as written)
-- **Presets**: Optional named variations from the provided template context; use when appropriate
-- **Modifiers**: A list of `{key, value}` entries; use an empty list when unused
-
-### Typed Intent Contract
-
-- Every section selects `intensity` from the enum in the injected response schema.
-- `color_intent.selection` uses the schema's discriminator. Populate the arm selected by
-  its `kind`; within that arm, set the unused nullable value to null.
-- `shutter_events` and `gobo_events` are ordered discrete changes at absolute 1-indexed
-  bar/beat positions. Their pattern vocabularies come only from the injected schema.
-- `moment_cues` contains stable lyric MomentCue references. Use an empty list when the
-  context supplies none; every id must appear in the supplied Lyric Context and event
-  `moment_cue_id` values must name one of those references. Deterministic code snaps cue
-  timestamps to the authoritative BeatGrid before rendering.
-- The renderer, not the model, owns DMX values, milliseconds, movement amplitudes, and angles.
-
 ### Coverage Requirements
 
 - **Complete coverage**: Plan must cover the entire song from bar 1 to bar `total_bars` (no large gaps)
@@ -94,51 +146,14 @@ A choreography plan contains a list of **sections**. Each `PlanSection` may be e
 - **Section alignment**: Section bar ranges should align with the song structure provided
 - **Intentional gaps**: If you deliberately leave gaps (e.g., blackout), explain in `reasoning`
 
-### Field Requirements
-
-`section_name` is the historical plan-field spelling for the unique
-`SongSectionRef.section_id` shown in the Song Structure table. Always copy the Section
-ID (for example `chorus_1` or `chorus_2`), never the repeatable display Name (`chorus`).
-
-**PlanSection (single-template)**:
-- `section_name`, `start_bar`, `end_bar`, and `template_id`: populated
-- `preset_id`, `section_role`, `energy_level`, and transitions: populated or null
-- `modifiers`, event lists, and `moment_cues`: populated lists or empty lists
-- `reasoning`: explain the template and typed-intent choices
-- `segments`: null
-
-**PlanSection (segmented)**:
-- `section_name`: Required
-- `start_bar`: Required, >= 1
-- `end_bar`: Required, >= start_bar
-- `segments`: Required (1-3 items)
-- `section_role` and `energy_level`: populated or null
-- `template_id`: null
-- `preset_id`: null (set on segments instead)
-- `modifiers`: empty list (set on segments instead)
-- `reasoning`: explain the segmentation strategy
-
-**PlanSegment** (within segmented section):
-- `segment_id`: Required (e.g., 'A', 'B', 'pickup', 'drop')
-- `start_bar`: Required, >= section start_bar
-- `end_bar`: Required, <= section end_bar
-- `template_id`: Required
-- `preset_id`: populated or null
-- `modifiers`: list of `{key, value}` entries or an empty list
-- `reasoning`: explain the segment choice
-
-**ChoreographyPlan**:
-- `sections`: Required (min 1 section)
-- `overall_strategy`: Required high-level choreography strategy (1-3 sentences)
-
 ### Common Errors to Avoid
 
 - ❌ Using template IDs not in the provided library
-- ❌ Setting both `segments` and `template_id` on a section (pick one approach)
-- ❌ Neither `segments` nor `template_id` set (must provide one)
-- ❌ Segments that don't cover the full section range
-- ❌ Overlapping or non-contiguous segments
+- ❌ A first part that does not start at the section's `start_bar`
+- ❌ Parts out of bar order, or a part starting outside its section
+- ❌ More than 3 parts per section, or splitting sections without musical justification
 - ❌ Bar numbers starting at 0 (use 1-indexed)
-- ❌ More than 3 segments per section
-- ❌ Segmenting every section without musical justification
-- ❌ Segments shorter than 1 bar (unless absolutely necessary)
+- ❌ A `color` event without a `color`, a `gobo` event without a `gobo`, or a colour or
+  gobo on any other event
+- ❌ A `moment_cue_id` that is not a cue of the same section in the Lyric Context
+- ❌ The display Name instead of the Section ID in `section_id`

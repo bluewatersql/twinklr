@@ -2,13 +2,13 @@
 
 import pytest
 
+from tests.support.moving_heads import plan_section
 from twinklr.core.agents.sequencer.moving_heads.heuristic_validator import (
     HeuristicValidationResult,
     HeuristicValidator,
 )
 from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
-    PlanSection,
 )
 
 
@@ -51,14 +51,7 @@ def test_validate_simple_valid_plan(available_templates, song_structure):
     )
 
     plan = ChoreographyPlan(
-        sections=[
-            PlanSection(
-                section_name="intro",
-                start_bar=1,
-                end_bar=8,
-                template_id="sweep_lr_fan_pulse",
-            )
-        ]
+        sections=[plan_section("intro", 1, 8, "sweep_lr_fan_pulse")], overall_strategy=""
     )
 
     result = validator.validate(plan)
@@ -75,14 +68,7 @@ def test_validate_missing_template(available_templates, song_structure):
     )
 
     plan = ChoreographyPlan(
-        sections=[
-            PlanSection(
-                section_name="intro",
-                start_bar=1,
-                end_bar=8,
-                template_id="nonexistent_template",  # Not in library
-            )
-        ]
+        sections=[plan_section("intro", 1, 8, "nonexistent_template")], overall_strategy=""
     )
 
     result = validator.validate(plan)
@@ -101,14 +87,7 @@ def test_validate_empty_sections():
 
     # Test a valid minimal plan with one section
     plan = ChoreographyPlan(
-        sections=[
-            PlanSection(
-                section_name="intro",
-                start_bar=1,
-                end_bar=8,
-                template_id="template1",
-            )
-        ]
+        sections=[plan_section("intro", 1, 8, "template1")], overall_strategy=""
     )
 
     result = validator.validate(plan)
@@ -125,14 +104,7 @@ def test_validate_section_timing_mismatch(available_templates, song_structure):
     )
 
     plan = ChoreographyPlan(
-        sections=[
-            PlanSection(
-                section_name="intro",
-                start_bar=1,
-                end_bar=12,  # Should be 8 per song structure
-                template_id="sweep_lr_fan_pulse",
-            )
-        ]
+        sections=[plan_section("intro", 1, 12, "sweep_lr_fan_pulse")], overall_strategy=""
     )
 
     result = validator.validate(plan)
@@ -150,12 +122,7 @@ def test_validate_negative_timing():
 
     # This should fail Pydantic validation before reaching heuristic validator
     with pytest.raises(Exception):  # noqa: B017
-        PlanSection(
-            section_name="intro",
-            start_bar=8,
-            end_bar=1,  # End before start
-            template_id="template1",
-        )
+        plan_section("intro", 8, 1, "template1")
 
 
 def test_validate_incomplete_coverage(available_templates, song_structure):
@@ -167,14 +134,7 @@ def test_validate_incomplete_coverage(available_templates, song_structure):
 
     # Only covers intro, missing verse and chorus
     plan = ChoreographyPlan(
-        sections=[
-            PlanSection(
-                section_name="intro",
-                start_bar=1,
-                end_bar=8,
-                template_id="sweep_lr_fan_pulse",
-            )
-        ]
+        sections=[plan_section("intro", 1, 8, "sweep_lr_fan_pulse")], overall_strategy=""
     )
 
     result = validator.validate(plan)
@@ -199,14 +159,7 @@ def test_validate_result_structure():
     )
 
     plan = ChoreographyPlan(
-        sections=[
-            PlanSection(
-                section_name="intro",
-                start_bar=1,
-                end_bar=8,
-                template_id="template1",
-            )
-        ]
+        sections=[plan_section("intro", 1, 8, "template1")], overall_strategy=""
     )
 
     result = validator.validate(plan)
@@ -226,14 +179,7 @@ def test_validate_multiple_errors(available_templates, song_structure):
     )
 
     plan = ChoreographyPlan(
-        sections=[
-            PlanSection(
-                section_name="unknown_section",  # Not in song structure
-                start_bar=1,
-                end_bar=8,
-                template_id="invalid_template",  # Not in library
-            )
-        ]
+        sections=[plan_section("unknown_section", 1, 8, "invalid_template")], overall_strategy=""
     )
 
     result = validator.validate(plan)
@@ -252,14 +198,7 @@ def test_validate_template_exists(available_templates, song_structure):
     )
 
     plan = ChoreographyPlan(
-        sections=[
-            PlanSection(
-                section_name="intro",
-                start_bar=1,
-                end_bar=8,
-                template_id="sweep_lr_fan_pulse",
-            )
-        ]
+        sections=[plan_section("intro", 1, 8, "sweep_lr_fan_pulse")], overall_strategy=""
     )
 
     result = validator.validate(plan)
@@ -269,38 +208,64 @@ def test_validate_template_exists(available_templates, song_structure):
     assert len(result.errors) == 0
 
 
-def test_validate_segments_null_accepted(available_templates, song_structure):
-    """Test that segments: null is accepted as equivalent to omitting segments."""
+def _two_parts(second_template: str):
+    return plan_section(
+        "intro",
+        1,
+        8,
+        "sweep_lr_fan_pulse",
+        parts=[
+            {
+                "start_bar": 1,
+                "template_id": "sweep_lr_fan_pulse",
+                "preset_id": None,
+                "modifiers": [],
+                "reasoning": "",
+            },
+            {
+                "start_bar": 5,
+                "template_id": second_template,
+                "preset_id": None,
+                "modifiers": [],
+                "reasoning": "",
+            },
+        ],
+    )
+
+
+def test_every_part_must_name_an_offered_template(available_templates, song_structure):
+    """Each part is checked against the library and located by its derived id."""
     validator = HeuristicValidator(
         available_templates=available_templates,
         song_structure=song_structure,
     )
 
-    # Create a plan with segments explicitly set to None (null in JSON)
+    good = validator.validate(
+        ChoreographyPlan(sections=[_two_parts("circle_fan_hold")], overall_strategy="")
+    )
+    bad = validator.validate(
+        ChoreographyPlan(sections=[_two_parts("not_offered")], overall_strategy="")
+    )
+
+    assert good.valid and good.errors == []
+    assert not bad.valid
+    assert bad.errors == ["Section 'intro|B': template 'not_offered' not in library"]
+
+
+def test_parts_are_units_for_cross_section_overlap(available_templates, song_structure):
+    """A section overlapping a later part of another section is named by that part."""
+    validator = HeuristicValidator(
+        available_templates=available_templates,
+        song_structure=song_structure,
+    )
     plan = ChoreographyPlan(
-        sections=[
-            PlanSection(
-                section_name="intro",
-                start_bar=1,
-                end_bar=8,
-                template_id="sweep_lr_fan_pulse",
-                segments=None,  # Explicitly set to None (null in JSON)
-            ),
-            PlanSection(
-                section_name="verse",
-                start_bar=9,
-                end_bar=24,
-                template_id="circle_fan_hold",
-                segments=None,  # Explicitly set to None
-            ),
-        ]
+        sections=[_two_parts("circle_fan_hold"), plan_section("verse", 8, 24, "circle_fan_hold")],
+        overall_strategy="",
     )
 
     result = validator.validate(plan)
 
-    # Should be valid - segments: null is treated the same as omitting segments
-    assert result.valid is True
-    assert len(result.errors) == 0
+    assert any("'intro|B' (5-8) overlaps 'verse' (8-24)" in error for error in result.errors)
 
 
 # =============================================================================
@@ -421,14 +386,7 @@ class TestHeuristicValidatorV2:
         validator = HeuristicValidator.from_context(planning_context)
 
         plan = ChoreographyPlan(
-            sections=[
-                PlanSection(
-                    section_name="intro",
-                    start_bar=1,
-                    end_bar=15,
-                    template_id="sweep_lr_fan_pulse",
-                )
-            ]
+            sections=[plan_section("intro", 1, 15, "sweep_lr_fan_pulse")], overall_strategy=""
         )
 
         result = validator.validate(plan)
@@ -441,14 +399,7 @@ class TestHeuristicValidatorV2:
         validator = HeuristicValidator.from_context(planning_context)
 
         plan = ChoreographyPlan(
-            sections=[
-                PlanSection(
-                    section_name="intro",
-                    start_bar=1,
-                    end_bar=15,
-                    template_id="nonexistent_template",
-                )
-            ]
+            sections=[plan_section("intro", 1, 15, "nonexistent_template")], overall_strategy=""
         )
 
         result = validator.validate(plan)
@@ -477,14 +428,7 @@ class TestHeuristicValidatorV2:
 
         # Valid plan
         valid_plan = ChoreographyPlan(
-            sections=[
-                PlanSection(
-                    section_name="intro",
-                    start_bar=1,
-                    end_bar=15,
-                    template_id="sweep_lr_fan_pulse",
-                )
-            ]
+            sections=[plan_section("intro", 1, 15, "sweep_lr_fan_pulse")], overall_strategy=""
         )
 
         errors = validator_fn(valid_plan)
@@ -502,14 +446,7 @@ class TestHeuristicValidatorV2:
 
         # Invalid plan with unknown template
         invalid_plan = ChoreographyPlan(
-            sections=[
-                PlanSection(
-                    section_name="intro",
-                    start_bar=1,
-                    end_bar=15,
-                    template_id="invalid_template_xyz",
-                )
-            ]
+            sections=[plan_section("intro", 1, 15, "invalid_template_xyz")], overall_strategy=""
         )
 
         errors = validator_fn(invalid_plan)

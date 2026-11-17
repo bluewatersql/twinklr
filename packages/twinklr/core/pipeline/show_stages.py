@@ -64,8 +64,8 @@ class CombinedShowRenderStage:
         record and frame runs the export traces and budgets, and the record `twinklr
         show` adds to the plan checkpoint once the export is written
         (`checkpoint_record`), for `eval-report` to re-render. The macro palette and
-        focal role are not projected onto the plan, since the renderer applies no planner
-        intensity or colour; the render record says so per section.
+        focal role are not projected onto the moving heads yet (a known regression the
+        song-intent rendering plan fixes); the render record says so per section.
         """
 
         from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
@@ -193,7 +193,9 @@ class CombinedShowRenderStage:
                 message=(
                     f"section {section.section.section_id!r}: the show's macro palette and "
                     "focal role (colour and intensity) are not projected onto the moving "
-                    "heads; the renderer does not apply planner intent"
+                    "heads yet, a known regression being fixed under "
+                    "changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md; the "
+                    "heads render their templates as authored"
                 ),
                 section_id=section.section.section_id,
                 action="unchanged",

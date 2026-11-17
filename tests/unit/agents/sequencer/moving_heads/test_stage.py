@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from tests.support.moving_heads import plan_section
 from twinklr.core.agents.audio.profile.models import (
     AudioProfileModel,
     Contrast,
@@ -127,7 +128,7 @@ def test_regenerate_rejects_ambiguous_display_name() -> None:
 
 
 def _section(name: str, start: int, end: int, template_id: str = "t") -> PlanSection:
-    return PlanSection(section_name=name, start_bar=start, end_bar=end, template_id=template_id)
+    return plan_section(name, start, end, template_id)
 
 
 def test_regenerate_with_a_base_plan_replaces_only_the_named_section_in_place() -> None:
@@ -153,15 +154,49 @@ def test_regenerate_with_a_base_plan_replaces_only_the_named_section_in_place() 
         is replan
     )
     # A section the injected plan left out goes in bar order.
-    bridge = ChoreographyPlan(sections=[_section("bridge", 17, 20)])
+    bridge = ChoreographyPlan(sections=[_section("bridge", 17, 20)], overall_strategy="")
     regenerated = MovingHeadStage(
         fixture_count=4, available_templates=["t"], section_id="bridge"
     )._with_base_plan(bridge, context)
-    assert [s.section_name for s in regenerated.sections] == [
+    assert [s.section_id for s in regenerated.sections] == [
         "intro",
         "chorus_1",
         "bridge",
         "outro",
+    ]
+
+
+def test_regenerate_keeps_the_kept_sections_repairs_and_the_replans_own() -> None:
+    """Repairs travel with the plan: the regenerated section's come from its re-plan,
+    every other section keeps those its injected plan recorded."""
+    from twinklr.core.agents.sequencer.moving_heads.models import PlanRepair, RepairAction
+
+    def repair(section_id: str, item: str) -> PlanRepair:
+        return PlanRepair(
+            section_id=section_id, item=item, action=RepairAction.DROPPED, reason="test"
+        )
+
+    base = ChoreographyPlan(
+        sections=[_section("intro", 1, 8), _section("chorus_1", 9, 16)],
+        overall_strategy="base",
+        repairs=[repair("intro", "kept"), repair("chorus_1", "replaced")],
+    )
+    replan = ChoreographyPlan(
+        sections=[_section("chorus_1", 9, 16, "new")],
+        overall_strategy="x",
+        repairs=[repair("chorus_1", "new")],
+    )
+    context = MagicMock()
+    context.get_state.side_effect = lambda key, default=None: (
+        base if key == "regeneration_base_plan" else default
+    )
+    stage = MovingHeadStage(fixture_count=4, available_templates=["t"], section_id="chorus_1")
+
+    plan = stage._with_base_plan(replan, context)
+
+    assert [(r.section_id, r.item) for r in plan.repairs] == [
+        ("intro", "kept"),
+        ("chorus_1", "new"),
     ]
 
 
@@ -180,7 +215,8 @@ def test_regenerate_with_a_base_plan_refuses_a_replan_that_breaks_the_song(
     """A re-plan merged into the injected plan must be one section, the named one, over
     the bars it had; a section the base lacks must fit between the kept ones."""
     base = ChoreographyPlan(
-        sections=[_section("intro", 1, 8), _section("chorus_1", 9, 16), _section("outro", 21, 24)]
+        sections=[_section("intro", 1, 8), _section("chorus_1", 9, 16), _section("outro", 21, 24)],
+        overall_strategy="",
     )
     context = MagicMock()
     context.get_state.side_effect = lambda key, default=None: (
@@ -189,7 +225,7 @@ def test_regenerate_with_a_base_plan_refuses_a_replan_that_breaks_the_song(
     stage = MovingHeadStage(fixture_count=4, available_templates=["t"], section_id=section_id)
 
     with pytest.raises(ValueError, match=message):
-        stage._with_base_plan(ChoreographyPlan(sections=replan), context)
+        stage._with_base_plan(ChoreographyPlan(sections=replan, overall_strategy=""), context)
 
 
 def _admission(**presets: tuple[str, ...]) -> Any:
@@ -214,13 +250,7 @@ def _admission(**presets: tuple[str, ...]) -> Any:
             "names template 'sweep_lr_fan_pulse', which this run's pre-planning check",
         ),
         (
-            PlanSection(
-                section_name="intro",
-                start_bar=1,
-                end_bar=8,
-                template_id="circle_fan_hold",
-                preset_id="narrow",
-            ),
+            plan_section("intro", 1, 8, "circle_fan_hold", "narrow"),
             _admission(circle_fan_hold=("wide",)),
             "names preset 'narrow' of template 'circle_fan_hold'",
         ),
@@ -232,14 +262,18 @@ def test_regenerate_refuses_a_base_plan_this_run_cannot_render_as_recorded(
     """A kept section whose template or named preset this run's gate did not admit (the
     rig, job or templates changed) would render differently from what was injected. The
     regenerated section's own choice does not matter: it is re-planned."""
-    base = ChoreographyPlan(sections=[kept, _section("chorus_1", 9, 16, "gone")])
+    base = ChoreographyPlan(
+        sections=[kept, _section("chorus_1", 9, 16, "gone")], overall_strategy=""
+    )
 
     with pytest.raises(ValueError, match="run `twinklr inject`") as refused:
         check_regeneration_base(base, "chorus_1", admission)
 
     assert message in str(refused.value)
     # Admitted with its preset, the kept section passes; "gone" is never consulted.
-    check_regeneration_base(base, "chorus_1", _admission(**{kept.template_id or "": ("narrow",)}))
+    check_regeneration_base(
+        base, "chorus_1", _admission(**{kept.parts[0].template_id: ("narrow",)})
+    )
 
 
 def create_mock_beat_grid() -> MagicMock:
@@ -388,14 +422,7 @@ class TestMovingHeadStageExecute:
         mock_result = IterationResult(
             success=True,
             plan=ChoreographyPlan(
-                sections=[
-                    PlanSection(
-                        section_name="intro",
-                        start_bar=1,
-                        end_bar=8,
-                        template_id="sweep_lr_fan_pulse",
-                    )
-                ],
+                sections=[plan_section("intro", 1, 8, "sweep_lr_fan_pulse")],
                 overall_strategy="Test",
             ),
             context=IterationContext(
@@ -521,14 +548,7 @@ class TestMovingHeadStageStateHandler:
         mock_context = MagicMock()
         mock_context.output_dir = None  # checkpoint writing is exercised separately below
         plan = ChoreographyPlan(
-            sections=[
-                PlanSection(
-                    section_name="intro",
-                    start_bar=1,
-                    end_bar=8,
-                    template_id="template1",
-                )
-            ],
+            sections=[plan_section("intro", 1, 8, "template1")],
             overall_strategy="Test",
         )
         result = IterationResult(
@@ -548,14 +568,7 @@ class TestMovingHeadStageStateHandler:
         result = {
             "success": True,
             "plan": {
-                "sections": [
-                    {
-                        "section_name": "intro",
-                        "start_bar": 1,
-                        "end_bar": 8,
-                        "template_id": "template1",
-                    }
-                ],
+                "sections": [plan_section("intro", 1, 8, "template1").model_dump(mode="json")],
                 "overall_strategy": "Test",
             },
             "context": {
@@ -603,14 +616,7 @@ class TestMovingHeadStageCheckpointWriter:
     def _dict_result(self) -> dict:
         return {
             "plan": {
-                "sections": [
-                    {
-                        "section_name": "intro",
-                        "start_bar": 1,
-                        "end_bar": 8,
-                        "template_id": "template1",
-                    }
-                ],
+                "sections": [plan_section("intro", 1, 8, "template1").model_dump(mode="json")],
                 "overall_strategy": "Test",
             }
         }
@@ -637,7 +643,7 @@ class TestMovingHeadStageCheckpointWriter:
 
         assert isinstance(plan, ChoreographyPlan)
         assert len(plan.sections) == 1
-        assert plan.sections[0].section_name == "intro"
+        assert plan.sections[0].section_id == "intro"
 
     def test_checkpoint_uses_current_plan_schema(self, stage: MovingHeadStage, tmp_path) -> None:
         """No `templates:[...]` list-shaped entry — the schema-drift trap."""
@@ -649,9 +655,7 @@ class TestMovingHeadStageCheckpointWriter:
 
         for section in written["plan"]["sections"]:
             assert "templates" not in section
-            has_template_id = bool(section.get("template_id"))
-            has_segments = bool(section.get("segments"))
-            assert has_template_id != has_segments  # exactly one of the two
+            assert [part["template_id"] for part in section["parts"]] == ["template1"]
 
     def test_checkpoint_holds_the_run_and_the_plan(self, stage: MovingHeadStage, tmp_path) -> None:
         """The planning stage writes the run id and the plan; the render stage adds the
@@ -712,18 +716,8 @@ class TestMovingHeadStageMetricsHandler:
         mock_context = MagicMock()
         plan = ChoreographyPlan(
             sections=[
-                PlanSection(
-                    section_name="intro",
-                    start_bar=1,
-                    end_bar=8,
-                    template_id="template1",
-                ),
-                PlanSection(
-                    section_name="verse",
-                    start_bar=9,
-                    end_bar=24,
-                    template_id="template1",
-                ),
+                plan_section("intro", 1, 8, "template1"),
+                plan_section("verse", 9, 24, "template1"),
             ],
             overall_strategy="Test",
         )
@@ -762,14 +756,7 @@ class TestMovingHeadStageMetricsHandler:
         result = {
             "success": True,
             "plan": {
-                "sections": [
-                    {
-                        "section_name": "intro",
-                        "start_bar": 1,
-                        "end_bar": 8,
-                        "template_id": "t1",
-                    }
-                ],
+                "sections": [plan_section("intro", 1, 8, "t1").model_dump(mode="json")],
                 "overall_strategy": "Test",
             },
             "context": {

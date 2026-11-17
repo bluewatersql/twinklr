@@ -417,7 +417,7 @@ class MovingHeadStage:
         base = self._base_plan(context)
         if self.section_id is None or base is None:
             return plan
-        others = sorted({s.section_name for s in plan.sections} - {self.section_id})
+        others = sorted({s.section_id for s in plan.sections} - {self.section_id})
         if others:
             raise ValueError(
                 f"the re-plan of section {self.section_id!r} also names {others}; "
@@ -430,7 +430,7 @@ class MovingHeadStage:
             )
         (replanned,) = plan.sections
         bars = f"bars {replanned.start_bar}-{replanned.end_bar}"
-        names = [section.section_name for section in base.sections]
+        names = [section.section_id for section in base.sections]
         if self.section_id in names:
             at = names.index(self.section_id)
             recorded = base.sections[at]
@@ -444,17 +444,25 @@ class MovingHeadStage:
                 (i for i, s in enumerate(base.sections) if s.start_bar > replanned.start_bar),
                 len(base.sections),
             )
-        kept = [s for s in base.sections if s.section_name != self.section_id]
+        kept = [s for s in base.sections if s.section_id != self.section_id]
         for section in kept:
             if section.start_bar <= replanned.end_bar and replanned.start_bar <= section.end_bar:
                 raise ValueError(
                     f"the re-plan of section {self.section_id!r} ({bars}) overlaps "
-                    f"{section.section_name!r} (bars {section.start_bar}-{section.end_bar}) "
+                    f"{section.section_id!r} (bars {section.start_bar}-{section.end_bar}) "
                     "of the injected plan"
                 )
-        before = [s for s in base.sections[:at] if s.section_name != self.section_id]
-        after = [s for s in base.sections[at:] if s.section_name != self.section_id]
-        return base.model_copy(update={"sections": [*before, replanned, *after]})
+        before = [s for s in base.sections[:at] if s.section_id != self.section_id]
+        after = [s for s in base.sections[at:] if s.section_id != self.section_id]
+        return base.model_copy(
+            update={
+                "sections": [*before, replanned, *after],
+                "repairs": [
+                    *(r for r in base.repairs if r.section_id != self.section_id),
+                    *plan.repairs,
+                ],
+            }
+        )
 
     @staticmethod
     def _base_plan(context: PipelineContext) -> ChoreographyPlan | None:
@@ -467,11 +475,8 @@ class MovingHeadStage:
         return base if isinstance(base, _ChoreographyPlan) else None
 
     def _write_checkpoint(self, plan: ChoreographyPlan, context: PipelineContext) -> None:
-        """Serialize today's plan for `twinklr eval-report` (P1P-T10).
-
-        Historical checkpoints used a `templates:[...]` list shape that today's
-        `PlanSection` model no longer has; this writes `plan.model_dump()` directly,
-        which is exactly what `collect.extract_plan` already validates against.
+        """Serialize the plan for `twinklr eval-report` (P1P-T10): `plan.model_dump()`,
+        which `collect.extract_plan` reads back (`load_plan`).
         """
         if not context.job_config.write_checkpoint or context.output_dir is None:
             return
@@ -549,26 +554,21 @@ def check_regeneration_base(
 
     problems: list[str] = []
     for section in base.sections:
-        if section.section_name == section_id:
+        if section.section_id == section_id:
             continue
-        choices: list[tuple[str | None, str | None]] = (
-            [(segment.template_id, segment.preset_id) for segment in section.segments]
-            if section.segments
-            else [(section.template_id, section.preset_id)]
-        )
-        for template_id, preset_id in choices:
-            if template_id is None:
-                continue
-            resolved = canonical(template_id)
+        for part in section.parts:
+            resolved = canonical(part.template_id)
             if resolved not in admission.admitted:
                 problems.append(
-                    f"section {section.section_name!r} names template {template_id!r}, "
+                    f"section {section.section_id!r} names template {part.template_id!r}, "
                     "which this run's pre-planning check did not admit on this rig and song"
                 )
-            elif preset_id and preset_id not in admission.admitted_presets.get(resolved, ()):
+            elif part.preset_id and part.preset_id not in admission.admitted_presets.get(
+                resolved, ()
+            ):
                 problems.append(
-                    f"section {section.section_name!r} names preset {preset_id!r} of "
-                    f"template {template_id!r}, which this run's pre-planning check did "
+                    f"section {section.section_id!r} names preset {part.preset_id!r} of "
+                    f"template {part.template_id!r}, which this run's pre-planning check did "
                     "not admit"
                 )
     if problems:

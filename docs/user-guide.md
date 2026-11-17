@@ -850,7 +850,8 @@ it, which has not been verified against a running xLights.
   `twinklr inject` runs again for that sequence.
   An unreadable `.twinklr-live-plans.json` is named with what to do (delete it, then
   `inject`); an `inject` that cannot record its plan reports the injection complete and
-  the plan unrecorded.
+  the plan unrecorded. A plan recorded before the planner contract of 2026-11-17 is
+  refused by name: run `twinklr inject` to re-plan the song.
 - **Interrupted runs.** Before its first write a command records, in the ownership
   manifest, every effect it may place (the ones Twinklr owns that it found in the
   sequence and the ones it is about to add), and any interruption it survives (an
@@ -882,16 +883,19 @@ The `twinklr run` command executes the moving heads pipeline with these stages:
 3. **Audio Profiling** (`profile`) — LLM generates musical interpretation and creative guidance from the analysis.
 4. **Lyrics Analysis** (`lyrics`) — conditional stage; runs only if lyrics are detected. Produces narrative and thematic context.
 5. **Macro Planning** (`macro`) — LLM generates a high-level choreography strategy across all display groups.
-6. **Moving Head Planning** (`moving_heads`) — multi-agent loop (planner -> deterministic heuristics -> judge) generates a `ChoreographyPlan` with template selections and parameters per section.
+6. **Moving Head Planning** (`moving_heads`) — multi-agent loop (planner -> deterministic heuristics -> judge) generates a `ChoreographyPlan`: per song section, one to three templates (each with a preset or none) over its bars, and the section's song intent (intensity, colour from the song's palette or a named colour, gobo, timed accents such as strobes, hits and colour or gobo changes tied to the lyrics' moment cues, motif variation, movement density, and entry and exit transitions; null means as the template is authored). A single item the song cannot hold (an unknown lyric cue, an event outside its section) is repaired rather than refused: the repair is recorded in the trace (`plan_repairs`, and in the `eval-report`) and shown to the planner on its next revision. A plan that is structurally wrong (a template not offered, a section beyond the song) goes back to the planner.
 7. **Rendering** (`render`) — compiles the plan's templates against each fixture's profile into complete 20 ms frames, plans dark repositioning between cues, then writes the delivery: a fresh `.xsq`, one `.xtiming` per timing track, and an `.xmap`.
 
 **Known regression: the moving-head render does not yet carry the song.** The renderer
-applies the template, preset and bars each section names. It does not yet render the
-planner's intensity, section colour, shutter and gobo events, lyric moment cues bound to
-events, or section transitions, and `twinklr show` does not yet project the macro palette
-or focal role onto the heads; the trace's diagnostics say so per section. The
-renderer Twinklr used before the single-renderer cutover rendered these; the cutover lost
-them, and rendering all of them on the current renderer is planned work
+applies the templates, presets and bars each section names. It does not yet render the
+planner's song intent (intensity, colour, gobo, timed accents and the lyric moment cues
+they land on, motif variation, density, entry and exit transitions), and `twinklr show`
+does not yet project the macro palette or focal role onto the heads; the trace's
+diagnostics name, per section, the intent fields it set that are not rendered. The
+renderer Twinklr used before the single-renderer cutover rendered intensity, section
+colour, shutter and gobo events (cue-bound ones included) and entry transitions; the
+cutover lost them, and rendering all of the song intent on the current renderer is
+planned work
 ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 
 _Source: `packages/twinklr/core/pipeline/definitions/moving_heads.py` and `common.py`_
@@ -964,7 +968,10 @@ twinklr eval-report \
 ```
 
 The report re-renders the run's moving-head plan and writes `report.json`, `report.md`
-and per-channel plots under `plots/`; it writes no sequence file.
+and per-channel plots under `plots/`; it writes no sequence file. Each section states the
+planner's song intent as planned (`song_intent`) and names the fields it set that the
+renderer does not render yet; the render block lists the plan's repairs
+(`plan_repairs`).
 
 Every command that plans and renders the moving heads
 (`twinklr run`, `show`, `inject`, `regenerate`) adds a `render` record to the plan
@@ -989,7 +996,9 @@ without a readable `render` record is refused before any analysis: the command t
 planned it stopped before it delivered its moving-head render (an output budget refused
 it, for one), or could not write the record (it logs a warning), and re-running that
 command writes it; a record written before the record carried the rig's identity, or one whose
-policy names `mode` (written by an earlier Twinklr version), is refused as malformed. So is a
+policy names `mode` (written by an earlier Twinklr version), is refused as malformed. A
+checkpoint whose plan was written before the planner contract of 2026-11-17 is refused
+by name; re-run the command that planned it. So is a
 plan that names a template not in the family catalog: `eval-report` has no
 template directory option, so a plan using `--template-dir` templates cannot be
 re-rendered. A report on a show's checkpoint states its dark spans (how many, and their

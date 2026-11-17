@@ -314,6 +314,49 @@ class TestV2PlannerPrompts:
         # Should NOT contain full template list (token optimization)
         # Full template list is only in iteration 0
 
+    def test_refinement_reports_what_repair_changed(
+        self, prompt_loader, renderer, v2_context_iteration_1
+    ):
+        """The repairs of the last plan reach the next planning prompt, one per line."""
+        context = {
+            **v2_context_iteration_1,
+            "plan_repairs": [
+                "section 'chorus_1': moment cue 'ghost' dropped: no lyric moment cue has id 'ghost'"
+            ],
+        }
+        prompts = prompt_loader.load_with_refinement("planner", context)
+        rendered = renderer.render(prompts["user"], context)
+
+        assert "What Deterministic Repair Changed" in rendered
+        assert "- section 'chorus_1': moment cue 'ghost' dropped" in rendered
+        quiet = renderer.render(prompts["user"], v2_context_iteration_1)
+        assert "What Deterministic Repair Changed" not in quiet
+
+    def test_initial_prompt_shows_each_section_palette_colours(
+        self, prompt_loader, renderer, v2_context_iteration_0
+    ):
+        macro_section = {
+            "section_id": "intro",
+            "energy_target": "LOW",
+            "motion_density": "SPARSE",
+            "choreography_style": "HYBRID",
+            "palette_id": "core.christmas_traditional",
+            "palette_colors": [{"hex": "#C8102E", "name": "red"}, {"hex": "#00843D", "name": None}],
+            "motif_ids": [],
+            "coordination_intent": "UNIFIED",
+            "notes": "Open warmly.",
+        }
+        context = {
+            **v2_context_iteration_0,
+            "macro_plan": [macro_section],
+            "macro_palette_arc": [],
+            "macro_motif_continuity": [],
+            "macro_focal_arc": [],
+        }
+        rendered = renderer.render(prompt_loader.load("planner")["user"], context)
+
+        assert "- **intro**: #C8102E red, #00843D (`core.christmas_traditional`)\n" in rendered
+
     def test_render_planner_developer_with_learning_context(self, prompt_loader, renderer):
         """Test planner developer prompt includes learning context."""
         prompts = prompt_loader.load("planner")

@@ -19,9 +19,10 @@ from tests.support.moving_heads import (
     family_job,
     family_rig,
     initial_state_payload,
+    plan_section,
     sections_plan,
 )
-from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import JobConfig, MHRenderPolicy
 from twinklr.core.sequencer.models.template import StepPatch, TemplateDoc
@@ -60,7 +61,7 @@ def _grid() -> BeatGrid:
 
 
 def _templates(plan: ChoreographyPlan) -> list[TemplateDoc]:
-    ids = {section.template_id for section in plan.sections if section.template_id}
+    ids = {part.template_id for section in plan.sections for part in section.parts}
     return [get_template(template_id) for template_id in sorted(ids)]
 
 
@@ -132,15 +133,7 @@ def test_template_content_changes_the_hash() -> None:
 
 def test_preset_content_changes_the_hash() -> None:
     plan = ChoreographyPlan(
-        sections=[
-            PlanSection(
-                section_name="verse",
-                start_bar=1,
-                end_bar=4,
-                template_id="mirror_wings",
-                preset_id="narrow",
-            )
-        ]
+        sections=[plan_section("verse", 1, 4, "mirror_wings", "narrow")], overall_strategy=""
     )
     doc = get_template("mirror_wings")
     narrow = next(preset for preset in doc.presets if preset.preset_id == "narrow")
@@ -204,36 +197,19 @@ def test_other_functional_inputs_change_the_hash(override: dict[str, Any]) -> No
     assert _fingerprint(**override) != _fingerprint()
 
 
-def test_omitted_intent_flag_changes_the_hash() -> None:
-    """Two plans that dump identically but differ in legacy intent omission."""
-    base = {
-        "section_name": "verse",
-        "start_bar": 1,
-        "end_bar": 4,
-        "template_id": "mirror_wings",
-        "preset_id": None,
-    }
-    omitted = ChoreographyPlan(sections=[PlanSection.model_validate(base)])
-    explicit = ChoreographyPlan(
-        sections=[
-            PlanSection.model_validate(
-                {
-                    **base,
-                    **omitted.sections[0].model_dump(include={"intensity", "color_intent"}),
-                    "shutter_events": [],
-                    "gobo_events": [],
-                    "moment_cues": [],
-                }
-            )
-        ]
+def test_song_intent_changes_the_hash() -> None:
+    """The plan's song intent is part of the render's identity, set or neutral."""
+    neutral = ChoreographyPlan(
+        sections=[plan_section("verse", 1, 4, "mirror_wings")], overall_strategy=""
     )
-    assert omitted.sections[0].legacy_intent_omitted
-    assert not explicit.sections[0].legacy_intent_omitted
-    assert omitted.model_dump() == explicit.model_dump()
+    accented = ChoreographyPlan(
+        sections=[plan_section("verse", 1, 4, "mirror_wings", intensity="DRAMATIC")],
+        overall_strategy="",
+    )
 
-    templates = _templates(omitted)
-    assert _fingerprint(plan=omitted, templates=templates) != _fingerprint(
-        plan=explicit, templates=templates
+    templates = _templates(neutral)
+    assert _fingerprint(plan=neutral, templates=templates) != _fingerprint(
+        plan=accented, templates=templates
     )
 
 
@@ -263,16 +239,7 @@ def _pipeline(
 
 def _single_section_pipeline(template_id: str) -> RenderingPipeline:
     return _pipeline(
-        ChoreographyPlan(
-            sections=[
-                PlanSection(
-                    section_name="verse",
-                    start_bar=1,
-                    end_bar=4,
-                    template_id=template_id,
-                )
-            ]
-        )
+        ChoreographyPlan(sections=[plan_section("verse", 1, 4, template_id)], overall_strategy="")
     )
 
 

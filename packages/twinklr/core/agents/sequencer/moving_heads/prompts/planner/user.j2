@@ -145,12 +145,19 @@ The MacroPlanner has defined the following strategic guidance for each section. 
 - **{{ mp.section_id }}**: {{ mp.notes }}
 {% endfor %}
 
-**IMPORTANT:** Your template selections should support these macro-level directives:
-- **Energy targets** indicate how aggressive, balanced, rising, or restrained the selected schema-valid intensity should feel
-- **Motion density** uses the injected schema to express fast, balanced, or restrained activity
-- **Choreography style** uses the injected schema to express narrative, patterned, or mixed intent
-- **Palette** indicates color theme override for the section (if specified, choose templates that complement this mood)
-- **Motifs** indicate visual patterns emphasized in this section (use to inform template geometry/movement choices)
+**Section palettes** (the colours a palette role stands for in each section):
+{% for mp in macro_plan %}
+{% if mp.palette_colors is defined and mp.palette_colors %}
+- **{{ mp.section_id }}**: {% for stop in mp.palette_colors %}{{ stop.hex }}{% if stop.name %} {{ stop.name }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %} (`{{ mp.palette_id }}`)
+{% endif %}
+{% endfor %}
+
+**IMPORTANT:** Your templates and song intent should support these macro-level directives:
+- **Energy targets** indicate how aggressive, balanced, rising, or restrained the section's `intensity` should feel
+- **Motion density** indicates fast, balanced, or restrained activity (`density` and template choice)
+- **Choreography style** indicates narrative, patterned, or mixed intent
+- **Palette** is the section's colour story: a palette-role `color` takes its colours from it
+- **Motifs** indicate visual patterns emphasized in this section (template geometry and movement, `motif_id` and `variation`)
 {% endif %}
 
 ## Your Task
@@ -158,10 +165,11 @@ The MacroPlanner has defined the following strategic guidance for each section. 
 Create a complete choreography plan for **{{ song_title | default('this song', true) }}** that:
 
 1. **Maps to song structure**: Design choreography for each section (intro, verse, chorus, bridge, outro)
-2. **Matches musical energy**: Use appropriate template intensities - builds for builds, impacts for drops
-3. **Creates visual interest**: Vary templates and timing throughout, avoid repetition
-4. **Maintains flow**: Plan smooth transitions between sections
-5. **Serves the holiday display**: Remember these are accent lights supporting a festive show
+2. **Matches musical energy**: Use appropriate templates and intensity - builds for builds, impacts for drops
+3. **Answers the song**: Colour from the song's palette, accents on its musical and lyric moments
+4. **Creates visual interest**: Vary templates and timing throughout, avoid repetition
+5. **Maintains flow**: Choose how each section enters and leaves (smooth, or intentionally abrupt)
+6. **Serves the holiday display**: Remember these are accent lights supporting a festive show
 
 ### Template Selection
 
@@ -171,30 +179,27 @@ Create a complete choreography plan for **{{ song_title | default('this song', t
 
 ### Section Approach
 
-For each song section, choose ONE approach:
+For each song section, give `parts`:
 
-**Single-template section** (preferred, default):
-- Set `template_id` for the entire section
-- Set `preset_id` to a supported preset or null
-- Set `segments` to null
+**One part** (preferred, default): one template for the whole section, its `start_bar`
+the section's, `preset_id` a supported preset or null.
 
-**Segmented section** (only when musically justified):
-- Use when section has distinct musical phases (pickup → drop, A → B)
-- Max 3 segments per section
-- Segments must be contiguous and cover full section range
+**Two or three parts** (only when musically justified): when the section has distinct
+musical phases (pickup → drop, A → B), each part a template from its own start bar.
 
-### Typed Intent
+### Song Intent
 
-- Set `intensity` from the response schema's moving-head intensity enum.
-- Set `color_intent.selection` to the schema arm matching its discriminator and keep the
-  unused nullable value in that arm null.
-- Use `shutter_events` and `gobo_events` for discrete bar/beat changes; use empty lists
-  when no change is planned.
-- Reference only MomentCue ids listed in Lyric Context; use an empty list when none are
-  listed. For a cue-driven shutter or gobo accent, set its `moment_cue_id` to the same id.
-  Deterministic code rebinds the event's exact bar/beat from the cue timestamp.
-- Never emit DMX values, milliseconds, angles, or hand-authored enum values; the renderer
-  resolves the categorical intent.
+- Leave a field null (or a list empty) wherever the template as authored already serves
+  the music.
+- `intensity` follows the section's energy; `color` follows the song's palette (a palette
+  role) unless a fixed colour makes a deliberate contrast; `gobo` sets a texture.
+- Put `events` on the moments that matter: drops, hits, stops, and the lyric moment cues
+  above. For a cue, list its id in `moment_cues` and set the event's `moment_cue_id`;
+  deterministic code lands the event on the cue's beat.
+- Carry a macro motif with `motif_id` and say how this section varies it.
+- Choose `transitions` where a boundary should be shaped, not left to the default.
+- Never emit DMX values, milliseconds or angles; deterministic code resolves the
+  categories.
 
 ### Bar Numbering
 

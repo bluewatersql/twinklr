@@ -31,6 +31,7 @@ from tests.support.moving_heads import (
     sections_plan,
     sine_step,
     sweep_step,
+    with_preset,
 )
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.config.fixtures import AxisCapability, FixtureCapabilities, FixtureGroup
@@ -113,7 +114,7 @@ def _plan(*sections: tuple[str, str | None, int, int]) -> ChoreographyPlan:
     return plan.model_copy(
         update={
             "sections": [
-                section.model_copy(update={"preset_id": preset_id})
+                with_preset(section, preset_id)
                 for section, (_, preset_id, _, _) in zip(plan.sections, sections, strict=True)
             ]
         }

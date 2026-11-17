@@ -4,8 +4,8 @@ The selector deliberately keeps its small amount of creative policy in one inspe
 configuration object.  It chooses among an explicit candidate set: the run's
 :class:`SelectorAdmission`, the templates the pre-planning gate admitted on this rig and
 song (the same set the LLM path is offered), each named with its effective variant.  It
-emits today's schema-v2 :class:`ChoreographyPlan` and never
-calls a provider.  When no candidate fills a section at any rung of the fallback ladder
+emits the planner's :class:`ChoreographyPlan` with every song intent neutral (each
+template plays as authored) and never calls a provider.  When no candidate fills a section at any rung of the fallback ladder
 it raises :class:`NoEligibleTemplateError`; the admission is never relaxed.
 """
 
@@ -21,15 +21,14 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
-    ColorIntent,
-    ColorIntentKind,
-    PaletteRoleColorIntent,
+    Density,
+    PlanPart,
     PlanSection,
+    Variation,
 )
-from twinklr.core.sequencer.models.enum import Intensity, TemplateCategory
+from twinklr.core.sequencer.models.enum import TemplateCategory
 from twinklr.core.sequencer.models.template import TemplateDoc
 from twinklr.core.sequencer.moving_heads.templates.library import REGISTRY
-from twinklr.core.sequencer.vocabulary.visual import PaletteRole
 
 if TYPE_CHECKING:
     from twinklr.core.sequencer.moving_heads.pipeline import TemplateAdmission
@@ -177,9 +176,6 @@ class SelectorConfig(BaseModel):
     )
     low_energy_ceiling: int = Field(default=33, ge=0, le=98)
     medium_energy_ceiling: int = Field(default=66, ge=1, le=99)
-    intensity_cutoffs: tuple[int, int, int, int] = (25, 50, 70, 85)
-    accent_roles: tuple[str, ...] = ("chorus", "drop", "peak", "build", "lift")
-    neutral_roles: tuple[str, ...] = ("intro", "outro", "ambient")
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -194,8 +190,6 @@ class SelectorConfig(BaseModel):
             raise ValueError("fallback_order must preserve the fixed P2P-T13 ladder")
         if self.low_energy_ceiling >= self.medium_energy_ceiling:
             raise ValueError("energy category ceilings must be strictly increasing")
-        if tuple(sorted(self.intensity_cutoffs)) != self.intensity_cutoffs:
-            raise ValueError("intensity_cutoffs must be ordered")
         if self.relaxation_order != (
             ConstraintRelaxation.DISTINCT_ROLES,
             ConstraintRelaxation.REPEAT_CAP,
@@ -223,14 +217,13 @@ class SelectionTrace(BaseModel):
     fallback_rule: FallbackRule
     eligible_template_ids: tuple[str, ...]
     selected_template_id: str
-    unresolved_intent_fields: tuple[str, ...]
     relaxed_constraints: tuple[ConstraintRelaxation, ...] = ()
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
 class SelectorResult(BaseModel):
-    """Schema-v2 plan plus the selector policy and auditable choice trace."""
+    """The plan plus the selector policy and auditable choice trace."""
 
     plan: ChoreographyPlan
     config: SelectorConfig
@@ -335,8 +328,7 @@ class DeterministicSelector:
             roles_by_template[chosen].add(section.role)
             previous = chosen
             document = self._documents[chosen]
-            plan_section, unresolved = self._build_plan_section(section, document)
-            plan_sections.append(plan_section)
+            plan_sections.append(self._build_plan_section(section, document))
             traces.append(
                 SelectionTrace(
                     section_id=section.section_id,
@@ -345,7 +337,6 @@ class DeterministicSelector:
                     fallback_rule=chosen_rule,
                     eligible_template_ids=tuple(eligible),
                     selected_template_id=chosen,
-                    unresolved_intent_fields=unresolved,
                     relaxed_constraints=relaxed,
                 )
             )
@@ -420,45 +411,39 @@ class DeterministicSelector:
             and role not in existing_roles
         )
 
-    def _build_plan_section(
-        self, section: SelectorSection, document: TemplateDoc
-    ) -> tuple[PlanSection, tuple[str, ...]]:
+    def _build_plan_section(self, section: SelectorSection, document: TemplateDoc) -> PlanSection:
+        """One part naming the template with its effective variant; every song intent
+        neutral, so the template plays as authored."""
         template = document.template
-        color_intent = ColorIntent(
-            selection=PaletteRoleColorIntent(
-                kind=ColorIntentKind.PALETTE_ROLE,
-                palette_role=self._palette_role(section.role),
-                explicit_color=None,
-            )
-        )
-        # The plan schema still carries shutter and gobo events; nothing in a template
-        # resolves them, so they stay empty and are reported unresolved.
-        unresolved = ("shutter_events", "gobo_events")
-        planned = PlanSection(
-            section_name=section.section_id,
+        return PlanSection(
+            section_id=section.section_id,
             start_bar=section.start_bar,
             end_bar=section.end_bar,
             section_role=section.role,
             energy_level=section.energy,
-            template_id=template.template_id,
-            preset_id=self._presets[template.template_id],
-            modifiers=[],
+            parts=[
+                PlanPart(
+                    start_bar=section.start_bar,
+                    template_id=template.template_id,
+                    preset_id=self._presets[template.template_id],
+                    modifiers=[],
+                    reasoning="",
+                )
+            ],
+            intensity=None,
+            color=None,
+            gobo=None,
+            moment_cues=[],
+            events=[],
+            motif_id=None,
+            variation=Variation.NONE,
+            density=Density.BALANCED,
+            transitions=[],
             reasoning=(
                 "Deterministic annotation join with seeded choice; "
                 f"role={section.role}, energy={section.energy}"
             ),
-            segments=None,
-            transition_in=None,
-            transition_out=None,
-            intensity=self._intensity(section.energy),
-            color_intent=color_intent,
-            shutter_events=[],
-            gobo_events=[],
-            moment_cues=[],
         )
-        if planned.legacy_intent_omitted:
-            raise AssertionError("selector must explicitly construct every schema-v2 intent field")
-        return planned, unresolved
 
     def _seeded_order_key(self, section_id: str, template_id: str) -> str:
         payload = f"{self.seed}:{section_id}:{template_id}".encode()
@@ -470,26 +455,6 @@ class DeterministicSelector:
         if energy <= self.config.medium_energy_ceiling:
             return TemplateCategory.MEDIUM_ENERGY
         return TemplateCategory.HIGH_ENERGY
-
-    def _intensity(self, energy: int) -> Intensity:
-        low, smooth, fast, dramatic = self.config.intensity_cutoffs
-        if energy <= low:
-            return Intensity.SLOW
-        if energy <= smooth:
-            return Intensity.SMOOTH
-        if energy <= fast:
-            return Intensity.FAST
-        if energy <= dramatic:
-            return Intensity.DRAMATIC
-        return Intensity.INTENSE
-
-    def _palette_role(self, role: str) -> PaletteRole:
-        lowered = role.lower()
-        if lowered in self.config.accent_roles:
-            return PaletteRole.ACCENT
-        if lowered in self.config.neutral_roles:
-            return PaletteRole.NEUTRAL
-        return PaletteRole.PRIMARY
 
 
 def selector_sections_from_context(context: Any) -> list[SelectorSection]:

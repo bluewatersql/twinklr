@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from tests.support.moving_heads import plan_section
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.reporting.evaluation.collect import (
     build_run_metadata,
@@ -35,6 +36,23 @@ class TestExtractPlan:
 
     def test_extract_valid_plan(self):
         """Test extracting a valid plan from checkpoint data."""
+        section = plan_section("verse_1", 1, 21, "fan_pulse", section_role="verse", energy_level=40)
+        checkpoint_data = {
+            "run_id": "test",
+            "plan": {
+                "sections": [section.model_dump(mode="json")],
+                "overall_strategy": "Test strategy",
+            },
+        }
+
+        plan = extract_plan(checkpoint_data)
+        assert isinstance(plan, ChoreographyPlan)
+        assert len(plan.sections) == 1
+        assert plan.sections[0].section_id == "verse_1"
+
+    def test_an_old_shape_plan_is_refused_by_name_with_the_remedy(self):
+        """A checkpoint written before the song-intent contract cannot be read; the
+        refusal says so and how to write it again."""
         checkpoint_data = {
             "run_id": "test",
             "plan": {
@@ -47,7 +65,7 @@ class TestExtractPlan:
                         "energy_level": 40,
                         "template_id": "fan_pulse",
                         "preset_id": None,
-                        "modifiers": {},
+                        "modifiers": [],
                         "reasoning": "Test",
                         "segments": None,
                     }
@@ -56,10 +74,8 @@ class TestExtractPlan:
             },
         }
 
-        plan = extract_plan(checkpoint_data)
-        assert isinstance(plan, ChoreographyPlan)
-        assert len(plan.sections) == 1
-        assert plan.sections[0].section_name == "verse_1"
+        with pytest.raises(ValueError, match=r"before 2026-11-17.*re-run .*`twinklr run`"):
+            extract_plan(checkpoint_data)
 
     def test_extract_missing_plan(self):
         """Test extracting plan when plan field is missing."""
@@ -96,18 +112,16 @@ class TestBuildRunMetadata:
             "status": "SUCCESS",
             "plan": {
                 "sections": [
-                    {
-                        "section_name": "intro",
-                        "start_bar": 1,
-                        "end_bar": 8,
-                        "section_role": "intro",
-                        "energy_level": 30,
-                        "template_id": "sweep_lr",
-                        "preset_id": "GENTLE",
-                        "modifiers": {"width": "narrow"},
-                        "reasoning": "Gentle introduction",
-                        "segments": None,
-                    }
+                    plan_section(
+                        "intro",
+                        1,
+                        8,
+                        "sweep_lr",
+                        "GENTLE",
+                        section_role="intro",
+                        energy_level=30,
+                        reasoning="Gentle introduction",
+                    ).model_dump(mode="json")
                 ],
                 "overall_strategy": "Build energy gradually",
             },

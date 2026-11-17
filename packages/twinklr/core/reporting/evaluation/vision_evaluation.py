@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from enum import StrEnum
 import hashlib
 import json
 from pathlib import Path
@@ -201,7 +202,7 @@ async def evaluate_preview(
 def plan_structure(
     plan: ChoreographyPlan, beat_grid: BeatGrid
 ) -> tuple[list[dict[str, str | int]], list[StructureSection]]:
-    """Adapt today's PlanSection shape into timestamped judge and metric inputs."""
+    """Adapt the plan's sections into timestamped judge and metric inputs."""
     judge_sections: list[dict[str, str | int]] = []
     metric_sections: list[StructureSection] = []
     for section in plan.sections:
@@ -209,7 +210,7 @@ def plan_structure(
         end_ms = round(beat_grid.get_bar_start_ms(section.end_bar))
         judge_sections.append(
             {
-                "section_name": section.section_name,
+                "section_name": section.section_id,
                 "start_ms": start_ms,
                 "end_ms": end_ms,
                 "intent": _section_intent(section),
@@ -217,7 +218,7 @@ def plan_structure(
         )
         metric_sections.append(
             StructureSection(
-                name=section.section_name,
+                name=section.section_id,
                 start_ms=start_ms,
                 end_ms=end_ms,
                 bars=section.end_bar - section.start_bar + 1,
@@ -227,15 +228,29 @@ def plan_structure(
 
 
 def _section_intent(section: PlanSection) -> str:
-    template = section.template_id or ", ".join(
-        segment.template_id for segment in section.segments or []
+    """The section's song intent as the planner set it, for the vision judge to compare
+    against what it sees. Null fields are "as authored"."""
+
+    def value(choice: StrEnum | None) -> str:
+        return "as authored" if choice is None else choice.value
+
+    templates = ", ".join(
+        f"{part.template_id}"
+        + (f" ({part.preset_id})" if part.preset_id else "")
+        + f" from bar {start}"
+        for part, start, _ in section.part_bars()
     )
-    color = section.color_intent.model_dump(mode="json")
+    events = "; ".join(event.describe() for event in section.events) or "none"
     return (
         f"role={section.section_role or 'unspecified'}; energy={section.energy_level}; "
-        f"intensity={section.intensity.value}; color={color}; templates={template}; "
-        f"shutter_events={len(section.shutter_events)}; gobo_events={len(section.gobo_events)}; "
-        f"moment_cues={','.join(cue.cue_id for cue in section.moment_cues) or 'none'}"
+        f"templates={templates}; intensity={value(section.intensity)}; "
+        f"color={value(section.color)}; gobo={value(section.gobo)}; events={events}; "
+        f"moment_cues={','.join(section.moment_cues) or 'none'}; "
+        f"motif={section.motif_id or 'none'}; variation={section.variation.value}; "
+        f"density={section.density.value}; "
+        f"entry={section.entry.describe() if section.entry else 'default'}; "
+        f"exit={section.exit.describe() if section.exit else 'default'}; "
+        f"not_rendered_yet={','.join(section.set_intent_fields()) or 'none'}"
     )
 
 

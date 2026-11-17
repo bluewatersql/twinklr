@@ -1,13 +1,16 @@
-"""The transition hint the moving-head plan schema carries.
+"""The section transition the moving-head plan carries.
 
-- TransitionHint: the planner's transition preference for a section
-- TransitionStrategy: per-channel transition strategies it may name
+- PlanTransition: the planner's categorical transition into (ENTRY) or out of (EXIT) a
+  section
+- ChannelTransition: one per-channel strategy override within a transition
+
+Every field is a category: the renderer, not the planner, turns a length, curve and split
+into milliseconds and DMX values.
 """
 
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -38,104 +41,96 @@ class TransitionStrategy(StrEnum):
     SEQUENCE = "sequence"
 
 
-class ChannelTransitionOverrides(BaseModel):
-    """Strict, closed set of optional per-channel transition strategies."""
+class TransitionEdge(StrEnum):
+    """Which edge of its section a transition shapes."""
 
-    pan: TransitionStrategy | None = Field(description="Pan override, or null")
-    tilt: TransitionStrategy | None = Field(description="Tilt override, or null")
-    dimmer: TransitionStrategy | None = Field(description="Dimmer override, or null")
-    shutter: TransitionStrategy | None = Field(description="Shutter override, or null")
-    color: TransitionStrategy | None = Field(description="Color override, or null")
-    gobo: TransitionStrategy | None = Field(description="Gobo override, or null")
+    ENTRY = "ENTRY"
+    EXIT = "EXIT"
+
+
+class TransitionLength(StrEnum):
+    """How long a transition lasts, on the song's beat grid."""
+
+    BEAT = "BEAT"
+    HALF_BAR = "HALF_BAR"
+    BAR = "BAR"
+    TWO_BARS = "TWO_BARS"
+    FOUR_BARS = "FOUR_BARS"
+    EIGHT_BARS = "EIGHT_BARS"
+
+
+class TransitionSplit(StrEnum):
+    """Where a crossfade hands over from the outgoing to the incoming look."""
+
+    EARLY = "EARLY"
+    EVEN = "EVEN"
+    LATE = "LATE"
+
+
+class TransitionChannel(StrEnum):
+    """A channel a transition may give its own strategy."""
+
+    PAN = "pan"
+    TILT = "tilt"
+    DIMMER = "dimmer"
+    SHUTTER = "shutter"
+    COLOR = "color"
+    GOBO = "gobo"
+
+
+class ChannelTransition(BaseModel):
+    """One channel's own transition strategy, overriding the transition's mode."""
+
+    channel: TransitionChannel = Field(description="The channel this strategy applies to")
+    strategy: TransitionStrategy = Field(description="How this channel changes")
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_legacy_mapping(cls, value: Any) -> Any:
-        if isinstance(value, dict):
-            return {
-                "pan": None,
-                "tilt": None,
-                "dimmer": None,
-                "shutter": None,
-                "color": None,
-                "gobo": None,
-                **value,
-            }
-        return value
 
-
-class TransitionHint(BaseModel):
-    """Hint for how to transition into a section or step.
-
-    This is the agent's or template's way of specifying transition preferences.
-    The rendering pipeline will honor these hints when generating transitions.
-
-    Attributes:
-        mode: Transition mode (SNAP, CROSSFADE, MORPH).
-        duration_bars: Transition duration in bars.
-        curve: Curve to use for interpolation (LINEAR, EASE_IN_OUT, etc.).
-        fade_out_ratio: For crossfades, ratio of fade-out to total duration (0.0-1.0).
-        per_channel_overrides: Optional per-channel strategy overrides.
+class PlanTransition(BaseModel):
+    """The planner's transition into or out of a section, as categories.
 
     Examples:
-        >>> # Quick snap transition
-        >>> TransitionHint(mode=TransitionMode.SNAP, duration_bars=0.0)
-
-        >>> # Smooth crossfade
-        >>> TransitionHint(
+        >>> PlanTransition(
+        ...     edge=TransitionEdge.ENTRY,
         ...     mode=TransitionMode.CROSSFADE,
-        ...     duration_bars=1.0,
-        ...     curve=CurveLibrary.EASE_IN_OUT,
-        ...     fade_out_ratio=0.5
-        ... )
-
-        >>> # Custom per-channel strategies
-        >>> TransitionHint(
-        ...     mode=TransitionMode.CROSSFADE,
-        ...     duration_bars=1.5,
-        ...     per_channel_overrides={
-        ...         "dimmer": TransitionStrategy.FADE_VIA_BLACK,
-        ...         "color": TransitionStrategy.SNAP
-        ...     }
-        ... )
+        ...     length=TransitionLength.BAR,
+        ...     curve=CurveLibrary.EASE_IN_OUT_SINE,
+        ...     split=TransitionSplit.EVEN,
+        ...     channels=[],
+        ... ).length
+        <TransitionLength.BAR: 'BAR'>
     """
 
-    model_config = ConfigDict(extra="forbid")
-
-    mode: TransitionMode = Field(description="Transition mode")
-
-    duration_bars: float = Field(
-        ge=0.0,
-        le=8.0,
-        description="Transition duration in bars (0.0 = instant/SNAP)",
+    edge: TransitionEdge = Field(description="ENTRY shapes the section's start, EXIT its end")
+    mode: TransitionMode = Field(description="How the look changes across the boundary")
+    length: TransitionLength = Field(description="How long the change lasts")
+    curve: CurveLibrary = Field(description="The easing of the change")
+    split: TransitionSplit = Field(
+        description="Where a crossfade hands over: early, halfway, or late"
+    )
+    channels: list[ChannelTransition] = Field(
+        description="Per-channel strategies overriding the mode; empty when none",
+        max_length=len(TransitionChannel),
     )
 
-    curve: CurveLibrary = Field(
-        description="Interpolation curve for smooth transitions",
-    )
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
-    fade_out_ratio: float = Field(
-        ge=0.0,
-        le=1.0,
-        description="For crossfades, ratio of fade-out to total duration",
-    )
+    @model_validator(mode="after")
+    def _one_strategy_per_channel(self) -> PlanTransition:
+        channels = [entry.channel for entry in self.channels]
+        if len(channels) != len(set(channels)):
+            raise ValueError("a transition names each channel at most once")
+        return self
 
-    per_channel_overrides: ChannelTransitionOverrides | None = Field(
-        description="Optional per-channel strategy overrides, or null"
-    )
-
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_legacy_defaults(cls, value: Any) -> Any:
-        if isinstance(value, dict):
-            return {
-                "mode": TransitionMode.CROSSFADE,
-                "duration_bars": 0.5,
-                "curve": CurveLibrary.EASE_IN_OUT_SINE,
-                "fade_out_ratio": 0.5,
-                "per_channel_overrides": None,
-                **value,
-            }
-        return value
+    def describe(self) -> str:
+        """One line: mode, length, curve, split and any per-channel strategies."""
+        line = (
+            f"{self.mode.value} over {self.length.value}, curve {self.curve.value}, "
+            f"split {self.split.value}"
+        )
+        if self.channels:
+            line += "; " + ", ".join(
+                f"{entry.channel.value} {entry.strategy.value}" for entry in self.channels
+            )
+        return line

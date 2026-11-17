@@ -16,9 +16,9 @@ from typing import Any
 
 import pytest
 
-from tests.support.moving_heads import family_catalog, family_job, family_rig
+from tests.support.moving_heads import family_catalog, family_job, family_rig, plan_section
 from twinklr.core.agents.audio.profile.models import SongSectionRef
-from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.formats.xlights.sequence.models.xsq import TimeMarker, XSequence
 from twinklr.core.formats.xlights.sequence.trace import build_xsq_trace_payload
 from twinklr.core.sequencer.display.effects.handlers import load_builtin_handlers
@@ -178,14 +178,7 @@ def _build_combined() -> tuple[XSequence, dict[str, Any], RenderingPipeline]:
     graph = _graph()
     pipeline = RenderingPipeline(
         choreography_plan=ChoreographyPlan(
-            sections=[
-                PlanSection(
-                    section_name="drop",
-                    start_bar=1,
-                    end_bar=2,
-                    template_id="mirror_wings",
-                )
-            ],
+            sections=[plan_section("drop", 1, 2, "mirror_wings")],
             overall_strategy="golden",
         ),
         beat_grid=grid,

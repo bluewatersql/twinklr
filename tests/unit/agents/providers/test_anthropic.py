@@ -834,11 +834,11 @@ async def test_union_parameter_limit_decides_the_format(
 
 
 @pytest.mark.asyncio
-async def test_moving_head_plan_is_one_prompt_only_request(
+async def test_macro_plan_is_one_prompt_only_request(
     mock_anthropic_clients: dict, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """The moving-head plan schema exceeds Claude's limits, so it is never sent as a format."""
-    from twinklr.core.agents.sequencer.moving_heads.specs import get_planner_spec
+    """The macro plan schema exceeds Claude's limits, so it is never sent as a format."""
+    from twinklr.core.agents.sequencer.macro_planner.specs import get_planner_spec
 
     spec = get_planner_spec(model="claude-opus-5-5")
     provider = _make_provider(mock_anthropic_clients)
@@ -860,20 +860,41 @@ async def test_moving_head_plan_is_one_prompt_only_request(
         assert sent.kwargs["output_config"] == {"effort": "high"}
     assert first.metadata.structured_output_mode == "prompt_schema"
     assert first.metadata.structured_output_fallback_reason == "schema_too_complex"
-    notices = [record for record in caplog.records if "ChoreographyPlan" in record.getMessage()]
+    notices = [record for record in caplog.records if "MacroPlan" in record.getMessage()]
     assert len(notices) == 1
 
 
-def test_prompt_only_schema_on_sync_path(mock_anthropic_clients: dict) -> None:
-    from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+@pytest.mark.asyncio
+async def test_moving_head_plan_is_sent_as_an_enforced_format(
+    mock_anthropic_clients: dict,
+) -> None:
+    """The moving-head plan schema is within Claude's limits: Claude enforces it."""
+    from twinklr.core.agents.sequencer.moving_heads.specs import get_planner_spec
 
+    spec = get_planner_spec(model="claude-opus-5-5")
+    provider = _make_provider(mock_anthropic_clients)
+    stream = mock_anthropic_clients["async_client"].messages.stream
+
+    response = await provider.generate_json_async(
+        messages=[{"role": "user", "content": "plan"}],
+        model=spec.model,
+        response_model=spec.response_model,
+        allow_json_object_fallback=spec.allow_json_object_fallback,
+    )
+
+    assert "format" in stream.call_args.kwargs["output_config"]
+    assert response.metadata.structured_output_mode == "json_schema"
+    assert response.metadata.structured_output_fallback_reason is None
+
+
+def test_prompt_only_schema_on_sync_path(mock_anthropic_clients: dict) -> None:
     provider = _make_provider(mock_anthropic_clients)
     stream = mock_anthropic_clients["sync_client"].messages.stream
 
     response = provider.generate_json(
         messages=[{"role": "user", "content": "test"}],
         model="claude-opus-5-5",
-        response_model=ChoreographyPlan,
+        response_model=MacroPlan,
     )
 
     assert stream.call_count == 1
@@ -885,19 +906,17 @@ def test_prompt_only_schema_on_sync_path(mock_anthropic_clients: dict) -> None:
 async def test_schema_over_limits_without_fallback_fails_before_any_request(
     mock_anthropic_clients: dict, tmp_path: Path
 ) -> None:
-    from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
-
     provider = _make_provider(mock_anthropic_clients)
     runner = AsyncAgentRunner(provider=provider, prompt_base_path=tmp_path)
     spec = AgentSpec(
         name="anthropic-test",
         prompt_pack="unused",
-        response_model=ChoreographyPlan,
+        response_model=MacroPlan,
         model="claude-opus-5-5",
         allow_json_object_fallback=False,
     )
 
-    with pytest.raises(LLMProviderError, match="ChoreographyPlan"):
+    with pytest.raises(LLMProviderError, match="MacroPlan"):
         await runner._call_oneshot_async(spec, [{"role": "user", "content": "test"}])
 
     mock_anthropic_clients["async_client"].messages.stream.assert_not_called()
@@ -949,15 +968,13 @@ def test_grammar_rejection_on_sync_path_is_not_resent(mock_anthropic_clients: di
 async def test_prompt_only_reply_tolerates_surrounding_prose(
     mock_anthropic_clients: dict, text: str
 ) -> None:
-    from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
-
     provider = _make_provider(mock_anthropic_clients)
     mock_anthropic_clients["async_msg"].content[0].text = text
 
     response = await provider.generate_json_async(
         messages=[{"role": "user", "content": "test"}],
         model="claude-opus-5-5",
-        response_model=ChoreographyPlan,
+        response_model=MacroPlan,
     )
 
     assert response.content == {"result": "ok"}
@@ -982,8 +999,6 @@ async def test_schema_enforced_reply_with_prose_is_still_a_decode_error(
 
 @pytest.mark.asyncio
 async def test_conversation_path_sends_prompt_only_schema(mock_anthropic_clients: dict) -> None:
-    from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
-
     provider = _make_provider(mock_anthropic_clients)
     stream = mock_anthropic_clients["async_client"].messages.stream
 
@@ -991,7 +1006,7 @@ async def test_conversation_path_sends_prompt_only_schema(mock_anthropic_clients
         user_message="test",
         conversation_id="conv-prompt-only",
         model="claude-opus-5-5",
-        response_model=ChoreographyPlan,
+        response_model=MacroPlan,
     )
 
     assert stream.call_count == 1

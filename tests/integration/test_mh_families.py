@@ -42,6 +42,7 @@ from tests.support.moving_heads import (
     registered_templates,
     sections_plan,
     sweep_step,
+    with_preset,
     zoom_job,
     zoom_rig,
 )
@@ -471,7 +472,7 @@ def _preset_plan(*sections: tuple[str, str | None, int, int]) -> ChoreographyPla
     return plan.model_copy(
         update={
             "sections": [
-                section.model_copy(update={"preset_id": preset_id})
+                with_preset(section, preset_id)
                 for section, (_, preset_id, _, _) in zip(plan.sections, sections, strict=True)
             ]
         }

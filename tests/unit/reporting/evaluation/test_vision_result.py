@@ -9,6 +9,7 @@ from PIL import Image
 from pydantic import ValidationError
 import pytest
 
+from tests.support.moving_heads import plan_section
 from twinklr.core.agents.result import AgentResult
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.config.models import get_vision_judge_agent_default
@@ -310,17 +311,9 @@ async def test_deterministic_preflight_fails_before_paid_call(tmp_path: Path) ->
     Image.new("RGB", (320, 180), "black").save(frame_path)
     runner = MagicMock()
     runner.run = AsyncMock(side_effect=AssertionError("paid provider must not be called"))
-    plan = ChoreographyPlan.model_validate(
-        {
-            "sections": [
-                {
-                    "section_name": "chorus",
-                    "start_bar": 1,
-                    "end_bar": 1,
-                    "template_id": "sweep_lr_fan_hold",
-                }
-            ]
-        }
+    plan = ChoreographyPlan(
+        sections=[plan_section("chorus", 1, 1, "sweep_lr_fan_hold")],
+        overall_strategy="",
     )
 
     with (
@@ -388,17 +381,9 @@ async def test_combined_record_hashes_preview_plan_and_config(tmp_path: Path) ->
             metadata={"model": "configured-mini-tier"},
         )
     )
-    plan = ChoreographyPlan.model_validate(
-        {
-            "sections": [
-                {
-                    "section_name": "chorus",
-                    "start_bar": 1,
-                    "end_bar": 1,
-                    "template_id": "sweep_lr_fan_hold",
-                }
-            ]
-        }
+    plan = ChoreographyPlan(
+        sections=[plan_section("chorus", 1, 1, "sweep_lr_fan_hold")],
+        overall_strategy="",
     )
 
     with patch(

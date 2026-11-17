@@ -29,8 +29,10 @@ See [product/overview.md](product/overview.md).
   typed creative context for planning. `packages/twinklr/core/agents/audio/`
 - **Multi-agent planning** — macro planning plus iterative moving-head and display
   planning, deterministic heuristic repair, and a judge whose verdicts feed the next
-  revision. Schema-v2 sections carry categorical intensity, color, shutter, gobo, and
-  lyric MomentCue intent; the moving-head renderer does not yet render it, a known
+  revision. Moving-head sections carry 1-3 template parts and categorical song intent
+  (intensity, colour, gobo, timed events tied to lyric MomentCues, motif variation,
+  density, entry/exit transitions; contract of 2026-11-17, enforced by Claude as a
+  structured output); the moving-head renderer does not yet render the intent, a known
   regression (below).
   [architecture/multi-agent-planning.md](architecture/multi-agent-planning.md)
 - **Providers** — OpenAI (default; Responses API strict structured outputs), Claude

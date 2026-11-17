@@ -13,6 +13,11 @@ from pathlib import Path
 import sys
 from typing import Any
 
+from twinklr.core.agents.sequencer.moving_heads.models import (
+    ChoreographyPlan,
+    PlanSection,
+    flatten_section,
+)
 from twinklr.core.config.fixtures import AxisCapability, FixtureCapabilities
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.reporting.evaluation.analyze import (
@@ -38,6 +43,7 @@ from twinklr.core.reporting.evaluation.models import (
     ReportSummary,
     SectionRenderFacts,
     SectionReport,
+    SongIntentReport,
     SongMetadata,
     TargetResolution,
     TemplateSelection,
@@ -62,30 +68,27 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import quantize_cu
 logger = logging.getLogger(__name__)
 
 
-def _expand_plan_sections(plan):
-    """Expand plan sections into individual sections per segment.
+def _expand_plan_sections(plan: ChoreographyPlan) -> list[PlanSection]:
+    """The plan's sections as the renderer places them: one per part
+    (`RenderingPipeline.iterate_plan_sections`, `flatten_section`)."""
+    return [unit for section in plan.sections for unit in flatten_section(section)]
 
-    This mimics the behavior of RenderingPipeline.iterate_plan_sections().
 
-    Args:
-        plan: ChoreographyPlan with potentially segmented sections
-
-    Returns:
-        List of PlanSection objects (one per segment)
-    """
-    from twinklr.core.agents.sequencer.moving_heads.models import flatten_plan_segment
-
-    expanded = []
-    for section in plan.sections:
-        if section.segments:
-            # Expand each segment into its own PlanSection
-            for seg in section.segments:
-                expanded.append(flatten_plan_segment(section, seg))
-        else:
-            # No segments, keep as-is
-            expanded.append(section)
-
-    return expanded
+def _song_intent(section: PlanSection) -> SongIntentReport:
+    """The section's song intent as planned, for the report."""
+    return SongIntentReport(
+        intensity=None if section.intensity is None else section.intensity.value,
+        color=None if section.color is None else section.color.value,
+        gobo=None if section.gobo is None else section.gobo.value,
+        moment_cues=list(section.moment_cues),
+        events=[event.describe() for event in section.events],
+        motif_id=section.motif_id,
+        variation=section.variation.value,
+        density=section.density.value,
+        entry=None if section.entry is None else section.entry.describe(),
+        exit=None if section.exit is None else section.exit.describe(),
+        not_rendered=list(section.set_intent_fields()),
+    )
 
 
 async def generate_evaluation_report(
@@ -307,12 +310,11 @@ def _process_section(
     Returns:
         SectionReport with analysis and plots
     """
-    # Parse section_id and segment_id from section_name
-    # Format: "section_name|segment_id" or just "section_name"
-    if "|" in plan_section.section_name:
-        section_id, segment_id = plan_section.section_name.split("|", 1)
+    # A part of a section of several is "<section_id>|<part id>" (`flatten_section`).
+    if "|" in plan_section.section_id:
+        section_id, segment_id = plan_section.section_id.split("|", 1)
     else:
-        section_id = plan_section.section_name
+        section_id = plan_section.section_id
         segment_id = None
 
     output = render_data.output
@@ -341,7 +343,7 @@ def _process_section(
     # Analyze curves and generate plots
     curve_analyses = []
     section_flags = []
-    render_facts = _section_facts(output.render_record, plan_section.section_name, frames_ms)
+    render_facts = _section_facts(output.render_record, plan_section.section_id, frames_ms)
     render_facts = render_facts.model_copy(
         update={
             "lit_steps": _lit_steps(curves_by_fixture, output.profiles, frames_ms[0]),
@@ -414,14 +416,13 @@ def _process_section(
             )
 
     # Build template selection
-    template_selection = None
-    if plan_section.template_id:
-        template_selection = TemplateSelection(
-            template_id=plan_section.template_id,
-            preset_id=plan_section.preset_id,
-            modifiers={modifier.key: modifier.value for modifier in plan_section.modifiers},
-            reasoning=plan_section.reasoning,
-        )
+    (part,) = plan_section.parts
+    template_selection = TemplateSelection(
+        template_id=part.template_id,
+        preset_id=part.preset_id,
+        modifiers={modifier.key: modifier.value for modifier in part.modifiers},
+        reasoning=part.reasoning or plan_section.reasoning,
+    )
 
     return SectionReport(
         section_id=section_id,
@@ -430,6 +431,7 @@ def _process_section(
         time_range_ms=(start_ms, end_ms),
         selected_template=template_selection,
         segments=None,  # Segments are now processed individually
+        song_intent=_song_intent(plan_section),
         targets=TargetResolution(
             bindings={},
             resolved_roles=[f.role for f in render_data.fixture_contexts],
@@ -458,6 +460,7 @@ def _render_summary(output: RerenderOutput) -> RenderSummary:
         admission_preset_exclusions=record.get("admission_preset_exclusions", []),
         admission_effective_presets=record.get("admission_effective_presets", {}),
         unplayable_totals=record["unplayable_totals"],
+        plan_repairs=record.get("plan_repairs", []),
     )
 
 

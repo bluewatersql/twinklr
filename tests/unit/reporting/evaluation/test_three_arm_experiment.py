@@ -19,6 +19,7 @@ from tests.support.moving_heads import (
     family_catalog,
     family_job,
     family_rig,
+    plan_section,
 )
 from twinklr.core.agents.sequencer.moving_heads.deterministic_selector import (
     AdmittedTemplate,
@@ -393,31 +394,20 @@ class _Backend:
                 maximum_cost_usd=0.20 if call.role == "vision_judge" else 0.01,
             )
             request.spend_gate.settle(authorization, call)
-        plan = request.plan or ChoreographyPlan.model_validate(
-            {
-                "sections": [
-                    {
-                        "section_name": "verse_1",
-                        "start_bar": 1,
-                        "end_bar": 4,
-                        "section_role": "verse",
-                        "energy_level": 45,
-                        "template_id": "mirror_wings",
-                        "intensity": "SMOOTH",
-                        "color_intent": {
-                            "selection": {
-                                "kind": "PALETTE_ROLE",
-                                "palette_role": "PRIMARY",
-                                "explicit_color": None,
-                            }
-                        },
-                        "shutter_events": [],
-                        "gobo_events": [],
-                        "moment_cues": [],
-                    }
-                ],
-                "overall_strategy": "fixture",
-            }
+        plan = request.plan or ChoreographyPlan(
+            sections=[
+                plan_section(
+                    "verse_1",
+                    1,
+                    4,
+                    "mirror_wings",
+                    section_role="verse",
+                    energy_level=45,
+                    intensity="SMOOTH",
+                    color="PALETTE_PRIMARY",
+                )
+            ],
+            overall_strategy="fixture",
         )
         return ArmRunResult(
             run_id=f"{request.song.song_id}-{request.arm}-{request.replicate}",
@@ -866,31 +856,20 @@ def _result(
     calibration_sha = manifest.calibration_record_sha256
     calibration_path = manifest.calibration_record
     assert calibration_sha is not None and calibration_path is not None
-    plan = ChoreographyPlan.model_validate(
-        {
-            "sections": [
-                {
-                    "section_name": "verse_1",
-                    "start_bar": 1,
-                    "end_bar": 4,
-                    "section_role": "verse",
-                    "energy_level": 50,
-                    "template_id": "mirror_wings",
-                    "intensity": "SMOOTH",
-                    "color_intent": {
-                        "selection": {
-                            "kind": "PALETTE_ROLE",
-                            "palette_role": "PRIMARY",
-                            "explicit_color": None,
-                        }
-                    },
-                    "shutter_events": [],
-                    "gobo_events": [],
-                    "moment_cues": [],
-                }
-            ],
-            "overall_strategy": "fixture",
-        }
+    plan = ChoreographyPlan(
+        sections=[
+            plan_section(
+                "verse_1",
+                1,
+                4,
+                "mirror_wings",
+                section_role="verse",
+                energy_level=50,
+                intensity="SMOOTH",
+                color="PALETTE_PRIMARY",
+            )
+        ],
+        overall_strategy="fixture",
     )
     nonce = None if arm is Arm.A else _sha(f"s{song}-{arm}-{replicate}".encode())
     planning_input = (
@@ -1707,48 +1686,29 @@ def _family_llm_plan(
     segments: list[tuple[str, str | None]] | None = None,
 ) -> ChoreographyPlan:
     """A one-section, eight-bar plan naming `template_id` and `preset_id`, or, with
-    `segments`, consecutive four-bar segments of `(template_id, preset_id)`."""
-    return ChoreographyPlan.model_validate(
-        {
-            "sections": [
-                {
-                    "section_name": "verse_1",
-                    "start_bar": 1,
-                    "end_bar": 4 * len(segments) if segments else 8,
-                    "section_role": "verse",
-                    "energy_level": 45,
-                    "template_id": template_id,
-                    "preset_id": preset_id,
-                    "segments": (
-                        None
-                        if segments is None
-                        else [
-                            {
-                                "segment_id": chr(ord("A") + index),
-                                "start_bar": 4 * index + 1,
-                                "end_bar": 4 * index + 4,
-                                "template_id": segment_template,
-                                "preset_id": segment_preset,
-                            }
-                            for index, (segment_template, segment_preset) in enumerate(segments)
-                        ]
-                    ),
-                    "intensity": "SMOOTH",
-                    "color_intent": {
-                        "selection": {
-                            "kind": "PALETTE_ROLE",
-                            "palette_role": "PRIMARY",
-                            "explicit_color": None,
-                        }
-                    },
-                    "shutter_events": [],
-                    "gobo_events": [],
-                    "moment_cues": [],
-                }
-            ],
-            "overall_strategy": "fixture",
-        }
+    `segments`, consecutive four-bar parts of `(template_id, preset_id)`."""
+    parts = segments if segments is not None else [(template_id or "", preset_id)]
+    section = plan_section(
+        "verse_1",
+        1,
+        4 * len(segments) if segments else 8,
+        parts[0][0],
+        section_role="verse",
+        energy_level=45,
+        intensity="SMOOTH",
+        color="PALETTE_PRIMARY",
+        parts=[
+            {
+                "start_bar": 4 * index + 1,
+                "template_id": part_template,
+                "preset_id": part_preset,
+                "modifiers": [],
+                "reasoning": "",
+            }
+            for index, (part_template, part_preset) in enumerate(parts)
+        ],
     )
+    return ChoreographyPlan(sections=[section], overall_strategy="fixture")
 
 
 class _FamilyBackend(_Backend):
@@ -1849,8 +1809,9 @@ async def test_family_run_plans_arm_a_over_the_gate_admission_and_records_it(
     assert all(result.plan == expected.plan for result in arm_a)
     effective = {entry.template_id: entry.effective_preset for entry in admission.templates}
     for section in expected.plan.sections:
-        assert section.template_id in FAMILY_IDS
-        assert section.preset_id == effective[section.template_id]
+        (part,) = section.parts
+        assert part.template_id in FAMILY_IDS
+        assert part.preset_id == effective[part.template_id]
 
     admission_sha = _identity_sha(admission.model_dump(mode="json"))
     assert {result.held_constant.admission_sha256 for result in results} == {admission_sha}

@@ -12,19 +12,26 @@ deterministic heuristics plus the LLM judge form the live validation loop._
 
 The choreography planner is an iterative refinement loop over structured Pydantic models:
 
-1. **Planner** generates a typed schema-v2 plan. A section selects a template/preset and
-   can carry categorical intensity, color, shutter, gobo, segmentation, and lyric
-   MomentCue intent.
-2. **Heuristic validation** checks structural validity (fast, free); on the display
-   path five deterministic auto-repair passes fix common LLM mistakes before scoring.
+1. **Planner** generates a typed plan. A moving-head section has 1-3 parts (template and
+   preset over its bars) and categorical song intent: intensity, colour (a role in the
+   song's palette, whose colours the prompt shows, or a named colour), gobo, timed events
+   (open/closed, strobes, pulse, hit, colour, gobo) bound optionally to lyric MomentCues,
+   motif and variation, density, and ENTRY/EXIT transitions; null means as authored. The
+   schema is small enough for Claude to enforce (5 unions, 57 nodes; pinned in
+   `tests/unit/agents/test_structured_outputs.py`).
+2. **Normalisation and heuristic validation**: on the moving-head path, single items the
+   song cannot hold are repaired, recorded in the plan's `repairs` (and the render
+   trace) and fed back on the next iteration, never refusing the plan; structural
+   errors fail validation (fast, free). On the display path five deterministic
+   auto-repair passes fix common LLM mistakes before scoring.
 3. **Judge** scores 0–10 and decides: approve (≥ 7.0 by default), soft-fail (revise),
    or hard-fail (redo). `JudgeVerdict` validation reconciles verdict status to score.
    Structured feedback loops back to the planner. Up to 3 iterations by default.
 
-**Known regression.** The moving-head renderer applies only the selected template,
-preset and section bars. It does not yet render the plan's intensity, section colour,
-shutter and gobo events, lyric MomentCues bound to events, or section transitions, which
-the renderer deleted in the single-renderer cutover did render. The owner has ruled that
+**Known regression.** The moving-head renderer applies only the selected templates,
+presets and their bars. It does not yet render the plan's song intent; the renderer
+deleted in the single-renderer cutover rendered intensity, section colour, shutter and
+gobo events (cue-bound ones included) and entry transitions. The owner has ruled that
 all of it is rendered on the single path and that nothing leaves the planner contract
 without the owner's word ([song-intent rendering](../../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md),
 [decision](../../memories/decisions/mh-single-renderer.md)). The dated history of that

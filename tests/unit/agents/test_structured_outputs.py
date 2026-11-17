@@ -5,11 +5,11 @@ from __future__ import annotations
 from collections.abc import Iterator
 import json
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Literal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from openai import APITimeoutError, BadRequestError
-from pydantic import BaseModel, ConfigDict, ValidationError, create_model
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, create_model
 import pytest
 
 from twinklr.core.agents._paths import AGENTS_BASE_PATH
@@ -18,6 +18,11 @@ from twinklr.core.agents.async_runner import AsyncAgentRunner
 from twinklr.core.agents.audio.lyrics.spec import get_lyrics_spec
 from twinklr.core.agents.audio.profile.spec import get_audio_profile_spec
 from twinklr.core.agents.prompts import spec_prompt_hash
+from twinklr.core.agents.providers.anthropic import (
+    ClaudeSchemaSize,
+    claude_json_schema,
+    claude_schema_size,
+)
 from twinklr.core.agents.providers.base import LLMResponse, ResponseMetadata, TokenUsage
 from twinklr.core.agents.providers.errors import (
     LLMProviderError,
@@ -50,7 +55,7 @@ from twinklr.core.agents.sequencer.macro_planner.specs import (
 from twinklr.core.agents.sequencer.macro_planner.specs import (
     get_planner_spec as get_macro_planner_spec,
 )
-from twinklr.core.agents.sequencer.moving_heads.models import ColorIntent
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.agents.sequencer.moving_heads.specs import (
     get_judge_spec as get_moving_head_judge_spec,
 )
@@ -237,26 +242,38 @@ def test_ref_normalization_fails_loud_on_semantic_siblings() -> None:
         )
 
 
+class _PaletteArm(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["PALETTE"]
+    role: str
+
+
+class _ExplicitArm(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["EXPLICIT"]
+    color: str
+
+
+class _DiscriminatedRoot(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    selection: Annotated[_PaletteArm | _ExplicitArm, Field(discriminator="kind")]
+
+
 def test_machine_derived_schema_normalizes_discriminated_union_to_supported_anyof() -> None:
-    raw_schema = get_moving_head_planner_spec().response_model.model_json_schema()
+    raw_schema = _DiscriminatedRoot.model_json_schema()
     assert any("oneOf" in node for node in _walk_json(raw_schema))
     assert any("discriminator" in node for node in _walk_json(raw_schema))
 
-    schema = strict_json_schema(get_moving_head_planner_spec().response_model)
+    schema = strict_json_schema(_DiscriminatedRoot)
     assert not any("oneOf" in node for node in _walk_json(schema))
     assert not any("discriminator" in node for node in _walk_json(schema))
     assert any("anyOf" in node for node in _walk_json(schema))
 
     with pytest.raises(ValidationError):
-        ColorIntent.model_validate(
-            {
-                "selection": {
-                    "kind": "PALETTE_ROLE",
-                    "palette_role": None,
-                    "explicit_color": "RED",
-                }
-            }
-        )
+        _DiscriminatedRoot.model_validate({"selection": {"kind": "PALETTE", "color": "red"}})
 
 
 def test_all_registered_strict_roots_stay_within_openai_schema_ceilings() -> None:
@@ -277,6 +294,7 @@ _CLAUDE_COMPILED_SPECS = frozenset(
         "lyrics",
         "section_judge",
         "holistic_judge",
+        "mh_planner",
         "mh_judge",
         "macro_judge",
         "vision_judge",
@@ -284,7 +302,7 @@ _CLAUDE_COMPILED_SPECS = frozenset(
     }
 )
 _CLAUDE_REJECTED_SPECS = frozenset(
-    {"audio_profile", "group_planner", "holistic_corrector", "mh_planner", "macro_planner"}
+    {"audio_profile", "group_planner", "holistic_corrector", "macro_planner"}
 )
 
 
@@ -299,13 +317,26 @@ def test_claude_grammar_limits_classify_every_registered_spec() -> None:
     largest schema the live probe saw compile. A schema change that moves a spec across
     either limit fails here, before any request is spent.
     """
-    from twinklr.core.agents.providers.anthropic import claude_json_schema, claude_schema_size
-
     specs = _registered_specs()
     assert {spec.name for spec in specs} == _CLAUDE_COMPILED_SPECS | _CLAUDE_REJECTED_SPECS
     for spec in specs:
         size = claude_schema_size(claude_json_schema(spec.response_model))
         assert size.within_limits is (spec.name in _CLAUDE_COMPILED_SPECS), (spec.name, size)
+
+
+def test_moving_head_plan_schema_size_is_pinned() -> None:
+    """The moving-head plan fits one Claude-enforced call with margin; a change that grows
+    it moves these figures and must be re-measured here.
+
+    Claude: 5 union parameters of 16, 57 nodes of 68 (every $ref expanded where used;
+    the transition is one list of ENTRY/EXIT items, so it is counted once). OpenAI strict
+    mode: 39 properties, depth 7, 161 enum values.
+    """
+    assert claude_schema_size(claude_json_schema(ChoreographyPlan)) == ClaudeSchemaSize(
+        union_parameters=5, nodes=57
+    )
+    stats = strict_schema_stats(strict_json_schema(ChoreographyPlan))
+    assert (stats.property_count, stats.max_depth, stats.enum_value_count) == (39, 7, 161)
 
 
 def test_shipped_full_response_examples_match_registered_strict_models() -> None:

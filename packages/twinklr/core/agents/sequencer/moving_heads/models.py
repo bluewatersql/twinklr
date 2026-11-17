@@ -1,32 +1,150 @@
-"""Response models for moving heads agents."""
+"""The moving-head planner's response model: one plan of song intent per section.
+
+The planner chooses typed categories only. Deterministic code owns timing, DMX values and
+physical limits: it places bars and beats on the song's beat grid, resolves a palette role
+through the song's palette, and repairs what a rig cannot do (`moment_cues.py`).
+
+A null intent field means "as the template is authored"; a section whose intent is all
+neutral renders exactly as its templates are authored.
+"""
 
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
+from typing import Literal
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    PrivateAttr,
-    field_validator,
-    model_validator,
-)
-
-if TYPE_CHECKING:
-    from pydantic import ModelWrapValidatorHandler
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic.json_schema import SkipJsonSchema
 
 from twinklr.core.sequencer.models.enum import Intensity
-from twinklr.core.sequencer.models.transition import TransitionHint
-from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
+from twinklr.core.sequencer.models.transition import PlanTransition, TransitionEdge
 from twinklr.core.sequencer.moving_heads.libraries.gobo import GoboPattern
-from twinklr.core.sequencer.moving_heads.libraries.shutter import ShutterPattern
-from twinklr.core.sequencer.vocabulary.visual import PaletteRole
+
+
+class PlanColor(StrEnum):
+    """A colour the planner picks: a role in the song's palette, or a named colour.
+
+    The palette roles resolve through the song's macro palette; the named colours are the
+    moving-head colour presets (`ColorPreset`), spelled as they are.
+    """
+
+    PALETTE_PRIMARY = "PALETTE_PRIMARY"
+    PALETTE_ACCENT = "PALETTE_ACCENT"
+    PALETTE_WARM = "PALETTE_WARM"
+    PALETTE_COOL = "PALETTE_COOL"
+    PALETTE_NEUTRAL = "PALETTE_NEUTRAL"
+    RED = "red"
+    BLUE = "blue"
+    GREEN = "green"
+    YELLOW = "yellow"
+    MAGENTA = "magenta"
+    CYAN = "cyan"
+    ORANGE = "orange"
+    PURPLE = "purple"
+    AMBER = "amber"
+    LIME = "lime"
+    WHITE = "white"
+    WARM_WHITE = "warm_white"
+    COOL_WHITE = "cool_white"
+    UV = "uv"
+
+
+class EventAction(StrEnum):
+    """What a timed event does to the heads."""
+
+    OPEN = "open"
+    CLOSED = "closed"
+    STROBE_SLOW = "strobe_slow"
+    STROBE_MEDIUM = "strobe_medium"
+    STROBE_FAST = "strobe_fast"
+    PULSE = "pulse"
+    HIT = "hit"
+    COLOR = "color"
+    GOBO = "gobo"
+
+
+class Variation(StrEnum):
+    """How a section varies the motif it returns to."""
+
+    NONE = "NONE"
+    NARROW = "NARROW"
+    WIDEN = "WIDEN"
+    SLOWER = "SLOWER"
+    FASTER = "FASTER"
+
+
+class Density(StrEnum):
+    """How busy a section's movement is."""
+
+    REST = "REST"
+    SPARSE = "SPARSE"
+    BALANCED = "BALANCED"
+    BUSY = "BUSY"
+
+
+class RepairAction(StrEnum):
+    """What deterministic repair did with one planned item."""
+
+    DROPPED = "dropped"
+    ADJUSTED = "adjusted"
+    RECORDED = "recorded"
+
+
+# Nullable choices are spelled as one enum that includes null, so a provider's grammar
+# sees one enum rather than a union.
+IntensityChoice = Literal[
+    Intensity.SLOW,
+    Intensity.SMOOTH,
+    Intensity.FAST,
+    Intensity.DRAMATIC,
+    Intensity.INTENSE,
+    None,
+]
+ColorChoice = Literal[
+    PlanColor.PALETTE_PRIMARY,
+    PlanColor.PALETTE_ACCENT,
+    PlanColor.PALETTE_WARM,
+    PlanColor.PALETTE_COOL,
+    PlanColor.PALETTE_NEUTRAL,
+    PlanColor.RED,
+    PlanColor.BLUE,
+    PlanColor.GREEN,
+    PlanColor.YELLOW,
+    PlanColor.MAGENTA,
+    PlanColor.CYAN,
+    PlanColor.ORANGE,
+    PlanColor.PURPLE,
+    PlanColor.AMBER,
+    PlanColor.LIME,
+    PlanColor.WHITE,
+    PlanColor.WARM_WHITE,
+    PlanColor.COOL_WHITE,
+    PlanColor.UV,
+    None,
+]
+GoboChoice = Literal[
+    GoboPattern.OPEN,
+    GoboPattern.CIRCLES,
+    GoboPattern.TRIANGLES,
+    GoboPattern.STARS,
+    GoboPattern.DIAMONDS,
+    GoboPattern.CLOUDS,
+    GoboPattern.PRISM,
+    GoboPattern.SHATTER,
+    GoboPattern.DOTS,
+    GoboPattern.FLAME,
+    GoboPattern.WATER,
+    GoboPattern.FOLIAGE,
+    GoboPattern.ABSTRACT,
+    None,
+]
+
+PART_IDS = ("A", "B", "C")
+"""The ids code gives a section's parts, in order, when it has more than one."""
 
 
 class PlanModifier(BaseModel):
-    """One planner modifier entry, encoded as a strict-schema-compatible list item."""
+    """One free-form modifier the planner attaches to a part."""
 
     key: str = Field(min_length=1, description="Modifier name")
     value: str = Field(description="Modifier value")
@@ -34,400 +152,250 @@ class PlanModifier(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class ColorIntentKind(StrEnum):
-    """How a planned color is selected."""
+class PlanPart(BaseModel):
+    """One template over a run of a section's bars, up to the next part's start."""
 
-    PALETTE_ROLE = "PALETTE_ROLE"
-    EXPLICIT = "EXPLICIT"
-
-
-class PaletteRoleColorIntent(BaseModel):
-    """Color selected from the active show palette."""
-
-    kind: Literal[ColorIntentKind.PALETTE_ROLE]
-    palette_role: PaletteRole
-    explicit_color: None
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-
-class ExplicitColorIntent(BaseModel):
-    """Color selected from the named moving-head preset library."""
-
-    kind: Literal[ColorIntentKind.EXPLICIT]
-    palette_role: None
-    explicit_color: ColorPreset
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-
-ColorIntentSelection = Annotated[
-    PaletteRoleColorIntent | ExplicitColorIntent,
-    Field(discriminator="kind"),
-]
-
-
-class ColorIntent(BaseModel):
-    """Renderer-resolvable color selection without fixture-specific DMX values.
-
-    The nested selection is a genuine discriminated union in the generated response
-    schema. A pre-validator accepts the historical flat constructor shape so existing
-    deterministic callers remain compatible while model output uses the strict nested
-    contract.
-    """
-
-    selection: ColorIntentSelection = Field(description="Discriminated color selection")
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_legacy_input(cls, value: object) -> object:
-        if isinstance(value, dict) and "selection" not in value and "kind" in value:
-            return {"selection": value}
-        return value
-
-    @property
-    def kind(self) -> ColorIntentKind:
-        """Expose the historical flat read interface to renderer callers."""
-        return ColorIntentKind(self.selection.kind)
-
-    @property
-    def palette_role(self) -> PaletteRole | None:
-        """Expose the selected palette role, if any."""
-        return self.selection.palette_role
-
-    @property
-    def explicit_color(self) -> ColorPreset | None:
-        """Expose the selected explicit preset, if any."""
-        return self.selection.explicit_color
-
-
-class MomentCueReference(BaseModel):
-    """Reference to a lyric ``MomentCue`` defined by P2P-T4."""
-
-    cue_id: str = Field(min_length=1, description="Stable MomentCue identifier")
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    @field_validator("cue_id")
-    @classmethod
-    def _strip_cue_id(cls, value: str) -> str:
-        stripped = value.strip()
-        if not stripped:
-            raise ValueError("cue_id must not be blank")
-        return stripped
-
-
-class ShutterEvent(BaseModel):
-    """Discrete shutter intent resolved against the beat grid by P2P-T2."""
-
-    bar: int = Field(ge=1, description="Absolute 1-indexed bar")
-    beat: int = Field(ge=1, description="1-indexed beat within the bar")
-    pattern: ShutterPattern = Field(description="Named shutter pattern")
-    moment_cue_id: str | None = Field(
-        description="Referenced MomentCue id when lyric-driven; otherwise null"
+    start_bar: int = Field(ge=1, description="First bar of this part (1-indexed)")
+    template_id: str = Field(description="Template from the Template Library")
+    preset_id: str | None = Field(
+        description="A preset the template declares, or null for the template as authored"
     )
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-
-class GoboEvent(BaseModel):
-    """Discrete gobo-wheel intent resolved against the beat grid by P2P-T2."""
-
-    bar: int = Field(ge=1, description="Absolute 1-indexed bar")
-    beat: int = Field(ge=1, description="1-indexed beat within the bar")
-    pattern: GoboPattern = Field(description="Named gobo pattern")
-    moment_cue_id: str | None = Field(
-        description="Referenced MomentCue id when lyric-driven; otherwise null"
-    )
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-
-class PlanSegment(BaseModel):
-    """LLM selection for a contiguous sub-range within a section."""
-
-    segment_id: str = Field(description="Short id within the section (e.g., 'A', 'B', 'C')")
-    start_bar: int = Field(ge=1, description="Start bar (1-indexed)")
-    end_bar: int = Field(ge=1, description="End bar (1-indexed, inclusive)")
-    template_id: str = Field(description="Template ID to use for this segment")
-    preset_id: str | None = Field(description="Optional preset ID; null when unused")
     modifiers: list[PlanModifier] = Field(description="Modifier entries; empty when unused")
-    reasoning: str = Field(description="Why this segment choice was made")
+    reasoning: str = Field(description="Why this template here")
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_legacy_input(cls, value: object) -> object:
-        """Keep deterministic callers compatible while the response schema stays strict."""
-        if not isinstance(value, dict):
-            return value
-        normalized = dict(value)
-        normalized.setdefault("preset_id", None)
-        normalized.setdefault("modifiers", [])
-        normalized.setdefault("reasoning", "")
-        if isinstance(normalized["modifiers"], dict):
-            normalized["modifiers"] = [
-                {"key": key, "value": modifier_value}
-                for key, modifier_value in normalized["modifiers"].items()
-            ]
-        return normalized
+
+class PlanEvent(BaseModel):
+    """A timed accent at a bar and beat, optionally tied to a lyric moment cue."""
+
+    bar: int = Field(ge=1, description="Absolute 1-indexed bar")
+    beat: int = Field(ge=1, description="1-indexed beat within the bar")
+    moment_cue_id: str | None = Field(
+        description="The lyric moment cue this event lands on, or null"
+    )
+    action: EventAction = Field(description="What the heads do")
+    color: ColorChoice = Field(description="The colour for a color event; otherwise null")
+    gobo: GoboChoice = Field(description="The pattern for a gobo event; otherwise null")
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     @model_validator(mode="after")
-    def _validate_bar_range(self) -> PlanSegment:
-        if self.end_bar < self.start_bar:
-            raise ValueError(f"end_bar ({self.end_bar}) must be >= start_bar ({self.start_bar})")
+    def _action_carries_its_field(self) -> PlanEvent:
+        needs_color = self.action is EventAction.COLOR
+        needs_gobo = self.action is EventAction.GOBO
+        if (self.color is not None) != needs_color or (self.gobo is not None) != needs_gobo:
+            raise ValueError(
+                f"a {self.action.value} event at bar {self.bar} beat {self.beat} sets "
+                + (
+                    "color and no gobo"
+                    if needs_color
+                    else "gobo and no color"
+                    if needs_gobo
+                    else "neither color nor gobo"
+                )
+            )
         return self
+
+    def describe(self) -> str:
+        """One line: where, what, and the cue it lands on."""
+        detail = " ".join(
+            value.value for value in (self.action, self.color, self.gobo) if value is not None
+        )
+        cue = f" on cue '{self.moment_cue_id}'" if self.moment_cue_id else ""
+        return f"bar {self.bar} beat {self.beat}: {detail}{cue}"
 
 
 class PlanSection(BaseModel):
-    """Typed LLM intent for one song section.
+    """The planner's song intent for one song section."""
 
-    Renderer contract: ``intensity`` resolves through the moving-head parameter tables;
-    ``color_intent`` resolves through the palette or color library; shutter and gobo
-    events resolve their bar/beat positions against the authoritative beat grid; and
-    ``moment_cues`` are joined to lyric MomentCues by id. P2P-T2 implements those
-    renderer resolutions.
-
-    The template-versus-segments XOR intentionally remains a post-validation check.
-    A nested discriminated selection object would break the live renderer's stable
-    ``template_id``/``segments`` interface and risk changing golden output in this
-    schema-only task. All keys remain required for strict structured outputs, with the
-    unused arm explicitly ``null``; P2P-T11 therefore retains this one repair surface.
-    """
-
-    section_name: str = Field(
-        description=(
-            "Unique SongSectionRef.section_id (e.g., 'verse_1', 'chorus_1'); never the "
-            "repeatable display name"
-        )
+    section_id: str = Field(
+        description="Unique SongSectionRef.section_id (e.g. 'chorus_2'), never the display name"
     )
     start_bar: int = Field(ge=1, description="Start bar (1-indexed)")
     end_bar: int = Field(ge=1, description="End bar (1-indexed, inclusive)")
     section_role: str | None = Field(
-        description="Section role (verse, chorus, bridge, build, drop, etc.) or null"
+        description="Section role (verse, chorus, bridge, build, drop, ...) or null"
     )
-    energy_level: int | None = Field(ge=0, le=100, description="Energy level 0-100 or null")
-    template_id: str | None = Field(
-        description="Template ID for an unsegmented section; otherwise null"
-    )
-    preset_id: str | None = Field(description="Optional preset ID; null when unused")
-    modifiers: list[PlanModifier] = Field(description="Modifier entries; empty when unused")
-    reasoning: str = Field(description="Why this template or segmentation was chosen")
-    segments: list[PlanSegment] | None = Field(
-        description="One to three contiguous segments, or null for a single template",
+    energy_level: int | None = Field(ge=0, le=100, description="Energy 0-100 or null")
+    parts: list[PlanPart] = Field(
+        description="One to three templates in bar order; one part covers the whole section",
         min_length=1,
-        max_length=3,
+        max_length=len(PART_IDS),
     )
-    transition_in: TransitionHint | None = Field(
-        description="Transition into this section, or null for renderer defaults"
+    intensity: IntensityChoice = Field(description="How hard the light drives; null = as authored")
+    color: ColorChoice = Field(description="The section's colour; null = as authored")
+    gobo: GoboChoice = Field(description="The section's gobo pattern; null = as authored")
+    moment_cues: list[str] = Field(description="Lyric moment cue ids this section answers")
+    events: list[PlanEvent] = Field(description="Timed accents in the section; empty when none")
+    motif_id: str | None = Field(description="The macro motif this section carries, or null")
+    variation: Variation = Field(description="How this section varies its motif")
+    density: Density = Field(description="How busy the movement is")
+    transitions: list[PlanTransition] = Field(
+        description="At most one ENTRY and one EXIT transition; empty for the default",
+        max_length=len(TransitionEdge),
     )
-    transition_out: TransitionHint | None = Field(
-        description="Transition out of this section, or null for renderer defaults"
-    )
-    intensity: Intensity = Field(
-        description="Categorical movement/dimmer intensity resolved by P2P-T2"
-    )
-    color_intent: ColorIntent = Field(
-        description="Palette-role or explicit-preset color resolved by P2P-T2"
-    )
-    shutter_events: list[ShutterEvent] = Field(
-        description="Discrete shutter changes resolved to DMX events by P2P-T2"
-    )
-    gobo_events: list[GoboEvent] = Field(
-        description="Discrete gobo-wheel changes resolved to DMX events by P2P-T2"
-    )
-    moment_cues: list[MomentCueReference] = Field(
-        description="Lyric MomentCue ids referenced by this section"
-    )
+    reasoning: str = Field(description="Why these choices serve the song here")
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    _legacy_intent_omitted: bool = PrivateAttr(default=False)
-
-    @model_validator(mode="wrap")
+    @field_validator("moment_cues")
     @classmethod
-    def _capture_intent_provenance(
-        cls, value: Any, handler: ModelWrapValidatorHandler[Self]
-    ) -> Self:
-        """Remember whether an internal legacy caller omitted schema-v2 intent.
-
-        The strict response schema still requires every public field. This private
-        marker exists only because the compatibility pre-validator below supplies
-        defaults for older deterministic constructors, and value comparison cannot
-        distinguish those omissions from an explicit SMOOTH/PRIMARY request.
-        """
-        intent_fields = {
-            "intensity",
-            "color_intent",
-            "shutter_events",
-            "gobo_events",
-            "moment_cues",
-        }
-        if isinstance(value, cls):
-            omitted = value.legacy_intent_omitted
-        else:
-            omitted = isinstance(value, dict) and intent_fields.isdisjoint(value)
-        section = handler(value)
-        assert section.__pydantic_private__ is not None
-        section.__pydantic_private__["_legacy_intent_omitted"] = omitted
-        return section
-
-    @property
-    def legacy_intent_omitted(self) -> bool:
-        """Whether a deterministic legacy constructor supplied no v2 intent fields."""
-        return self._legacy_intent_omitted
-
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_legacy_input(cls, value: object) -> object:
-        """Supply historical internal defaults without weakening the generated schema."""
-        if not isinstance(value, dict):
-            return value
-        normalized = dict(value)
-        legacy_defaults: dict[str, object] = {
-            "section_role": None,
-            "energy_level": None,
-            "template_id": None,
-            "preset_id": None,
-            "modifiers": [],
-            "reasoning": "",
-            "segments": None,
-            "transition_in": None,
-            "transition_out": None,
-            "intensity": Intensity.SMOOTH,
-            "color_intent": {
-                "selection": {
-                    "kind": ColorIntentKind.PALETTE_ROLE,
-                    "palette_role": PaletteRole.PRIMARY,
-                    "explicit_color": None,
-                }
-            },
-            "shutter_events": [],
-            "gobo_events": [],
-            "moment_cues": [],
-        }
-        for key, default in legacy_defaults.items():
-            normalized.setdefault(key, default)
-        if isinstance(normalized["modifiers"], dict):
-            normalized["modifiers"] = [
-                {"key": key, "value": modifier_value}
-                for key, modifier_value in normalized["modifiers"].items()
-            ]
-        return normalized
+    def _cue_ids(cls, value: list[str]) -> list[str]:
+        stripped = [cue_id.strip() for cue_id in value]
+        if any(not cue_id for cue_id in stripped):
+            raise ValueError("moment cue ids must not be blank")
+        if len(stripped) != len(set(stripped)):
+            raise ValueError("moment_cues must contain unique cue ids")
+        return stripped
 
     @model_validator(mode="after")
-    def _validate_section(self) -> PlanSection:
+    def _bars_and_parts(self) -> PlanSection:
         if self.end_bar < self.start_bar:
             raise ValueError(f"end_bar ({self.end_bar}) must be >= start_bar ({self.start_bar})")
-
-        has_segments = bool(self.segments)
-        has_single = bool(self.template_id)
-        if has_segments and has_single:
-            raise ValueError("Provide either 'segments' OR 'template_id', not both.")
-        if not has_segments and not has_single:
-            raise ValueError("Must provide either 'segments' or 'template_id'.")
-
-        cue_ids = [reference.cue_id for reference in self.moment_cues]
-        if len(cue_ids) != len(set(cue_ids)):
-            raise ValueError("moment_cues must contain unique cue_id values")
-        known_cues = set(cue_ids)
-        for shutter_event in self.shutter_events:
-            if not self.start_bar <= shutter_event.bar <= self.end_bar:
-                raise ValueError("Discrete event bar must be within the section bar range.")
-            if (
-                shutter_event.moment_cue_id is not None
-                and shutter_event.moment_cue_id not in known_cues
-            ):
-                raise ValueError(
-                    "Discrete event references unknown MomentCue id "
-                    f"'{shutter_event.moment_cue_id}'."
-                )
-        for gobo_event in self.gobo_events:
-            if not self.start_bar <= gobo_event.bar <= self.end_bar:
-                raise ValueError("Discrete event bar must be within the section bar range.")
-            if gobo_event.moment_cue_id is not None and gobo_event.moment_cue_id not in known_cues:
-                raise ValueError(
-                    f"Discrete event references unknown MomentCue id '{gobo_event.moment_cue_id}'."
-                )
-
-        if self.segments:
-            segs = sorted(self.segments, key=lambda segment: (segment.start_bar, segment.end_bar))
-            if segs[0].start_bar != self.start_bar:
-                raise ValueError("First segment must start at section start_bar.")
-            if segs[-1].end_bar != self.end_bar:
-                raise ValueError("Last segment must end at section end_bar.")
-            for index in range(len(segs) - 1):
-                if segs[index].end_bar + 1 != segs[index + 1].start_bar:
-                    raise ValueError("Segments must be contiguous and non-overlapping.")
-            for segment in segs:
-                if segment.start_bar < self.start_bar or segment.end_bar > self.end_bar:
-                    raise ValueError("Segment bar range must be within the section bar range.")
-
+        starts = [part.start_bar for part in self.parts]
+        if starts[0] != self.start_bar:
+            raise ValueError(
+                f"the first part starts at bar {starts[0]}, not the section's start "
+                f"{self.start_bar}"
+            )
+        if starts != sorted(set(starts)):
+            raise ValueError(f"parts must be ordered by start_bar, each later: {starts}")
+        if starts[-1] > self.end_bar:
+            raise ValueError(
+                f"part start bar {starts[-1]} is not inside the section "
+                f"({self.start_bar}-{self.end_bar})"
+            )
+        edges = [transition.edge for transition in self.transitions]
+        for edge in TransitionEdge:
+            if edges.count(edge) > 1:
+                raise ValueError(f"a section has at most one {edge.value} transition")
         return self
 
+    @property
+    def entry(self) -> PlanTransition | None:
+        """The transition into this section, if the planner chose one."""
+        return self._transition(TransitionEdge.ENTRY)
 
-def flatten_plan_segment(section: PlanSection, segment: PlanSegment) -> PlanSection:
-    """Project one parent section onto a contiguous segment.
+    @property
+    def exit(self) -> PlanTransition | None:
+        """The transition out of this section, if the planner chose one."""
+        return self._transition(TransitionEdge.EXIT)
 
-    Event bars are absolute and section segments are contiguous and non-overlapping, so
-    both segment endpoints are inclusive: an event on ``end_bar`` belongs to that segment
-    and the following segment starts at ``end_bar + 1``. Untimed MomentCue references
-    cannot be range-routed; they remain available on each derived section so routed
-    shutter/gobo events keep resolvable cue references. All other parent creative intent
-    is inherited unchanged unless the segment supplies its own template metadata.
-    """
+    def _transition(self, edge: TransitionEdge) -> PlanTransition | None:
+        return next((t for t in self.transitions if t.edge is edge), None)
 
-    flattened = PlanSection(
-        section_name=f"{section.section_name}|{segment.segment_id}",
-        start_bar=segment.start_bar,
-        end_bar=segment.end_bar,
-        section_role=section.section_role,
-        energy_level=section.energy_level,
-        template_id=segment.template_id,
-        preset_id=segment.preset_id,
-        modifiers=segment.modifiers,
-        reasoning=segment.reasoning or section.reasoning,
-        segments=None,
-        transition_in=section.transition_in,
-        transition_out=section.transition_out,
-        intensity=section.intensity,
-        color_intent=section.color_intent,
-        shutter_events=[
-            event
-            for event in section.shutter_events
-            if segment.start_bar <= event.bar <= segment.end_bar
-        ],
-        gobo_events=[
-            event
-            for event in section.gobo_events
-            if segment.start_bar <= event.bar <= segment.end_bar
-        ],
-        moment_cues=section.moment_cues,
-    )
-    assert flattened.__pydantic_private__ is not None
-    flattened.__pydantic_private__["_legacy_intent_omitted"] = section.legacy_intent_omitted
-    return flattened
+    def part_bars(self) -> list[tuple[PlanPart, int, int]]:
+        """Each part with its bars: from its start to the bar before the next part's."""
+        ends = [part.start_bar - 1 for part in self.parts[1:]] + [self.end_bar]
+        return [(part, part.start_bar, end) for part, end in zip(self.parts, ends, strict=True)]
+
+    def set_intent_fields(self) -> tuple[str, ...]:
+        """The song-intent fields the planner set away from "as authored"."""
+        chosen = {
+            "intensity": self.intensity is not None,
+            "color": self.color is not None,
+            "gobo": self.gobo is not None,
+            "moment_cues": bool(self.moment_cues),
+            "events": bool(self.events),
+            "motif_id": self.motif_id is not None,
+            "variation": self.variation is not Variation.NONE,
+            "density": self.density is not Density.BALANCED,
+            "entry": self.entry is not None,
+            "exit": self.exit is not None,
+            "modifiers": any(part.modifiers for part in self.parts),
+        }
+        return tuple(name for name, is_set in chosen.items() if is_set)
+
+
+class PlanRepair(BaseModel):
+    """One planned item deterministic repair dropped, adjusted or recorded, and why."""
+
+    section_id: str
+    item: str
+    action: RepairAction
+    reason: str
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    def describe(self) -> str:
+        """One line for the planner and the reader: what was repaired and why."""
+        return f"section '{self.section_id}': {self.item} {self.action.value}: {self.reason}"
 
 
 class ChoreographyPlan(BaseModel):
     """Complete choreography plan from the moving-head planner agent."""
 
-    sections: list[PlanSection] = Field(
-        description="Section selections and typed intents", min_length=1
-    )
+    sections: list[PlanSection] = Field(description="One entry per song section", min_length=1)
     overall_strategy: str = Field(description="High-level choreography strategy")
+    repairs: SkipJsonSchema[list[PlanRepair]] = Field(
+        default_factory=list,
+        description="What deterministic repair changed in the planner's response (not planned)",
+    )
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_legacy_input(cls, value: object) -> object:
-        """Retain the historical empty-strategy default for internal construction."""
-        if not isinstance(value, dict):
-            return value
-        normalized = dict(value)
-        normalized.setdefault("overall_strategy", "")
-        return normalized
+
+def flatten_section(section: PlanSection) -> list[PlanSection]:
+    """The section as the renderer places it: one section per part.
+
+    One part is the section itself. Several parts become sections named
+    `<section_id>|A`, `|B`, `|C` over their own bars; each keeps the section's intent,
+    with the events on its bars (event bars are absolute), the moment cues (untimed, so
+    on every part), the entry transition on the first part and the exit on the last.
+    """
+    if len(section.parts) == 1:
+        return [section]
+    bars = section.part_bars()
+    flattened: list[PlanSection] = []
+    for index, (part, start, end) in enumerate(bars):
+        edges = {TransitionEdge.ENTRY} if index == 0 else set()
+        if index == len(bars) - 1:
+            edges.add(TransitionEdge.EXIT)
+        flattened.append(
+            section.model_copy(
+                update={
+                    "section_id": f"{section.section_id}|{PART_IDS[index]}",
+                    "start_bar": start,
+                    "end_bar": end,
+                    "parts": [part],
+                    "events": [event for event in section.events if start <= event.bar <= end],
+                    "transitions": [t for t in section.transitions if t.edge in edges],
+                }
+            )
+        )
+    return flattened
+
+
+_OLD_SECTION_KEYS = frozenset(
+    {"section_name", "template_id", "segments", "color_intent", "shutter_events", "gobo_events"}
+)
+
+
+def load_plan(data: object, *, remedy: str) -> ChoreographyPlan:
+    """Read a saved plan, refusing one in the contract before 2026-11-17 by name.
+
+    Args:
+        data: The plan's JSON value.
+        remedy: What the user runs to write the plan again, appended to the refusal.
+
+    Raises:
+        ValueError: If `data` is a plan in the old contract (a moving-head plan whose
+            sections carry `section_name`, `template_id` or `segments`), naming it and
+            `remedy`.
+        ValidationError: If `data` is not a valid plan otherwise.
+    """
+    try:
+        return ChoreographyPlan.model_validate(data)
+    except ValidationError as error:
+        sections = data.get("sections") if isinstance(data, dict) else None
+        if isinstance(sections, list) and any(
+            isinstance(section, dict) and not _OLD_SECTION_KEYS.isdisjoint(section)
+            for section in sections
+        ):
+            raise ValueError(
+                "this moving-head plan was saved in the planner contract before 2026-11-17 "
+                "(its sections carry `section_name`, `template_id` or `segments`); this "
+                f"version reads only the song-intent contract. To write it again, {remedy}"
+            ) from error
+        raise

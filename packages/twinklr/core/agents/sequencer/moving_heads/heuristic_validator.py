@@ -1,12 +1,12 @@
 """Heuristic validator for choreography plans.
 
-Fast, deterministic validation without LLM calls.
-Catches technical errors before expensive judge evaluation.
-Primary validation layer - judge only evaluates creative quality.
+Fast, deterministic validation without LLM calls. It refuses what is structurally
+invalid against the song and the template library (a template not offered, a section
+beyond the song, overlapping sections), which the refinement loop re-plans. The plan
+model itself enforces the context-free rules (bar order, parts, event fields), and
+`moment_cues.bind_lyric_moment_cues` repairs single items instead of refusing them.
 
-V2 Migration:
-- Supports both legacy dict-based input and new MovingHeadPlanningContext
-- Use `from_context()` class method for V2 usage
+- Use `from_context()` with a `MovingHeadPlanningContext`
 - Use `create_validator_function()` for StandardIterationController integration
 """
 
@@ -14,12 +14,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-import itertools
 import logging
 from typing import TYPE_CHECKING, Any, NamedTuple
 
-from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
-from twinklr.core.agents.sequencer.moving_heads.moment_cues import lyric_moment_cue_errors
+from twinklr.core.agents.sequencer.moving_heads.models import (
+    PART_IDS,
+    ChoreographyPlan,
+    PlanSection,
+)
 
 if TYPE_CHECKING:
     from twinklr.core.agents.sequencer.moving_heads.context import MovingHeadPlanningContext
@@ -37,10 +39,10 @@ class HeuristicValidationResult:
 
 
 class _PlanUnit(NamedTuple):
-    """Flattened evaluation unit (section or segment)."""
+    """Flattened evaluation unit (a section, or one part of a section of several)."""
 
     # identity / location
-    location: str  # e.g. "verse_1" or "verse_1:A"
+    location: str  # e.g. "verse_1" or "verse_1|A"
     parent_section: str
 
     # bars
@@ -50,7 +52,6 @@ class _PlanUnit(NamedTuple):
     # selection
     template_id: str
     preset_id: str | None
-    modifiers: dict[str, str]
 
 
 def create_validator_function(
@@ -74,8 +75,7 @@ def create_validator_function(
 
     def validate(plan: ChoreographyPlan) -> list[str]:
         """Validate plan and return list of error messages."""
-        result = heuristic_validator.validate(plan)
-        return result.errors + lyric_moment_cue_errors(plan, context.lyric_context)
+        return heuristic_validator.validate(plan).errors
 
     return validate
 
@@ -83,21 +83,17 @@ def create_validator_function(
 class HeuristicValidator:
     """Code-based validator for choreography plans.
 
-    Primary technical validation layer. Performs comprehensive checks:
-    - Template existence in library
-    - Timing validity (bar ranges, no overlaps)
-    - Section coverage (no large gaps)
-    - Segmentation validity (1-3 segments, contiguous, full coverage)
-    - Basic parameter validation
+    Technical checks against the song and the library:
+    - Template existence in library, for every part
+    - Timing validity (bars within the song, no overlaps)
+    - Section coverage (gaps and uncovered song sections are warnings)
     - Bar numbering (1-indexed)
 
     This is the main technical gate. Judge focuses on creative quality.
 
-    V2 Usage:
-        Use `from_context()` class method or `create_validator_function()` factory.
-
-    Legacy Usage:
-        Direct instantiation with available_templates and song_structure dict.
+    Usage:
+        Use `from_context()`, `create_validator_function()`, or construct it with the
+        available templates and a song structure dict.
     """
 
     def __init__(
@@ -152,12 +148,12 @@ class HeuristicValidator:
             errors.append("Plan has no sections")
             return HeuristicValidationResult(valid=False, errors=errors, warnings=warnings)
 
-        covered_section_names: set[str] = set()
+        covered_section_ids: set[str] = set()
         units: list[_PlanUnit] = []
 
         # Validate each section structurally + collect flattened units
         for section in plan.sections:
-            covered_section_names.add(section.section_name)
+            covered_section_ids.add(section.section_id)
             section_units = self._validate_section(section, errors, warnings)
             units.extend(section_units)
 
@@ -166,7 +162,7 @@ class HeuristicValidator:
 
         # Compare against song structure (section coverage/mismatch) if available
         if self._song_sections:
-            missing_sections = set(self._song_sections.keys()) - covered_section_names
+            missing_sections = set(self._song_sections.keys()) - covered_section_ids
             if missing_sections:
                 warnings.append(
                     f"Plan doesn't cover all song sections: {', '.join(sorted(missing_sections))}"
@@ -200,148 +196,46 @@ class HeuristicValidator:
         errors: list[str],
         warnings: list[str],
     ) -> list[_PlanUnit]:
-        units: list[_PlanUnit] = []
+        name = section.section_id
 
-        # 1) basic bars
+        # 1) basic bars (the plan model enforces their order)
         if section.start_bar < 1:
             errors.append(
-                f"Section '{section.section_name}' has invalid start_bar ({section.start_bar}); must be >= 1 (1-indexed)"
-            )
-        if section.end_bar < section.start_bar:
-            errors.append(
-                f"Section '{section.section_name}' end_bar ({section.end_bar}) must be >= start_bar ({section.start_bar})"
+                f"Section '{name}' has invalid start_bar ({section.start_bar}); must be >= 1 (1-indexed)"
             )
 
-        # 2) schema form: either single-template OR segmented
-        # Note: segments can be None (null in JSON) or omitted entirely - both are treated as "no segments"
-        segments_value = getattr(section, "segments", None)
-        has_segments = bool(segments_value)  # None, [], or missing all evaluate to False
-        has_single = bool(getattr(section, "template_id", None))
-
-        if has_segments and has_single:
-            errors.append(
-                f"Section '{section.section_name}': provide either 'segments' OR 'template_id', not both"
-            )
-            return units
-        if not has_segments and not has_single:
-            errors.append(
-                f"Section '{section.section_name}': must provide either 'segments' or 'template_id'"
-            )
-            return units
-
-        # 3) compare to song structure if present (warn only)
-        if self._song_sections and section.section_name in self._song_sections:
-            expected_start = self._song_sections[section.section_name].get("start_bar")
-            expected_end = self._song_sections[section.section_name].get("end_bar")
+        # 2) compare to song structure if present (warn only)
+        if self._song_sections and name in self._song_sections:
+            expected_start = self._song_sections[name].get("start_bar")
+            expected_end = self._song_sections[name].get("end_bar")
             if expected_start is not None and section.start_bar != expected_start:
                 warnings.append(
-                    f"Section '{section.section_name}' start_bar ({section.start_bar}) doesn't match song structure ({expected_start})"
+                    f"Section '{name}' start_bar ({section.start_bar}) doesn't match song structure ({expected_start})"
                 )
             if expected_end is not None and section.end_bar != expected_end:
                 warnings.append(
-                    f"Section '{section.section_name}' end_bar ({section.end_bar}) doesn't match song structure ({expected_end})"
+                    f"Section '{name}' end_bar ({section.end_bar}) doesn't match song structure ({expected_end})"
                 )
 
-        # 4) single-template section
-        if has_single:
-            template_id = section.template_id
-            if template_id not in self.available_templates:
-                errors.append(
-                    f"Section '{section.section_name}': template '{template_id}' not in library"
-                )
-
-            # warn on very short (0-length or 1-bar-ish)
-            if section.end_bar - section.start_bar < 1:
-                warnings.append(
-                    f"Section '{section.section_name}' is very short ({section.end_bar - section.start_bar} bars)"
-                )
-
+        # 3) each part: an offered template over its own bars
+        units: list[_PlanUnit] = []
+        parts = section.part_bars()
+        for index, (part, start_bar, end_bar) in enumerate(parts):
+            location = name if len(parts) == 1 else f"{name}|{PART_IDS[index]}"
+            if part.template_id not in self.available_templates:
+                errors.append(f"Section '{location}': template '{part.template_id}' not in library")
+            if end_bar - start_bar < 1:
+                warnings.append(f"Section '{location}' is very short ({end_bar - start_bar} bars)")
             units.append(
                 _PlanUnit(
-                    location=section.section_name,
-                    parent_section=section.section_name,
-                    start_bar=section.start_bar,
-                    end_bar=section.end_bar,
-                    template_id=template_id or "",
-                    preset_id=section.preset_id,
-                    modifiers={modifier.key: modifier.value for modifier in section.modifiers},
+                    location=location,
+                    parent_section=name,
+                    start_bar=start_bar,
+                    end_bar=end_bar,
+                    template_id=part.template_id,
+                    preset_id=part.preset_id,
                 )
             )
-            return units
-
-        # 5) segmented section
-        segs = list(section.segments or [])
-        if not (1 <= len(segs) <= 3):
-            errors.append(
-                f"Section '{section.section_name}': segments must be 1–3 items (got {len(segs)})"
-            )
-            return units
-
-        # sort by bars for deterministic validation
-        segs_sorted = sorted(segs, key=lambda s: (s.start_bar, s.end_bar))
-
-        # validate each segment and build units
-        for seg in segs_sorted:
-            loc = f"{section.section_name}:{seg.segment_id}"
-
-            if seg.start_bar < 1:
-                errors.append(
-                    f"Segment '{loc}' has invalid start_bar ({seg.start_bar}); must be >= 1"
-                )
-            if seg.end_bar < seg.start_bar:
-                errors.append(
-                    f"Segment '{loc}' end_bar ({seg.end_bar}) must be >= start_bar ({seg.start_bar})"
-                )
-
-            if seg.template_id not in self.available_templates:
-                errors.append(f"Segment '{loc}': template '{seg.template_id}' not in library")
-
-            if seg.end_bar - seg.start_bar < 1:
-                warnings.append(
-                    f"Segment '{loc}' is very short ({seg.end_bar - seg.start_bar} bars)"
-                )
-
-            # must be within parent section range
-            if seg.start_bar < section.start_bar or seg.end_bar > section.end_bar:
-                errors.append(
-                    f"Segment '{loc}' bar range ({seg.start_bar}-{seg.end_bar}) must be within section "
-                    f"({section.start_bar}-{section.end_bar})"
-                )
-
-            units.append(
-                _PlanUnit(
-                    location=loc,
-                    parent_section=section.section_name,
-                    start_bar=seg.start_bar,
-                    end_bar=seg.end_bar,
-                    template_id=seg.template_id,
-                    preset_id=seg.preset_id,
-                    modifiers={modifier.key: modifier.value for modifier in seg.modifiers},
-                )
-            )
-
-        # validate contiguity + full coverage within the section
-        first = segs_sorted[0]
-        last = segs_sorted[-1]
-        if first.start_bar != section.start_bar:
-            errors.append(
-                f"Section '{section.section_name}': first segment must start at section start_bar ({section.start_bar}); "
-                f"got {first.start_bar}"
-            )
-        if last.end_bar != section.end_bar:
-            errors.append(
-                f"Section '{section.section_name}': last segment must end at section end_bar ({section.end_bar}); "
-                f"got {last.end_bar}"
-            )
-
-        for prev, nxt in itertools.pairwise(segs_sorted):
-            if prev.end_bar + 1 != nxt.start_bar:
-                errors.append(
-                    f"Section '{section.section_name}': segments must be contiguous and non-overlapping; "
-                    f"found gap/overlap between '{prev.segment_id}' ({prev.start_bar}-{prev.end_bar}) and "
-                    f"'{nxt.segment_id}' ({nxt.start_bar}-{nxt.end_bar})"
-                )
-
         return units
 
     # ---------------------------------------------------------------------

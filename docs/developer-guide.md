@@ -248,7 +248,11 @@ Factory: `TwinklrSession.from_directory(config_dir)` discovers `config.json` and
 ### Sequencer & Rendering
 
 **Moving heads** (`packages/twinklr/core/sequencer/moving_heads/`):
-- The template compiler turns `ChoreographyPlan` sections into cues with
+- The renderer places each `ChoreographyPlan` section's parts (one to three templates
+  over its bars) and renders the templates as authored: the section's song intent is
+  not rendered yet (a known regression, [plan](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)),
+  and each section that sets any says which fields in the trace's diagnostics
+- The template compiler turns the sections' parts into cues with
   typed physical trajectories; the transaction pass plans dark repositioning between
   them, and the frame encoder writes complete 20 ms frames as constant DMX effects
 - Output is a fresh xLights `.xsq` plus `.xtiming`/`.xmap` sidecars, written by `moving_heads/delivery.py`; no user sequence is read

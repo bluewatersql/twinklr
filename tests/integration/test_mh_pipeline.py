@@ -28,9 +28,10 @@ from tests.support.moving_heads import (
     p1_plan,
     p1_rig,
     p1_templates,
+    plan_section,
 )
 from twinklr.cli.main import build_run_pipeline
-from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
 from twinklr.core.caching import derive_session_id
 from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup, InitialFixtureState
@@ -459,17 +460,8 @@ def test_silent_song_edges_are_held_dark_outside_the_covered_span(
     grid = edge_grid(lead_in_ms=3000, tail_ms=4000)
     # Bars 1-3: bar 3 starts on the last observed beat, so its reveal lies past the span.
     plan = ChoreographyPlan(
-        sections=[
-            PlanSection.model_validate(
-                {
-                    "section_name": "verse",
-                    "start_bar": 1,
-                    "end_bar": 3,
-                    "template_id": TEMPLATE_ID,
-                    "preset_id": None,
-                }
-            )
-        ]
+        sections=[plan_section("verse", 1, 3, TEMPLATE_ID)],
+        overall_strategy="",
     )
     output = tmp_path / "show.xsq"
     pipeline = RenderingPipeline(

@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from tests.support.moving_heads import plan_section
 from twinklr.core.agents.audio.lyrics.models import LyricContextModel, MomentCue
 from twinklr.core.agents.audio.profile.models import (
     AudioProfileModel,
@@ -32,12 +33,7 @@ from twinklr.core.agents.sequencer.moving_heads.context import (
     MovingHeadPlanningContext,
     TemplateDescription,
 )
-from twinklr.core.agents.sequencer.moving_heads.models import (
-    ChoreographyPlan,
-    MomentCueReference,
-    PlanSection,
-    ShutterEvent,
-)
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.agents.sequencer.moving_heads.orchestrator import (
     MovingHeadPlannerOrchestrator,
     build_judge_variables,
@@ -198,29 +194,25 @@ def planning_context() -> MovingHeadPlanningContext:
     )
 
 
+def _event(bar: int, beat: int, action: str, cue_id: str | None = None) -> dict[str, object]:
+    return {
+        "bar": bar,
+        "beat": beat,
+        "moment_cue_id": cue_id,
+        "action": action,
+        "color": None,
+        "gobo": None,
+    }
+
+
 @pytest.fixture
 def valid_plan() -> ChoreographyPlan:
     """Create a valid choreography plan."""
     return ChoreographyPlan(
         sections=[
-            PlanSection(
-                section_name="intro",
-                start_bar=1,
-                end_bar=8,
-                template_id="sweep_lr_fan_pulse",
-            ),
-            PlanSection(
-                section_name="verse_1",
-                start_bar=9,
-                end_bar=24,
-                template_id="circle_fan_hold",
-            ),
-            PlanSection(
-                section_name="chorus_1",
-                start_bar=25,
-                end_bar=40,
-                template_id="pendulum_chevron_breathe",
-            ),
+            plan_section("intro", 1, 8, "sweep_lr_fan_pulse"),
+            plan_section("verse_1", 9, 24, "circle_fan_hold"),
+            plan_section("chorus_1", 25, 40, "pendulum_chevron_breathe"),
         ],
         overall_strategy="Build energy progressively",
     )
@@ -422,6 +414,46 @@ class TestMovingHeadPlannerOrchestrator:
         assert baseline_prompt["macro_motif_continuity"] == projection["motif_continuity"]
         assert baseline_prompt["macro_focal_arc"] == projection["focal_arc"]
 
+    def test_planner_sees_each_section_palette_colours(
+        self, planning_context: MovingHeadPlanningContext
+    ) -> None:
+        """A palette-role colour is chosen knowing what the role stands for: each macro
+        section carries its palette's colours, not only the palette id."""
+        from twinklr.core.sequencer.theming.catalog import get_palette
+
+        plan = create_test_macro_plan(planning_context.audio_profile)
+        context = planning_context.model_copy(update={"macro_plan": plan})
+
+        variables = build_planner_variables(context)
+
+        stops = get_palette("core.christmas_traditional").stops
+        for section in variables["macro_plan"]:
+            assert section["palette_id"] == "core.christmas_traditional"
+            assert section["palette_colors"] == [
+                {"hex": stop.hex, "name": stop.name} for stop in stops
+            ]
+
+    @pytest.mark.asyncio
+    async def test_the_response_schema_re_keys_the_plan_cache(
+        self, mock_provider: MagicMock, planning_context: MovingHeadPlanningContext
+    ) -> None:
+        """A change to the planner's response model alone gives every song a new cache
+        key, so a plan in another contract is never reused."""
+        from pydantic import BaseModel, ConfigDict
+
+        class OtherContract(BaseModel):
+            model_config = ConfigDict(extra="forbid")
+
+            sections: list[str]
+
+        orchestrator = MovingHeadPlannerOrchestrator(provider=mock_provider)
+        baseline = await orchestrator.get_cache_key(planning_context)
+        orchestrator.planner_spec = orchestrator.planner_spec.model_copy(
+            update={"response_model": OtherContract}
+        )
+
+        assert await orchestrator.get_cache_key(planning_context) != baseline
+
     @pytest.mark.asyncio
     async def test_cache_key_tracks_iteration_and_threshold_config(
         self, mock_provider: MagicMock, planning_context: MovingHeadPlanningContext
@@ -611,14 +643,7 @@ class TestOrchestratorIntegration:
             )
 
             plan = ChoreographyPlan(
-                sections=[
-                    PlanSection(
-                        section_name="intro",
-                        start_bar=1,
-                        end_bar=8,
-                        template_id="sweep_lr_fan_pulse",
-                    )
-                ],
+                sections=[plan_section("intro", 1, 8, "sweep_lr_fan_pulse")],
                 overall_strategy="Test",
             )
 
@@ -675,20 +700,13 @@ class TestOrchestratorIntegration:
         cue_id = "intro-home"
         plan = ChoreographyPlan(
             sections=[
-                PlanSection(
-                    section_name="intro",
-                    start_bar=1,
-                    end_bar=2,
-                    template_id="sweep_lr_fan_pulse",
-                    moment_cues=[MomentCueReference(cue_id=cue_id)],
-                    shutter_events=[
-                        ShutterEvent(
-                            bar=1,
-                            beat=1,
-                            pattern="strobe_fast",
-                            moment_cue_id=cue_id,
-                        )
-                    ],
+                plan_section(
+                    "intro",
+                    1,
+                    2,
+                    "sweep_lr_fan_pulse",
+                    moment_cues=[cue_id],
+                    events=[_event(1, 1, "strobe_fast", cue_id)],
                 )
             ],
             overall_strategy="Accentuate the lyric.",
@@ -730,8 +748,10 @@ class TestOrchestratorIntegration:
         assert result.plan is not None
         normalizer = controller_run.call_args.kwargs["plan_normalizer"]
         normalized = normalizer(result.plan)
-        event = normalized.sections[0].shutter_events[0]
+        event = normalized.sections[0].events[0]
         assert (event.bar, event.beat) == (1, 4)
+        repairs = controller_run.call_args.kwargs["plan_repairs"]
+        assert repairs(normalized) == []
 
     @pytest.mark.asyncio
     async def test_judge_provider_receives_canonical_section_and_bound_cue_event(self) -> None:
@@ -756,20 +776,13 @@ class TestOrchestratorIntegration:
         cue_id = "chorus-home"
         planner_plan = ChoreographyPlan(
             sections=[
-                PlanSection(
-                    section_name="chorus",  # Display name; normalizer must canonicalize it.
-                    start_bar=1,
-                    end_bar=2,
-                    template_id="sweep_lr_fan_pulse",
-                    moment_cues=[MomentCueReference(cue_id=cue_id)],
-                    shutter_events=[
-                        ShutterEvent(
-                            bar=2,
-                            beat=4,
-                            pattern="strobe_fast",
-                            moment_cue_id=cue_id,
-                        )
-                    ],
+                plan_section(
+                    "chorus",  # Display name; normalizer must canonicalize it.
+                    1,
+                    2,
+                    "sweep_lr_fan_pulse",
+                    moment_cues=[cue_id],
+                    events=[_event(2, 4, "strobe_fast", cue_id)],
                 )
             ],
             overall_strategy="Accentuate the lyric.",
@@ -789,7 +802,7 @@ class TestOrchestratorIntegration:
         invalid_plan = planner_plan.model_copy(
             update={
                 "sections": [
-                    planner_plan.sections[0].model_copy(update={"section_name": "missing_section"})
+                    planner_plan.sections[0].model_copy(update={"section_id": "missing_section"})
                 ]
             }
         )
@@ -844,9 +857,95 @@ class TestOrchestratorIntegration:
         assert provider.generate_json_with_conversation_async.await_count == 2
         assert provider.generate_json_async.await_count == 1
         assert result.plan is not None
-        assert result.plan.sections[0].section_name == "chorus_1"
-        event = result.plan.sections[0].shutter_events[0]
+        assert result.plan.sections[0].section_id == "chorus_1"
+        event = result.plan.sections[0].events[0]
         assert (event.bar, event.beat) == (1, 3)
         rendered_judge_request = "\n".join(message["content"] for message in judge_messages)
-        assert '"section_name": "chorus_1"' in rendered_judge_request
+        assert '"section_id": "chorus_1"' in rendered_judge_request
         assert '"beat": 3' in rendered_judge_request
+
+    @pytest.mark.asyncio
+    async def test_a_repaired_item_reaches_the_judge_and_the_next_planning_prompt(self) -> None:
+        """One impossible item is repaired, not refused: the run goes on to the judge, and
+        what repair did reaches the planner's refinement prompt."""
+        section = SongSectionRef(section_id="chorus_1", name="chorus", start_ms=0, end_ms=4_000)
+        profile = create_test_audio_profile().model_copy(
+            update={
+                "song_identity": SongIdentity(
+                    title="Cue Song",
+                    artist="Test Artist",
+                    duration_ms=4_000,
+                    bpm=120.0,
+                    time_signature="4/4",
+                ),
+                "structure": Structure(sections=[section], structure_confidence=0.9),
+            }
+        )
+        first = ChoreographyPlan(
+            sections=[
+                plan_section(
+                    "chorus_1",
+                    1,
+                    2,
+                    "sweep_lr_fan_pulse",
+                    moment_cues=["ghost"],
+                    events=[_event(2, 1, "hit", "ghost"), _event(5, 1, "closed")],
+                )
+            ],
+            overall_strategy="Accentuate the lyric.",
+        )
+        second = ChoreographyPlan(
+            sections=[plan_section("chorus_1", 1, 2, "sweep_lr_fan_pulse")],
+            overall_strategy="Accentuate the lyric.",
+        )
+        verdicts = [
+            JudgeVerdict(
+                status=status,
+                score=score,
+                confidence=0.9,
+                strengths=["On the grid"],
+                issues=[],
+                feedback_for_planner="Tighten the chorus.",
+                iteration=iteration,
+            )
+            for iteration, (status, score) in enumerate(
+                [(VerdictStatus.SOFT_FAIL, 6.0), (VerdictStatus.APPROVE, 8.0)]
+            )
+        ]
+        planner_messages: list[str] = []
+        judge_messages: list[str] = []
+
+        async def planner_call(*, user_message: str, **kwargs: object) -> LLMResponse:
+            planner_messages.append(user_message)
+            plan = first if len(planner_messages) == 1 else second
+            return LLMResponse(content=plan.model_dump(mode="json"), metadata=ResponseMetadata())
+
+        async def judge_call(*, messages: list[dict[str, str]], **kwargs: object) -> LLMResponse:
+            judge_messages.append("\n".join(message["content"] for message in messages))
+            verdict = verdicts[len(judge_messages) - 1]
+            return LLMResponse(content=verdict.model_dump(mode="json"), metadata=ResponseMetadata())
+
+        provider = MagicMock()
+        provider.provider_type = ProviderType.ANTHROPIC
+        provider.generate_json_with_conversation_async = AsyncMock(side_effect=planner_call)
+        provider.generate_json_async = AsyncMock(side_effect=judge_call)
+        context = MovingHeadPlanningContext(
+            audio_profile=profile,
+            lyric_context=LyricContextModel(has_lyrics=True, vocal_coverage_pct=0.25),
+            fixtures=FixtureContext(count=4, groups=[]),
+            beat_grid=BeatGrid.from_tempo(tempo_bpm=120, total_bars=2),
+            available_templates=["sweep_lr_fan_pulse"],
+        )
+
+        result = await MovingHeadPlannerOrchestrator(provider=provider, max_iterations=2).run(
+            context
+        )
+
+        assert result.success
+        assert len(planner_messages) == 2 and len(judge_messages) == 2
+        # The judge sees the repaired plan and its repairs; "ghost" survives only there.
+        assert '"repairs"' in judge_messages[0] and "ghost" in judge_messages[0]
+        assert "section 'chorus_1': moment cue 'ghost' dropped" in planner_messages[1]
+        assert "section 'chorus_1': closed event at bar 5 beat 1 dropped" in planner_messages[1]
+        assert "ghost" not in planner_messages[0]
+        assert result.plan is not None and result.plan.repairs == []

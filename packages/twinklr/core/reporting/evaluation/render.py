@@ -14,6 +14,7 @@ from twinklr.core.reporting.evaluation.models import (
     EvaluationReport,
     RenderSummary,
     SectionReport,
+    SongIntentReport,
 )
 
 if TYPE_CHECKING:
@@ -180,6 +181,11 @@ def _render_summary_markdown(summary: RenderSummary) -> list[str]:
             f"- **Kept dark as unplayable** ({code}): {total['cues']} cue(s), "
             f"{total['frames']} frame(s)"
         )
+    for repair in summary.plan_repairs:
+        lines.append(
+            f"- **Plan repair** (section `{repair['section_id']}`): {repair['item']} "
+            f"{repair['action']}: {repair['reason']}"
+        )
     lines.append("")
     lines.append(
         "Values are read from the encoded frames: pan, tilt and zoom in degrees; `dimmer` "
@@ -195,6 +201,29 @@ def _render_summary_markdown(summary: RenderSummary) -> list[str]:
         "detect sustained overspeed of up to one word per frame, nor a reveal before the "
         "head has finished travelling or settling."
     )
+    lines.append("")
+    return lines
+
+
+def _song_intent_markdown(intent: SongIntentReport) -> list[str]:
+    """The planner's song intent for a section; unset fields say "as authored"."""
+    authored = "as authored"
+    lines = [
+        "**Song intent** (as planned):",
+        f"- intensity: {intent.intensity or authored}",
+        f"- colour: {intent.color or authored}",
+        f"- gobo: {intent.gobo or authored}",
+        f"- moment cues: {', '.join(intent.moment_cues) or 'none'}",
+        f"- events: {'; '.join(intent.events) or 'none'}",
+        f"- motif: {intent.motif_id or 'none'} (variation {intent.variation}), "
+        f"density {intent.density}",
+        f"- entry: {intent.entry or 'default'}; exit: {intent.exit or 'default'}",
+    ]
+    if intent.not_rendered:
+        lines.append(
+            f"- not rendered yet ({', '.join(intent.not_rendered)}): a known regression, "
+            "being fixed under `changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md`"
+        )
     lines.append("")
     return lines
 
@@ -231,6 +260,9 @@ def _render_section_markdown(section: SectionReport) -> list[str]:
         if t.reasoning:
             lines.append(f"**Reasoning**: {t.reasoning}")
             lines.append("")
+
+    if section.song_intent is not None:
+        lines.extend(_song_intent_markdown(section.song_intent))
 
     # Segments
     if section.segments:

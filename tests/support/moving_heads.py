@@ -679,21 +679,64 @@ def registered_templates(*documents: TemplateDoc) -> Iterator[None]:
             REGISTRY._remove_registration(template_id)
 
 
+def plan_section(
+    section_id: str,
+    start_bar: int,
+    end_bar: int,
+    template_id: str,
+    preset_id: str | None = None,
+    **fields: Any,
+) -> PlanSection:
+    """One section of one part (`template_id`, `preset_id`), its song intent neutral (as
+    authored) unless `fields` sets any of the section's fields."""
+    return PlanSection.model_validate(
+        {
+            "section_id": section_id,
+            "start_bar": start_bar,
+            "end_bar": end_bar,
+            "section_role": None,
+            "energy_level": None,
+            "parts": [
+                {
+                    "start_bar": start_bar,
+                    "template_id": template_id,
+                    "preset_id": preset_id,
+                    "modifiers": [],
+                    "reasoning": "",
+                }
+            ],
+            "intensity": None,
+            "color": None,
+            "gobo": None,
+            "moment_cues": [],
+            "events": [],
+            "motif_id": None,
+            "variation": "NONE",
+            "density": "BALANCED",
+            "transitions": [],
+            "reasoning": "",
+            **fields,
+        }
+    )
+
+
+def with_preset(section: PlanSection, preset_id: str | None) -> PlanSection:
+    """`section`, every part naming `preset_id`."""
+    return section.model_copy(
+        update={
+            "parts": [part.model_copy(update={"preset_id": preset_id}) for part in section.parts]
+        }
+    )
+
+
 def sections_plan(*sections: tuple[str, int, int]) -> ChoreographyPlan:
     """A plan of `(template_id, start_bar, end_bar)` sections, no planner intent."""
     return ChoreographyPlan(
         sections=[
-            PlanSection.model_validate(
-                {
-                    "section_name": f"s{index}",
-                    "start_bar": start,
-                    "end_bar": end,
-                    "template_id": template_id,
-                    "preset_id": None,
-                }
-            )
+            plan_section(f"s{index}", start, end, template_id)
             for index, (template_id, start, end) in enumerate(sections, start=1)
-        ]
+        ],
+        overall_strategy="",
     )
 
 
@@ -919,17 +962,7 @@ def p1_job(**policy: Any) -> JobConfig:
 def p1_plan(template_id: str = TEMPLATE_ID) -> ChoreographyPlan:
     """One two-bar section, no planner intent, naming `template_id`."""
     return ChoreographyPlan(
-        sections=[
-            PlanSection.model_validate(
-                {
-                    "section_name": "verse",
-                    "start_bar": 1,
-                    "end_bar": 2,
-                    "template_id": template_id,
-                    "preset_id": None,
-                }
-            )
-        ]
+        sections=[plan_section("verse", 1, 2, template_id)], overall_strategy=""
     )
 
 

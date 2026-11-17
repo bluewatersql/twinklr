@@ -1,47 +1,91 @@
-"""Unit tests for the plan schema's transition hint."""
+"""Unit tests for the plan's categorical section transition."""
+
+from pydantic import ValidationError
+import pytest
 
 from twinklr.core.curves.library import CurveLibrary
 from twinklr.core.sequencer.models.enum import TransitionMode
-from twinklr.core.sequencer.models.transition import TransitionHint, TransitionStrategy
+from twinklr.core.sequencer.models.transition import (
+    ChannelTransition,
+    PlanTransition,
+    TransitionChannel,
+    TransitionEdge,
+    TransitionLength,
+    TransitionSplit,
+    TransitionStrategy,
+)
 
 
-class TestTransitionStrategy:
-    """Test TransitionStrategy enum."""
-
-    def test_all_strategies_defined(self):
-        """Test all expected strategies are defined."""
-        assert TransitionStrategy.SNAP == "snap"
-        assert TransitionStrategy.SMOOTH_INTERPOLATION == "smooth"
-        assert TransitionStrategy.CROSSFADE == "crossfade"
-        assert TransitionStrategy.FADE_VIA_BLACK == "fade_via_black"
-        assert TransitionStrategy.SEQUENCE == "sequence"
+def test_all_strategies_defined() -> None:
+    assert TransitionStrategy.SNAP == "snap"
+    assert TransitionStrategy.SMOOTH_INTERPOLATION == "smooth"
+    assert TransitionStrategy.CROSSFADE == "crossfade"
+    assert TransitionStrategy.FADE_VIA_BLACK == "fade_via_black"
+    assert TransitionStrategy.SEQUENCE == "sequence"
 
 
-class TestTransitionHint:
-    """Test TransitionHint model."""
+def test_modes_keep_the_old_set_and_add_blackout() -> None:
+    assert {mode.value for mode in TransitionMode} == {
+        "snap",
+        "crossfade",
+        "morph",
+        "fade_via_black",
+        "sweep",
+        "blackout",
+    }
 
-    def test_crossfade_transition(self):
-        """Test creating a crossfade transition."""
-        hint = TransitionHint(
-            mode=TransitionMode.CROSSFADE, duration_bars=1.0, curve=CurveLibrary.LINEAR
-        )
 
-        assert hint.mode == TransitionMode.CROSSFADE
-        assert hint.duration_bars == 1.0
-        assert hint.curve == CurveLibrary.LINEAR
+def test_lengths_span_a_beat_to_eight_bars() -> None:
+    assert [length.value for length in TransitionLength] == [
+        "BEAT",
+        "HALF_BAR",
+        "BAR",
+        "TWO_BARS",
+        "FOUR_BARS",
+        "EIGHT_BARS",
+    ]
 
-    def test_with_channel_overrides(self):
-        """Test transition hint with per-channel overrides."""
-        hint = TransitionHint(
-            mode=TransitionMode.CROSSFADE,
-            duration_bars=1.5,
-            per_channel_overrides={
-                "dimmer": TransitionStrategy.FADE_VIA_BLACK,
-                "color": TransitionStrategy.SNAP,
-            },
-        )
 
-        assert hint.per_channel_overrides is not None
-        assert hint.per_channel_overrides.dimmer == TransitionStrategy.FADE_VIA_BLACK
-        assert hint.per_channel_overrides.color == TransitionStrategy.SNAP
-        assert hint.per_channel_overrides.pan is None
+def _transition(**fields: object) -> PlanTransition:
+    return PlanTransition.model_validate(
+        {
+            "edge": "ENTRY",
+            "mode": "crossfade",
+            "length": "BAR",
+            "curve": "linear",
+            "split": "EARLY",
+            "channels": [],
+            **fields,
+        }
+    )
+
+
+def test_a_crossfade_with_channel_strategies() -> None:
+    transition = _transition(
+        channels=[
+            {"channel": "dimmer", "strategy": "fade_via_black"},
+            {"channel": "color", "strategy": "snap"},
+        ]
+    )
+
+    assert transition.edge is TransitionEdge.ENTRY
+    assert transition.mode is TransitionMode.CROSSFADE
+    assert transition.curve is CurveLibrary.LINEAR
+    assert transition.split is TransitionSplit.EARLY
+    assert transition.channels == [
+        ChannelTransition(
+            channel=TransitionChannel.DIMMER, strategy=TransitionStrategy.FADE_VIA_BLACK
+        ),
+        ChannelTransition(channel=TransitionChannel.COLOR, strategy=TransitionStrategy.SNAP),
+    ]
+    assert transition.describe() == (
+        "crossfade over BAR, curve linear, split EARLY; dimmer fade_via_black, color snap"
+    )
+
+
+def test_every_channel_may_have_its_own_strategy_once() -> None:
+    every = [{"channel": channel.value, "strategy": "snap"} for channel in TransitionChannel]
+
+    assert len(_transition(channels=every).channels) == 6
+    with pytest.raises(ValidationError, match="at most once"):
+        _transition(channels=[*every[:1], *every[:1]])

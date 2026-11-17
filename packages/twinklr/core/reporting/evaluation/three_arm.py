@@ -789,10 +789,6 @@ class ArmRunResult(BaseModel):
         expected_plan_sha = _identity_hash(self.plan.model_dump(mode="json"))
         if self.plan_sha256 != expected_plan_sha:
             raise ValueError("run plan SHA-256 does not match its ChoreographyPlan")
-        if any(section.legacy_intent_omitted for section in self.plan.sections):
-            raise ValueError(
-                "experiment plans must explicitly populate every schema-v2 intent field"
-            )
         vision = self.vision_evaluation.result
         if vision.plan_sha256 != self.plan_sha256:
             raise ValueError("vision plan identity does not match the scored run plan")
@@ -1017,13 +1013,9 @@ class ComparisonExperimentRunner:
             )
         admission = request.analysis.admission
         planned = {
-            (template_id, preset_id)
+            (part.template_id, part.preset_id)
             for section in result.plan.sections
-            for template_id, preset_id in (
-                (section.template_id, section.preset_id),
-                *((segment.template_id, segment.preset_id) for segment in section.segments or ()),
-            )
-            if template_id is not None
+            for part in section.parts
         }
         presets = {entry.template_id: entry.admitted_presets for entry in admission.templates}
         unadmitted = sorted({template_id for template_id, _ in planned} - set(presets))

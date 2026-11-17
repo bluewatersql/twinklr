@@ -22,6 +22,7 @@ from tests.support.moving_heads import (
     p1_layout_xml,
     p1_rig,
     p1_templates,
+    plan_section,
     tagged_p1_rig,
     unprofiled_rig,
 )
@@ -41,7 +42,7 @@ from twinklr.core.agents.audio.profile.models import (
     SongSectionRef,
     Structure,
 )
-from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.agents.sequencer.moving_heads.orchestrator import (
     MovingHeadPlannerOrchestrator,
 )
@@ -219,37 +220,17 @@ LIVE_GRID = bars_grid(500.0, 500.0, 500.0, 500.0)
 """Four 4/4 bars of 2 s: an intro on bars 1-2 and a chorus on bars 3-4."""
 BASE_PLAN = ChoreographyPlan(
     sections=[
-        PlanSection.model_validate(
-            {"section_name": name, "start_bar": start, "end_bar": end, "template_id": TEMPLATE_ID}
-        )
+        plan_section(name, start, end, TEMPLATE_ID)
         for name, start, end in (("intro", 1, 2), ("chorus", 3, 4))
     ],
     overall_strategy="sweep, then sweep again",
 )
 CHORUS_REPLAN = ChoreographyPlan(
-    sections=[
-        PlanSection.model_validate(
-            {
-                "section_name": "chorus",
-                "start_bar": 3,
-                "end_bar": 4,
-                "template_id": SUBSET_TEMPLATE_ID,
-            }
-        )
-    ],
+    sections=[plan_section("chorus", 3, 4, SUBSET_TEMPLATE_ID)],
     overall_strategy="the right head alone",
 )
 INTRO_REPLAN = ChoreographyPlan(
-    sections=[
-        PlanSection.model_validate(
-            {
-                "section_name": "intro",
-                "start_bar": 1,
-                "end_bar": 2,
-                "template_id": SUBSET_TEMPLATE_ID,
-            }
-        )
-    ],
+    sections=[plan_section("intro", 1, 2, SUBSET_TEMPLATE_ID)],
     overall_strategy="the right head opens",
 )
 
@@ -605,7 +586,7 @@ async def test_regenerate_twice_builds_on_each_recorded_plan(tmp_path, monkeypat
         for section_id in (None, "chorus", "intro"):
             assert await _live(tmp_path, section_id=section_id) == 0, capsys.readouterr().out
             (record,) = json.loads(_live_plans(tmp_path).read_text(encoding="utf-8")).values()
-            recorded.append([s["template_id"] for s in record["plan"]["sections"]])
+            recorded.append([s["parts"][0]["template_id"] for s in record["plan"]["sections"]])
             (xsq,) = (tmp_path / "out").glob("*/*_twinklr_mh.xsq")
             assert fake.placed() == _xsq_live_form(xsq)
 
@@ -629,7 +610,7 @@ async def test_regenerate_refuses_a_recorded_plan_the_gate_no_longer_admits_befo
         assert await _live(tmp_path) == 0
         payload = json.loads(_live_plans(tmp_path).read_text(encoding="utf-8"))
         for record in payload.values():
-            record["plan"]["sections"][0]["template_id"] = "fly_in_cascade"
+            record["plan"]["sections"][0]["parts"][0]["template_id"] = "fly_in_cascade"
         _live_plans(tmp_path).write_text(json.dumps(payload), encoding="utf-8")
         injected = fake.placed()
         captured["planned"].clear()
@@ -738,6 +719,42 @@ async def test_regenerate_refuses_a_sequence_switched_during_the_run(
 
 def _live_plans(tmp_path: Path) -> Path:
     return tmp_path / "out" / "song" / ".twinklr-live-plans.json"
+
+
+@pytest.mark.anyio
+async def test_regenerate_refuses_a_plan_recorded_in_the_old_contract_by_name(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    """A plan recorded before the song-intent contract cannot be read: regenerate says
+    so and to re-inject, before any planner runs, and leaves the sequence alone."""
+    fake = FakeLiveXLights(models=("Dmx MH1", "Dmx MH2"))
+    captured = _live_cli(monkeypatch, fake)
+
+    with p1_templates():
+        assert await _live(tmp_path) == 0
+        payload = json.loads(_live_plans(tmp_path).read_text(encoding="utf-8"))
+        for record in payload.values():
+            record["plan"]["sections"] = [
+                {
+                    "section_name": section["section_id"],
+                    "start_bar": section["start_bar"],
+                    "end_bar": section["end_bar"],
+                    "template_id": section["parts"][0]["template_id"],
+                }
+                for section in record["plan"]["sections"]
+            ]
+        _live_plans(tmp_path).write_text(json.dumps(payload), encoding="utf-8")
+        injected = fake.placed()
+        captured["planned"].clear()
+        capsys.readouterr()
+        exit_code = await _live(tmp_path, section_id="chorus")
+    output = " ".join(capsys.readouterr().out.split())
+
+    assert exit_code == 1
+    assert captured["planned"] == []
+    assert "planner contract before 2026-11-17" in output
+    assert "run `twinklr inject` to re-plan the whole song" in output
+    assert fake.placed() == injected
 
 
 @pytest.mark.anyio

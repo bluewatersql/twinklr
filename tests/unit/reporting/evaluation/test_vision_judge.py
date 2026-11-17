@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from PIL import Image
 import pytest
 
+from tests.support.moving_heads import plan_section
 from twinklr.core.agents.async_runner import AsyncAgentRunner
 from twinklr.core.agents.prompts import PromptPackLoader
 from twinklr.core.agents.providers.base import ProviderType
@@ -356,17 +357,9 @@ def test_contact_sheet_frame_ranges_are_valid_grounding(tmp_path: Path) -> None:
 
 
 def test_current_plan_shape_builds_timestamped_structure() -> None:
-    plan = ChoreographyPlan.model_validate(
-        {
-            "sections": [
-                {
-                    "section_name": "chorus",
-                    "start_bar": 2,
-                    "end_bar": 3,
-                    "template_id": "sweep_lr_fan_hold",
-                }
-            ]
-        }
+    plan = ChoreographyPlan(
+        sections=[plan_section("chorus", 2, 3, "sweep_lr_fan_hold", intensity="SMOOTH")],
+        overall_strategy="",
     )
     judge_sections, metric_sections = plan_structure(
         plan, BeatGrid.from_tempo(tempo_bpm=120.0, total_bars=4)
@@ -375,3 +368,56 @@ def test_current_plan_shape_builds_timestamped_structure() -> None:
     assert judge_sections[0]["end_ms"] == 6000
     assert "intensity=SMOOTH" in str(judge_sections[0]["intent"])
     assert metric_sections[0].bars == 2
+
+
+def test_the_judge_reads_every_song_intent_field_as_planned() -> None:
+    section = plan_section(
+        "chorus",
+        1,
+        4,
+        "sweep_lr_fan_hold",
+        "narrow",
+        color="red",
+        gobo="stars",
+        moment_cues=["hook"],
+        events=[
+            {
+                "bar": 2,
+                "beat": 1,
+                "moment_cue_id": "hook",
+                "action": "gobo",
+                "color": None,
+                "gobo": "dots",
+            }
+        ],
+        motif_id="pulse",
+        variation="WIDEN",
+        density="BUSY",
+        transitions=[
+            {
+                "edge": "ENTRY",
+                "mode": "sweep",
+                "length": "TWO_BARS",
+                "curve": "linear",
+                "split": "EVEN",
+                "channels": [],
+            }
+        ],
+    )
+    plan = ChoreographyPlan(sections=[section], overall_strategy="")
+
+    (judged,), _ = plan_structure(plan, BeatGrid.from_tempo(tempo_bpm=120.0, total_bars=4))
+
+    intent = str(judged["intent"])
+    for fragment in (
+        "templates=sweep_lr_fan_hold (narrow) from bar 1",
+        "intensity=as authored",
+        "color=red",
+        "gobo=stars",
+        "events=bar 2 beat 1: gobo dots on cue 'hook'",
+        "moment_cues=hook",
+        "motif=pulse; variation=WIDEN; density=BUSY",
+        "entry=sweep over TWO_BARS, curve linear, split EVEN; exit=default",
+        "not_rendered_yet=color,gobo,moment_cues,events,motif_id,variation,density,entry",
+    ):
+        assert fragment in intent, fragment

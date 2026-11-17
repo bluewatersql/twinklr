@@ -189,6 +189,32 @@ def _catalog() -> Iterator[None]:
         yield
 
 
+_LENGTHS = {
+    0.25: "BEAT",
+    0.5: "HALF_BAR",
+    1.0: "BAR",
+    2.0: "TWO_BARS",
+    4.0: "FOUR_BARS",
+    8.0: "EIGHT_BARS",
+}
+"""The transition lengths by their bars on the reference grid's 4/4."""
+
+
+def _transition(edge: str, hint: dict[str, Any]) -> dict[str, Any]:
+    """A fixture row's old-renderer `TransitionHint` as the contract's categorical
+    transition: the same mode and curve, the nearest length, and the split of its
+    fade-out ratio."""
+    ratio = hint["fade_out_ratio"]
+    return {
+        "edge": edge,
+        "mode": hint["mode"],
+        "length": _LENGTHS[min(_LENGTHS, key=lambda bars: abs(bars - hint["duration_bars"]))],
+        "curve": hint["curve"],
+        "split": "EARLY" if ratio < 1 / 3 else "LATE" if ratio > 2 / 3 else "EVEN",
+        "channels": [],
+    }
+
+
 def plan_section(
     intent: dict[str, Any],
     *,
@@ -196,44 +222,68 @@ def plan_section(
     bars: tuple[int, int] = (1, 4),
     template_id: str = TEMPLATE,
 ) -> PlanSection:
-    """The current planner model's section for a fixture row's renderer-neutral `intent`.
+    """The planner contract's section for a fixture row's renderer-neutral `intent`.
 
     `intent` keys: `intensity`, `color` (`{"explicit": preset}` or `{"palette_role":
     role}`), `shutter_events` and `gobo_events` (`bar`, `beat`, `pattern`, optional
-    `moment_cue_id`), `transition_in` (a hint). `{}` is the neutral plan: today the
-    model's own neutral values (SMOOTH, palette role PRIMARY, no events, no hint),
-    which the renderer ignores. W2 replaces the contract and rewrites this block, with
-    the neutral plan becoming all intent null.
+    `moment_cue_id`), `transition_in` (a hint). `{}` is the neutral plan: every song
+    intent null or empty, the template as authored.
     """
-    color = intent.get("color", {"palette_role": "PRIMARY"})
-    events = {
-        key: [{"moment_cue_id": None, **event} for event in intent.get(key, [])]
+    color = intent.get("color")
+    events = [
+        {
+            "bar": event["bar"],
+            "beat": event["beat"],
+            "moment_cue_id": event.get("moment_cue_id"),
+            "action": "gobo" if key == "gobo_events" else event["pattern"],
+            "color": None,
+            "gobo": event["pattern"] if key == "gobo_events" else None,
+        }
         for key in ("shutter_events", "gobo_events")
-    }
-    cues = sorted({e["moment_cue_id"] for items in events.values() for e in items} - {None})
+        for event in intent.get(key, [])
+    ]
+    cues = sorted({event["moment_cue_id"] for event in events} - {None})
+    hint = intent.get("transition_in")
     return PlanSection.model_validate(
         {
-            "section_name": name,
+            "section_id": name,
             "start_bar": bars[0],
             "end_bar": bars[1],
-            "template_id": template_id,
-            "intensity": intent.get("intensity", "SMOOTH"),
-            "color_intent": {
-                "selection": {
-                    "kind": "EXPLICIT" if "explicit" in color else "PALETTE_ROLE",
-                    "palette_role": color.get("palette_role"),
-                    "explicit_color": color.get("explicit"),
+            "section_role": None,
+            "energy_level": None,
+            "parts": [
+                {
+                    "start_bar": bars[0],
+                    "template_id": template_id,
+                    "preset_id": None,
+                    "modifiers": [],
+                    "reasoning": "",
                 }
-            },
-            **events,
-            "moment_cues": [{"cue_id": cue_id} for cue_id in cues],
-            "transition_in": intent.get("transition_in"),
+            ],
+            "intensity": intent.get("intensity"),
+            "color": (
+                None
+                if color is None
+                else color["explicit"]
+                if "explicit" in color
+                else f"PALETTE_{color['palette_role']}"
+            ),
+            "gobo": None,
+            "moment_cues": cues,
+            "events": events,
+            "motif_id": None,
+            "variation": "NONE",
+            "density": "BALANCED",
+            "transitions": [] if hint is None else [_transition("ENTRY", hint)],
+            "reasoning": "",
         }
     )
 
 
 def single_plan(intent: dict[str, Any], template_id: str = TEMPLATE) -> ChoreographyPlan:
-    return ChoreographyPlan(sections=[plan_section(intent, template_id=template_id)])
+    return ChoreographyPlan(
+        sections=[plan_section(intent, template_id=template_id)], overall_strategy=""
+    )
 
 
 def bound_plan(intent: dict[str, Any]) -> ChoreographyPlan:
@@ -252,15 +302,15 @@ def bound_plan(intent: dict[str, Any]) -> ChoreographyPlan:
 
 def transition_plan(intent: dict[str, Any]) -> ChoreographyPlan:
     """Two sections: a held aim (`finite_snap_hold`), then `TEMPLATE` from another aim. The
-    old contract carries the transition as the second section's `transition_in`; under the
-    revised contract it is the second section's `entry` (and, for FADE_VIA_BLACK, the first
-    section's `exit`)."""
+    old contract carried the transition as the second section's `transition_in`; the
+    contract carries it as the second section's ENTRY transition."""
     first, second = REFERENCE["setup"]["transition_sections"]
     return ChoreographyPlan(
         sections=[
             plan_section({}, name="s1", bars=tuple(first), template_id="finite_snap_hold"),
             plan_section(intent, name="s2", bars=tuple(second)),
-        ]
+        ],
+        overall_strategy="",
     )
 
 
@@ -563,7 +613,7 @@ def assert_dark_only_before_reveals(
 
 def test_neutral_intent_renders_the_pinned_bytes() -> None:
     """All intent neutral: the bytes `test_mh_pins.py` pins for this template and grid."""
-    plan = ChoreographyPlan(sections=[plan_section({}, bars=(1, 8))])
+    plan = ChoreographyPlan(sections=[plan_section({}, bars=(1, 8))], overall_strategy="")
     pipeline = RenderingPipeline(
         choreography_plan=plan,
         beat_grid=GRID,

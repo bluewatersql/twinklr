@@ -750,16 +750,20 @@ uv run twinklr run \
 
 5. **Moving Head Planning** — The 5-stage agent loop (Plan → Validate →
    Judge → Iterate) generates a `ChoreographyPlan`:
-   - **Plan**: LLM picks templates, presets, and timing per section
-   - **Validate**: Heuristic checks (bar ranges, no overlaps, coverage)
+   - **Plan**: LLM picks, per section, one to three templates (with presets)
+     and the section's song intent: intensity, colour, gobo, timed accents tied
+     to musical and lyric moments, motif variation, density, entry and exit
+   - **Validate**: Deterministic repair of single items the song cannot hold
+     (recorded, and shown to the planner on its next revision), then heuristic
+     checks (bar ranges, no overlaps, coverage, offered templates)
    - **Judge**: LLM scores the plan (0-10) and provides feedback
    - **Iterate**: If score < threshold, planner revises with feedback
 
 6. **Render** — Compiles the plan's templates against each fixture's profile into
    complete 20 ms DMX frames and writes the `.xsq` output file. It does not yet render
-   the planner's intensity, section colour, shutter and gobo events, lyric moment cues
-   or section transitions: a known regression from the single-renderer cutover, being
-   fixed ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
+   the planner's song intent (intensity, colour, gobo, timed accents and lyric moment
+   cues, motif variation, density, entry and exit transitions): a known regression from
+   the single-renderer cutover, being fixed ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 
 ### Demo Scripts
 

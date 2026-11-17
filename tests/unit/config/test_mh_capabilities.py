@@ -25,11 +25,12 @@ from tests.support.moving_heads import (
     fixture_segment,
     initial_state_payload,
     p1_grid,
+    plan_section,
     preposition_profile_payload,
     profile_payload,
     unprofiled_rig,
 )
-from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.config.fixtures import (
     AxisCapability,
     FixtureCapabilities,
@@ -807,9 +808,7 @@ def _split(path: str, prefixes: tuple[str, ...]) -> tuple[str, str]:
 def _identity_inputs() -> dict[str, Any]:
     """Render identity inputs other than the rig and the policy, held constant."""
     plan = ChoreographyPlan(
-        sections=[
-            PlanSection(section_name="verse", start_bar=1, end_bar=2, template_id="mirror_wings")
-        ]
+        sections=[plan_section("verse", 1, 2, "mirror_wings")], overall_strategy=""
     )
     return {
         "plan": plan,

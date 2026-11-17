@@ -578,10 +578,9 @@ def _plan_uncut(
     start, end = cue_limits(phase_map, int(grid.duration_ms))
     cues: list[FixtureSegment] = []
     for section in plan.sections:
-        assert section.template_id is not None
-        document = get_template(section.template_id)
+        document = get_template(section.parts[0].template_id)
         context = TemplateCompileContext(
-            section_id=section.section_name,
+            section_id=section.section_id,
             template_id=document.template.template_id,
             fixtures=pipeline._build_fixture_contexts(),
             beat_grid=grid,

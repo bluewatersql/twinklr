@@ -34,7 +34,14 @@ from tests.support.moving_heads import (
     zoom_pilot_profile_payload,
     zoom_rig,
 )
-from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+from twinklr.core.agents.sequencer.moving_heads.models import (
+    ChoreographyPlan,
+    EventAction,
+    PlanColor,
+    PlanEvent,
+    PlanRepair,
+    RepairAction,
+)
 from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
     MovingHeadRenderingStage,
     RenderPreflightStage,
@@ -58,6 +65,7 @@ from twinklr.core.reporting.evaluation.models import (
     ReportFlagLevel,
     SectionRenderFacts,
 )
+from twinklr.core.sequencer.models.enum import Intensity
 from twinklr.core.sequencer.moving_heads.templates.library import REGISTRY
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.session import TwinklrSession
@@ -85,8 +93,7 @@ class _FakeAnalyzer:
 
 
 def _plan(*sections: tuple[str, int, int]) -> ChoreographyPlan:
-    # Through JSON, as a planner's plan states every field: a section built without the
-    # planner-intent fields marks itself in a private flag that a checkpoint cannot carry.
+    # Through JSON, as a planner's plan arrives.
     return ChoreographyPlan.model_validate(sections_plan(*sections).model_dump(mode="json"))
 
 
@@ -293,6 +300,53 @@ def _change_template(fixture_path: Path, checkpoint: Path) -> None:
     )
 
 
+@pytest.mark.asyncio
+async def test_the_report_carries_each_sections_song_intent_and_the_plan_repairs(
+    tmp_path: Path,
+) -> None:
+    """The planner's song intent is reported per section as planned, with the fields the
+    renderer does not render yet; the plan's repairs are reported from the trace."""
+    accented = PLAN.sections[0].model_copy(
+        update={
+            "intensity": Intensity.DRAMATIC,
+            "color": PlanColor.PALETTE_ACCENT,
+            "events": [
+                PlanEvent(
+                    bar=2,
+                    beat=3,
+                    moment_cue_id=None,
+                    action=EventAction.HIT,
+                    color=None,
+                    gobo=None,
+                )
+            ],
+        }
+    )
+    repair = PlanRepair(
+        section_id="s1",
+        item="moment cue 'ghost'",
+        action=RepairAction.DROPPED,
+        reason="no lyric moment cue has id 'ghost'",
+    )
+    plan = PLAN.model_copy(update={"sections": [accented, PLAN.sections[1]], "repairs": [repair]})
+    with family_catalog():
+        checkpoint, fixture_path, _ = await _run(tmp_path, plan=plan)
+        report = await _report(tmp_path, checkpoint, fixture_path, "report")
+
+    first, second = (section.song_intent for section in report.sections)
+    assert first is not None and second is not None
+    assert (first.intensity, first.color, first.gobo) == ("DRAMATIC", "PALETTE_ACCENT", None)
+    assert first.events == ["bar 2 beat 3: hit"]
+    assert first.not_rendered == ["intensity", "color", "events"]
+    assert second.not_rendered == [] and second.intensity is None
+    assert report.render.plan_repairs == [repair.model_dump(mode="json")]
+    markdown = (tmp_path / "report" / "report.md").read_text(encoding="utf-8")
+    assert "**Song intent** (as planned):" in markdown
+    assert "- intensity: DRAMATIC" in markdown and "- intensity: as authored" in markdown
+    assert "not rendered yet (intensity, color, events): a known regression" in markdown
+    assert "**Plan repair** (section `s1`): moment cue 'ghost' dropped" in markdown
+
+
 @pytest.mark.parametrize(
     ("change", "named"),
     [
@@ -442,7 +496,7 @@ async def test_a_plan_naming_a_template_eval_report_cannot_load_is_refused_early
     with family_catalog():
         checkpoint, fixture_path, _ = await _run(tmp_path)
     data = json.loads(checkpoint.read_text(encoding="utf-8"))
-    data["plan"]["sections"][1]["template_id"] = "my_user_template"
+    data["plan"]["sections"][1]["parts"][0]["template_id"] = "my_user_template"
     checkpoint.write_text(json.dumps(data), encoding="utf-8")
 
     with (

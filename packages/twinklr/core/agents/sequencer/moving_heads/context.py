@@ -17,6 +17,7 @@ from twinklr.core.agents.audio.profile.models import (
     SongSectionRef,
 )
 from twinklr.core.sequencer.planning import MacroPlan
+from twinklr.core.sequencer.theming.catalog import get_palette
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 logger = logging.getLogger(__name__)
@@ -251,9 +252,12 @@ class MovingHeadPlanningContext(BaseModel):
             for section in macro_guidance:
                 section_id = section["section"]["section_id"]
                 section["section_id"] = section_id
-                section["palette_id"] = self.macro_plan.palette_for_section(
-                    str(section_id)
-                ).palette_id
+                palette_id = self.macro_plan.palette_for_section(str(section_id)).palette_id
+                section["palette_id"] = palette_id
+                # The palette's colours, so a colour role is chosen knowing what it shows.
+                section["palette_colors"] = [
+                    {"hex": stop.hex, "name": stop.name} for stop in get_palette(palette_id).stops
+                ]
 
         # Template descriptions for prompt enrichment
         template_descs = None

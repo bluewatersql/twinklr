@@ -141,6 +141,8 @@ class IterationContext(BaseModel):
         total_tokens_used: Cumulative token usage
         termination_reason: Reason for termination (if terminated)
         final_verdict: Final judge verdict (if any)
+        plan_repairs: What deterministic repair changed in the latest plan, fed to the
+            next planning iteration
     """
 
     # State
@@ -158,6 +160,9 @@ class IterationContext(BaseModel):
     # Termination
     termination_reason: str | None = Field(default=None)
     final_verdict: JudgeVerdict | None = Field(default=None)
+
+    # Repair of the latest plan, for the next planner prompt
+    plan_repairs: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -348,6 +353,7 @@ class StandardIterationController[TPlan]:
         judge_context_builder: Callable[[TPlan, int, IterationContext], dict[str, Any]]
         | None = None,
         plan_normalizer: Callable[[TPlan], TPlan] | None = None,
+        plan_repairs: Callable[[TPlan], list[str]] | None = None,
     ) -> IterationResult[TPlan]:
         """Run iteration loop until approval or termination.
 
@@ -365,6 +371,8 @@ class StandardIterationController[TPlan]:
                 variables rather than replacing them.
             plan_normalizer: Optional deterministic normalization applied to every
                 planner result before heuristic validation and judging.
+            plan_repairs: Optional reader of what normalization repaired in a plan; the
+                next planning iteration's prompt receives it as `plan_repairs`.
 
         Returns:
             IterationResult with final plan and metadata
@@ -439,6 +447,10 @@ class StandardIterationController[TPlan]:
                     plan = plan_normalizer(plan)
                 except ValueError as error:
                     normalization_errors.append(str(error))
+
+            context.plan_repairs = (
+                plan_repairs(plan) if plan_repairs is not None and not normalization_errors else []
+            )
 
             # === VALIDATION STAGE ===
             context.update_state(IterationState.VALIDATING)
@@ -611,6 +623,7 @@ class StandardIterationController[TPlan]:
             variables["revision_request"] = (
                 context.revision_requests[-1] if context.revision_requests else None
             )
+            variables["plan_repairs"] = list(context.plan_repairs)
 
             # Extract strengths from latest verdict for preserve_elements
             # (empty list if no verdict yet, e.g. heuristic validation failed)

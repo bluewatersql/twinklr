@@ -80,12 +80,13 @@ def test_selects_only_admitted_families_with_their_effective_variant() -> None:
             sections
         )
         for planned, trace in zip(result.plan.sections, result.traces, strict=True):
-            assert planned.template_id in admitted
+            (part,) = planned.parts
+            assert part.template_id in admitted
             assert set(trace.eligible_template_ids) <= set(admitted)
-            entry = next(t for t in admission.templates if t.template_id == planned.template_id)
-            assert planned.preset_id == entry.effective_preset
-            assert planned.preset_id in (None, *entry.admitted_presets)
-            assert planned.legacy_intent_omitted is False
+            entry = next(t for t in admission.templates if t.template_id == part.template_id)
+            assert part.preset_id == entry.effective_preset
+            assert part.preset_id in (None, *entry.admitted_presets)
+            assert planned.set_intent_fields() == ()
 
 
 def test_the_whole_registry_is_not_the_candidate_set() -> None:
@@ -104,7 +105,7 @@ def test_capability_exclusions_are_never_relaxed_to_make_selection_total() -> No
 
     result = DeterministicSelector(seed=11, admission=admission).select(sections)
 
-    choices = [section.template_id for section in result.plan.sections]
+    choices = [section.parts[0].template_id for section in result.plan.sections]
     assert choices == ["target_orbit"] + ["finite_snap_hold"] * 6
     assert any(trace.relaxed_constraints for trace in result.traces)
     assert all(
@@ -177,7 +178,7 @@ def test_variety_holds_under_an_admission_without_relaxing(seed: int) -> None:
 
     result = DeterministicSelector(seed=seed, admission=admission).select(sections)
 
-    choices = [section.template_id for section in result.plan.sections]
+    choices = [section.parts[0].template_id for section in result.plan.sections]
     assert all(trace.relaxed_constraints == () for trace in result.traces)
     assert all(left != right for left, right in pairwise(choices))
     assert max(choices.count(choice) for choice in choices) <= 2
@@ -195,7 +196,7 @@ def test_a_reprise_reuses_the_admitted_family_the_ladder_gives_its_role() -> Non
 
     result = DeterministicSelector(seed=42, admission=admission).select(sections)
 
-    assert [(s.template_id, s.preset_id) for s in result.plan.sections] == [
+    assert [(s.parts[0].template_id, s.parts[0].preset_id) for s in result.plan.sections] == [
         ("target_orbit", None),
         ("finite_snap_hold", "narrow"),
         ("target_orbit", None),
@@ -230,25 +231,22 @@ def test_admission_from_the_gate_keeps_order_variants_and_exclusions() -> None:
 
 
 @pytest.mark.parametrize("template_id", CATALOG_IDS)
-def test_a_family_yields_the_palette_role_intent_and_no_step_derived_events(
-    template_id: str,
-) -> None:
-    """The step colour, shutter and gobo derivation has nothing to read on a family
-    (family steps carry none of those fields), so a family's section always gets the
-    role's palette colour and no events: removing that derivation with the old
-    templates (C1.2) cannot change a plan."""
+def test_a_family_section_leaves_every_song_intent_as_authored(template_id: str) -> None:
+    """The selector chooses templates only: each section is one part naming the family
+    with its effective variant, and its song intent is neutral (null intensity, colour
+    and gobo, no events, cues or transitions, variation NONE, density BALANCED), so the
+    family renders as authored."""
     metadata = REGISTRY.get(template_id).template.metadata
     assert metadata is not None and metadata.energy_range is not None
     section = _section(metadata.recommended_sections[0], metadata.energy_range[0], 1)
     result = DeterministicSelector(seed=1, admission=_admission((template_id,))).select([section])
 
     [planned] = result.plan.sections
-    assert planned.template_id == template_id
-    selection = planned.color_intent.selection
-    assert selection.kind == "PALETTE_ROLE"
-    assert selection.palette_role is not None and selection.explicit_color is None
-    assert planned.shutter_events == [] and planned.gobo_events == []
-    assert result.traces[0].unresolved_intent_fields == ("shutter_events", "gobo_events")
+    assert [part.template_id for part in planned.parts] == [template_id]
+    assert (planned.intensity, planned.color, planned.gobo, planned.motif_id) == (None,) * 4
+    assert planned.events == [] and planned.moment_cues == [] and planned.transitions == []
+    assert (planned.variation.value, planned.density.value) == ("NONE", "BALANCED")
+    assert planned.set_intent_fields() == ()
 
 
 def test_admission_rejects_an_unadmitted_effective_variant_and_duplicates() -> None:
@@ -278,12 +276,12 @@ def test_the_repeat_cap_relaxes_when_the_admission_leaves_too_few_families() -> 
     assert chosen.count(chosen[4]) == 3
     assert all(a != b for a, b in pairwise(chosen))
     effective = {"fly_in_cascade": None, "fly_out_cascade": "slow"}
-    assert [s.preset_id for s in result.plan.sections] == [effective[t] for t in chosen]
+    assert [s.parts[0].preset_id for s in result.plan.sections] == [effective[t] for t in chosen]
 
 
 def test_a_selector_plan_round_trips_through_the_plan_schema() -> None:
-    """The plan the selector builds is a complete schema-v2 plan: its JSON dump reads
-    back as the same plan, every intent field set."""
+    """The plan the selector builds is a complete plan: its JSON dump reads back as the
+    same plan."""
     admitted = ("finite_snap_hold", "mirror_wings", "target_orbit")
     admission = _admission(admitted, {"mirror_wings": "narrow"})
     result = DeterministicSelector(seed=3, admission=admission).select(
@@ -293,4 +291,3 @@ def test_a_selector_plan_round_trips_through_the_plan_schema() -> None:
     restored = ChoreographyPlan.model_validate_json(result.plan.model_dump_json())
     assert restored == result.plan
     assert restored.model_dump(mode="json") == result.plan.model_dump(mode="json")
-    assert not any(section.legacy_intent_omitted for section in restored.sections)

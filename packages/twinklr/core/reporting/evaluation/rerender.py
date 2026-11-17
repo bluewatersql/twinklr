@@ -97,12 +97,7 @@ def admit_plan_templates(plan: ChoreographyPlan) -> None:
             such as one a run loaded with `--template-dir`.
     """
     load_template_catalog()
-    named = {
-        selection.template_id
-        for section in plan.sections
-        for selection in (section, *(section.segments or ()))
-        if selection.template_id
-    }
+    named = {part.template_id for section in plan.sections for part in section.parts}
     missing = []
     for template_id in sorted(named):
         try:

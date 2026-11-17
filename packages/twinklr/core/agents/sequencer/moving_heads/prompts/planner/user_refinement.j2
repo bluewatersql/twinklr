@@ -53,6 +53,19 @@ Token Optimization: ~80% reduction vs full context on refinement iterations.
 {% endfor %}
 {% endif %}
 
+{% if plan_repairs is defined and plan_repairs %}
+## What Deterministic Repair Changed in Your Last Plan
+
+These items could not stand as planned on this song or rig, so code dropped or adjusted
+them. Re-plan them in a form the song can hold, or leave them out:
+{% for repair in plan_repairs[:20] %}
+- {{ repair }}
+{% endfor %}
+{% if plan_repairs | length > 20 %}
+- ... and {{ plan_repairs | length - 20 }} more
+{% endif %}
+
+{% endif %}
 {% if preserve_elements %}
 ## Keep What Works
 
@@ -77,7 +90,7 @@ Preserve these elements while addressing the feedback above.
 1. **Template Selection**: Use ONLY templates from the library provided in iteration 1
 2. **Bar Numbering**: 1-indexed (first bar = 1, last bar = {{ total_bars }})
 3. **Section Coverage**: Cover all sections from bar 1 to bar {{ total_bars }}
-4. **Segmentation**: Default to 1 template per section; segment only when musically justified
+4. **Parts**: Default to 1 part per section; split only when musically justified
 5. **Schema**: Return valid ChoreographyPlan JSON per developer prompt
 
 ## Instructions

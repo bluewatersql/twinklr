@@ -291,10 +291,12 @@ class MovingHeadPlannerOrchestrator:
 
         Executes the complete MovingHead planner workflow:
         1. Generate initial plan (planner agent)
-        2. Validate plan (heuristic validator)
-        3. Evaluate plan (judge agent)
-        4. Refine if needed (repeat with feedback)
-        5. Return final plan or best attempt
+        2. Normalise it: canonical section ids, repair of single items the song cannot
+           hold, lyric cues bound to their beats (`bind_lyric_moment_cues`)
+        3. Validate plan (heuristic validator)
+        4. Evaluate plan (judge agent)
+        5. Refine if needed (repeat with feedback, including what was repaired)
+        6. Return final plan or best attempt
 
         Args:
             context: MovingHead planning context containing:
@@ -351,6 +353,7 @@ class MovingHeadPlannerOrchestrator:
                 context.beat_grid,
                 context.sections,
             ),
+            plan_repairs=lambda plan: [repair.describe() for repair in plan.repairs],
         )
 
         if result.success:

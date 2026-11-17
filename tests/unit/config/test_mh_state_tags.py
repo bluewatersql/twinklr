@@ -26,7 +26,6 @@ from tests.support.moving_heads import (
     profile_payload,
     tagged_p1_rig,
 )
-from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup
 from twinklr.core.config.fixtures.state_tags import (
     ColorMatch,
@@ -721,18 +720,7 @@ def test_state_tag_changes_identity_not_output(config_path: str) -> None:
     """A tag enters the render fingerprint (it is rig data) and changes no frame:
     nothing reads it until the rig offer (W3) and colour and gobo resolution (W4)."""
     prefix, _, suffix = config_path.partition(".discrete.")
-    plan = ChoreographyPlan.model_validate(
-        {
-            "sections": [
-                {
-                    "section_name": "s1",
-                    "start_bar": 1,
-                    "end_bar": 8,
-                    "template_id": "masked_wheel_flick",
-                }
-            ]
-        }
-    )
+    plan = m.sections_plan(("masked_wheel_flick", 1, 8))
 
     def render(tag: str | None) -> RenderingPipeline:
         pipeline = RenderingPipeline(

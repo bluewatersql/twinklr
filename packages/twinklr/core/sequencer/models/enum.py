@@ -28,6 +28,7 @@ class TransitionMode(StrEnum):
     MORPH = "morph"  # Smooth morphing (Bezier curves)
     FADE_VIA_BLACK = "fade_via_black"  # Fade to black, change, fade up
     SWEEP = "sweep"  # Sweeping motion (advanced)
+    BLACKOUT = "blackout"  # Cut to or from dark at the boundary
 
 
 class TemplateCategory(StrEnum):

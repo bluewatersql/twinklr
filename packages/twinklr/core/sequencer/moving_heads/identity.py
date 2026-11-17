@@ -110,20 +110,16 @@ def _canonical_lock(lock: dict[str, Any]) -> dict[str, Any]:
 
 
 def _plan_payload(plan: BaseModel) -> dict[str, Any]:
-    """Dump the plan with canonical template ids and each section's legacy-intent flag.
+    """Dump the plan with canonical template ids.
 
-    `PlanSection` keeps that flag out of `model_dump`, yet the renderer ignores a
-    section's intent when it is set, so it is functional. The renderer looks every
-    template up in the registry, which resolves case, separators, display names and
-    aliases, so only the canonical id counts.
+    The renderer looks every template up in the registry, which resolves case,
+    separators, display names and aliases, so only the canonical id counts.
     """
     payload = plan.model_dump(mode="json")
     if isinstance(plan, ChoreographyPlan):
-        for dumped, section in zip(payload["sections"], plan.sections, strict=True):
-            dumped["legacy_intent_omitted"] = section.legacy_intent_omitted
-            for selection in [dumped, *(dumped["segments"] or [])]:
-                if selection["template_id"]:
-                    selection["template_id"] = _canonical_template_id(selection["template_id"])
+        for dumped in payload["sections"]:
+            for part in dumped["parts"]:
+                part["template_id"] = _canonical_template_id(part["template_id"])
     return payload
 
 

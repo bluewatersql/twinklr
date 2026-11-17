@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from twinklr.core.sequencer.models.template import TemplateDoc, TemplatePreset
 
 from twinklr.core.agents.sequencer.moving_heads import ChoreographyPlan
-from twinklr.core.agents.sequencer.moving_heads.models import PlanSection, flatten_plan_segment
+from twinklr.core.agents.sequencer.moving_heads.models import PlanSection, flatten_section
 from twinklr.core.config.fixtures import FixtureCapabilities, FixtureGroup, InitialFixtureState
 from twinklr.core.config.models import JobConfig
 from twinklr.core.config.render_policy import (
@@ -1301,36 +1301,36 @@ def _section_preset(
     diagnostics: list[MHDiagnostic],
     admission: TemplateAdmission | None,
 ) -> TemplatePreset | None:
-    """The preset a section renders: the one it names, when the template declares it and
-    the pre-planning gate (`admission`, when it ran) did not leave it out; otherwise the
-    template's effective variant (the base without a gate result), with a warning when
-    the section named a preset.
+    """The preset a flattened section (one part, `flatten_section`) renders: the one its
+    part names, when the template declares it and the pre-planning gate (`admission`,
+    when it ran) did not leave it out; otherwise the template's effective variant (the
+    base without a gate result), with a warning when the part named a preset.
 
-    An undeclared id is not turned into an energy preset: that is planner intent, which
-    Phase 1 does not apply.
+    An undeclared id is not turned into an energy preset: intensity is planner intent,
+    which the renderer does not apply yet.
     """
     template_id = template_doc.template.template_id
     declared = {preset.preset_id: preset for preset in template_doc.presets}
     fallback = None if admission is None else admission.effective_preset.get(template_id)
-    if not section.preset_id:
+    (part,) = section.parts
+    if not part.preset_id:
         return None if fallback is None else declared[fallback]
     reason = next(
         (
             exclusion["reason"]
             for exclusion in (admission.preset_exclusions if admission else ())
-            if (exclusion["template_id"], exclusion["preset_id"])
-            == (template_id, section.preset_id)
+            if (exclusion["template_id"], exclusion["preset_id"]) == (template_id, part.preset_id)
         ),
         None,
     )
-    if section.preset_id in declared and reason is None:
-        return declared[section.preset_id]
+    if part.preset_id in declared and reason is None:
+        return declared[part.preset_id]
     diagnostics.append(
         MHDiagnostic(
             code="unsupported_attribute",
             severity="warning",
             message=(
-                f"section {section.section_name!r}: preset {section.preset_id!r} is not "
+                f"section {section.section_id!r}: preset {part.preset_id!r} is not "
                 + (
                     f"declared by template {template_id!r}"
                     if reason is None
@@ -1342,7 +1342,7 @@ def _section_preset(
                     else f"; the renderer applies its effective variant {fallback!r}"
                 )
             ),
-            section_id=section.section_name,
+            section_id=section.section_id,
             action="unchanged",
         )
     )
@@ -1553,12 +1553,11 @@ class RenderingPipeline:
         """
         substitutions: list[tuple[str, str | None]] = []
         for section in self.iterate_plan_sections(self.choreography_plan):
-            if not section.template_id:
-                continue
-            preset = _section_preset(section, get_template(section.template_id), [], self.admission)
+            (part,) = section.parts
+            preset = _section_preset(section, get_template(part.template_id), [], self.admission)
             rendered = None if preset is None else preset.preset_id
-            if rendered != (section.preset_id or None):
-                substitutions.append((section.section_name, rendered))
+            if rendered != (part.preset_id or None):
+                substitutions.append((section.section_id, rendered))
         return render_fingerprint(
             plan=self.choreography_plan,
             beat_grid=self.beat_grid,
@@ -1686,15 +1685,14 @@ class RenderingPipeline:
         diagnostics: list[MHDiagnostic] = []
         fixture_contexts = self._build_fixture_contexts()
         for section in self.iterate_plan_sections(self.choreography_plan):
-            if not section.template_id:
-                raise ValueError(f"Section '{section.section_name}' has no template_id")
+            (part,) = section.parts
             try:
-                template_doc = get_template(section.template_id)
+                template_doc = get_template(part.template_id)
             except Exception as e:
-                raise ValueError(f"Template not found: {section.template_id}") from e
+                raise ValueError(f"Template not found: {part.template_id}") from e
             preset = _section_preset(section, template_doc, diagnostics, self.admission)
             context = TemplateCompileContext(
-                section_id=section.section_name,
+                section_id=section.section_id,
                 template_id=template_doc.template.template_id,
                 preset_id=preset.preset_id if preset else None,
                 fixtures=fixture_contexts,
@@ -1707,20 +1705,23 @@ class RenderingPipeline:
             )
             time_markers.append(
                 TimeMarker(
-                    name=section.section_name, time_ms=context.start_ms, end_time_ms=context.end_ms
+                    name=section.section_id, time_ms=context.start_ms, end_time_ms=context.end_ms
                 )
             )
-            if not section.legacy_intent_omitted:
+            unrendered = section.set_intent_fields()
+            if unrendered:
                 diagnostics.append(
                     MHDiagnostic(
                         code="unsupported_attribute",
                         severity="warning",
                         message=(
-                            f"section {section.section_name!r}: planner intent (intensity, "
-                            "color, shutter and gobo events) is not applied by the renderer "
-                            "in Phase 1; the template renders as authored"
+                            f"section {section.section_id!r}: the planner's song intent "
+                            f"({', '.join(unrendered)}) is not rendered yet, a known "
+                            "regression being fixed under "
+                            "changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md; "
+                            "the template renders as authored"
                         ),
-                        section_id=section.section_name,
+                        section_id=section.section_id,
                         action="unchanged",
                     )
                 )
@@ -1795,7 +1796,7 @@ class RenderingPipeline:
                 logger.warning(
                     "moving heads: section %r (%s-%s ms) is shorter than its entry window, "
                     "which ends at %s ms; it renders dark",
-                    section.section_name,
+                    section.section_id,
                     context.start_ms,
                     context.end_ms,
                     window_end,
@@ -1953,6 +1954,11 @@ class RenderingPipeline:
         if self.dark_spans:
             # Left out when there are none, so earlier traces keep their keys.
             self.render_record["dark_spans"] = [list(span) for span in self.dark_spans]
+        if self.choreography_plan.repairs:
+            # What repair changed in the planner's response; left out when nothing was.
+            self.render_record["plan_repairs"] = [
+                repair.model_dump(mode="json") for repair in self.choreography_plan.repairs
+            ]
         if self.admission is not None:
             # Each key is left out when empty (nothing excluded, every admitted template
             # playing its base), so earlier traces keep their keys.
@@ -2011,26 +2017,22 @@ class RenderingPipeline:
         """
         docs: dict[str, TemplateDoc] = {}
         for section in self.iterate_plan_sections(self.choreography_plan):
-            if section.template_id:
-                doc = get_template(section.template_id)
-                docs.setdefault(doc.template.template_id, doc)
+            doc = get_template(section.parts[0].template_id)
+            docs.setdefault(doc.template.template_id, doc)
         return [docs[template_id] for template_id in sorted(docs)]
 
     def iterate_plan_sections(self, plan: ChoreographyPlan) -> Iterator[PlanSection]:
-        """Iterate over the plan sections and yield each section.
+        """Yield the plan's sections as the renderer places them: one per part
+        (`flatten_section`).
 
         Args:
             plan: The choreography plan to iterate over.
 
         Returns:
-            An iterator over the plan sections.
+            An iterator over the flattened sections, each with exactly one part.
         """
         for section in plan.sections:
-            if section.segments:
-                for seg in section.segments:
-                    yield flatten_plan_segment(section, seg)
-            else:
-                yield section
+            yield from flatten_section(section)
 
     def _build_fixture_contexts(self) -> list[FixtureContext]:
         """Build fixture contexts from rig profile.

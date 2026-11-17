@@ -27,6 +27,7 @@ from tests.support.moving_heads import (
     hold_step,
     loop_template_doc,
     p1_job,
+    plan_section,
     registered_templates,
     sine_step,
     topology_rig,
@@ -34,7 +35,7 @@ from tests.support.moving_heads import (
 from tests.unit.cli.test_live_injection_command import _audio_profile
 from twinklr.cli.show_cmd import export_show_artifacts, run_show_pipeline_async
 from twinklr.core.agents.audio.profile.models import SongSectionRef
-from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.agents.sequencer.moving_heads.orchestrator import MovingHeadPlannerOrchestrator
 from twinklr.core.agents.sequencer.moving_heads.rendering_stage import MovingHeadRenderingStage
 from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
@@ -126,7 +127,7 @@ type Frames = dict[tuple[str, int], dict[int, int]]
 type MacroSpec = Sequence[tuple[str, int, int, bool]]
 """Macro sections: `(section_id, start_ms, end_ms, the heads answer the tree's calls)`."""
 type MovingHeadSpec = Sequence[tuple[str, int, int, str]]
-"""Moving-head plan sections: `(section_name, first_bar, last_bar, template_id)`."""
+"""Moving-head plan sections: `(section_id, first_bar, last_bar, template_id)`."""
 
 UNIFIED: MacroSpec = [("drop", *SECTION_MS, False)]
 CALL_RESPONSE: MacroSpec = [("drop", *SECTION_MS, True)]
@@ -308,17 +309,10 @@ def _section_plan(section: SongSectionRef) -> SectionCoordinationPlan:
 def _mh_plan(sections: MovingHeadSpec = SWING) -> ChoreographyPlan:
     return ChoreographyPlan(
         sections=[
-            PlanSection.model_validate(
-                {
-                    "section_name": name,
-                    "start_bar": first,
-                    "end_bar": last,
-                    "template_id": template_id,
-                    "preset_id": None,
-                }
-            )
+            plan_section(name, first, last, template_id)
             for name, first, last, template_id in sections
-        ]
+        ],
+        overall_strategy="",
     )
 
 

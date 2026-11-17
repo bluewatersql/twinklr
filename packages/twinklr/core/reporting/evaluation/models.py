@@ -140,6 +140,29 @@ class SegmentSelection(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
+class SongIntentReport(BaseModel):
+    """The planner's song intent for a section or part, as planned.
+
+    Null fields and empty lists are "as the template is authored". `not_rendered` names
+    the fields the planner set that the renderer does not render yet (a known regression,
+    `changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md`).
+    """
+
+    intensity: str | None = Field(description="Intensity, or null for as authored")
+    color: str | None = Field(description="Colour (palette role or named), or null")
+    gobo: str | None = Field(description="Gobo pattern, or null")
+    moment_cues: list[str] = Field(description="Lyric moment cue ids the section answers")
+    events: list[str] = Field(description="Timed accents, one line each")
+    motif_id: str | None = Field(description="The macro motif carried, or null")
+    variation: str = Field(description="Variation of the motif")
+    density: str = Field(description="Movement density")
+    entry: str | None = Field(description="Transition into the section, or null")
+    exit: str | None = Field(description="Transition out of the section, or null")
+    not_rendered: list[str] = Field(description="Fields set that are not rendered yet")
+
+    model_config = ConfigDict(frozen=True)
+
+
 class TargetResolution(BaseModel):
     """Fixture targeting resolution."""
 
@@ -165,6 +188,9 @@ class SectionReport(BaseModel):
     )
     segments: list[SegmentSelection] | None = Field(
         default=None, description="Segment selections (for segmented sections)"
+    )
+    song_intent: SongIntentReport | None = Field(
+        default=None, description="The planner's song intent for this section"
     )
 
     # Rendering data
@@ -300,6 +326,10 @@ class RenderSummary(BaseModel):
     )
     unplayable_totals: dict[str, dict[str, int]] = Field(
         default_factory=dict, description="Cues and frames kept dark as unplayable, by code"
+    )
+    plan_repairs: list[dict[str, str]] = Field(
+        default_factory=list,
+        description="Items repair dropped, adjusted or recorded in the planner's response",
     )
 
     model_config = ConfigDict(frozen=True)

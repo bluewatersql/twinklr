@@ -74,14 +74,88 @@ def _catalog() -> Iterator[None]:
 
 def test_plan_section_schema_requires_every_intent_field() -> None:
     schema = PlanSection.model_json_schema()
-    assert "_legacy_intent_omitted" not in schema["properties"]
     assert {
+        "parts",
         "intensity",
-        "color_intent",
-        "shutter_events",
-        "gobo_events",
+        "color",
+        "gobo",
         "moment_cues",
+        "events",
+        "motif_id",
+        "variation",
+        "density",
+        "transitions",
     } <= set(schema["required"])
+
+
+def _unrendered(pipeline: RenderingPipeline) -> list[dict[str, Any]]:
+    assert pipeline.render_record is not None
+    return [
+        diagnostic
+        for diagnostic in pipeline.render_record["diagnostics"]
+        if "is not rendered yet" in diagnostic["message"]
+    ]
+
+
+def test_a_neutral_section_reports_no_unrendered_intent() -> None:
+    pipeline = _pipeline()
+    pipeline.render()
+
+    assert _unrendered(pipeline) == []
+
+
+def test_set_intent_is_reported_unrendered_per_section_and_renders_as_authored() -> None:
+    """Song intent is not rendered yet: the frames are those of the neutral plan, and
+    each section that set intent says which fields, naming the plan that fixes it."""
+    neutral = _pipeline()
+    neutral.render()
+    plan = neutral.choreography_plan
+    accented = plan.model_copy(
+        update={
+            "sections": [
+                plan.sections[0].model_copy(
+                    update={"intensity": "DRAMATIC", "color": "PALETTE_ACCENT"}
+                ),
+                plan.sections[1],
+            ]
+        }
+    )
+    pipeline = RenderingPipeline(
+        choreography_plan=accented,
+        beat_grid=_make_beat_grid(),
+        fixture_group=family_rig(HEADS),
+        job_config=_job(),
+    )
+    pipeline.render()
+
+    assert pipeline.frames == neutral.frames
+    (diagnostic,) = _unrendered(pipeline)
+    assert diagnostic["section_id"] == "s1"
+    assert "(intensity, color)" in diagnostic["message"]
+    assert "known regression" in diagnostic["message"]
+    assert "plan/song-intent-rendering.md" in diagnostic["message"]
+
+
+def test_plan_repairs_reach_the_render_record_only_when_there_are_any() -> None:
+    from twinklr.core.agents.sequencer.moving_heads.models import PlanRepair, RepairAction
+
+    plain = _pipeline()
+    plain.render()
+    assert plain.render_record is not None and "plan_repairs" not in plain.render_record
+    repair = PlanRepair(
+        section_id="s1", item="moment cue 'x'", action=RepairAction.DROPPED, reason="unknown"
+    )
+    repaired = RenderingPipeline(
+        choreography_plan=plain.choreography_plan.model_copy(update={"repairs": [repair]}),
+        beat_grid=_make_beat_grid(),
+        fixture_group=family_rig(HEADS),
+        job_config=_job(),
+    )
+    repaired.render()
+
+    assert repaired.frames == plain.frames
+    assert repaired.render_record is not None
+    assert repaired.render_record["plan_repairs"] == [repair.model_dump(mode="json")]
 
 
 def test_one_head_rig_collapses_spatial_groups_to_its_only_fixture() -> None:
@@ -175,7 +249,7 @@ class TestIteratePlanSections:
 
     def test_section_names_match(self, pipeline: RenderingPipeline) -> None:
         sections = list(pipeline.iterate_plan_sections(pipeline.choreography_plan))
-        names = [s.section_name for s in sections]
+        names = [s.section_id for s in sections]
         assert names == ["s1", "s2"]
 
 

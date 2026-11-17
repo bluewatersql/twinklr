@@ -11,9 +11,9 @@ from pathlib import Path
 import subprocess
 from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
 
-from pydantic import ConfigDict, TypeAdapter, with_config
+from pydantic import ConfigDict, TypeAdapter, ValidationError, with_config
 
-from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, load_plan
 from twinklr.core.config.models import MHRenderPolicy
 from twinklr.core.config.render_policy import UnsupportedRenderModeError
 from twinklr.core.reporting.evaluation.models import RunMetadata
@@ -191,8 +191,12 @@ def extract_plan(checkpoint_data: dict) -> ChoreographyPlan:
         raise ValueError("No 'plan' field found in checkpoint data")
 
     try:
-        return ChoreographyPlan.model_validate(plan_data)
-    except Exception as e:
+        return load_plan(
+            plan_data,
+            remedy="re-run the command that planned it (`twinklr run` or `twinklr show`) "
+            "with checkpoints on",
+        )
+    except ValidationError as e:
         raise ValueError(f"Failed to validate ChoreographyPlan: {e}") from e
 
 
