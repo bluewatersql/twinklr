@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -11,6 +12,7 @@ import pytest
 from tests.golden.harness import RIGS, build_beat_grid, build_fixture_group, build_plan
 from tests.support.mh_physical import (
     PHYSICAL_INITIAL_STATE,
+    TEMPLATE_ID,
     hold_step,
     physical_bars_grid,
     physical_grid,
@@ -27,7 +29,9 @@ from twinklr.core.audio.models.metadata import EmbeddedMetadata, MetadataBundle
 from twinklr.core.config.models import JobConfig
 from twinklr.core.formats.xlights.layout.models.rgb_effects import Model
 from twinklr.core.pipeline.context import PipelineContext
+from twinklr.core.reporting.evaluation.collect import load_checkpoint, recorded_render
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import UnsupportedRigShapeError
+from twinklr.core.sequencer.moving_heads.pipeline import TemplateAdmission
 
 
 def _context_with_fixture_path(fixture_path: str) -> PipelineContext:
@@ -251,3 +255,131 @@ async def test_the_stage_keeps_the_warning_about_cues_kept_dark(tmp_path: Path) 
     assert warning is not None and "cannot play honestly" in warning
     trace = json.loads(context.get_state("delivery_artifacts").trace_path.read_text())
     assert trace["render"]["unplayable_totals"]["infeasible_transition"]["cues"] > 0
+
+
+def _checkpoint(output_dir: Path, plan: Any, **fields: Any) -> Path:
+    """A plan checkpoint as the planning stage writes it."""
+    path = output_dir / "checkpoints" / "plans" / "final.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps({"run_id": "run", "plan": plan.model_dump(mode="json"), **fields}, indent=2),
+        encoding="utf-8",
+    )
+    return path
+
+
+@pytest.mark.asyncio
+async def test_physical_render_records_itself_in_the_plan_checkpoint(tmp_path: Path) -> None:
+    """`eval-report` re-renders a physical plan from what the run rendered: the stage adds
+    the render's fingerprint, policy, beat grid and gate result to the run's checkpoint,
+    and they read back as the objects the render used."""
+    admission = TemplateAdmission(
+        admitted=(TEMPLATE_ID,),
+        admitted_presets={TEMPLATE_ID: ()},
+        effective_preset={TEMPLATE_ID: None},
+        exclusions=({"template_id": "other", "reason": "why"},),
+        preset_exclusions=(),
+        entry_dips={TEMPLATE_ID: {"fixture_id": "MH1", "bound_ms": 120, "beats": 1}},
+    )
+    stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
+    context = _physical_context()
+    context.output_dir = tmp_path
+    context.set_state("template_admission", admission)
+    checkpoint = _checkpoint(tmp_path, physical_plan(), render_mode="physical_v2")
+    checkpoint.chmod(0o640)
+
+    with (
+        physical_test_templates(),
+        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=physical_rig()),
+    ):
+        result = await stage.execute({"moving_heads": physical_plan()}, context)
+
+    assert result.success, result.error
+    trace = json.loads((tmp_path / "out.xsq.trace.json").read_text(encoding="utf-8"))
+    data = load_checkpoint(checkpoint)
+    assert set(data) == {"run_id", "plan", "render_mode", "render"}
+    recorded = recorded_render(data)
+    assert recorded is not None
+    assert recorded.fingerprint == trace["render"]["render_fingerprint"]
+    assert recorded.policy == context.job_config.moving_heads
+    assert recorded.beat_grid == physical_grid()
+    assert recorded.admission == admission
+    # The hashes the trace carries, to name the input that differs on a mismatch.
+    assert recorded.inputs == {
+        key: trace["render"][key]
+        for key in (
+            "fixtures",
+            "template_sha256",
+            "beat_grid_sha256",
+            "renderer_revision",
+            "encoder_version",
+        )
+    }
+    assert [p.name for p in checkpoint.parent.iterdir()] == ["final.json"]  # no temp left
+    assert checkpoint.stat().st_mode & 0o777 == 0o640  # the replaced file keeps its mode
+
+
+@pytest.mark.asyncio
+async def test_a_checkpoint_that_cannot_be_extended_does_not_fail_the_render(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The delivery is written before the record; a checkpoint the stage cannot read
+    is left as it is, with a warning, and the render still succeeds."""
+    stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
+    context = _physical_context()
+    context.output_dir = tmp_path
+    checkpoint = tmp_path / "checkpoints" / "plans" / "final.json"
+    checkpoint.parent.mkdir(parents=True)
+    checkpoint.write_text("{not json", encoding="utf-8")
+
+    with (
+        physical_test_templates(),
+        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=physical_rig()),
+        caplog.at_level("WARNING"),
+    ):
+        result = await stage.execute({"moving_heads": physical_plan()}, context)
+
+    assert result.success, result.error
+    assert (tmp_path / "out.xsq").exists()
+    assert checkpoint.read_text(encoding="utf-8") == "{not json"
+    assert "could not record the render in the checkpoint" in caplog.text
+    assert [p.name for p in checkpoint.parent.iterdir()] == ["final.json"]
+
+
+@pytest.mark.asyncio
+async def test_physical_render_writes_no_checkpoint_the_run_did_not(tmp_path: Path) -> None:
+    """With no plan checkpoint (the planning stage writes one when `write_checkpoint`
+    holds), the render records nothing."""
+    stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
+    context = _physical_context()
+    context.output_dir = tmp_path
+
+    with (
+        physical_test_templates(),
+        patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=physical_rig()),
+    ):
+        result = await stage.execute({"moving_heads": physical_plan()}, context)
+
+    assert result.success, result.error
+    assert not (tmp_path / "checkpoints").exists()
+
+
+@pytest.mark.asyncio
+async def test_legacy_render_leaves_the_checkpoint_untouched(tmp_path: Path) -> None:
+    stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
+    context = _context_with_fixture_path("fixture_config.json")
+    context.session.job_config = JobConfig()
+    context.output_dir = tmp_path
+    context.set_state("beat_grid", build_beat_grid())
+    checkpoint = _checkpoint(tmp_path, build_plan())
+    before = checkpoint.read_bytes()
+
+    with patch.object(
+        MovingHeadRenderingStage,
+        "_load_fixture_config",
+        return_value=build_fixture_group(RIGS["mh4_minimal"]),
+    ):
+        result = await stage.execute({"moving_heads": build_plan()}, context)
+
+    assert result.success, result.error
+    assert checkpoint.read_bytes() == before

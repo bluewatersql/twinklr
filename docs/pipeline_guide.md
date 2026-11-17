@@ -826,8 +826,9 @@ either end renders only its covered span, the detected beats plus one beat inter
 beyond the first and last (or up to the song's edge when nearer); every fixture is held
 dark outside it and no tempo is inferred there. The gate logs that span, and the trace
 records it with each dropped cue. `twinklr show`,
-`inject` and `regenerate` render legacy output only and refuse it; `eval-report` refuses a
-checkpoint that records a physical render mode.
+`inject` and `regenerate` render legacy output only and refuse it. `eval-report`
+re-renders a physical checkpoint from the render its run recorded in it and reports
+physical metrics ([user guide](user-guide.md#evaluation-report-twinklr-eval-report)).
 With `twinklr run --layout`, a physical job's fixture models are checked against
 the xLights layout before analysis; without it that check is skipped with a warning.
 `twinklr display` renders no moving heads and ignores the mode. Do not reuse the

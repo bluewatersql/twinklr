@@ -10,7 +10,10 @@ from pathlib import Path
 import click
 
 from twinklr.core.reporting.evaluation.config import EvalConfig
-from twinklr.core.reporting.evaluation.generator import generate_evaluation_report
+from twinklr.core.reporting.evaluation.generator import (
+    generate_evaluation_report,
+    mismatch_message,
+)
 from twinklr.core.reporting.evaluation.show_record import load_show_evaluation_record
 
 logger = logging.getLogger(__name__)
@@ -66,11 +69,11 @@ def eval_report_cli(
     config: Path | None,
     log_level: str,
 ) -> None:
-    """Read a completed show record, or generate a legacy checkpoint report.
+    """Read a completed show record, or generate a checkpoint report.
 
     This command re-renders a choreography plan through the sequencing pipeline,
-    analyzes the resulting curves, and generates a comprehensive evaluation report
-    with plots.
+    analyzes the resulting channels, and generates a comprehensive evaluation report
+    with plots. A physical checkpoint is re-rendered from the render its run recorded.
 
     Example:
         twinklr eval-report \\
@@ -98,7 +101,7 @@ def eval_report_cli(
         if value is None
     ]
     if missing:
-        raise click.UsageError("legacy checkpoint reports require " + ", ".join(missing))
+        raise click.UsageError("checkpoint reports require " + ", ".join(missing))
     assert checkpoint is not None
     assert audio is not None
     assert fixture is not None
@@ -129,7 +132,7 @@ def eval_report_cli(
         click.echo(f"  Output: {out}")
 
         # Run async function with asyncio.run()
-        report_path = asyncio.run(
+        report = asyncio.run(
             generate_evaluation_report(
                 checkpoint_path=checkpoint,
                 audio_path=audio,
@@ -141,7 +144,9 @@ def eval_report_cli(
 
         click.echo("")
         click.echo("✓ Report generated successfully!")
-        click.echo(f"  Report: {report_path}")
+        if report.physical is not None and not report.physical.fingerprint_matches:
+            click.echo(f"  ✗ {mismatch_message(report.physical)}")
+        click.echo(f"  Report: {out / 'report.md'}")
         click.echo(f"  JSON: {out / 'report.json'}")
         click.echo(f"  Plots: {out / 'plots/'}")
 

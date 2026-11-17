@@ -68,11 +68,13 @@ class ReportSummary(BaseModel):
         default_factory=list, description="Unique roles targeted in plan"
     )
 
-    # Phase 2: Advanced metrics
+    # Phase 2: Advanced metrics. None: not reported (physical output).
     validation_errors: int = Field(default=0, description="Heuristic validation errors")
-    physics_violations: int = Field(default=0, description="Physics constraint violations")
-    compliance_issues: int = Field(default=0, description="Template compliance issues")
-    harsh_transitions: int = Field(default=0, description="Number of harsh section transitions")
+    physics_violations: int | None = Field(default=0, description="Physics constraint violations")
+    compliance_issues: int | None = Field(default=0, description="Template compliance issues")
+    harsh_transitions: int | None = Field(
+        default=0, description="Number of harsh section transitions"
+    )
 
     model_config = ConfigDict(frozen=True)
 
@@ -85,8 +87,19 @@ class CurveStats(BaseModel):
     range: float = Field(description="Range (max - min)")
     mean: float = Field(description="Mean value")
     std: float = Field(description="Standard deviation")
-    clamp_pct: float = Field(description="Percentage of samples at bounds (0-100)")
-    energy: float = Field(description="Mean absolute derivative (movement energy)")
+    clamp_pct: float | None = Field(
+        default=None,
+        description=(
+            "Percentage of samples at bounds (0-100); None for physical output, which the "
+            "renderer never clamps"
+        ),
+    )
+    energy: float = Field(
+        description=(
+            "Mean absolute derivative (movement energy): per sample for legacy curves, "
+            "per second for physical output"
+        )
+    )
 
     model_config = ConfigDict(frozen=True)
 
@@ -106,10 +119,33 @@ class CurveAnalysis(BaseModel):
 
     role: str = Field(description="Fixture role (e.g., OUTER_LEFT)")
     channel: str = Field(description="Channel name (PAN, TILT, DIMMER)")
-    space: str = Field(description="Value space: 'norm' or 'dmx'")
+    space: str = Field(
+        description=(
+            "Value space: 'norm' or 'dmx' for legacy curves; for physical output the "
+            "unit, 'degree' (pan, tilt) or 'normalized' (emitted intensity)"
+        )
+    )
     plot_path: Path | None = Field(default=None, description="Path to plot PNG")
     stats: CurveStats = Field(description="Statistical metrics")
-    continuity: ContinuityCheck = Field(description="Loop continuity check")
+    continuity: ContinuityCheck | None = Field(
+        default=None, description="Loop continuity check; None for physical output"
+    )
+    lit_range: float | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description=(
+            "Physical pan, tilt or zoom only: range over the lit frames (emitted intensity "
+            "above 0), leaving out dark repositioning; `stats.range` counts every frame"
+        ),
+    )
+    lit_rate: float | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description=(
+            "Physical pan, tilt or zoom only: mean rate of change per second between "
+            "consecutive lit frames; `stats.energy` counts every frame"
+        ),
+    )
 
     # Metadata from FixtureSegment
     curve_type: str | None = Field(default=None, description="Curve type (e.g., SINE, LINEAR)")
@@ -210,6 +246,11 @@ class SectionReport(BaseModel):
     validation_issues: list[str] = Field(
         default_factory=list, description="Heuristic validation issues"
     )
+    render_facts: SectionRenderFacts | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="The physical renderer's trace facts for this section (physical only)",
+    )
 
     model_config = ConfigDict(frozen=True)
 
@@ -222,6 +263,112 @@ class EvaluationReport(BaseModel):
     song: SongMetadata = Field(description="Song timing and structure")
     summary: ReportSummary = Field(description="High-level statistics")
     sections: list[SectionReport] = Field(description="Per-section analysis")
+    physical: PhysicalRenderSummary | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="The physical render's identity and the gate's facts (physical only)",
+    )
+
+    model_config = ConfigDict(frozen=True)
+
+
+class LitStep(BaseModel):
+    """One fixture's change in one channel between two encoded frames."""
+
+    fixture_id: str = Field(description="Fixture")
+    channel: str = Field(description="pan, tilt, zoom (degrees) or dimmer (emitted intensity)")
+    from_ms: int = Field(description="Start of the earlier frame")
+    to_ms: int = Field(description="Start of the later frame")
+    change: float = Field(description="Value at `to_ms` minus value at `from_ms`")
+    lit: bool = Field(description="Whether both frames emit light")
+    allowed: float | None = Field(
+        description=(
+            "Largest change the fixture's configured travel speed allows over the interval, "
+            "plus one DMX word; None for the dimmer or an axis without a travel speed"
+        )
+    )
+    beyond_travel: bool = Field(
+        default=False,
+        description=(
+            "Whether the change exceeds `allowed`, decided exactly in DMX words. The bound "
+            "is necessary, not sufficient: it does not detect sustained overspeed of up to "
+            "one word per frame, nor a reveal before the head has finished travelling or "
+            "settling"
+        ),
+    )
+
+    model_config = ConfigDict(frozen=True)
+
+
+class SectionRenderFacts(BaseModel):
+    """What a physical render's trace records about one section, and the motion its
+    encoded frames show there."""
+
+    entry_windows: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="The section's `entry_windows` records: each fixture's dark entry",
+    )
+    dropped_cues: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="The section's `dropped_cues` records: cues kept dark, with the reason",
+    )
+    transactions: dict[str, int] = Field(
+        default_factory=dict,
+        description="Reposition transactions of cues starting in the section, by status",
+    )
+    diagnostics: list[dict[str, Any]] = Field(
+        default_factory=list, description="Render diagnostics naming the section"
+    )
+    lit_steps: list[LitStep] = Field(
+        default_factory=list,
+        description=(
+            "Per fixture and channel, the largest frame-to-frame step inside the section: "
+            "between two lit frames for pan, tilt and zoom, between any two for the dimmer"
+        ),
+    )
+    boundary_steps: list[LitStep] = Field(
+        default_factory=list,
+        description=(
+            "Per fixture whose entry is `skipped` (it plays through the boundary) and "
+            "channel, the change from its last lit frame before the section to the "
+            "section's first frame"
+        ),
+    )
+
+    model_config = ConfigDict(frozen=True)
+
+
+class PhysicalRenderSummary(BaseModel):
+    """A physical report's render identity, the gate's facts and what it leaves out."""
+
+    run_fingerprint: str = Field(description="Render fingerprint the run recorded")
+    rerender_fingerprint: str = Field(description="Render fingerprint of the re-render")
+    fingerprint_matches: bool = Field(description="Whether the re-render is the run's render")
+    mismatched_inputs: list[str] = Field(
+        default_factory=list,
+        description=(
+            "On a mismatch, each recorded input hash that differs from the re-render's "
+            "(fixture profile or model name, template, beat grid, revisions)"
+        ),
+    )
+    admission_exclusions: list[dict[str, Any]] = Field(
+        default_factory=list, description="Templates the gate left out of the offer, and why"
+    )
+    admission_preset_exclusions: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Variants of admitted templates the gate did not admit, and why",
+    )
+    admission_effective_presets: dict[str, str] = Field(
+        default_factory=dict,
+        description="Each admitted template's effective variant, where not its base",
+    )
+    unplayable_totals: dict[str, dict[str, int]] = Field(
+        default_factory=dict, description="Cues and frames kept dark as unplayable, by code"
+    )
+    not_reported: list[str] = Field(
+        default_factory=list,
+        description="Legacy metrics left out of a physical report, each with the reason",
+    )
 
     model_config = ConfigDict(frozen=True)
 

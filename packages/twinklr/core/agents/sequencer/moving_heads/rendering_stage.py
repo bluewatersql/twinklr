@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from twinklr.core.formats.xlights.sequence.models.xsq import TimingTrack
     from twinklr.core.pipeline.context import PipelineContext
     from twinklr.core.pipeline.result import StageResult
+    from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
     from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 logger = logging.getLogger(__name__)
@@ -100,6 +101,8 @@ class MovingHeadRenderingStage:
             - Stores "rendered_segment_count" in context.state
             - Adds "mh_render_segments" to context.metrics
             - Adds "mh_render_transitions" to context.metrics
+            - Adds a physical render's record to the run's plan checkpoint, when the
+              planning stage wrote one (`_record_render`)
         """
         from twinklr.core.agents.sequencer.moving_heads.models import (
             ChoreographyPlan as _ChoreographyPlan,
@@ -165,6 +168,8 @@ class MovingHeadRenderingStage:
 
             # Render to segments and write the delivery
             segments = pipeline.render()
+            if pipeline.render_record is not None:
+                _record_render(pipeline, context)
 
             logger.debug(f"✅ Rendered {len(segments)} segments to {self.xsq_output_path}")
 
@@ -259,6 +264,74 @@ class MovingHeadRenderingStage:
     def _load_fixture_config(self, context: PipelineContext) -> FixtureGroup | None:
         """Load fixture configuration; see `load_render_fixture_group`."""
         return load_render_fixture_group(context, self.fixture_config_path)
+
+
+def _record_render(pipeline: RenderingPipeline, context: PipelineContext) -> None:
+    """Add a physical render's identity and inputs to the run's plan checkpoint.
+
+    `twinklr eval-report` re-renders the plan from them exactly as this render ran: its
+    `render_fingerprint` (the run's, checked against the re-render's), the render
+    `policy`, the `beat_grid` it rendered against and the pre-planning gate's
+    `admission` (null when none ran), under the checkpoint's `render` key, with the
+    trace's input hashes (`inputs`) that name what differs on a mismatch. Only a
+    checkpoint the planning stage wrote is extended; a legacy render records nothing.
+
+    The checkpoint is replaced atomically. The delivery is already written, so a
+    checkpoint that cannot be read or written is logged and left as it was.
+    """
+    import dataclasses
+    import json
+    import os
+    import stat
+    import tempfile
+
+    if not context.job_config.write_checkpoint or context.output_dir is None:
+        return
+    checkpoint_path = context.output_dir / "checkpoints" / "plans" / "final.json"
+    if not checkpoint_path.exists():
+        return
+    record = pipeline.render_record
+    assert record is not None  # set by a physical render
+    try:
+        data = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+        data["render"] = {
+            "render_fingerprint": record["render_fingerprint"],
+            "policy": pipeline.job_config.moving_heads.model_dump(mode="json"),
+            "beat_grid": pipeline.beat_grid.model_dump(mode="json"),
+            "admission": (
+                None if pipeline.admission is None else dataclasses.asdict(pipeline.admission)
+            ),
+            "inputs": {
+                key: record[key]
+                for key in (
+                    "fixtures",
+                    "template_sha256",
+                    "beat_grid_sha256",
+                    "renderer_revision",
+                    "encoder_version",
+                )
+            },
+        }
+        handle, name = tempfile.mkstemp(
+            dir=checkpoint_path.parent, prefix=".final.", suffix=".json.tmp"
+        )
+        temporary = Path(name)
+        try:
+            with os.fdopen(handle, "w", encoding="utf-8") as file:
+                json.dump(data, file, indent=2)
+            # The replacement keeps the checkpoint's mode (a temp file is created 0600).
+            temporary.chmod(stat.S_IMODE(checkpoint_path.stat().st_mode))
+            temporary.replace(checkpoint_path)
+        except BaseException:
+            temporary.unlink(missing_ok=True)
+            raise
+    except (OSError, ValueError, TypeError) as error:
+        logger.warning(
+            "physical_v2: could not record the render in the checkpoint %s, so "
+            "`twinklr eval-report` cannot re-render this run: %s",
+            checkpoint_path,
+            error,
+        )
 
 
 def load_render_fixture_group(

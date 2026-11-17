@@ -2,16 +2,25 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from dataclasses import dataclass
 import datetime as dt
 from datetime import datetime
 import json
 from pathlib import Path
 import subprocess
-from typing import Any
+from typing import TYPE_CHECKING, Any, TypedDict
+
+from pydantic import ConfigDict, TypeAdapter, with_config
 
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.config.models import MHRenderPolicy
+from twinklr.core.config.render_policy import UnsupportedRenderModeError
 from twinklr.core.reporting.evaluation.models import RunMetadata
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+
+if TYPE_CHECKING:
+    from twinklr.core.sequencer.moving_heads.pipeline import TemplateAdmission
 
 
 def load_checkpoint(checkpoint_path: Path) -> dict[str, Any]:
@@ -49,6 +58,99 @@ def checkpoint_render_policy(checkpoint_data: dict) -> MHRenderPolicy:
         ValidationError: If `render_mode` names no known mode.
     """
     return MHRenderPolicy.model_validate({"mode": checkpoint_data.get("render_mode", "legacy_v1")})
+
+
+@with_config(ConfigDict(extra="allow"))
+class _RecordedFixture(TypedDict):
+    """One fixture's entry in the run trace's `fixtures` (other keys kept as recorded)."""
+
+    fixture_id: str
+    xlights_model_name: str
+    profile_sha256: str
+
+
+class _RecordedInputs(TypedDict):
+    """The input hashes a run's render record carries (`RecordedRender.inputs`)."""
+
+    fixtures: list[_RecordedFixture]
+    template_sha256: dict[str, str]
+    beat_grid_sha256: str
+    renderer_revision: str
+    encoder_version: str
+
+
+@dataclass(frozen=True)
+class RecordedRender:
+    """The physical render a run recorded in its checkpoint (`render`, written by the
+    render stage): its fingerprint and the inputs a re-render needs to be that render.
+
+    Attributes:
+        fingerprint: The run's render fingerprint.
+        policy: The job's full moving-head render policy.
+        beat_grid: The beat grid the run rendered against.
+        admission: The pre-planning gate's result, or None when no gate ran.
+        inputs: The run trace's input hashes (`fixtures`, `template_sha256`,
+            `beat_grid_sha256`, `renderer_revision`, `encoder_version`).
+    """
+
+    fingerprint: str
+    policy: MHRenderPolicy
+    beat_grid: BeatGrid
+    admission: TemplateAdmission | None
+    inputs: Mapping[str, Any]
+
+
+def recorded_render(checkpoint_data: dict) -> RecordedRender | None:
+    """The physical render the checkpoint records, or None for a legacy checkpoint.
+
+    Raises:
+        UnsupportedRenderModeError: If the checkpoint names a physical render mode but
+            records no render (its run failed before rendering, or predates the record),
+            or a record that does not read back.
+    """
+    mode = checkpoint_render_policy(checkpoint_data).mode
+    if mode == "legacy_v1":
+        return None
+    render = checkpoint_data.get("render")
+    if render is None:
+        raise UnsupportedRenderModeError(
+            f"`twinklr eval-report` re-renders a moving_heads.mode {mode!r} plan only from "
+            "the render its run recorded in the checkpoint (`render`), and this checkpoint "
+            "records none; re-run the job through its render to write it"
+        )
+    try:
+        if not isinstance(render, dict):
+            raise TypeError(f"expected a mapping, got {type(render).__name__}")
+        return _recorded_render(render)
+    except (KeyError, TypeError, AttributeError, ValueError) as error:
+        raise UnsupportedRenderModeError(
+            "`twinklr eval-report` cannot re-render this checkpoint: its render record "
+            f"(`render`) is malformed ({type(error).__name__}: {error})"
+        ) from error
+
+
+def _recorded_render(render: dict[str, Any]) -> RecordedRender:
+    """The record the render stage writes, read back."""
+    from twinklr.core.sequencer.moving_heads.pipeline import TemplateAdmission
+
+    admission = render["admission"]
+    return RecordedRender(
+        fingerprint=str(render["render_fingerprint"]),
+        # Validated here, so a mismatch is compared against well-formed hashes.
+        inputs=TypeAdapter(_RecordedInputs).validate_python(render["inputs"]),
+        policy=MHRenderPolicy.model_validate(render["policy"]),
+        beat_grid=BeatGrid.model_validate(render["beat_grid"]),
+        admission=None
+        if admission is None
+        else TemplateAdmission(
+            admitted=tuple(admission["admitted"]),
+            admitted_presets={t: tuple(p) for t, p in admission["admitted_presets"].items()},
+            effective_preset=dict(admission["effective_preset"]),
+            exclusions=tuple(admission["exclusions"]),
+            preset_exclusions=tuple(admission["preset_exclusions"]),
+            entry_dips=dict(admission["entry_dips"]),
+        ),
+    )
 
 
 def extract_plan(checkpoint_data: dict) -> ChoreographyPlan:

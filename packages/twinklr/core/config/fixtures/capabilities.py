@@ -162,6 +162,12 @@ class AxisCapability(BaseModel):
         word = self._uninverted_word(Fraction(value))
         return self._invert(word)
 
+    def decode(self, word: int) -> Fraction:
+        """The calibrated value a DMX word encodes: the inverse of `dmx_word`, inversion
+        undone, exact at the word's center (within half a word of any value that
+        encodes to it)."""
+        return self._word_value(self._invert(word))
+
     def word_center(self, word: int) -> float:
         """A value that encodes to `word` with margin: the word's center, kept in the
         allowed window, so no float rounding lands on a DMX rounding tie.

@@ -232,6 +232,35 @@ def test_dmx_word_rounds_half_up_exactly(value: float, word: int) -> None:
     assert _profile().axes["pan"].dmx_word(value) == word
 
 
+@pytest.mark.parametrize(
+    ("update", "word", "value"),
+    [
+        pytest.param({}, 32768, -270 + Fraction(540 * 32768, 65535), id="16-bit"),
+        pytest.param(
+            {"inverted": True}, 65535 - 32768, -270 + Fraction(540 * 32768, 65535), id="inverted"
+        ),
+        pytest.param({"dmx_min": 1000, "dmx_max": 60000}, 1000, Fraction(-270), id="sub-range-low"),
+        pytest.param(
+            {"dmx_min": 1000, "dmx_max": 60000, "inverted": True},
+            1000,
+            Fraction(270),
+            id="sub-range-inverted",
+        ),
+    ],
+)
+def test_decode_is_the_inverse_of_dmx_word(
+    update: dict[str, Any], word: int, value: Fraction
+) -> None:
+    """`decode` gives the calibrated value a word encodes, inversion undone, over the
+    axis' word range; every word an admitted value encodes decodes back to itself."""
+    axis = AxisCapability.model_validate({**_profile().axes["pan"].model_dump(), **update})
+
+    assert axis.decode(word) == value
+    for angle in (-270.0, -12.5, 0.0, 45.0, 269.9):
+        assert axis.dmx_word(axis.decode(axis.dmx_word(angle))) == axis.dmx_word(angle)
+        assert abs(axis.decode(axis.dmx_word(angle)) - Fraction(angle)) <= Fraction(540, 2 * 59000)
+
+
 def test_dmx_word_takes_an_exact_fraction() -> None:
     """-270 + 90/4369 degrees scales to exactly 2.5; no float holds that value."""
     pan = _profile().axes["pan"]

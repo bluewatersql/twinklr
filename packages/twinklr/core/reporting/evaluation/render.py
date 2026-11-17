@@ -10,7 +10,11 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from twinklr.core.reporting.evaluation.models import EvaluationReport, SectionReport
+from twinklr.core.reporting.evaluation.models import (
+    EvaluationReport,
+    PhysicalRenderSummary,
+    SectionReport,
+)
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -111,14 +115,17 @@ def write_report_markdown(report: EvaluationReport, output_path: Path) -> None:
     # Phase 2: Advanced metrics
     if report.summary.validation_errors > 0:
         lines.append(f"- **Validation Errors**: {report.summary.validation_errors} ❌")
-    if report.summary.physics_violations > 0:
+    if report.summary.physics_violations:
         lines.append(f"- **Physics Violations**: {report.summary.physics_violations} ⚠️")
-    if report.summary.compliance_issues > 0:
+    if report.summary.compliance_issues:
         lines.append(f"- **Compliance Issues**: {report.summary.compliance_issues} ⚠️")
-    if report.summary.harsh_transitions > 0:
+    if report.summary.harsh_transitions:
         lines.append(f"- **Harsh Transitions**: {report.summary.harsh_transitions} ⚠️")
 
     lines.append("")
+
+    if report.physical is not None:
+        lines.extend(_render_physical_markdown(report.physical))
 
     # Song metadata
     lines.append("## Song Metadata")
@@ -143,6 +150,56 @@ def write_report_markdown(report: EvaluationReport, output_path: Path) -> None:
     output_path.write_text("\n".join(lines), encoding="utf-8")
 
     logger.debug(f"Wrote report Markdown: {output_path}")
+
+
+def _render_physical_markdown(physical: PhysicalRenderSummary) -> list[str]:
+    """The physical render block: identity, the gate's facts, and what is left out."""
+    lines = ["## Physical render", ""]
+    if physical.fingerprint_matches:
+        lines.append(f"- **Render fingerprint**: `{physical.rerender_fingerprint}` (the run's) ✓")
+    else:
+        lines.append(
+            f"- **Render fingerprint**: ❌ the re-render's `{physical.rerender_fingerprint}` "
+            f"does not match the run's `{physical.run_fingerprint}`; the metrics describe the "
+            "re-render, not the delivered sequence"
+        )
+        for input_name in physical.mismatched_inputs:
+            lines.append(f"  - differs: {input_name}")
+    for exclusion in physical.admission_exclusions:
+        lines.append(f"- **Not offered**: `{exclusion['template_id']}`: {exclusion['reason']}")
+    for exclusion in physical.admission_preset_exclusions:
+        variant = exclusion["preset_id"] or "base"
+        lines.append(
+            f"- **Variant not admitted**: `{exclusion['template_id']}` {variant}: "
+            f"{exclusion['reason']}"
+        )
+    for template_id, preset_id in physical.admission_effective_presets.items():
+        lines.append(f"- **Effective variant**: `{template_id}` plays preset `{preset_id}`")
+    for code, total in physical.unplayable_totals.items():
+        lines.append(
+            f"- **Kept dark as unplayable** ({code}): {total['cues']} cue(s), "
+            f"{total['frames']} frame(s)"
+        )
+    lines.append("")
+    lines.append(
+        "Values are read from the encoded frames: pan, tilt and zoom in degrees; `dimmer` "
+        "is the emitted intensity, the dimmer's value or 0 where the shutter extinguishes; "
+        "`rate` is the mean rate of change per second. Range and rate count every frame, "
+        "so they include the heads' dark repositioning; `lit range` and `lit rate` count "
+        "only lit frames (intensity above 0), the motion an audience sees. Each section "
+        "lists every head's largest step between two frames (lit frames for pan, tilt "
+        "and zoom) and, for a head that plays through the boundary (entry `skipped`), the "
+        "change from its last lit frame before the section; a lit step beyond the head's "
+        "travel speed plus one DMX word is flagged `LIT_STEP_EXCEEDS_TRAVEL`. That bound is "
+        "per frame on commanded values, so it is necessary, not sufficient: it does not "
+        "detect sustained overspeed of up to one word per frame, nor a reveal before the "
+        "head has finished travelling or settling."
+    )
+    lines.append("")
+    lines.append("**Not reported for physical output**:")
+    lines.extend(f"- {reason}" for reason in physical.not_reported)
+    lines.append("")
+    return lines
 
 
 def _render_section_markdown(section: SectionReport) -> list[str]:
@@ -218,6 +275,22 @@ def _render_section_markdown(section: SectionReport) -> list[str]:
             lines.append("**Metrics**:")
             for curve in curves:
                 s = curve.stats
+                if curve.continuity is None:
+                    # Physical output: values in the channel's unit, rate per second.
+                    unit = "°" if curve.space == "degree" else ""
+                    lines.append(
+                        f"- {curve.channel} ({curve.space}): min={s.min:.2f}{unit}, "
+                        f"max={s.max:.2f}{unit}, range={s.range:.2f}{unit}, "
+                        f"mean={s.mean:.3f}{unit}, std={s.std:.3f}{unit}, "
+                        f"rate={s.energy:.3f}{unit}/s"
+                        + (
+                            f", lit range={curve.lit_range:.2f}{unit}, "
+                            f"lit rate={curve.lit_rate:.3f}{unit}/s"
+                            if curve.lit_range is not None and curve.lit_rate is not None
+                            else ""
+                        )
+                    )
+                    continue
                 cont = "✓" if curve.continuity.ok else f"✗ ({curve.continuity.loop_delta:.3f})"
 
                 # Build metric line with curve metadata
@@ -287,6 +360,44 @@ def _render_section_markdown(section: SectionReport) -> list[str]:
             for issue in tc.issues:
                 lines.append(f"- ⚠️ {issue}")
 
+        lines.append("")
+
+    if section.render_facts is not None:
+        facts = section.render_facts
+        lines.append("**Render facts**:")
+        for window in facts.entry_windows:
+            lines.append(
+                f"- Entry {window['fixture_id']}: {window['action']}"
+                + (
+                    f", dark for {window['window_ms']} ms"
+                    if window["window_ms"] is not None
+                    else ""
+                )
+            )
+        transactions = ", ".join(f"{status}: {n}" for status, n in facts.transactions.items())
+        lines.append(f"- Transactions: {transactions or 'none'}")
+        for cue in facts.dropped_cues:
+            lines.append(
+                f"- Kept dark: {cue['fixture_id']} step {cue.get('step_id')!r} "
+                f"({cue['reason']}{', ' + str(cue['code']) if 'code' in cue else ''})"
+            )
+        for label, steps in (
+            ("Largest step", facts.lit_steps),
+            ("Across the boundary", facts.boundary_steps),
+        ):
+            for step in steps:
+                unit = "" if step.channel == "dimmer" else "°"
+                allowed = (
+                    ""
+                    if step.allowed is None
+                    else f" (travel plus one DMX word allows {step.allowed:.2f}°)"
+                )
+                lines.append(
+                    f"- {label}: {step.fixture_id} {step.channel} {step.change:+.2f}{unit} "
+                    f"from {step.from_ms} to {step.to_ms} ms"
+                    + ("" if step.lit else ", not lit at both ends")
+                    + allowed
+                )
         lines.append("")
 
     # Validation issues

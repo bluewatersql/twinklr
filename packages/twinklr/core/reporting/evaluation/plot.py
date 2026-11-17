@@ -36,7 +36,8 @@ def plot_curve(
         samples: Curve sample values
         title: Plot title
         output_path: Path to save PNG
-        space: "norm" (0-1) or "dmx" (0-255)
+        space: Physical values in their unit, "degree" or "normalized"; any other
+            value plots legacy normalized samples in DMX space (0-255)
         bar_range: (start_bar, end_bar) for x-axis
         curve_type: Optional curve type/name to display
         section_bar_range: Optional (t0, t1) section boundaries to mark
@@ -63,10 +64,17 @@ def plot_curve(
     start_bar, end_bar = bar_range
     x = np.linspace(start_bar, end_bar, len(samples))
 
-    # Y-axis: Always use DMX space (0-255)
-    y = np.array(samples) * 255
-    ax.set_ylim(0, 255)
-    ax.set_ylabel("DMX Value", fontsize=10)
+    if space in ("degree", "normalized"):
+        # Physical values, in the channel's unit.
+        y = np.array(samples)
+        if space == "normalized":
+            ax.set_ylim(0, 1)
+        ax.set_ylabel("Degrees" if space == "degree" else "Intensity", fontsize=10)
+    else:
+        # Legacy curves: normalized samples shown in DMX space (0-255)
+        y = np.array(samples) * 255
+        ax.set_ylim(0, 255)
+        ax.set_ylabel("DMX Value", fontsize=10)
 
     # Plot main curve
     ax.plot(x, y, linewidth=1.5, color="#2E86AB", label="Curve")

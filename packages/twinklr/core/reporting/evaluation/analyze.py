@@ -6,6 +6,7 @@ flags for issues like clamping, discontinuities, and limited range.
 
 from __future__ import annotations
 
+from itertools import pairwise
 import logging
 
 import numpy as np
@@ -64,13 +65,14 @@ def analyze_curve(
     arr = np.array(samples)
 
     # Compute statistics
+    clamp_pct = _calculate_clamp_percentage(arr)
     stats = CurveStats(
         min=float(arr.min()),
         max=float(arr.max()),
         range=float(arr.max() - arr.min()),
         mean=float(arr.mean()),
         std=float(arr.std()),
-        clamp_pct=_calculate_clamp_percentage(arr),
+        clamp_pct=clamp_pct,
         energy=_calculate_energy(arr),
     )
 
@@ -89,7 +91,7 @@ def analyze_curve(
         error_threshold = 0.60 if is_pulse_curve else config.clamp_error_threshold
         warning_threshold = 0.50 if is_pulse_curve else config.clamp_warning_threshold
 
-        if stats.clamp_pct > error_threshold * 100:
+        if clamp_pct > error_threshold * 100:
             flags.append(
                 ReportFlag(
                     level=ReportFlagLevel.ERROR,
@@ -101,7 +103,7 @@ def analyze_curve(
                     },
                 )
             )
-        elif stats.clamp_pct > warning_threshold * 100:
+        elif clamp_pct > warning_threshold * 100:
             flags.append(
                 ReportFlag(
                     level=ReportFlagLevel.WARNING,
@@ -140,6 +142,60 @@ def analyze_curve(
         )
 
     return stats, flags
+
+
+def physical_channel_stats(values: list[float], *, frame_ms: int) -> CurveStats:
+    """Statistics of one channel of a physical render, in the channel's own unit.
+
+    `values` holds one value per frame (`physical_channel_values`). `energy` is the
+    mean absolute rate of change per second. No clamp percentage is reported: the
+    physical renderer refuses a value outside the axis' operable range instead of
+    clamping it. No flag is raised: the legacy flags key on curve types a physical
+    render does not have. `values` is never empty: a fixture has a value in every frame.
+    """
+    arr = np.array(values)
+    return CurveStats(
+        min=float(arr.min()),
+        max=float(arr.max()),
+        range=float(arr.max() - arr.min()),
+        mean=float(arr.mean()),
+        std=float(arr.std()),
+        energy=_calculate_energy(arr) * 1000 / frame_ms,
+    )
+
+
+def lit_motion(
+    values: list[float], intensity: list[float], *, frame_ms: int
+) -> tuple[float, float] | None:
+    """A pose channel's range over its lit frames (emitted intensity above 0) and its
+    mean absolute rate of change per second between consecutive lit frames: the motion
+    an audience sees, without the dark repositioning. None when no frame is lit."""
+    lit = [value for value, level in zip(values, intensity, strict=True) if level > 0]
+    if not lit:
+        return None
+    steps = [
+        abs(b - a)
+        for (a, b), (la, lb) in zip(pairwise(values), pairwise(intensity), strict=True)
+        if la > 0 and lb > 0
+    ]
+    rate = sum(steps) / len(steps) * 1000 / frame_ms if steps else 0.0
+    return max(lit) - min(lit), rate
+
+
+def largest_step(
+    values: list[float], *, start_ms: int, frame_ms: int, lit: list[float] | None = None
+) -> tuple[float, int, int] | None:
+    """The largest change between consecutive frames, signed, with the times of the two
+    frames (`values[0]` at `start_ms`); with `lit` (emitted intensity per frame), only
+    between two lit frames. The first of equal steps wins; None when there is no pair."""
+    best: tuple[float, int, int] | None = None
+    for index, (a, b) in enumerate(pairwise(values)):
+        if lit is not None and not (lit[index] > 0 and lit[index + 1] > 0):
+            continue
+        if best is None or abs(b - a) > abs(best[0]):
+            at = start_ms + index * frame_ms
+            best = (b - a, at, at + frame_ms)
+    return best
 
 
 def check_loop_continuity(

@@ -52,8 +52,8 @@ def test_eval_report_cli_has_no_xsq_option() -> None:
 
 @pytest.mark.asyncio
 async def test_rerender_refuses_a_physical_policy_before_reading_inputs(tmp_path: Path) -> None:
-    """A plan from a physical job is never re-rendered as legacy: the report analyzes
-    legacy DMX curves, so the mismatch is refused before any file or audio is read."""
+    """A plan from a physical job is re-rendered only from the render its run recorded;
+    without one it is refused before any file or audio is read."""
     with (
         patch("twinklr.core.audio.analyzer.AudioAnalyzer") as analyzer,
         pytest.raises(UnsupportedRenderModeError, match=r"eval-report.*physical_v2"),
@@ -110,8 +110,9 @@ async def test_rerender_passes_the_given_policy_to_the_pipeline(tmp_path: Path) 
 
 @pytest.mark.asyncio
 async def test_eval_report_refuses_a_physical_checkpoint_before_analysis(tmp_path: Path) -> None:
-    """A checkpoint written by a physical job names its mode; the report refuses it
-    before reading audio, instead of re-rendering the plan as legacy."""
+    """A checkpoint written by a physical job names its mode; one that records no render
+    is refused before reading audio, instead of re-rendering the plan as legacy or
+    without the run's gate result."""
     checkpoint = tmp_path / "final.json"
     checkpoint.write_text(
         json.dumps(
