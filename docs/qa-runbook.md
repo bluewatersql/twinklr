@@ -159,6 +159,9 @@ describe what it rendered, and the pins in §8 catch unintended output change.
 - [ ] **Color/palette** — do palettes read correctly on your physical models?
 - [ ] **Moving-head motion** — smooth, in-range, no clipping/whip artifacts?
 - [ ] **Transitions** — section changes feel intentional (no dead or jarring cuts)?
+
+Moving-head colour, intensity and section transitions are not planner-driven yet (see §7):
+judge them as the templates author them, not as a reading of the song.
 - [ ] **Layout coverage** — all intended groups animated; nothing dark that shouldn't be?
 - [ ] **Import cleanliness** — no unresolved models, no clobbered user layers.
 - [ ] **(Owner-gated)** vision calibration ranking, if running the evaluation harness.
@@ -176,6 +179,11 @@ release.
 - **`temperature` is stripped for the GPT-5 reasoning line** (mutually exclusive with a
   reasoning effort); non-reasoning models (gpt-4.1/gpt-4o) keep it.
 - **Display catalog drift:** plans are bound to the recipe catalog at generation time.
+- **Moving-head song intent is not rendered yet (known regression).** The renderer applies
+  each section's template, preset and bars only; the planner's intensity, section colour,
+  shutter and gobo events, lyric moment cues and section transitions, and `twinklr show`'s
+  palette and focal role, are ignored until the song-intent work lands
+  ([plan](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 - **Owner-local inputs** (audio, layout, `config.json`/`fixture_config.json`/`job_config.json`,
   `.env`, local `data/templates/` overlay) are gitignored and not part of CI.
 

@@ -30,8 +30,9 @@ updated: 2026-11-17
   template and preset on the rig over the song and admits each family through its first
   passing variant, its **effective variant**.
 - **BeatGrid** — the beat-aligned timing grid produced by audio rhythm analysis.
-- **Categorical planning** — LLM reasons in semantic categories (intensity:
-  WHISPER/SOFT/MED/STRONG/PEAK; duration: HIT/BURST/PHRASE/EXTENDED/SECTION) which
+- **Categorical planning** — LLM reasons in semantic categories (display intensity:
+  WHISPER/SOFT/MED/STRONG/PEAK; moving-head intensity: SLOW/SMOOTH/FAST/DRAMATIC/INTENSE;
+  duration: HIT/BURST/PHRASE/EXTENDED/SECTION) which
   deterministic code resolves to precise values. The moving-head renderer does not yet
   render planner intensity: a known regression being fixed
   ([plan](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).

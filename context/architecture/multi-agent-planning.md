@@ -40,8 +40,9 @@ are not decision evidence.
 
 - **LLM plans intent; renderer implements precision** — the foundational decision; see
   [memories/decisions/llm-plans-intent-renderer-implements-precision.md](../../memories/decisions/llm-plans-intent-renderer-implements-precision.md).
-- **Categorical over numeric** — intensity is WHISPER/SOFT/MED/STRONG/PEAK; duration is
-  HIT/BURST/PHRASE/EXTENDED/SECTION. The display renderer resolves categories to precise
+- **Categorical over numeric** — intensity is WHISPER/SOFT/MED/STRONG/PEAK for the
+  display planner and SLOW/SMOOTH/FAST/DRAMATIC/INTENSE for the moving-head planner;
+  duration is HIT/BURST/PHRASE/EXTENDED/SECTION. The display renderer resolves categories to precise
   values; the moving-head renderer does not yet render planner intensity (the known
   regression above).
 - **Templates as complete units** — each moving-head template states its steps' motion,

@@ -11,13 +11,15 @@ updated: 2026-11-17
 
 C1.2 (`0ec65d47`), C1.3 (`079831df`) and C1.4 (`24c22b79`) left one moving-head renderer.
 C1.5 brings the published documents, `context/`, `memories/` and `scripts/` in line with
-that. The work is in the working tree of `feat/mh-true-up-p3` on top of `24c22b79`;
-nothing is committed. No provider was called, no xLights instance was touched, no
+that. The work was done on `feat/mh-true-up-p3` on top of `24c22b79` and committed as
+`9e7205cf`; an independent review requested changes, which are applied in a follow-up
+commit (§13). No provider was called, no xLights instance was touched, no
 owner-local data was read, and `make validate` was not run (the brief forbids it). Every
 statement written was checked against the code at `24c22b79` or a dated record; the
 sources are named below. The planner contract is unchanged and is not described as
 changing. §1–§3 record the first pass; §11 records the revision made the same day after
-the owner's song-intent direction, and where they differ §11 is current.
+the owner's song-intent direction, and §13 the review corrections; where they differ the
+later section is current.
 
 Scratch files are under
 `/private/tmp/claude-501/-Users-ondeck-work-github-twinklr/9cfb5b66-fff4-47db-adcb-766b50dc61e9/scratchpad/c15/`
@@ -268,3 +270,38 @@ Checks after the revision: see §12.
 
 The full suite was not rerun after the revision, which touched Markdown only; its last
 run (§8) was 6,512 passed, 30 skipped.
+
+## 13. Review corrections — 2026-11-17
+
+An independent review of `9e7205cf` requested changes. Applied in the working tree (no
+`packages/` change; another agent's uncommitted W0 files were not touched):
+
+| Finding | Change |
+|---|---|
+| HIGH: merging would put the regression on `main` | `changes/ACTIVE.md` and `plan/handoff.md` state that `main` still has the renderer that applies song intent, so the branch stays unmerged until W0–W9 land unless the owner says otherwise; "owner: merge and push" removed as a next action; the owner-gated merge item says "after W0–W9" |
+| Look acceptance called the reference | `memories/decisions/mh-single-renderer.md` (decision and consequences) and `context/current-state.md` (moving-head item, live-evidence row): that render applied no planner intensity, colour, events or cues; the acceptance covers the templates' motion and timing, not the absence of song intent, which W4–W9 add with owner views |
+| Regression statement missing | `context/product/overview.md` (moving-head scope) and `docs/qa-runbook.md` §7 state it with the plan link; §6 notes moving-head colour, intensity and transitions are not planner-driven yet |
+| Plan: field mapping | `plan/song-intent-rendering.md` gains an old → new field mapping table, one row per current planner field (from `agents/sequencer/moving_heads/models.py` and `sequencer/models/transition.py` at `24c22b79`), marked kept / reshaped same range / reshaped narrower / new, and "W2 does not start until the owner has seen this table and given their word on every narrower row". Narrower rows: `preset_id` → `reach`/`rate` (open points: COMPACT+SLOW has no catalog preset; `--template-dir` presets with other names are unreachable), `modifiers`, `transition_in`, `transition_out`. The additions list is corrected (section `gobo`, `reach`, `rate`, `variation`, `density`, `motif_id`, HIT, COLOR events, `entry`/`exit`/`transition_length`) |
+| Plan: intensity | Null and SMOOTH as authored; SLOW and FAST as SMOOTH (owner revert of 2026-11-12, W0 record); DRAMATIC and INTENSE add a beat-locked pulse and raise the floor, never below the authored look; W5's view judges the table |
+| Plan: refusals | Replaced by deterministic repair: drop or adjust the one item, record it in the trace, feed it back to the planner; the run never fails for it; W2 tests the loop |
+| Plan: timing | New rules: dark lead before a reveal bounded to half a beat (proposed), the gate publishes dark phases, HIT forces a lit frame, colour-change dips at boundaries that play lit today are a look change judged at W4 |
+| Plan: W1 layout read | Owner-gated; W1 tests derivation on a synthetic layout only; added to the handoff's owner-gated list |
+| Plan: T2, T4; cache consequences | T2 → W3; T4 emits the new contract in W2, arrangement after W9; W2 re-keys planner caches and refuses old checkpoints and live plans, owner told before merge |
+| Plan: W0 result | 20 strict xfails mapped W4: 5, W5: 2, W6: 5 + cue-bound shutter, W7: 2, W8: 4, W9: 1; the focal-role rule needs its own W9 check; old defects not carried over |
+| Plan: schema figure | Marked as the architect's scratch measurement; W2 measures and pins the real one |
+| Plan: stale diagnostics | Listed under W2 (`sequencer/moving_heads/pipeline.py:1719-1721`, `pipeline/show_stages.py:66-68` and `:189-200`) |
+| LOW: intensity vocabularies | `README.md`, `context/architecture/multi-agent-planning.md`, `context/glossary.md`, `docs/developer-guide.md`: WHISPER…PEAK is the display's; SLOW/SMOOTH/FAST/DRAMATIC/INTENSE the moving-head planner's (`sequencer/models/enum.py`) |
+| LOW: refusal exception | `context/current-state.md`: fixture fields retired before 2026-08 are dropped with a warning (`config/fixtures/removed_fields.py:28-40`; call sites `groups.py:53-57`, `instances.py:60`, `dmx.py:28`) |
+| LOW: C1.5 status | Consistent in `plan/handoff.md`, `phase-3-arrangement.md` and this record: committed as `9e7205cf`, reviewed, corrections in a follow-up commit; the handoff's commit table says it lists code and record commits only (`6caf7cba`, `462ad93e` named as left out) and gains a W0 row; the start-here section is separated from the 2026-11-12 planning log by a heading |
+| Provenance | The architect's gap inventory is committed as `evidence/2026-11-17-song-intent-gap-inventory/README.md`: header (read-only, 2026-11-17, `5d50580c` vs `24c22b79`, superseded where the plan differs) plus the final report extracted from the agent's JSONL transcript by reading from the end (`c15/extract_final.py`); a comparison after reversing the heading demotion found it identical (26,126 characters). The plan's "Source" line points at it |
+
+Checks after these corrections: §14.
+
+## 14. Checks after the review corrections (this session)
+
+| Command | Result |
+|---|---|
+| `uv run pytest tests/unit/config tests/unit/agents/test_model_retarget.py tests/unit/agents/test_structured_outputs.py tests/unit/scripts tests/unit/sequencer/moving_heads/export/test_frame_encoder.py tests/regression/test_mh_pins.py tests/regression/test_xsq_parity.py -q --no-cov` | 769 passed |
+| `uv run ruff check packages tests scripts` | All checks passed |
+| `uv run ruff format --check packages tests scripts` | 1,289 files already formatted (includes the uncommitted W0 files) |
+| `c15/check_links.py` on every Markdown file changed or added in the tree, plus the plan, the decision and the snapshot | 0 broken |

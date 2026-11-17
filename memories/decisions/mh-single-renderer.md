@@ -23,7 +23,9 @@ complete 20 ms DMX frames is the only moving-head renderer. The curve-based rend
 37 built-in templates, the `moving_heads.mode` and schema-version switches, transitions
 and `template-export` were deleted, not kept beside it. The look the owner accepted on
 2026-11-16 (one song, their rig, the xLights house preview) replaces the pre-clean-up
-look as the moving-head reference.
+look as the moving-head reference. That render applied no planner intensity, colour,
+events or cues, so the acceptance covers the templates' motion and timing, not the
+absence of song intent; W4–W9 of the song-intent plan add it, each with an owner view.
 
 ## Context
 
@@ -64,7 +66,8 @@ was accepted the same day.
 - Upgrades across the cutover re-keyed caches and refused old live plans
   ([learning](../learnings/model-dump-hashes-rekey-caches.md)).
 - The accepted look is not a hardware result: no real fixture was driven and the
-  profile timings were chosen, not measured.
+  profile timings were chosen, not measured. Nor does it accept the missing song intent:
+  that render applied no planner intensity, colour, events or cues.
 
 ## Related
 

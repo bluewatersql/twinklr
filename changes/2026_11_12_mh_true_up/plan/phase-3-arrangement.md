@@ -781,7 +781,8 @@ Carried into C1.5: `context/current-state.md:47,49`, `scripts/validation/README.
 ## 2026-11-17: C1.5 done — documents, context, memories and scripts
 
 Record: [evidence/2026-11-17-c1-5-docs-context](../evidence/2026-11-17-c1-5-docs-context/README.md).
-Not yet reviewed; uncommitted at hand-off.
+Committed as `9e7205cf`; an independent review requested changes, applied in a
+follow-up commit (record §13).
 
 - **`docs/`, `README.md`, the catalog README:** describe one moving-head renderer; the
   carried items (`README.md:175`, `docs/overview.md:147`, `docs/pipeline_guide.md:845`,

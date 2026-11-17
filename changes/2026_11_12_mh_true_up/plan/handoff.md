@@ -39,7 +39,8 @@ withdrawn. What is true now is in
 [context/current-state.md](../../../context/current-state.md#implemented) and the
 decision [mh-single-renderer](../../../memories/decisions/mh-single-renderer.md).
 
-Commits on the branch since `main`:
+Commits on the branch since `main` (code and record commits; the handoff-only commits
+`6caf7cba` and `462ad93e` are left out):
 
 | Work | Commits | Record |
 |---|---|---|
@@ -57,16 +58,29 @@ Commits on the branch since `main`:
 | C1.2 old renderer deleted | `0ec65d47` (tag `mh-last-with-legacy-renderer` = `5d50580c`, local) | [record](../evidence/2026-11-16-c1-2-deletion/README.md) |
 | C1.3 shared models narrowed | `079831df` | [record](../evidence/2026-11-16-c1-3-model-narrowing/README.md) |
 | C1.4 names of the second path removed | `24c22b79` | [record](../evidence/2026-11-17-c1-4-renames/README.md) |
-| C1.5 documents, context, memories, scripts | uncommitted at hand-off; the integrator commits | [record](../evidence/2026-11-17-c1-5-docs-context/README.md) |
+| C1.5 documents, context, memories, scripts | `9e7205cf`; reviewed (changes requested), corrections in a follow-up commit | [record](../evidence/2026-11-17-c1-5-docs-context/README.md) |
+| W0 intent-parity harness | in progress, uncommitted | [record](../evidence/2026-11-17-w0-intent-parity/README.md) |
 
 Validation: `uv run pytest tests -q --no-cov` on `24c22b79`: 6,515 passed, 30 skipped
 ([C1.4 record](../evidence/2026-11-17-c1-4-renames/README.md#46-checks-run-on-the-final-tree-this-session));
 the integrator reported `make validate` green on `24c22b79` with the same counts. C1.5's
-checks are in its record. `make validate` has not been run on the C1.5 tree.
+checks are in its record. `make validate` has not been run on `9e7205cf` or later.
+
+**Do not merge this branch yet.** `main` still has the renderer that applies the
+planner's song intent. Merging `feat/mh-true-up-p3` before the song-intent work (W0–W9)
+lands would put the regression on `main`, so the branch stays unmerged until then unless
+the owner says otherwise.
 
 Owner-gated, not done:
 
-- **Merge and push** `feat/mh-true-up-p3`.
+- **Merge and push** `feat/mh-true-up-p3`, after W0–W9 (above) unless the owner rules
+  otherwise.
+- **Field mapping of the planner contract:** W2 does not start until the owner has seen
+  the old→new mapping table in [song-intent rendering](song-intent-rendering.md) and given
+  their word on every row marked narrower.
+- **Reading the owner's xLights layout to derive wheel tags (W1):** not authorized for
+  this purpose. W1 builds profile tags with paste-ready guidance and a derivation tested
+  on a synthetic layout only; running it on the owner's layout waits for their word.
 - **Hardware:** no real fixture has been driven; every profile timing is chosen, not
   measured.
 - **Live `inject`/`regenerate`** against a running xLights with a scratch sequence: the
@@ -75,7 +89,8 @@ Owner-gated, not done:
 - **Paid provider requests:** authorized on 2026-11-13 at the minimum that answers the
   question, logged in the evidence record (W2's one live schema probe falls under it).
 - Any look verdict beyond the one given for Need A Favor on 2026-11-16, including the
-  views that end W4–W9.
+  views that end W4–W9. That render applied no planner intensity, colour, events or cues;
+  its acceptance covers the templates' motion and timing, not the absence of song intent.
 
 Answered on 2026-11-17: palette-role colour and lyric moment cues stay in the planner
 contract and are rendered; `variation` stays a planner choice
@@ -98,11 +113,15 @@ Open owner questions:
    profile, macro plan, group planner, holistic corrector) not provider-enforced on
    Claude.
 
-Also for the owner: after this branch is merged, the first `twinklr run` or `show` of
+Also for the owner, before any merge: W2's contract change re-keys the planner caches
+again and makes old checkpoints and live plans unreadable (refused by name). After this
+branch is merged, the first `twinklr run` or `show` of
 each song plans again (paid), `twinklr regenerate` refuses sequences injected before
 the cutover until `twinklr inject` runs again, and `eval-report` on an older checkpoint
 reports a fingerprint mismatch
 ([learning](../../../memories/learnings/model-dump-hashes-rekey-caches.md)).
+
+## Planning handoff — 2026-11-12
 
 Status: **planning deliverable complete; all implementation remains proposed**.
 Branch/worktree: `chore/knowledge-optimization`, `/Users/ondeck/work/github/twinklr`.
@@ -536,8 +555,9 @@ schema is the one with a cost).
 The owner accepted the look on 2026-11-16 and the cutover ran in five steps: the four
 consumer ports (C1.1), the deletion of the old renderer (C1.2), the model narrowing
 (C1.3), the renames (C1.4), and documents, context, memories and scripts (C1.5).
-C1.1–C1.4 were each written by one agent and reviewed by another; C1.5 awaits its
-review. Byte matrices against the commit before each of
+C1.1–C1.4 were each written by one agent and reviewed by another. C1.5 was committed as
+`9e7205cf` and reviewed by a separate agent (changes requested); the corrections are in a
+follow-up commit. Byte matrices against the commit before each of
 C1.2–C1.4 found no change to frames or delivered files. The commits, records, validation,
 owner-gated items and open questions are in "Start here" at the top of this file.
 

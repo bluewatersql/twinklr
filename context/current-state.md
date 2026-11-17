@@ -44,7 +44,10 @@ See [product/overview.md](product/overview.md).
   dark repositioning between cues. What it requires and refuses:
   - Job schema `3.1` only. `moving_heads.mode`, `transitions` and schema `"3.0"`, and
     every fixture or template key Twinklr no longer reads, are refused by name when the
-    file loads; there are no aliases.
+    file loads; there are no aliases. The exception: fixture fields retired before
+    2026-08 (`dmx_universe`, `dmx_start_address`, `channel_count`, `capabilities`,
+    `movement_speed`, a channel `config`) are dropped with a warning
+    (`config/fixtures/removed_fields.py:28-40`).
   - Every fixture needs a `physical_profile` and a settled `moving_heads.initial_states`
     entry, and its own xLights model; otherwise the job is refused when its fixtures
     load, before analysis. Profiles default what is safe; timings and initial states are
@@ -73,8 +76,10 @@ See [product/overview.md](product/overview.md).
   `tests/regression/test_mh_pins.py`, which pins the render fingerprint and encoded
   frames of every family variant and one delivered `.xsq`. xLights reproduces its bytes.
   The owner accepted its look for one song on their rig in the house preview on
-  2026-11-16; there is no hardware result, and the profile timings used were chosen,
-  not measured ([record](../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p3-viewing-render/README.md)).
+  2026-11-16. That render applied no planner intensity, colour, events or cues: the
+  acceptance covers the templates' motion and timing, not the absence of song intent,
+  which W4–W9 add with owner views. There is no hardware result, and the profile timings
+  used were chosen, not measured ([record](../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p3-viewing-render/README.md)).
   `inject` and `regenerate` have been run only against a fake xLights client.
   Reference: [user guide](../docs/user-guide.md#job_configjson-job-config),
   [catalog README](../catalog/templates/moving_heads/README.md).
@@ -126,7 +131,7 @@ the moving-head output pins and a hermetic display replay. The unmerged
 | 2026-08-29 | OpenAI, `Need A Favor`, owner 4-head rig | Valid `.xsq`; meets or exceeds the pre-refactor baseline (396 effects vs 262) | [run notes](../changes/post-refactor-validation/notes/live-run-prereqs.md), [QA runbook](../docs/qa-runbook.md) |
 | 2026-11-12 | Claude `claude-opus-5-5`, every role | 6/6 stages, about $0.95; on par with the baseline (251 effects vs 262; indicative, different song); human judgment PENDING-OWNER | [evaluation](../evaluations/2026-11-12-claude-baseline-live-run/README.md) |
 | 2026-11-12 | Ollama cloud `glm-5.3:cloud`, every role | 6/6 stages, 0 schema repairs; on par with the baseline (256 effects vs 262; indicative, different song) | [evidence](../changes/twinklr-reactivation-review/evidence/2026-11-12-p4-t2-ollama-cloud-pipeline/README.md) |
-| 2026-11-16 | Claude `claude-opus-5-5`, `Need A Favor`, owner 4-head rig, the current moving-head renderer | 29,631 effects; xLights reproduced every moving-head byte; look accepted by the owner for this song, rig and house preview (not a hardware result) | [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p3-viewing-render/README.md) |
+| 2026-11-16 | Claude `claude-opus-5-5`, `Need A Favor`, owner 4-head rig, the current moving-head renderer | 29,631 effects; xLights reproduced every moving-head byte; look accepted by the owner for this song, rig and house preview: the templates' motion and timing, with no planner intensity, colour, events or cues applied (not a hardware result) | [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p3-viewing-render/README.md) |
 
 The three earlier runs rendered moving heads with the renderer deleted on 2026-11-16;
 their effect counts are not comparable with the current renderer's.

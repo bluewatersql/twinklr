@@ -60,7 +60,7 @@ Audio File (.mp3)
 
 - **Full Audio Analysis** — tempo, beat grid, energy dynamics, section detection, harmonic content, and lyrics with multi-source fallback (embedded tags, LRCLib, Genius, and optional WhisperX; its runtime remains deferred and unavailable with the default FFmpeg 9)
 - **Multi-Agent Orchestration** — iterative planner/heuristic/judge loop with structured feedback and automatic refinement
-- **Categorical Planning** — LLM reasons in semantic terms (WHISPER/SOFT/MED/STRONG/PEAK intensity, HIT/BURST/PHRASE/EXTENDED/SECTION duration) while deterministic renderers map them to precise values. Known regression: the moving-head renderer does not yet render the planner's intensity, section colour, shutter and gobo events, lyric moment cues bound to events, and section transitions; restoring them is planned ([song-intent rendering](changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md))
+- **Categorical Planning** — LLM reasons in semantic terms (display intensity WHISPER/SOFT/MED/STRONG/PEAK, moving-head intensity SLOW/SMOOTH/FAST/DRAMATIC/INTENSE, HIT/BURST/PHRASE/EXTENDED/SECTION duration) while deterministic renderers map them to precise values. Known regression: the moving-head renderer does not yet render the planner's intensity, section colour, shutter and gobo events, lyric moment cues bound to events, and section transitions; restoring them is planned ([song-intent rendering](changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md))
 - **Moving-Head Template Families** — seven data-form families (cascades, orbit, mirrored wings, snap hold, wheel flick, a zoom pilot) with presets and per-head phase distribution; before planning, a gate dry-compiles each on your rig and song and offers the planner only what the rig can render
 - **Schema Auto-Injection** — Pydantic models generate the JSON schemas shown to the LLM, eliminating prompt/schema drift
 - **Two-Tier Validation** — fast heuristic checks before expensive LLM evaluation
@@ -171,7 +171,7 @@ agents (Claude Code, Codex, others):
 | Principle | What It Means |
 |---|---|
 | **LLM plans intent, renderer implements precision** | The LLM selects templates and categorical parameters; deterministic code computes motion, DMX values, curves, and timing |
-| **Categorical over numeric** | Intensity is WHISPER/SOFT/MED/STRONG/PEAK, not a float. Duration is HIT/BURST/PHRASE, not milliseconds. The renderer resolves categories to precise values (the moving-head renderer does not yet render planner intensity: a known regression being fixed) |
+| **Categorical over numeric** | Intensity is a category, not a float: WHISPER/SOFT/MED/STRONG/PEAK for the display, SLOW/SMOOTH/FAST/DRAMATIC/INTENSE for moving heads. Duration is HIT/BURST/PHRASE, not milliseconds. The renderer resolves categories to precise values (the moving-head renderer does not yet render planner intensity: a known regression being fixed) |
 | **Templates as complete units** | Each moving-head template states, per step, its motion, dimmer or shutter pulse, wheel states and phase spread across the heads as data, and is dry-compiled on the rig before it is offered. The LLM selects templates, never invents new ones |
 | **Schema auto-injection** | Pydantic response models generate the JSON schemas shown in prompts, so model changes automatically propagate — no manual sync |
 | **Two-tier validation** | Heuristic checks (template exists? timing valid?) run before the LLM judge, saving tokens on structurally invalid plans |

@@ -23,7 +23,9 @@ protocol in
 
 - **Moving head fixtures** — pan, tilt, dimmer, optional zoom, and shutter, color and
   gobo states, rendered from each fixture's declared profile as complete DMX frames
-  (primary CLI workflow).
+  (primary CLI workflow). Known regression: the planner's intensity, section colour,
+  shutter and gobo events, lyric moment cues and section transitions are not rendered
+  yet ([song-intent rendering](../../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 - **Display sequencer** — RGB/pixel effects for outline, tree, and other display elements.
 - **Feature engineering** — offline corpus analysis feeding style profiles and recipes
   into generation.
