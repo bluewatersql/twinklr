@@ -1360,3 +1360,59 @@ def test_the_offer_bounds_a_dark_change_over_every_axis_the_heads_move() -> None
     slow = rig_offer(FixtureGroup.model_validate(payload), g).dark_change_ms
 
     assert fast is not None and slow is not None and slow > fast
+
+
+@pytest.mark.parametrize("bpm", [120, 170])
+def test_repair_never_says_a_snap_is_the_plain_cut_where_the_render_plays_it(bpm: int) -> None:
+    """Into a template the gate found the heads enter dark, a snap still plays (dark just
+    before the boundary, lit on it, the wheel turning in that darkness): repair claims the
+    plain cut only where the render plays nothing on every head (the song's first ENTRY).
+    The W10b/c review repro: `mirror_wings` red into `finite_snap_hold` blue at 170 BPM."""
+    from twinklr.core.sequencer.moving_heads.pipeline import admit_templates
+
+    beat_grid = grid(bpm, bars=8)
+    fg = rig()
+    job = m.family_job(HEADS)
+    admission = admit_templates(
+        list(m.FAMILY_IDS),
+        beat_grid=beat_grid,
+        fixture_group=fg,
+        initial_states=job.moving_heads.initial_states,
+        failure_mode=job.moving_heads.reposition_fallback,
+        on_unplayable=job.moving_heads.on_unplayable,
+        excludable=list(m.FAMILY_IDS),
+    )
+    for before, after in (
+        ("mirror_wings", "finite_snap_hold"),
+        ("target_orbit", "mirror_wings"),
+        ("fly_in_cascade", "target_orbit"),
+    ):
+        for colour in (False, True):
+            sections = [
+                m.plan_section("s1", 1, 4, before, color="red" if colour else None),
+                m.plan_section(
+                    "s2",
+                    5,
+                    8,
+                    after,
+                    color="blue" if colour else None,
+                    transitions=[transition("ENTRY", "snap", "BEAT")],
+                ),
+            ]
+            repaired = repair_rig_intent(
+                ChoreographyPlan(sections=sections, overall_strategy=""),
+                admission.offer,
+                {},
+                beat_grid,
+            )
+            (entry,) = transitions_of(
+                render(
+                    repaired.sections, beat_grid=beat_grid, fixture_group=fg, admission=admission
+                )
+            )
+            claimed = any("plain cut" in r.reason for r in repaired.repairs)
+            nothing = [
+                h for h, o in entry["heads"].items() if o.get("plays", "").startswith("nothing")
+            ]
+            assert not claimed or len(nothing) == len(HEADS), (before, after, colour)
+    assert admission.offer.dark_entries.get("finite_snap_hold", {}).get("mirror_wings")

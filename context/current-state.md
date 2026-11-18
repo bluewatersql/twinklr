@@ -141,14 +141,15 @@ See [product/overview.md](product/overview.md).
   - **Motif and variation** (W10b/W10c, 2026-11-18, not yet seen by the owner). Each
     family template plays a three-by-three grid of variants (reach narrow/base/wide by
     rate slow/base/fast), each admitted on its own dry compile; one that plays the same
-    as its base after its own base is not offered. Sections sharing a motif chain in plan
-    order (code writes each carrier's relation and source, from the macro thread where
-    it lists the section); a carrier plays its source's variant stepped one step by its
-    variation, part by part; a variation without a motif steps from the previous section
-    on its template. A step that cannot play plays the source's variant, traced and
-    repaired (`recorded`); a motif's colour and gobo are never changed. The trace's
-    `arrangement` says per section the relation and the variant played. Renderer
-    revision 13.
+    as its base after its own base is not offered. Every later carrier of a motif varies
+    the section that introduced it by one step (code derives each relation and source,
+    from the macro thread where it lists the section, overwriting whatever arrives); a
+    restatement returns to the introduced look, part by part; a variation without a motif
+    steps from the previous section on its template. A step that cannot play plays the
+    look it steps from, traced and repaired (`recorded`); a motif's colour and gobo are
+    never changed. The trace's `arrangement` and the evaluation report say per section the
+    relation and the variant played; `regenerate` says which kept sections a re-plan
+    moves to another variant. Renderer revision 13.
     ([user guide](../docs/user-guide.md#how-a-sections-motif-and-variation-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-w10bc-motif-variation/README.md))
   - **Not rendered yet: density and modifiers.** Accepted and ignored (a per-section

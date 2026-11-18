@@ -4276,24 +4276,7 @@ class RenderingPipeline:
         cached = self._arrangement_cache
         if cached is not None and cached[0] is plan:
             return cached[1]
-        variants = (
-            {}
-            if self.admission is None
-            else {t: list(offer.variants) for t, offer in self.admission.offer.templates.items()}
-        )
-        arranged = resolve_arrangement(
-            plan,
-            options_from_variants(
-                variants,
-                lambda t: [preset.preset_id for preset in get_template(t).presets],
-                {}
-                if self.admission is None
-                else {
-                    t: offer.plays_as_base for t, offer in self.admission.offer.templates.items()
-                },
-            ),
-            canonical=lambda t: get_template(t).template.template_id,
-        )
+        arranged = self._resolve(plan)
         out: dict[str, tuple[SectionArrangement, int]] = {}
         for section in plan.sections:
             if section.section_id in arranged:
@@ -4301,6 +4284,53 @@ class RenderingPipeline:
                     out[flat.section_id] = (arranged[section.section_id], index)
         self._arrangement_cache = (plan, out)
         return out
+
+    def _resolve(self, plan: ChoreographyPlan) -> dict[str, SectionArrangement]:
+        """`arrangement.resolve_arrangement` of `plan` over this render's gate (its
+        admitted variants and those that play as base), or every declared preset without
+        one."""
+        templates = {} if self.admission is None else self.admission.offer.templates
+        return resolve_arrangement(
+            plan,
+            options_from_variants(
+                {t: list(offer.variants) for t, offer in templates.items()},
+                lambda t: [preset.preset_id for preset in get_template(t).presets],
+                {t: offer.plays_as_base for t, offer in templates.items()},
+            ),
+            canonical=lambda t: get_template(t).template.template_id,
+        )
+
+    def arrangement_changes(self, base: ChoreographyPlan, replanned: str) -> str | None:
+        """Under `twinklr regenerate`, the warning naming each kept section whose parts now
+        play another variant than they did in `base` (the injected plan), because the
+        re-planned section `replanned` introduces or carries a motif they carry, or is the
+        previous section on their family; None when none changed. Never a refusal: the
+        trace's `arrangement` says what each plays."""
+
+        def plays(plan: ChoreographyPlan) -> dict[tuple[str, int], str]:
+            return {
+                (section_id, index): part.plays
+                for section_id, arrangement in self._resolve(plan).items()
+                for index, part in enumerate(arrangement.parts)
+                if part is not None
+            }
+
+        # A kept section is resolved in both plans or in neither (its own motif and
+        # variation decide that), so comparing the parts the new plan resolves suffices.
+        before, after = plays(base), plays(self.choreography_plan)
+        changed = [
+            f"{section_id} part {index + 1} ({before[section_id, index]} → {variant})"
+            for (section_id, index), variant in after.items()
+            if section_id != replanned
+            and (section_id, index) in before
+            and before[section_id, index] != variant
+        ]
+        if not changed:
+            return None
+        return (
+            f"re-planning section {replanned!r} changes the variant other sections play "
+            f"through their motif or variation: {'; '.join(changed)}"
+        )
 
     def _transitions_played(
         self, section_looks: Sequence[dict[str, Any]], free: RenderingPipeline

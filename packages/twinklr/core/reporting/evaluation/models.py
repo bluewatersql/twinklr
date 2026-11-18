@@ -121,6 +121,13 @@ class TemplateSelection(BaseModel):
 
     template_id: str = Field(description="Template identifier")
     preset_id: str | None = Field(default=None, description="Preset identifier")
+    plays: str | None = Field(
+        default=None,
+        description=(
+            "The variant the render plays where the section's motif or variation decided it "
+            "(the trace's `arrangement`); None where the planned preset decides"
+        ),
+    )
     modifiers: dict[str, str] = Field(
         default_factory=dict, description="Template modifiers applied"
     )

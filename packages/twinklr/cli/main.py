@@ -825,6 +825,9 @@ async def _run_pipeline_async(
             unplayable = pipeline_context.get_state("unplayable_warning")
             if unplayable:
                 console.print(f"\n[yellow]⚠ {unplayable}[/yellow]")
+            arrangement = pipeline_context.get_state("arrangement_warning")
+            if arrangement:
+                console.print(f"\n[yellow]⚠ {arrangement}[/yellow]")
 
         console.print(f"\n[green]📁 All artifacts saved to:[/green] {artifact_dir}")
         return 0

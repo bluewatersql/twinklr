@@ -7,31 +7,34 @@ W10 view (plan: `changes/2026_11_12_mh_true_up/plan/w10-arrangement.md`).
 
 **Motif relation** (`motif_relations`). Equal `motif_id`s are the same idea, with or
 without a macro plan. The first section carrying a motif, in plan order, introduces it;
-each later one relates to the previous carrier (its *source*): with a macro motif thread
-that lists the section, by the thread's `evolution` (a repeated INTRODUCE restates);
-otherwise it varies where the planner set a `variation`, else restates. The relation and
-source are written on the plan at plan time (`PlanSection.motif_relation`,
-`motif_source_id`, code-owned); a plan without them derives them by plan order.
+every later one relates to that introducing section (its *source*): with a macro motif
+thread that lists the section, by the thread's `evolution` (a repeated INTRODUCE
+restates); otherwise it varies where the planner set a `variation`, else restates. The
+relation and source are code-owned (`PlanSection.motif_relation`, `motif_source_id`):
+plan time (`with_motif_relations`) derives and writes both, overwriting whatever arrived,
+and the render derives them again; the one value the render keeps from the plan is a
+later carrier's RESOLVE, which only a macro thread can give and which plan time wrote.
 
 **Variation** (`resolve_arrangement`). One step on one axis of the grid (NARROW, WIDEN on
 reach; SLOWER, FASTER on rate) from a source variant:
 
-- with a motif and a source, the source's part at the same index (the last where it has
-  fewer parts), as that part plays (its own resolution);
-- otherwise, for a part with a step to take, the previous section in plan order with a
-  part on the same family, as it plays; otherwise the part's own preset where the planner
-  named an admitted one; otherwise the family's effective variant (so an introduced motif
-  with no variation plays its own preset).
+- a later motif carrier: the introducing section's part at the same index (its last part
+  where it has fewer), as that part plays;
+- an introducing section: its own preset where the planner named an admitted one, else
+  the family's effective variant;
+- a section without a motif, with a step to take: the previous section in plan order with
+  a part on the same family, as it plays; otherwise its own preset, else the effective
+  variant.
 
-A restating (or varying, with no variation set) section plays its source's variant; a
-RESOLVE with no variation set steps SLOWER, else NARROW, else restates. The step carries
-the source's reach and rate *class* across templates by name. A step off the grid, a
-variant not admitted for the part's template on this rig and song, or a source variant not
-on the grid plays the source variant (or, where that is not admitted for this template,
-the template's effective variant), with the reason; so does a step to a ladder variant
-(`narrow`, `slow`) the gate found to play the same frames as the base here. A section with no motif and no
-variation plays exactly as before (its named preset, else the effective variant): no part
-is resolved.
+So every carrier varies the introduced look by one step: a restating section plays the
+introducer's variant, and a RESOLVE with no variation set steps from it SLOWER, else
+NARROW, else restates. The step carries the source's reach and rate *class* across
+templates by name. A step off the grid, a variant not admitted for the part's template on
+this rig and song, or a source variant not on the grid plays the source variant (or,
+where that is not admitted for this template, the template's effective variant), with the
+reason; so does a step to a ladder variant (`narrow`, `slow`) the gate found to play the
+same frames as the base here. A section with no motif and no variation plays exactly as
+before (its named preset, else the effective variant): no part is resolved.
 
 The render (`pipeline.RenderingPipeline`) and the plan repair (`rig_repair`) both call
 `resolve_arrangement`, the render with the gate's admission and the repair with its offer.
@@ -165,49 +168,53 @@ class SectionArrangement:
 
 
 def motif_relations(
-    plan: ChoreographyPlan, threads: Mapping[str, tuple[Sequence[str], str]] | None = None
+    plan: ChoreographyPlan,
+    threads: Mapping[str, tuple[Sequence[str], str]] | None = None,
+    *,
+    keep_resolve: bool = False,
 ) -> dict[str, tuple[str, str | None]]:
-    """Per section carrying a motif, its relation and source section (the previous carrier),
-    as the module docstring says; `threads`, per motif id, the macro thread's section ids
-    and evolution. A section's own `motif_relation` and `motif_source_id`, written at plan
-    time, win."""
+    """Per section carrying a motif, its relation and source section (the motif's
+    introducing section), as the module docstring says; `threads`, per motif id, the
+    macro thread's section ids and evolution. Values written on the plan are never read,
+    except, with `keep_resolve` (the render, which has no macro plan), a later carrier's
+    RESOLVE."""
     out: dict[str, tuple[str, str | None]] = {}
-    previous: dict[str, str] = {}
+    introduced: dict[str, str] = {}
     for section in plan.sections:
         motif = section.motif_id
         if motif is None:
             continue
-        source = previous.get(motif)
-        if section.motif_relation is not None:
-            out[section.section_id] = (section.motif_relation, section.motif_source_id)
-        elif source is None:
+        source = introduced.get(motif)
+        if source is None:
             out[section.section_id] = ("INTRODUCE", None)
+            introduced[motif] = section.section_id
+            continue
+        thread = (threads or {}).get(motif)
+        if thread is not None and section.section_id in thread[0]:
+            relation = "RESTATE" if thread[1] == "INTRODUCE" else thread[1]
+        elif keep_resolve and section.motif_relation == "RESOLVE":
+            relation = "RESOLVE"
         else:
-            thread = (threads or {}).get(motif)
-            if thread is not None and section.section_id in thread[0]:
-                relation = "RESTATE" if thread[1] == "INTRODUCE" else thread[1]
-            else:
-                relation = "RESTATE" if section.variation.value == "NONE" else "VARY"
-            out[section.section_id] = (relation, source)
-        previous[motif] = section.section_id
+            relation = "RESTATE" if section.variation.value == "NONE" else "VARY"
+        out[section.section_id] = (relation, source)
     return out
 
 
 def with_motif_relations(
     plan: ChoreographyPlan, threads: Mapping[str, tuple[Sequence[str], str]] | None = None
 ) -> ChoreographyPlan:
-    """The plan with each motif section's relation and source written (code-owned), from
-    the macro motif threads where given; with threads, a section no thread lists and a
-    repeated introduction (played as a restatement) are recorded in `plan.repairs`."""
+    """The plan with each section's motif relation and source derived and written
+    (code-owned: whatever arrived is overwritten, and cleared on a section without a
+    motif), from the macro motif threads where given; with threads, a section no thread
+    lists and a repeated introduction (played as a restatement) are recorded in
+    `plan.repairs`."""
     from twinklr.core.agents.sequencer.moving_heads.models import PlanRepair, RepairAction
 
     relations = motif_relations(plan, threads)
-    if not relations:
-        return plan
     repairs = list(plan.repairs)
     for section in plan.sections:
         motif = section.motif_id
-        if motif is None or section.motif_relation is not None or threads is None:
+        if motif is None or threads is None:
             continue
         relation, source = relations[section.section_id]
         thread = threads.get(motif)
@@ -219,27 +226,25 @@ def with_motif_relations(
         elif source is not None and thread[1] == "INTRODUCE":
             why = (
                 f"the macro thread introduces motif {motif!r}, which section {source!r} "
-                "already carries: this section restates it"
+                "already introduced: this section restates it"
             )
         else:
             continue
-        repairs.append(
-            PlanRepair(
-                section_id=section.section_id,
-                item=f"motif {motif}",
-                action=RepairAction.RECORDED,
-                reason=why,
-            )
+        record = PlanRepair(
+            section_id=section.section_id,
+            item=f"motif {motif}",
+            action=RepairAction.RECORDED,
+            reason=why,
         )
+        if record not in repairs:  # normalising twice records once
+            repairs.append(record)
     sections = [
         section.model_copy(
             update={
-                "motif_relation": relations[section.section_id][0],
-                "motif_source_id": relations[section.section_id][1],
+                "motif_relation": relations.get(section.section_id, (None, None))[0],
+                "motif_source_id": relations.get(section.section_id, (None, None))[1],
             }
         )
-        if section.section_id in relations
-        else section
         for section in plan.sections
     ]
     return plan.model_copy(update={"sections": sections, "repairs": repairs})
@@ -253,7 +258,7 @@ def resolve_arrangement(
     """Per plan section with a motif or a variation, its relation and each part's resolved
     variant (module docstring); `options` gives a template's (canonical id) effective and
     admitted variants, `canonical` a template id's canonical form."""
-    relations = motif_relations(plan)
+    relations = motif_relations(plan, keep_resolve=True)
     played: dict[tuple[str, int], tuple[str, str]] = {}
     """Per (section, part index), the template and the variant it plays."""
     out: dict[str, SectionArrangement] = {}
@@ -312,16 +317,18 @@ def _resolve_part(
     if relation not in (None, "INTRODUCE") and source_parts:
         at = min(index, len(source_parts) - 1)
         source = played[source_parts[at]][1]
-        relative_to = f"motif {section.motif_id!r} in section {source_id!r}, part {at + 1}"
+        relative_to = (
+            f"motif {section.motif_id!r} as section {source_id!r} introduced it, part {at + 1}"
+        )
     else:
-        # A part with a step to take (and no motif source) steps from the previous
-        # section on its template; one with none plays its own.
+        # Without a motif, a part with a step to take steps from the previous section on
+        # its template; an introducing section, or one with no step, from its own.
         previous = [
             variant
             for (section_id, _), (template, variant) in played.items()
             if template == template_id and section_id != section.section_id
         ]
-        if previous and asked != "NONE":
+        if previous and asked != "NONE" and section.motif_id is None:
             source = previous[-1]
             earlier = next(
                 section_id

@@ -162,18 +162,22 @@ the same section are valid.
 **`motif_id`** and **`variation`**: carry a macro motif (from the Macro Strategy motifs)
 through the song and shape the arc across repeated sections. `motif_id` names the motif a
 section carries; sections naming the same motif are the same idea. Deterministic code plays
-it: the first section carrying a motif introduces it as planned; each later one plays the
-variant of each template its previous carrier played (a part steps from the source's part
-at the same position), one step further where you set `variation`: `NARROW` (tighter
-reach), `WIDEN` (broader reach), `SLOWER` (half the rate), `FASTER` (double the rate);
-`NONE` restates it. Without a motif, `variation` steps from the previous section on the
-same template. A step only plays where the rig admits that variant (What This Rig Can
-Show names the variants a template does not play); otherwise the section restates, and
-repair says so. Keep a motif on the
-same template where you can: on another template only its reach and rate carry it. Code
-never changes a section's colour or gobo to match its motif; choose them yourself. `preset_id`
-is replaced where a motif's source or a variation step decides the variant. A second chorus widens or
-quickens the first, a last chorus goes furthest, a bridge narrows or slows.
+it relative to the section that introduced the motif (the first section carrying it):
+every later carrier varies that introduced look by one step where you set `variation`:
+`NARROW` (tighter reach), `WIDEN` (broader reach), `SLOWER` (half the rate), `FASTER`
+(double the rate). `NONE` (RESTATE) returns to the introduced look, and a section the
+macro thread resolves steps from the introduced look slower, else narrower. Each part
+steps from the introducing section's part at the same position. Steps never accumulate: two
+`WIDEN` choruses play the same, broader look. The introducing section itself plays its own
+`preset_id` (else the template's default), stepped by its own `variation` if you set one.
+Without a motif, `variation` steps from the previous section on the same template, else from
+its own preset. A step only plays where the rig admits that variant (What This Rig Can Show
+names the variants a template does not play); otherwise the section plays the look it steps
+from, and repair says so. Keep a motif on the same template where you can: on another
+template only its reach and rate carry it. Code never changes a section's colour or gobo to
+match its motif; choose them yourself. `preset_id` is replaced where a motif's introduced
+look or a variation step decides the variant. A chorus can widen or quicken the verse that
+introduced the motif, a bridge narrow or slow it, a return restate it.
 
 **`density`**: how busy the movement is, shaping the arc with intensity:
 - `REST`: the heads mostly hold (a breakdown, a held note)
@@ -188,8 +192,8 @@ section's `ENTRY` and the last section's `EXIT` play against the heads at rest (
 their home aim). Deterministic code places and plays each:
 - `snap`: a cut on the boundary, into a drop or on a downbeat hit: where the heads must
   move or turn a wheel for the new look they go dark just before the boundary (at most
-  `length` before it) and are in place, lit, on its first beat; where nothing changes it
-  is the plain cut (the song's first `ENTRY`; into a template the heads enter dark). It
+  `length` before it) and are in place, lit, on its first beat; where nothing changes
+  (the song's first `ENTRY`, or heads with nothing to move or turn) it is the plain cut. It
   ignores `curve` and `split`
 - `crossfade`: one look hands over to the next, between related sections: the light eases
   down to half the lower of the two looks' levels at the boundary and up to the new

@@ -141,8 +141,18 @@ Departures from §1 and §3, each recorded here:
   (`arrangement.resolve_arrangement`) runs in the render and in repair, so they agree by
   construction, and a saved or injected plan renders its motif and variation without a
   re-repair. Repair records a named preset the resolution replaces.
-- *No step to take.* An introduced motif, or a section without a motif source, with no
-  variation plays its own preset (not the previous section's variant).
+- *Source is the introducer* (integrator decision, 2026-11-18, after 5b708b26). Every
+  later carrier steps from the motif's introducing section (first carrier in plan order),
+  not the previous carrier: steps never accumulate, RESTATE returns to the introduced
+  look, RESOLVE steps from it. The lost "build" arc (a last chorus going further than the
+  first) is a PENDING-OWNER look question. Multi-part rule unchanged (same index in the
+  introducer).
+- *The introducing section* steps from its own preset (else the effective variant), with
+  or without a variation; a section without a motif steps from the previous section on
+  its family when it has a step, else its own preset.
+- *Code-owned relation* (W10b/c review M1): plan time derives and overwrites
+  `motif_relation`/`motif_source_id`; the render derives them again, keeping only a
+  plan-time RESOLVE (only a macro thread gives one; the render has no macro plan).
 - *Plays as base.* A ladder variant (`narrow`, `slow`) whose frames equal the base's here
   stays admitted for a section naming it, but no variation steps to it
   (`TemplateOffer.plays_as_base`); a variation variant that does is not offered (W10a

@@ -1284,7 +1284,7 @@ def _transition_repairs(
             outgoing, incoming = (
                 (other, section) if kept.edge is TransitionEdge.ENTRY else (section, other)
             )
-            for said in _plays_nothing(kept, outgoing, incoming, offer, played):
+            for said in _plays_nothing(kept, outgoing):
                 note(RepairAction.RECORDED, said)
             for said in _yields_to_events(kept, outgoing, incoming, beat_grid, offer):
                 note(RepairAction.RECORDED, said)
@@ -1319,17 +1319,14 @@ def _transition_repairs(
     return out, repairs
 
 
-def _plays_nothing(
-    transition: PlanTransition,
-    outgoing: PlanSection | None,
-    incoming: PlanSection | None,
-    offer: RigOffer,
-    played: Mapping[tuple[str, int], str] | None = None,
-) -> list[str]:
-    """Where a `snap` is the plain cut, the frames the render plays without it: the song's
-    first ENTRY (the heads rest dark before it and are moved into place in the dark before
-    its first cue), and on the heads that always enter the incoming template dark after the
-    outgoing one (`RigOffer.dark_entries`: nothing to be in place for)."""
+def _plays_nothing(transition: PlanTransition, outgoing: PlanSection | None) -> list[str]:
+    """Where a `snap` is certainly the plain cut, the frames the render plays without it:
+    the song's first ENTRY (the heads rest dark before it and are moved into place in the
+    dark before its first cue). At any later boundary whether a head has anything to move
+    or turn before it, or already sits dark there, is settled by the render's frames
+    (`RenderingPipeline._transitions_played`), not by the offer: a head the gate found to
+    enter a template dark still plays the snap (dark before the boundary, lit on it), so
+    repair claims nothing there."""
     if transition.mode is not TransitionMode.SNAP:
         return []
     if outgoing is None and transition.edge is TransitionEdge.ENTRY:
@@ -1337,17 +1334,7 @@ def _plays_nothing(
             "the song's first ENTRY: the heads rest dark before it and are moved into place "
             "in the dark before its first cue, so a snap plays as the plain cut (nothing)"
         ]
-    if outgoing is None or incoming is None:
-        return []
-    after, before = incoming.parts[0].template_id, outgoing.parts[-1].template_id
-    dark = _entry_heads(offer, played, outgoing, incoming)
-    if not dark:
-        return []
-    return [
-        f"{after} always enters dark after {before} on {', '.join(sorted(dark))}: there is "
-        "nothing to be in place for before the boundary, so a snap plays as the plain cut "
-        "(nothing) on those heads"
-    ]
+    return []
 
 
 def played_window(

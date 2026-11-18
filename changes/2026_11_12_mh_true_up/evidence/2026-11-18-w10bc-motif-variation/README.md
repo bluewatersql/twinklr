@@ -22,19 +22,23 @@ Every value is a proposal; nothing here has been viewed (PENDING-OWNER, below).
   (`RenderingPipeline._arranged`, over the gate's admission) and by plan repair
   (`rig_repair._arrangement`, over the offer), so repair and render agree by
   construction. Rules: [user guide](../../../../docs/user-guide.md#how-a-sections-motif-and-variation-reach-the-lights).
-- **Motif (W10b).** Equal `motif_id`s chain in plan order; the relation comes from the
-  macro thread where it lists the section (a repeated INTRODUCE restates), else VARY where
-  a variation is set, else RESTATE. `normalize_plan` writes the code-owned
-  `PlanSection.motif_relation` and `motif_source_id` (hidden from the planner schema with
-  `SkipJsonSchema`, left out of the plan dump when null, so every existing plan's
-  fingerprint input is unchanged) and records a section no thread lists and a repeated
-  introduction. A plan without them (saved, injected) derives them in plan order at render.
-- **Variation (W10c).** One step on one axis of the reach/rate grid, from the motif
-  source's part at the same index, else (with a step to take) the previous section on the
-  family, else the part's own preset, else the effective variant. A step off the grid, to
-  a variant not admitted, or to a ladder variant that plays as the base here plays the
-  source variant, traced with the reason and recorded by repair. RESOLVE without a
-  variation steps slower, else narrower, else restates.
+- **Motif (W10b).** Equal `motif_id`s are one idea; the first carrier in plan order
+  introduces it and is every later carrier's source (integrator decision after
+  5b708b26; the first build chained from the previous carrier). The relation comes from
+  the macro thread where it lists the section (a repeated INTRODUCE restates), else VARY
+  where a variation is set, else RESTATE. `normalize_plan` derives and writes the
+  code-owned `PlanSection.motif_relation` and `motif_source_id`, overwriting whatever
+  arrived (hidden from the planner schema with `SkipJsonSchema`, left out of the plan dump
+  when null), and records a section no thread lists and a repeated introduction. The
+  render derives them again, keeping only a plan-time RESOLVE.
+- **Variation (W10c).** One step on one axis of the reach/rate grid: a later carrier from
+  the introducing section's part at the same index; the introducing section from its own
+  preset (else the effective variant); a section without a motif from the previous
+  section on its family when it has a step, else its own preset. Steps never accumulate:
+  two WIDEN choruses play the same look; RESTATE returns to the introduced look; RESOLVE
+  without a variation steps from it slower, else narrower, else restates. A step off the
+  grid, to a variant not admitted, or to a ladder variant that plays as the base here plays
+  the look it steps from, traced with the reason and recorded by repair.
 - **Repair** (`_arrangement_repairs`, first, before the section repairs that read the
   resolved variant's phases): steps that cannot play, a named preset the resolution
   replaces, a named preset not declared or not admitted (review M2), a motif on another
@@ -53,6 +57,37 @@ Every value is a proposal; nothing here has been viewed (PENDING-OWNER, below).
 facts, and the old renderer never rendered motif or variation, so there is no parity row
 to add. In their place: the pins (`tests/regression/test_mh_pins.py`) were re-recorded
 fingerprint-only with every frame unchanged, and the new tests below pin the new behaviour.
+
+## W10b/c review fixes (2026-11-18, after 5b708b26)
+
+- **Introducer as source** (integrator decision, above). Pins unchanged (no pin has a
+  motif), so `RENDERER_REVISION` stays 13.
+- **H1 — the evaluation report agrees with the render.** `RENDERED_INTENT_FIELDS` names
+  `motif_id` and `variation`; the report's template line prints the variant the trace
+  says plays (`plays: wide`, with the planned preset where it differs), and
+  `describe_look` leads a section's "played" lines with the motif relation and source and
+  the variant line (asked, from, relative to, the planned preset that does not play, the
+  reason a step did not play).
+- **M1 — code-owned fields are never trusted.** Plan time overwrites both fields on every
+  section (cleared where no motif); the render derives them again (a bogus source never
+  plays). The reviewer's repro is a test (`test_relations_arriving_on_the_plan_are_overwritten`).
+- **M2 — a snap into a template the heads enter dark** (pre-existing since W8). The render
+  plays it (dark just before the boundary, lit on it); repair said "the plain cut" from
+  `RigOffer.dark_entries`, and so did the planner prompt. Whether a snap changes a head's
+  frames at a later boundary is settled only by the render's frames, so repair now claims
+  the plain cut only on the song's first ENTRY, and the prompt's dark-entries snap
+  sentence (and the offer's `transitions.dark_entries` list) is removed; the developer
+  prompt and the user guide say a snap is the plain cut on the first ENTRY or on a head
+  with nothing to move or turn. A probe over 6×6 family pairs at 120 and 170 BPM had 52
+  of 144 cases where the old claim contradicted the render. Test:
+  `test_repair_never_says_a_snap_is_the_plain_cut_where_the_render_plays_it`.
+- **Regeneration.** `RenderingPipeline.arrangement_changes` compares the injected plan's
+  resolution with the regenerated one; the rendering stage logs and stores
+  `arrangement_warning` (printed by the CLI) naming each kept section part that now plays
+  another variant ("s2 part 1 (wide+slow → wide)"). Never a refusal.
+- **LOW — an introducing section with a variation** steps from its own preset (chosen:
+  a first appearance has nothing before it); stated in the module, both planner prompts
+  and the user guide.
 
 ## W10a review fixes (listed apart)
 
@@ -91,8 +126,8 @@ fingerprint-only with every frame unchanged, and the new tests below pin the new
 
 | Check | Result |
 |---|---|
-| New tests `tests/unit/sequencer/moving_heads/test_arrangement_render.py` | 56 (resolver rules, multi-part, off-grid / not admitted / plays-as-base, default identity, byte change per family × variation over all seven families, repair = render on two plans × 2 tempos × 2 head speeds, M1, M2, H1/M3 ladder equality, per-pair dark entries, motif-thread records) |
-| Full suite, ruff, format, mypy | see the hand-back (fresh output) |
+| New tests `tests/unit/sequencer/moving_heads/test_arrangement_render.py` | 58 after the review round (resolver rules, multi-part, off-grid / not admitted / plays-as-base, default identity, byte change per family × variation over all seven families, repair = render on two plans × 2 tempos × 2 head speeds, M1, M2, H1/M3 ladder equality, per-pair dark entries, motif-thread records) |
+| Full suite, ruff, format, mypy (after the review round) | 7376 passed, 30 skipped; ruff, format, mypy clean; pins unchanged |
 | Reviewer `prompt_compare` (3 rigs × 4 grids) vs 1eca8998 | 0 changed fields other than the two new keys |
 | Planner user prompt, owner-like rig, short-grid song | 10,471 → 11,270 chars (+799, two added lines, no existing line changed) |
 | Reviewer `repro_dark_entries` | identical to 1eca8998's output |
@@ -109,10 +144,10 @@ fingerprint-only with every frame unchanged, and the new tests below pin the new
 chorus_1 (WIDEN), break (FASTER) and chorus_2 (WIDEN, two parts); no section names a
 preset. It exercises motif and variation as saved: no fresh paid plan is needed for these.
 Its saved admission predates W10a, so the render must re-run the gate (with it, every
-step would be refused as not admitted). Expected with a gate that admits the steps:
-verse_2 base, chorus_1 `wide`, break `wide+fast`, chorus_2 both parts `wide+fast` (WIDEN
-off the grid, traced). It never shows a RESTATE, a RESOLVE, a same-template motif or a
-named preset replaced.
+step would be refused as not admitted). Expected with a gate that admits the steps, every
+carrier stepping from verse_2's base: chorus_1 `wide`, break `fast`, chorus_2 both parts
+`wide`. It never shows a RESTATE, a RESOLVE, a same-template motif or a named preset
+replaced.
 
 ## M1 design note (not built): carrying rate on the snap family
 
@@ -126,9 +161,12 @@ offer reach only. (a) is the most legible; it is a catalog change with a gate re
 
 ## PENDING-OWNER
 
-1. Look: does a WIDEN / FASTER restatement read as "the same idea, bigger / quicker"
-   across templates (chorus_1 → break → chorus_2 on the owner song)?
+1. Look: does a WIDEN / FASTER variation read as "the same idea, bigger / quicker"
+   across templates (verse_2 → chorus_1, break, chorus_2 on the owner song)?
 2. Look: is "only reach and rate carry a motif across templates" enough to read as a motif?
-3. Look: the off-grid case (WIDEN from `wide+fast` plays `wide+fast`): acceptable, or step
-   the other axis?
+3. Look: the off-grid case (WIDEN from an introduced `wide` plays `wide`): acceptable, or
+   step the other axis?
 4. The snap family's rate (design note above).
+5. The lost "build" arc: with every carrier one step from the introducer, a last chorus
+   cannot go further than the first (two WIDENs play the same). Acceptable, or should a
+   later carrier be allowed a second step?

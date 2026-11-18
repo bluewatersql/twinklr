@@ -56,6 +56,9 @@ class MovingHeadRenderingStage:
           .xsq is written from and live injection reads, and its render identity
         - "unplayable_warning": the render's warning about the cues it kept
           dark under `on_unplayable`, when it kept any
+        - "arrangement_warning": under `twinklr regenerate`, the kept sections whose
+          motif or variation now resolve to another variant
+          (`RenderingPipeline.arrangement_changes`), when any
 
     Example:
         >>> stage = MovingHeadRenderingStage(
@@ -193,6 +196,13 @@ class MovingHeadRenderingStage:
                 context.set_state("render_fingerprint", record["render_fingerprint"])
             if pipeline.unplayable_warning is not None:
                 context.set_state("unplayable_warning", pipeline.unplayable_warning)
+            base_plan = context.get_state("regeneration_base_plan")
+            replanned = context.get_state("regeneration_section_id")
+            if isinstance(base_plan, _ChoreographyPlan) and isinstance(replanned, str):
+                changes = pipeline.arrangement_changes(base_plan, replanned)
+                if changes is not None:
+                    logger.warning("moving heads: %s", changes)
+                    context.set_state("arrangement_warning", changes)
 
             # Track metrics
             context.add_metric("mh_render_segments", len(segments))

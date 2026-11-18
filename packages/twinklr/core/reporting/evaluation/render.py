@@ -15,6 +15,7 @@ from twinklr.core.reporting.evaluation.models import (
     RenderSummary,
     SectionReport,
     SongIntentReport,
+    TemplateSelection,
 )
 
 if TYPE_CHECKING:
@@ -230,6 +231,17 @@ def _song_intent_markdown(intent: SongIntentReport) -> list[str]:
     return lines
 
 
+def _variant_str(template: TemplateSelection) -> str:
+    """The variant a part plays, for its template line: the one the render's motif and
+    variation resolved to where they decided it (and the planned preset where that differs),
+    else the planned preset."""
+    if template.plays is None:
+        return f" (preset: {template.preset_id})" if template.preset_id else ""
+    if template.preset_id and template.preset_id != template.plays:
+        return f" (plays: {template.plays}; planned preset {template.preset_id})"
+    return f" (plays: {template.plays})"
+
+
 def _render_section_markdown(section: SectionReport) -> list[str]:
     """Render single section as markdown lines.
 
@@ -249,8 +261,7 @@ def _render_section_markdown(section: SectionReport) -> list[str]:
     # Template info
     if section.selected_template:
         t = section.selected_template
-        preset_str = f" (preset: {t.preset_id})" if t.preset_id else ""
-        lines.append(f"**Template**: `{t.template_id}`{preset_str}")
+        lines.append(f"**Template**: `{t.template_id}`{_variant_str(t)}")
         lines.append("")
 
         if t.modifiers:
@@ -270,9 +281,9 @@ def _render_section_markdown(section: SectionReport) -> list[str]:
     if section.segments:
         lines.append(f"**Segments**: {len(section.segments)}")
         for seg in section.segments:
-            preset_str = f" (preset: {seg.template.preset_id})" if seg.template.preset_id else ""
             lines.append(
-                f"- Segment {seg.segment_id}: `{seg.template.template_id}`{preset_str} "
+                f"- Segment {seg.segment_id}: `{seg.template.template_id}`"
+                f"{_variant_str(seg.template)} "
                 f"(bars {seg.start_bar:.1f}–{seg.end_bar:.1f})"
             )
         lines.append("")

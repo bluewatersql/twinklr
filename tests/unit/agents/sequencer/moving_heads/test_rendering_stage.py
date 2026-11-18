@@ -439,3 +439,51 @@ def test_a_regeneration_keeps_the_injected_palettes_of_the_sections_it_keeps() -
     context.set_state("regeneration_section_id", "s1")
     assert render_palettes(context)["s1"].palette_id == "spec.cosmic_night"
     assert "s2" in render_palettes(context)
+
+
+@pytest.mark.asyncio
+async def test_a_regeneration_says_which_kept_sections_now_play_another_variant(
+    tmp_path: Path,
+) -> None:
+    """Re-planning a motif's introducing section moves the variant every later carrier
+    steps from: the render says which kept sections changed, and does not refuse."""
+    heads = ("MH1", "MH2", "MH3", "MH4")
+
+    def sections(introduced: str | None) -> ChoreographyPlan:
+        return ChoreographyPlan(
+            sections=[
+                m.plan_section("s1", 1, 2, "mirror_wings", introduced, motif_id="m"),
+                m.plan_section("s2", 3, 4, "mirror_wings", motif_id="m", variation="WIDEN"),
+                m.plan_section("s3", 5, 6, "target_orbit"),
+            ],
+            overall_strategy="",
+        )
+
+    stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
+    context = _context_with_fixture_path("fixture_config.json")
+    context.session.job_config = m.family_job(heads)
+    context.set_state("beat_grid", m.bars_grid(*([500.0] * 8)))
+    context.set_state("regeneration_base_plan", sections("slow"))
+    context.set_state("regeneration_section_id", "s1")
+
+    with (
+        m.family_catalog(),
+        patch.object(
+            MovingHeadRenderingStage, "_load_fixture_config", return_value=m.family_rig(heads)
+        ),
+    ):
+        result = await stage.execute({"moving_heads": sections(None)}, context)
+        same = MovingHeadRenderingStage(xsq_output_path=tmp_path / "same.xsq")
+        quiet = _context_with_fixture_path("fixture_config.json")
+        quiet.session.job_config = m.family_job(heads)
+        quiet.set_state("beat_grid", m.bars_grid(*([500.0] * 8)))
+        quiet.set_state("regeneration_base_plan", sections("slow"))
+        quiet.set_state("regeneration_section_id", "s3")
+        await same.execute({"moving_heads": sections("slow")}, quiet)
+
+    assert result.success, result.error
+    assert context.get_state("arrangement_warning") == (
+        "re-planning section 's1' changes the variant other sections play through their "
+        "motif or variation: s2 part 1 (wide+slow → wide)"
+    )
+    assert quiet.get_state("arrangement_warning") is None

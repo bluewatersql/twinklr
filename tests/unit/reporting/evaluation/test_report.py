@@ -36,11 +36,13 @@ from tests.support.moving_heads import (
 )
 from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
+    Density,
     EventAction,
     PlanColor,
     PlanEvent,
     PlanRepair,
     RepairAction,
+    Variation,
 )
 from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
     MovingHeadRenderingStage,
@@ -316,6 +318,7 @@ async def test_the_report_carries_each_sections_song_intent_and_the_plan_repairs
             "intensity": Intensity.DRAMATIC,
             "color": PlanColor.PALETTE_ACCENT,
             "motif_id": "m1",
+            "density": Density.BUSY,
             "events": [
                 PlanEvent(
                     bar=2,
@@ -334,7 +337,8 @@ async def test_the_report_carries_each_sections_song_intent_and_the_plan_repairs
         action=RepairAction.DROPPED,
         reason="no lyric moment cue has id 'ghost'",
     )
-    plan = PLAN.model_copy(update={"sections": [accented, PLAN.sections[1]], "repairs": [repair]})
+    varied = PLAN.sections[1].model_copy(update={"motif_id": "m1", "variation": Variation.WIDEN})
+    plan = PLAN.model_copy(update={"sections": [accented, varied], "repairs": [repair]})
     with family_catalog():
         checkpoint, fixture_path, _ = await _run(tmp_path, plan=plan)
         report = await _report(tmp_path, checkpoint, fixture_path, "report")
@@ -343,9 +347,12 @@ async def test_the_report_carries_each_sections_song_intent_and_the_plan_repairs
     assert first is not None and second is not None
     assert (first.intensity, first.color, first.gobo) == ("DRAMATIC", "PALETTE_ACCENT", None)
     assert first.events == ["bar 2 beat 3: hit"]
-    assert first.not_rendered == ["motif_id"]
+    assert first.not_rendered == ["density"]
+    # The motif and the variant it resolved to lead what played.
+    motif, variant, played, intensity, hit = first.played
+    assert motif == "motif m1: INTRODUCE"
+    assert variant == "variant base: variation NONE from base (its effective variant)"
     # The family rig's colour wheel carries no tags: the colour plays on no head.
-    played, intensity, hit = first.played
     assert hit.startswith("event hit at bar 2 beat 3: a hit at ")
     # The family holds the dimmer full: DRAMATIC dips and returns every half bar.
     assert intensity == (
@@ -355,11 +362,18 @@ async def test_the_report_carries_each_sections_song_intent_and_the_plan_repairs
     assert played.startswith("colour PALETTE_ACCENT (#FF00FF, fixed table (magenta: ")
     assert played.endswith("no head shows it; MH1, MH2, MH3, MH4 keep their authored colour")
     assert second.not_rendered == [] and second.intensity is None
+    assert second.played[0] == "motif m1: VARY of section s1"
+    assert second.played[1].startswith("variant wide: variation WIDEN from base (motif 'm1'")
+    assert [s.selected_template.plays for s in report.sections if s.selected_template] == [
+        "base",
+        "wide",
+    ]
     assert report.render.plan_repairs == [repair.model_dump(mode="json")]
     markdown = (tmp_path / "report" / "report.md").read_text(encoding="utf-8")
     assert "**Song intent** (as planned):" in markdown
     assert "- intensity: DRAMATIC" in markdown and "- intensity: as authored" in markdown
-    assert "not rendered yet (motif_id): no renderer has rendered them yet" in markdown
+    assert "not rendered yet (density): no renderer has rendered them yet" in markdown
+    assert "(plays: wide)" in markdown and f"- played: {variant}" in markdown
     assert f"- played: {hit}" in markdown
     assert f"- played: {played}" in markdown and f"- played: {intensity}" in markdown
     assert "**Plan repair** (section `s1`): moment cue 'ghost' dropped" in markdown

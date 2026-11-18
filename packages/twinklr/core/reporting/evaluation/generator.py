@@ -430,9 +430,18 @@ def _process_section(
 
     # Build template selection
     (part,) = plan_section.parts
+    arranged = next(
+        (
+            look.get("arrangement", {}).get("variation")
+            for look in output.render_record.get("section_looks", [])
+            if look["section_id"] == plan_section.section_id
+        ),
+        None,
+    )
     template_selection = TemplateSelection(
         template_id=part.template_id,
         preset_id=part.preset_id,
+        plays=None if arranged is None else arranged["plays"],
         modifiers={modifier.key: modifier.value for modifier in part.modifiers},
         reasoning=part.reasoning or plan_section.reasoning,
     )

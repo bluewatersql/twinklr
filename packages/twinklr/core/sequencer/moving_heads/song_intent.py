@@ -66,11 +66,21 @@ if TYPE_CHECKING:
     from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 RENDERED_INTENT_FIELDS = frozenset(
-    {"intensity", "color", "gobo", "events", "moment_cues", "entry", "exit"}
+    {
+        "intensity",
+        "color",
+        "gobo",
+        "events",
+        "moment_cues",
+        "entry",
+        "exit",
+        "motif_id",
+        "variation",
+    }
 )
 """The section song-intent fields (`PlanSection.set_intent_fields`) the renderer plays:
 colour and gobo here, intensity in `intensity.py`, events and the lyric cues they land on
-in `events.py`."""
+in `events.py`, transitions in `transitions.py`, motif and variation in `arrangement.py`."""
 
 FIXED_ROLE_COLORS: dict[PaletteRole, ColorPreset] = {
     PaletteRole.PRIMARY: ColorPreset.RED,
@@ -1164,9 +1174,7 @@ def _transitions_for_prompt(offer: RigOffer) -> dict[str, Any]:
     """What a transition is at this song's median beat: each length in ms; how long the
     slowest head takes to travel each pose axis' whole range (a lit move longer than the
     window, or for `sweep` its share after the split point, dips dark); the wheel change
-    a colour or gobo change across a lit transition dips dark for; the template pairs a
-    `snap` is the plain cut on (`RigOffer.dark_entries`: the heads that always enter the
-    template dark after the other one)."""
+    a colour or gobo change across a lit transition dips dark for."""
     lengths = []
     if offer.beat_ms:
         for length in TransitionLength:
@@ -1176,16 +1184,6 @@ def _transitions_for_prompt(offer: RigOffer) -> dict[str, Any]:
         "lengths": lengths,
         "full_travel_ms": dict(sorted(offer.full_travel_ms.items())),
         "wheel_change_ms": offer.wheel_change_ms,
-        "dark_entries": [
-            {
-                "template": template,
-                "after": before,
-                "heads": "every head" if len(heads) == len(offer.heads) else ", ".join(heads),
-            }
-            for template, afters in sorted(offer.dark_entries.items())
-            for before, heads in sorted(afters.items())
-            if heads
-        ],
     }
 
 
@@ -1229,8 +1227,25 @@ def describe_look(record: Mapping[str, Any]) -> list[str]:
     section's start, where a head turns to it later or keeps the previous or authored
     state, each boundary's dark dip, what its intensity plays
     (`intensity.describe_intensity`), what each event played (`events.describe_events`)
-    and what its transitions played (`transitions.describe_transitions`)."""
+    and what its transitions played (`transitions.describe_transitions`), led by the
+    variant its motif and variation resolved to (`arrangement`), where it has one."""
     lines = []
+    arrangement = record.get("arrangement") or {}
+    motif = arrangement.get("motif")
+    if motif is not None:
+        source = f" of section {motif['source']}" if motif.get("source") else ""
+        lines.append(f"motif {motif['id']}: {motif['relation']}{source}")
+    variant = arrangement.get("variation")
+    if variant is not None:
+        line = (
+            f"variant {variant['plays']}: variation {variant['asked']} from "
+            f"{variant['from']} ({variant['relative_to']})"
+        )
+        if variant.get("named") and variant["named"] != variant["plays"]:
+            line += f"; the planned preset {variant['named']} does not play"
+        if variant.get("reason"):
+            line += f"; {variant['reason']}"
+        lines.append(line)
     for key, noun in (("color", "colour"), ("gobo", "gobo")):
         entry = record.get(key)
         if entry is None:

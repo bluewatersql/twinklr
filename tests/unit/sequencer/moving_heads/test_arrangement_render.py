@@ -134,10 +134,10 @@ def test_equal_motifs_relate_by_plan_order_and_a_macro_thread_names_the_relation
     assert motif_relations(the_plan) == {
         "a": ("INTRODUCE", None),
         "b": ("RESTATE", "a"),
-        "c": ("VARY", "b"),
+        "c": ("VARY", "a"),
     }
     threaded = motif_relations(the_plan, {"m": (["a", "b", "c"], "RESOLVE")})
-    assert threaded["b"] == ("RESOLVE", "a") and threaded["c"] == ("RESOLVE", "b")
+    assert threaded["b"] == ("RESOLVE", "a") and threaded["c"] == ("RESOLVE", "a")
     assert motif_relations(the_plan, {"m": (["a", "b"], "INTRODUCE")})["b"] == ("RESTATE", "a")
 
 
@@ -158,14 +158,46 @@ def test_writing_the_relations_records_what_the_macro_threads_do_not_say() -> No
     ]
     said = {(r.section_id, r.item): r.reason for r in written.repairs}
     assert set(said) == {("b", "motif m"), ("c", "motif n")}
-    assert "restates it" in said["b", "motif m"]
+    assert "already introduced: this section restates it" in said["b", "motif m"]
     assert "no macro motif thread lists section 'c'" in said["c", "motif n"]
     assert with_motif_relations(written, {"m": (["a", "b"], "INTRODUCE")}) == written
     assert with_motif_relations(the_plan).repairs == []
 
 
-def test_a_variation_steps_one_axis_from_the_motifs_previous_carrier() -> None:
-    """The motif chains: each carrier steps from the previous one as it plays."""
+def test_relations_arriving_on_the_plan_are_overwritten() -> None:
+    """The reviewer's repro: whatever relation or source arrives (from the planner or an
+    injected file) is replaced by the derived one; a bogus source never plays."""
+    from twinklr.core.sequencer.moving_heads.arrangement import with_motif_relations
+
+    def the_plan(**s3: Any) -> ChoreographyPlan:
+        return plan(
+            section("s1", (1, 4), "mirror_wings", motif="m1"),
+            section("s2", (5, 8), "mirror_wings", motif="m1", variation="WIDEN"),
+            section("s3", (9, 12), "mirror_wings", motif="m1", **s3),
+        )
+
+    derived = with_motif_relations(the_plan())
+    for supplied in (
+        {"motif_relation": "RESTATE", "motif_source_id": "s2"},
+        {"motif_relation": "INTRODUCE"},
+        {"motif_relation": "RESOLVE", "motif_source_id": "zzz"},
+    ):
+        written = with_motif_relations(the_plan(**supplied))
+        assert written.sections == derived.sections, supplied
+    bogus = the_plan(motif_relation="VARY", motif_source_id="zzz", variation="FASTER")
+    (s3,) = [p for p in resolve_arrangement(bogus, everything)["s3"].parts if p]
+    assert s3.relative_to.startswith("motif 'm1' as section 's1' introduced it")
+    assert s3.plays == "fast"
+    plain = with_motif_relations(
+        plan(section("x", (1, 2), "mirror_wings", motif_relation="VARY", motif_source_id="y"))
+    )
+    assert plain.sections[0].motif_relation is None and plain.sections[0].motif_source_id is None
+
+
+def test_every_carrier_varies_the_introduced_look_by_one_step() -> None:
+    """Each carrier steps from the introducing section's variant, not from the carrier
+    before it: two WIDEN choruses play the same variant, and a restatement returns to the
+    introduced look."""
     resolved = resolve_arrangement(
         plan(
             section("a", (1, 2), "mirror_wings", preset="slow", motif="m"),
@@ -177,8 +209,37 @@ def test_a_variation_steps_one_axis_from_the_motifs_previous_carrier() -> None:
     )
 
     plays = {sid: a.parts[0].plays for sid, a in resolved.items() if a.parts[0]}
-    assert plays == {"a": "slow", "b": "wide+slow", "c": "wide", "d": "wide"}
-    assert resolved["c"].parts[0].relative_to.startswith("motif 'm' in section 'b'")
+    assert plays == {"a": "slow", "b": "wide+slow", "c": "base", "d": "slow"}
+    assert resolved["c"].parts[0].relative_to.startswith("motif 'm' as section 'a' introduced it")
+    assert all(a.source_id == "a" for sid, a in resolved.items() if sid != "a")
+    twice = resolve_arrangement(
+        plan(
+            section("v", (1, 2), "target_orbit", motif="m"),
+            section("c1", (3, 4), "fly_out_cascade", motif="m", variation="WIDEN"),
+            section("br", (5, 6), "fly_in_cascade", motif="m", variation="FASTER"),
+            section("c2", (7, 8), "mirror_wings", motif="m", variation="WIDEN"),
+        ),
+        everything,
+    )
+    assert [twice[s].parts[0].plays for s in ("v", "c1", "br", "c2")] == [  # type: ignore[union-attr]
+        "base",
+        "wide",
+        "fast",
+        "wide",
+    ]
+
+
+def test_an_introducing_section_with_a_variation_steps_from_its_own_preset() -> None:
+    resolved = resolve_arrangement(
+        plan(
+            section("a", (1, 2), "mirror_wings", preset="wide"),
+            section("b", (3, 4), "mirror_wings", preset="slow", motif="m", variation="NARROW"),
+        ),
+        everything,
+    )
+
+    (b,) = [p for p in resolved["b"].parts if p]
+    assert (b.source, b.plays, b.relative_to) == ("slow", "narrow+slow", "its own preset")
 
 
 def test_without_a_motif_a_variation_steps_from_the_previous_section_on_its_family() -> None:
@@ -212,7 +273,7 @@ def test_a_step_that_cannot_play_plays_its_source_and_says_why() -> None:
     )
 
     off = resolved["b"].parts[0]
-    assert off.plays == "wide+fast"  # the source's variant
+    assert off is not None and off.plays == "wide+fast"  # the source's variant
     assert "already the fastest" in (off.reason or "")
     missing = resolved["c"].parts[0]
     assert missing.plays == BASE and "'wide' of target_orbit is not admitted" in (
