@@ -33,16 +33,19 @@ below).
   - `aim: low | high`: every step's start tilt -/+10 degrees.
   No key duplicates a typed field (reach and rate are `variation`; colour, gobo,
   intensity, events and transitions have their own). Each is a phase shift, a time
-  reversal or a tilt translation of the variant's path: no head moves faster, and every
-  dark gap between a head's own cues keeps its time and travel.
+  reversal or a tilt translation of the variant's path: no head moves faster. (The first
+  build also claimed every dark gap between a head's own cues keeps its travel; the review
+  showed that false for gaps set in time, see "Review round" below.)
 - **The offer** (`pipeline._admit_modifiers`, one call in `admit_templates`). Per admitted
   template, each value its steps take (`modifiers.candidates`) is compiled on the
   effective variant at bar 1 over the song (range, speed, topology) and compared with the
   unmodified compile over the first bar and two cycles by the twin rule
   (`_cues_alike`: the same cues, every channel equal but the aim, every aim within
-  `TWIN_POSE_DEG`); it is offered unless it fails or plays alike. On every other admitted
+  `TWIN_POSE_DEG`); it is offered unless it fails or plays alike. On every admitted
   variant an `aim` is excluded where that variant's compiled tilt range, moved 10
-  degrees, would leave a head's operable range (`modifiers.aim_fits`, no compile). A
+  degrees, would leave a head's operable range (`modifiers.aim_fits`, no compile), and a
+  `spread` or `direction` where the variant has dark gaps and its first three cycles with
+  the value cannot be planned (review round, below). A
   spread that moves the darkness (the cascades: their lit window follows the head's
   phase) publishes each admitted variant's dark phases with it, from a compile over its
   first three cycles (checked equal to the whole-song compile's for the unmodified
@@ -51,7 +54,7 @@ below).
 - **Play** (`modifiers.resolve_modifiers`, one function for the render and repair). A part
   plays each offered value that fits its variant, in the order spread, direction, aim;
   every other entry is not applied with why and the template's valid set: unknown key,
-  unknown value, a second entry for a key (the first counts), not offered here (with the
+  unknown value, a second entry for a key another entry already plays, not offered here (with the
   gate's reason), does not fit the variant played, or the part's modifiers gave way. The
   render compiles `modifiers.played_template` (the preset applied, the modifiers on top);
   with none applied it compiles exactly as before.
@@ -133,6 +136,50 @@ reviewers' `timing2.py` with modifiers added: each part every key's last offered
 | + variation | 27.3 s | 14 | 7 | — |
 | + variation + modifiers | 69.9 s | 34 | 17 | 7 parts; 3 spreads gave way (chorus_1, break, chorus_2 A), the rest play |
 | transitions + events + modifiers | 45.2 s | 22 | 11 | the same |
+
+## Review round (REVIEW.md of 9be42ccf), 2026-11-18
+
+- **HIGH-1, fixed at the gate.** An offered `spread=wave` refused (`on_unplayable: error`)
+  or darkened MH2 for 4 x 1000 ms on the flick's admitted `wide` (allowed 150°/s, 120 BPM):
+  the flick's masks are set in time and the wave meets them at other poses. The gate now
+  compiles every offered `spread` and `direction` on every admitted variant that has dark
+  gaps (three cycles) and plans that placement (`_plan_placement`, from the song's start
+  and from each first-cycle cue, as the variant's own); a failure excludes it on that
+  variant ("on wide the dark repositioning between its own cues cannot be planned: MH2 cue
+  at 1520 ms: infeasible_transition …"). Exempt: a spread on a template whose only darkness
+  is its visibility envelope (the cascades), which follows the head's phase. The reviewer's
+  `repro_high.py` now shows the wave excluded on `wide`, repair saying so, and the render
+  playing without it under `error`. Test:
+  `test_a_modifier_the_variant_cannot_reposition_through_is_not_offered_there`.
+- **MEDIUM-1, decided at render.** A spread (or aim, or direction) can drop more of a head's
+  first cue at a section's entry (fly_in_cascade + `wide_wave`: MH2/MH3's first cue in the
+  entry window). How much depends on where the heads enter from (the section before, or
+  the song's start), so the gate cannot decide it in general. The arrangement loop judges a
+  modifier unit beside `worse` by `_darkened_by_modifiers(last accepted, trial)`: a head
+  whose `dropped_cues` (entry window or unplayable) in the modified part or the part after
+  it total more than in the arrangement accepted so far makes the unit give way ("the
+  modifier gave way to MH2 loses 500 ms of its cues in section 'a' (dropped at its entry,
+  or unplayable)"). Variations are judged as before (the clause looks only at parts whose
+  modifier choice differs). Gate-decidable: range (aim), topology (wave), the repositioning
+  between a head's own cues (spread, direction). Render-time: a section's entry, and any
+  placement the gate's bar-1 and first-cycle checks do not cover. Test:
+  `test_a_modifier_that_drops_a_cue_at_an_entry_gives_way`; the byte-change and combine
+  tests now also assert `dropped_cues` equal to the plan without modifiers, the combine
+  test at 79.5 and 120 BPM.
+- **MEDIUM-2, hedged and modifier-aware.** `_boundary_repairs` reads the successor's dark
+  phases with its modifiers (`_parts(..., plays)`) and, where either side plays modifiers,
+  says the heads "may keep the previous section's colour" / the change "may wait", ending
+  "its parts play modifiers, whose entries this prediction does not count: the render
+  decides on its own frames". The dark-entry claims themselves are still measured without
+  modifiers. `repro_q4.py` now reads "may keep" with the hedge; the render shows MH2/MH3
+  blue for 980 ms, so the record is no longer a false statement.
+- **LOW-1, fixed.** Only an entry that plays blocks a later one for its key ("the part
+  already plays aim (high); only one entry for a key plays"); a first entry that did not
+  play no longer blocks the next.
+- **LOW-2** (no test bounds the offer's own compile count): not added; the gate-time
+  ratio below is measured instead. **LOW-3/4** are pre-existing (unmodified plans too).
+
+PERMOD
 
 ## Per-family offer
 

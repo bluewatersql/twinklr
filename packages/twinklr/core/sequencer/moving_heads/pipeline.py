@@ -141,7 +141,6 @@ from twinklr.core.sequencer.moving_heads.modifiers import (
     ModifierPlay,
     aim_fits,
     candidates,
-    modify,
     played_template,
     resolve_modifiers,
     spelled,
@@ -1888,7 +1887,10 @@ def admit_templates(
                     whole_compiles,
                     reach,
                     profiles=profiles,
+                    initial_states=initial_states,
                     phase_map=phase_map,
+                    failure_mode=failure_mode,
+                    sequence_end_ms=sequence_end_ms,
                     start_limit_ms=start_limit,
                     end_limit_ms=end_limit,
                 ),
@@ -2031,6 +2033,42 @@ def _modifier_units(pipeline: RenderingPipeline) -> list[ArrangementUnit]:
 register_arrangement_units(_modifier_units)
 
 
+def _darkened_by_modifiers(before: RenderingPipeline, after: RenderingPipeline) -> list[str]:
+    """Each head a cue of which `after` drops (`dropped_cues`: one an entry window covers,
+    or one the head cannot play) for longer than `before` does, in a placed part whose
+    modifiers `after` plays otherwise than `before`, or in the part after it (whose entry
+    starts where the modified part leaves the head): a modifier may not take light the
+    plan without it plays. The arrangement loop judges a modifier unit by it beside
+    `worse`, against the arrangement accepted so far."""
+    keys = {
+        key.partition(":")[2]
+        for key in (after._choices or {})
+        if key.startswith("modifier:") and after.unit_choice(key) != before.unit_choice(key)
+    }
+    if not keys:
+        return []
+    order = [s.section_id for s in after.iterate_plan_sections(after.choreography_plan)]
+    parts = keys | {
+        order[order.index(key) + 1] for key in keys if order.index(key) + 1 < len(order)
+    }
+
+    def dropped(pipeline: RenderingPipeline) -> dict[tuple[str, str], int]:
+        out: dict[tuple[str, str], int] = defaultdict(int)
+        for record in (pipeline.render_record or {}).get("dropped_cues", []):
+            if record.get("section_id") in parts and record.get("reason") != "outside_cue_limits":
+                key = (record["section_id"], record["fixture_id"])
+                out[key] += int(record["end_ms"]) - int(record["start_ms"])
+        return out
+
+    was = dropped(before)
+    return [
+        f"{fixture_id} loses {ms - was.get((section_id, fixture_id), 0)} ms of its cues in "
+        f"section {section_id!r} (dropped at its entry, or unplayable)"
+        for (section_id, fixture_id), ms in sorted(dropped(after).items())
+        if ms > was.get((section_id, fixture_id), 0) + EFFECT_GRID_MS
+    ]
+
+
 def _modifier_warnings(section_id: str, play: ModifierPlay) -> list[MHDiagnostic]:
     """One warning per modifier of a placed part that does not play."""
     return [
@@ -2055,8 +2093,9 @@ def worse(reference: RenderingPipeline, trial: RenderingPipeline) -> list[str]:
     - a hit farther from its lyric cue (else its planned frame), or with a lower peak level
       over its first four frames;
     - a colour or gobo change shown later, or for less time (lit, holding its state);
-    - a `closed` with more lit frames, a strobe or `pulse` with fewer, over the 25 frames
-      from its frame (whether or not it plays: a replaced one still asked for that);
+    - a `closed` with more lit frames, a strobe or `pulse` with fewer flashes (lit runs)
+      or fewer lit frames, over the whole span the reference traced on the head (whether
+      or not it plays: a replaced one still asked for that);
     - a transition that plays on a head in the reference and not in the trial.
 
     Public: the render's arrangement units are judged by it (`ArrangementUnit`)."""
@@ -2140,11 +2179,18 @@ def worse(reference: RenderingPipeline, trial: RenderingPipeline) -> list[str]:
                 elif run_now + FRAME < run_was:
                     said.append(f"{what} (shown more briefly on {fixture_id})")
             elif shutter:
-                start = entry.get("frame_ms") or 0
-                lit_was = of(reference, fixture_id).lit_over(start, 25)
-                lit_now = of(trial, fixture_id).lit_over(start, 25)
+                # The whole span the reference traced on this head (else 25 frames from
+                # its frame): a `closed` by its dark frames, a strobe or pulse by its
+                # flashes (lit runs: a strobe turned solid has more lit frames, not more
+                # flashes) and its lit frames.
+                start = outcome.get("from_ms", entry.get("frame_ms") or 0)
+                end = outcome.get("to_ms", start + 25 * FRAME)
+                lit_was, flashes_was = of(reference, fixture_id).lit_runs(start, end)
+                lit_now, flashes_now = of(trial, fixture_id).lit_runs(start, end)
                 if action == "closed" and lit_now > lit_was + 1:
                     said.append(f"{what} (lit inside on {fixture_id})")
+                elif action != "closed" and flashes_now < flashes_was:
+                    said.append(f"{what} (fewer flashes on {fixture_id})")
                 elif action != "closed" and lit_now < lit_was - 1:
                     said.append(f"{what} (fewer lit frames on {fixture_id})")
     current_transitions = transitions(trial)
@@ -2196,8 +2242,11 @@ class _Frames:
             t += FRAME
         return t - start
 
-    def lit_over(self, t: int, count: int) -> int:
-        return sum(1 for k in range(count) if self.frames.lit.get(t + k * FRAME, False))
+    def lit_runs(self, start: int, end: int) -> tuple[int, int]:
+        """Lit frames and lit runs (flashes) in `[start, end)`."""
+        lit = [self.frames.lit.get(t, False) for t in range(start, end, FRAME)]
+        runs = sum(1 for i, on in enumerate(lit) if on and (i == 0 or not lit[i - 1]))
+        return sum(lit), runs
 
 
 TWIN_POSE_DEG = 3.0
@@ -2370,27 +2419,43 @@ def _admit_modifiers(
     reach: Mapping[tuple[str, str | None], Mapping[str, _Reach]],
     *,
     profiles: Mapping[str, FixtureCapabilities],
+    initial_states: Mapping[str, InitialFixtureState],
     phase_map: MusicalPhaseMap,
+    failure_mode: FailureMode,
+    sequence_end_ms: int,
     start_limit_ms: int,
     end_limit_ms: int,
 ) -> dict[str, Any]:
     """An admitted template's modifier offer (`modifiers`, module docstring), as
     `TemplateOffer` fields.
 
-    Each value `modifiers.candidates` applies to the template's effective variant (its
-    first passing ladder rung) is compiled on it at bar 1 over the song, where the
-    compile checks every frame's range and speed and the rig's topology; it is offered
-    where its first two cycles then do not play like the unmodified variant's
-    (`_cues_alike`, the twin-variant rule), and each other recognised value is refused
-    with why. Its placements are not planned again: a modifier is a phase shift, a time
-    reversal or a tilt translation of the variant's own path, so every dark gap between
-    a head's own cues spans the same time and the same travel as in the variant, whose
-    placements the gate planned. Per other passing variant, each offered `aim` that would
-    leave a head's operable tilt range (`aim_fits`, over that variant's compiled tilt)
-    is excluded. A `spread` that moves the effective variant's darkness publishes each
-    passing variant's dark phases with it, from a compile over its first three cycles
-    (`_dark_phases` reads the second); it is excluded on a variant where that does not
-    compile."""
+    **Offered.** Each value `modifiers.candidates` applies to the template's effective
+    variant (its first passing ladder rung) is offered where it fits that variant (below)
+    and its first bar and two cycles do not play like the unmodified variant's
+    (`_cues_alike`, the twin-variant rule); each other recognised value is refused with
+    why. **Per variant** (every other passing variant), an offered value that does not fit
+    it is excluded there, with why. A value fits a variant:
+
+    - `aim`: where the variant's compiled tilt range, moved by the offset, stays in each
+      head's operable range (`aim_fits`). A tilt translation changes nothing else.
+    - `spread` and `direction`: where the variant's first three cycles compile with it (the
+      rig's topology; a phase shift or a time reversal keeps every pose and speed of the
+      path), and, on a variant with dark gaps between a head's own cues, where their dark
+      repositioning can be planned from the song's start and from each cue of the first
+      cycle (`_plan_placement`, as the variant's own placements were): a wave or a
+      reversed path meets gaps set in time (an overlay's mask, a gap between steps) at
+      other poses than the variant does. A spread on a template whose only darkness is its
+      visibility envelope is not planned again: that darkness follows the head's phase,
+      so every gap keeps its poses.
+
+    What depends on the section before (a section's entry: how much of a head's first cue
+    an entry window drops) is not decidable here; the render's arrangement loop gives a
+    part's modifiers way where they drop more of a cue than the plan without them
+    (`_darkened_by_modifiers`).
+
+    A `spread` that moves the effective variant's darkness publishes each passing
+    variant's dark phases with it, from the three-cycle compile (`_dark_phases` reads the
+    second)."""
     from twinklr.core.sequencer.moving_heads.compile.step import CompileError
     from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
         UnsupportedRigShapeError,
@@ -2398,26 +2463,54 @@ def _admit_modifiers(
 
     refused = (CompileError, PhysicalChannelError, UnsupportedRigShapeError, ValueError)
     document = get_template(template_id)
+    template = document.template
     effective = next(p for p in passing if p not in VARIATION_PRESETS)
-    name = BASE if effective is None else effective
-    unmodified, context, preset, cycle_bars = whole_compiles[template_id, effective]
-    played = apply_preset(document.template, preset) if preset else document.template
-    # The first bar and two cycles, as the twin variants are compared.
-    shown = min(context.end_ms, context.bar_offset_to_ms(1 + 2 * math.ceil(cycle_bars)))
-    darkness = _dark_phases(whole_compiles[template_id, effective], profiles, phase_map)
-    offered: list[Modifier] = []
-    refusals: dict[str, str] = {}
-    moving: list[Modifier] = []
-    """Offered spreads that move the darkness."""
-    for spelled_name, why in candidates(played).items():
-        if why is not None:
-            refusals[spelled_name] = why
-            continue
-        key, _, value = spelled_name.partition("=")
-        modifier = (key, value)
+    phase_darkness = (
+        not template.overlays
+        and len(template.steps) == 1
+        and template.steps[0].visibility is not None
+    )
+    tilts = {
+        fixture_id: profile.axes["tilt"].operable_range
+        for fixture_id, profile in profiles.items()
+        if "tilt" in profile.axes
+    }
+
+    def short(preset_id: str | None) -> TemplateCompileContext:
+        """The variant's bar-1 context over its first three cycles: `_dark_phases` reads
+        the second, the third holds where its last dark window ends."""
+        _, context, _, cycle_bars = whole_compiles[template_id, preset_id]
+        return context.model_copy(
+            update={"duration_bars": min(context.duration_bars, 1 + 3 * math.ceil(cycle_bars))}
+        )
+
+    gaps = {
+        preset_id: any(
+            _dark_phases(whole_compiles[template_id, preset_id], profiles, phase_map).heads.values()
+        )
+        for preset_id in passing
+    }
+
+    def planned(preset_id: str | None, modifier: Modifier) -> bool:
+        """Whether a spread or direction must be planned on the variant: it has dark gaps
+        between a head's own cues that do not all follow the head's phase."""
+        return gaps[preset_id] and not (modifier[0] == "spread" and phase_darkness)
+
+    def fits(preset_id: str | None, modifier: Modifier) -> tuple[str | None, Any]:
+        """Why `modifier` does not fit the variant (None where it does), and its compile."""
+        variant = BASE if preset_id is None else preset_id
+        if modifier[0] == "aim":
+            tilt = {
+                fixture_id: poses[ChannelName.TILT]
+                for fixture_id, (poses, _) in reach[template_id, preset_id].items()
+                if ChannelName.TILT in poses and fixture_id in tilts
+            }
+            return aim_fits(modifier[1], tilt, tilts), None
+        _, _, preset, cycle_bars = whole_compiles[template_id, preset_id]
+        context = short(preset_id)
         try:
             compiled = compile_template(
-                modify(played, [modifier]),
+                played_template(template, preset, [modifier])[0],
                 context,
                 None,
                 phase_map=phase_map,
@@ -2426,64 +2519,83 @@ def _admit_modifiers(
             )
         except refused as error:
             notes = "; ".join(getattr(error, "__notes__", ()))
-            refusals[spelled_name] = f"on {name} it does not compile here: {notes or error}"
+            return f"on {variant} it does not compile here: {notes or error}", None
+        if planned(preset_id, modifier) and (
+            refusal := _plan_placement(
+                compiled.segments,
+                profiles,
+                initial_states,
+                section_start_ms=context.start_ms,
+                first_cycle_end_ms=context.bar_offset_to_ms(cycle_bars),
+                phase_map=phase_map,
+                failure_mode=failure_mode,
+                sequence_end_ms=sequence_end_ms,
+                song_start=True,
+            )
+        ):
+            return (
+                f"on {variant} the dark repositioning between its own cues cannot be planned: "
+                f"{refusal}"
+            ), None
+        return None, compiled
+
+    def dark(preset_id: str | None, compiled: Any) -> DarkPhases:
+        cycle_bars = whole_compiles[template_id, preset_id][3]
+        return _dark_phases(
+            (compiled.segments, short(preset_id), None, cycle_bars), profiles, phase_map
+        )
+
+    name = BASE if effective is None else effective
+    _, _, preset, cycle_bars = whole_compiles[template_id, effective]
+    played = apply_preset(template, preset) if preset else template
+    plain = compile_template(
+        template,
+        short(effective),
+        preset,
+        phase_map=phase_map,
+        start_limit_ms=start_limit_ms,
+        end_limit_ms=end_limit_ms,
+    )
+    # The first bar and two cycles, as the twin variants are compared.
+    shown = short(effective).bar_offset_to_ms(1 + 2 * math.ceil(cycle_bars))
+    offered: list[Modifier] = []
+    refusals: dict[str, str] = {}
+    moving: list[Modifier] = []
+    """Offered spreads that move the darkness."""
+    phases: dict[str, dict[str, DarkPhases]] = {}
+    for spelled_name, why in candidates(played).items():
+        if why is not None:
+            refusals[spelled_name] = why
             continue
-        if _cues_alike(compiled.segments, unmodified, shown):
+        key, _, value = spelled_name.partition("=")
+        modifier = (key, value)
+        why, compiled = fits(effective, modifier)
+        if why is not None:
+            refusals[spelled_name] = why
+            continue
+        if compiled is not None and _cues_alike(compiled.segments, plain.segments, shown):
             refusals[spelled_name] = (
                 f"on {name} it plays like the template without it here (the same darkness, "
                 f"every aim within {TWIN_POSE_DEG:g} degrees)"
             )
             continue
         offered.append(modifier)
-        if key == "spread" and darkness != _dark_phases(
-            (compiled.segments, context, None, cycle_bars), profiles, phase_map
-        ):
+        if key == "spread" and (moved := dark(effective, compiled)) != dark(effective, plain):
             moving.append(modifier)
+            phases.setdefault(name, {})[spelled_name] = moved
     exclusions: dict[str, dict[str, str]] = {}
-    phases: dict[str, dict[str, DarkPhases]] = {}
-    tilts = {
-        fixture_id: profile.axes["tilt"].operable_range
-        for fixture_id, profile in profiles.items()
-        if "tilt" in profile.axes
-    }
     for preset_id in passing:
+        if preset_id == effective:
+            continue
         variant = BASE if preset_id is None else preset_id
-        tilt = {
-            fixture_id: poses[ChannelName.TILT]
-            for fixture_id, (poses, _) in reach[template_id, preset_id].items()
-            if ChannelName.TILT in poses and fixture_id in tilts
-        }
         for modifier in offered:
-            if (
-                preset_id != effective
-                and modifier[0] == "aim"
-                and (why := aim_fits(modifier[1], tilt, tilts)) is not None
-            ):
+            if modifier[0] != "aim" and not planned(preset_id, modifier) and modifier not in moving:
+                continue  # it compiled on the effective variant: the same poses and speeds
+            why, compiled = fits(preset_id, modifier)
+            if why is not None:
                 exclusions.setdefault(variant, {})[spelled(modifier)] = why
-        _, context, preset, cycle_bars = whole_compiles[template_id, preset_id]
-        # The first three cycles: `_dark_phases` reads the second, and the third holds
-        # where its last dark window ends.
-        short = context.model_copy(
-            update={"duration_bars": min(context.duration_bars, 1 + 3 * math.ceil(cycle_bars))}
-        )
-        for modifier in moving:
-            try:
-                compiled = compile_template(
-                    played_template(document.template, preset, [modifier])[0],
-                    short,
-                    None,
-                    phase_map=phase_map,
-                    start_limit_ms=start_limit_ms,
-                    end_limit_ms=end_limit_ms,
-                )
-            except refused as error:
-                exclusions.setdefault(variant, {})[spelled(modifier)] = (
-                    f"it does not compile on {variant} here: {error}"
-                )
-                continue
-            phases.setdefault(variant, {})[spelled(modifier)] = _dark_phases(
-                (compiled.segments, short, None, cycle_bars), profiles, phase_map
-            )
+            elif modifier in moving:
+                phases.setdefault(variant, {})[spelled(modifier)] = dark(preset_id, compiled)
     order = [(key, value) for key, values in MODIFIERS.items() for value in values]
     by_key: dict[str, tuple[str, ...]] = {}
     for key, value in sorted(offered, key=order.index):
@@ -5142,20 +5254,26 @@ class RenderingPipeline:
         gave_way: dict[str, str] = {}
         reference = trial(accepted, gave_way)
         last = reference
+
+        def unchanged(choices: dict[str, str]) -> bool:
+            probe = copy.copy(self)
+            probe._choices = choices
+            probe._arrangement_cache = None
+            return probe._signature() == last._signature()
+
         for unit in units:
             first_worse: str | None = None
+            same: dict[str, str] | None = None
             for candidate in unit.candidates:
                 choices = {**accepted, unit.key: candidate}
-                probe = copy.copy(self)
-                probe._choices = choices
-                probe._arrangement_cache = None
-                if probe._signature() == last._signature():
+                if unchanged(choices):
                     # Plays the same as the accepted arrangement (a step the rig cannot
-                    # play): kept, with its own trace, and no render.
-                    accepted = choices
-                    break
+                    # play resolves to its source): no render, and the next candidate
+                    # (a FASTER step's narrower reach) is still tried.
+                    same = same or choices
+                    continue
                 tried = trial(choices, gave_way)
-                found = worse(reference, tried)
+                found = worse(reference, tried) + _darkened_by_modifiers(last, tried)
                 if not found:
                     accepted, last = choices, tried
                     break
@@ -5164,6 +5282,10 @@ class RenderingPipeline:
             else:
                 if first_worse is not None:
                     gave_way[unit.key] = first_worse
+                elif same is not None:
+                    # Nothing differs: the unit keeps the first such candidate and its
+                    # own trace (e.g. "not admitted: it plays the source variant").
+                    accepted = same
         # A unit that gave way is tried again with every later acceptance in place (a
         # later unit can make it harmless); each acceptance shrinks the set, so this ends.
         changed = True
@@ -5174,8 +5296,10 @@ class RenderingPipeline:
                     continue
                 for candidate in unit.candidates:
                     choices = {**accepted, unit.key: candidate}
+                    if unchanged(choices):
+                        continue
                     tried = trial(choices, {k: v for k, v in gave_way.items() if k != unit.key})
-                    if not worse(reference, tried):
+                    if not worse(reference, tried) and not _darkened_by_modifiers(last, tried):
                         accepted, last = choices, tried
                         del gave_way[unit.key]
                         changed = True

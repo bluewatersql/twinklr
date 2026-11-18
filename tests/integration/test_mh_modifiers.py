@@ -323,9 +323,11 @@ def test_a_modifier_that_plays_like_the_variant_is_not_offered(name: str) -> Non
 @pytest.mark.parametrize("name", RIGS)
 @pytest.mark.parametrize("family", m.CATALOG_IDS)
 def test_every_offered_modifier_changes_the_bytes_within_the_limits(name: str, family: str) -> None:
-    """One section with each offered value, each after a section without; against the same
-    plan without modifiers, each modified section's frames differ, it plays its value, and
-    every frame stays inside the heads' range, speed and wheel darkness."""
+    """One section with each offered value, each after a section without. Played as planned
+    (the arrangement not chosen), each modified section's frames differ from the same plan
+    without modifiers and every frame stays inside the heads' range, speed and wheel
+    darkness. As rendered (the arrangement chosen), each value plays, or gives way where it
+    would drop more of a cue than the plan without it, and no head loses more of a cue."""
     fg = rig(name, family)
     beat_grid = grid(120, bars=24)
     admission = gate(fg, beat_grid, family)
@@ -343,32 +345,50 @@ def test_every_offered_modifier_changes_the_bytes_within_the_limits(name: str, f
             section(f"p{index}", (start, start + 1), family),
             section(f"m{index}", (start + 2, start + 3), family),
         ]
-    played, without = (
-        render(modified, fg, beat_grid, admission, family),
-        render(plain, fg, beat_grid, admission, family),
+    planned = RenderingPipeline(
+        choreography_plan=ChoreographyPlan(sections=modified, overall_strategy=""),
+        beat_grid=beat_grid,
+        fixture_group=fg,
+        job_config=job(family),
+        media_file="silence.wav",
+        admission=admission,
     )
-    frames, before = Frames(played), Frames(without)
-    trace = traced(played)
-
+    planned._settled = True  # every modifier as planned: what it changes
+    planned.render()
+    without = render(plain, fg, beat_grid, admission, family)
+    frames, before = Frames(planned), Frames(without)
+    trace = traced(planned)
     for index, (key, value) in enumerate(values):
         assert trace[f"m{index}"] == {"asked": [f"{key}={value}"], "applied": [f"{key}={value}"]}
         lo, hi = frame_index(beat_grid, 4 * index + 3), frame_index(beat_grid, 4 * index + 5)
         assert any(frames.raw(h)[lo:hi] != before.raw(h)[lo:hi] for h in HEADS), (key, value)
+    assert_within_limits(planned)
+
+    played = render(modified, fg, beat_grid, admission, family)
+    for index, part in ((i, traced(played)[f"m{i}"]) for i in range(len(values))):
+        assert part["applied"] or part["not_applied"][0]["reason"].startswith(
+            "the modifier gave way to MH"
+        ), (index, part)
+    assert dropped_ms(played) == dropped_ms(without)
     assert_within_limits(played)
 
 
+@pytest.mark.parametrize("bpm", [79.5, 120])
 @pytest.mark.parametrize("name", RIGS)
 @pytest.mark.parametrize("family", m.CATALOG_IDS)
-def test_modifiers_combine_with_every_variant_the_part_plays(name: str, family: str) -> None:
-    """At 79.5 BPM a section on every admitted variant with one value of each key, and a
-    motif carrier widened from it: each plays what the gate lets it there, repair says the
-    same, and every frame stays inside the limits. On the 150 degree/s heads the gate
-    fits the cascades' `fast` to them."""
+def test_modifiers_combine_with_every_variant_the_part_plays(
+    name: str, family: str, bpm: float
+) -> None:
+    """A section on every admitted variant with one value of each key, and a motif carrier
+    widened from it: each plays what the gate lets it there (or gives way), repair says
+    the same, no head loses more of a cue than without the modifiers (`dropped_cues`),
+    and every frame stays inside the limits. At 79.5 BPM on the 150 degree/s heads the
+    gate fits the cascades' `fast` to them."""
     fg = rig(name, family)
-    beat_grid = grid(79.5, bars=24)
+    beat_grid = grid(bpm, bars=24)
     admission = gate(fg, beat_grid, family)
     offered = admission.offer.templates[family]
-    if name == "allowed_150dps" and family in ("fly_in_cascade", "fly_out_cascade"):
+    if (name, bpm) == ("allowed_150dps", 79.5) and family in ("fly_in_cascade", "fly_out_cascade"):
         assert "fast" in offered.fitted  # a fitted variant among them
     chosen = [(key, values[-1]) for key, values in offered.modifiers.items()]
     sections = [
@@ -385,9 +405,86 @@ def test_modifiers_combine_with_every_variant_the_part_plays(name: str, family: 
     pipeline = render(repaired.sections, fg, beat_grid, admission, family)
 
     assert_repair_says_what_plays(repaired, pipeline)
-    for part in traced(pipeline).values():
-        assert part["applied"], part
+    assert any(part["applied"] for part in traced(pipeline).values())
+    without = render(
+        [with_modifiers(s) for s in repaired.sections], fg, beat_grid, admission, family
+    )
+    assert dropped_ms(pipeline) == dropped_ms(without)
     assert_within_limits(pipeline)
+
+
+def tagged(fg: FixtureGroup) -> FixtureGroup:
+    """`fg` with every wheel state tagged, settling in 150 ms, and the heads' darkness
+    taking 20 ms each way (the review's rigs)."""
+    payload = fg.model_dump(mode="json")
+    patterns = {"open": "open", "dots": "dots", "star": "stars"}
+    for fixture in payload["fixtures"]:
+        profile = fixture["config"]["physical_profile"]
+        for name, state in profile["discrete"]["color"]["states"].items():
+            state.update(hex=name, settle_ms=150)
+        for name, state in profile["discrete"]["gobo"]["states"].items():
+            state.update(pattern=patterns[name], settle_ms=150)
+        profile["visibility"].update(close_latency_ms=20, open_latency_ms=20)
+    return FixtureGroup.model_validate(payload)
+
+
+def dropped_ms(pipeline: RenderingPipeline) -> dict[tuple[str, str], int]:
+    """Per (placed part, head), the ms of its cues the render dropped or kept dark."""
+    assert pipeline.render_record is not None
+    out: dict[tuple[str, str], int] = {}
+    for record in pipeline.render_record["dropped_cues"]:
+        key = (record["section_id"], record["fixture_id"])
+        out[key] = out.get(key, 0) + int(record["end_ms"]) - int(record["start_ms"])
+    return out
+
+
+@pytest.mark.parametrize("name", RIGS)
+def test_a_modifier_the_variant_cannot_reposition_through_is_not_offered_there(
+    name: str,
+) -> None:
+    """The flick's masks are set in time: a wave meets them at other poses. On the 150
+    degree/s heads at 120 BPM a head of the flick's `wide` cannot reposition through a mask
+    in time with the wave (review HIGH-1), so the gate excludes the wave on `wide`; the
+    part plays without it, repair says why, and nothing is dropped."""
+    fg = tagged(rig(name))
+    beat_grid = grid(120, bars=8)
+    admission = gate(fg, beat_grid)
+    flick = admission.offer.templates["masked_wheel_flick"]
+    excluded = flick.modifier_exclusions.get("wide", {})
+    if name == "720dps":
+        assert "spread=wave" not in excluded
+        return
+    assert "dark repositioning between its own cues cannot be planned" in excluded["spread=wave"]
+    plan = ChoreographyPlan(
+        sections=[section("a", (1, 8), "masked_wheel_flick", ("spread", "wave"), preset="wide")],
+        overall_strategy="",
+    )
+    repaired = repair_rig_intent(plan, admission.offer, {}, beat_grid)
+    pipeline = render(repaired.sections, fg, beat_grid, admission)
+
+    assert traced(pipeline)["a"]["applied"] == []
+    assert_repair_says_what_plays(repaired, pipeline)
+    assert dropped_ms(pipeline) == {}
+
+
+@pytest.mark.parametrize("bpm", [79.5, 120])
+@pytest.mark.parametrize("name", RIGS)
+def test_a_modifier_that_drops_a_cue_at_an_entry_gives_way(name: str, bpm: float) -> None:
+    """A wide wave on the fly-in cascade from the song's start drops the inner heads' first
+    cue in the entry window (review MEDIUM-1), which depends on what the heads enter from
+    and so is the render's to judge: the modifier gives way, the trace says which head
+    loses what, and the render drops no more than without it."""
+    fg = rig(name)
+    beat_grid = grid(bpm)
+    admission = gate(fg, beat_grid)
+    plan = [section("a", (1, 8), "fly_in_cascade", ("spread", "wide_wave"))]
+    pipeline = render(plan, fg, beat_grid, admission)
+    without = render([with_modifiers(plan[0])], fg, beat_grid, admission)
+
+    assert dropped_ms(pipeline) == dropped_ms(without)
+    (why,) = traced(pipeline)["a"]["not_applied"]
+    assert why["reason"].startswith("the modifier gave way to MH")
+    assert "of its cues in section 'a' (dropped at its entry, or unplayable)" in why["reason"]
 
 
 def test_aim_gives_way_on_a_variant_whose_tilt_reaches_the_heads_limit() -> None:
@@ -537,11 +634,11 @@ def test_repair_says_what_the_render_plays(
         ]
         assert trace["c"]["applied"] == ["aim=high"]
         assert [e["reason"].split(";")[0] for e in trace["c"]["not_applied"]] == [
-            "the part already sets aim (high)",
+            "the part already plays aim (high)",
             "spread takes unison or wave or wide_wave or reversed, not 'far'",
         ]
         assert trace["d"]["applied"] == ["spread=wave"]
-        assert trace["d"]["not_applied"][0]["reason"].startswith("the part already sets spread")
+        assert trace["d"]["not_applied"][0]["reason"].startswith("the part already plays spread")
     assert_within_limits(pipeline)
 
 

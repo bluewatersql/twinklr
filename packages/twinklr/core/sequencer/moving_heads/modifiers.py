@@ -20,30 +20,35 @@ authored as catalog presets. None is carried by another field: reach and rate ar
 - `aim: low | high`: every step's start tilt `AIM_OFFSET_DEG` lower or higher.
 
 Each is a phase shift, a time reversal or a translation in tilt of the variant's own
-path, so no head moves faster, and the travel between a head's own cues is the same:
-what can newly fail is a tilt range (`aim`) or a rig without a topology (`wave`).
+path, so no head moves faster. What can newly fail: a tilt range (`aim`), a rig without
+a topology (`wave`), a dark gap set in time (an overlay's mask, a gap between steps) that
+a head now meets at another pose and cannot reposition through (`spread`, `direction`),
+and a section's entry, which can drop more of a head's first cue.
 
 **Offer** (`pipeline._admit_modifiers`). Per admitted template, the gate proves each
 recognised value it can apply (`candidates`) on the template's effective variant: compiled
 at bar 1 over the song, and its first bar and two cycles must not play like the
 unmodified variant's (`pipeline._cues_alike`, the twin-variant rule). Those that pass are
 offered (`TemplateOffer.modifiers`) and the others recorded with why
-(`modifier_refusals`). On every other admitted variant an offered `aim` fits only where
-each head's compiled tilt range, moved by the offset, stays in its operable range
-(`aim_fits`); what does not fit is recorded per variant (`modifier_exclusions`). A spread
-that moves a template's darkness (a visibility envelope following the wave) publishes
-each variant's dark phases with it (`modifier_phases`), for repair's event predictions.
+(`modifier_refusals`). On every admitted variant a value that does not fit it is
+excluded there (`modifier_exclusions`): an `aim` that would take a head's compiled tilt
+range out of its operable range (`aim_fits`); a `spread` or `direction` whose dark
+repositioning between a head's own cues cannot be planned. A spread that moves a
+template's darkness (a visibility envelope following the wave) publishes each variant's
+dark phases with it (`modifier_phases`), for repair's event predictions. A section's entry
+depends on the section before, so the render decides it (below).
 
 **Play** (`resolve_modifiers`, one function for the render and the plan repair). A part
 plays every modifier offered for its template that fits the variant it plays, in the
 fixed order of `MODIFIERS` whatever order the plan lists them in; each other entry is not
 applied, with why and the template's valid set: a key the renderer does not know, a value
-its key does not take, a second entry for a key (the first plays), a value not offered for
-the template here, a value that does not fit the variant played, or one the render
+its key does not take, a second entry for a key one entry already plays, a value not
+offered for the template here, a value that does not fit the variant played, or one the render
 withdrew because it gave way to the song (`withdrawn`). **The song outranks the
 arrangement:** a part's modifiers are one arrangement unit
 (`pipeline._modifier_units`): the render plays them only where no event of the song is
-worse than without them (`pipeline.worse`), first all of them, then, where a spread plays
+worse than without them (`pipeline.worse`) and no head loses more of a cue in the part
+or the next one (`pipeline._darkened_by_modifiers`), first all of them, then, where a spread plays
 with others, all but the spread (a spread is the one modifier that moves a template's
 darkness), else none, traced with the event they gave way to. Without a gate result for
 a template, every value `candidates` applies plays, as a template the gate did not judge
@@ -359,13 +364,11 @@ def resolve_modifiers(
         elif value not in MODIFIERS[key]:
             why = f"{key} takes {' or '.join(MODIFIERS[key])}, not {entry.value!r}"
         elif key in seen:
-            why = f"the part already sets {key} ({seen[key]}); only the first counts"
+            why = f"the part already plays {key} ({seen[key]}); only one entry for a key plays"
         elif spelled((key, value)) not in valid:
-            seen[key] = value
             reason = refused.get(spelled((key, value)))
             why = f"not offered for {template.template_id} here" + (f": {reason}" if reason else "")
         elif spelled((key, value)) in excluded:
-            seen[key] = value
             why = f"it does not fit {variant}: {excluded[spelled((key, value))]}"
         elif key in (withdrawn or {}):
             seen[key] = value

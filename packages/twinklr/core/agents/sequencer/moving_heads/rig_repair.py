@@ -773,7 +773,7 @@ def repair_rig_intent(
             palettes,
             beat_grid,
             played,
-            {section_id for (section_id, _), play in plays.items() if play.applied},
+            plays,
         )
         sections, transition_repairs = _transition_repairs(
             sections, offer, palettes, beat_grid, played
@@ -1416,14 +1416,16 @@ def _boundary_repairs(
     palettes: Mapping[str, SectionPalette],
     beat_grid: BeatGrid,
     variants: Mapping[tuple[str, int], str] | None = None,
-    modified: Collection[str] = (),
+    plays: Mapping[tuple[str, int], ModifierPlay] | None = None,
 ) -> list[PlanRepair]:
     """The colour changes between consecutive sections that set colours which the render
     may not play from the boundary (see `repair_rig_intent`), one record per section;
-    each head judged on its own wheel change time. Where a section on either side of the
-    boundary plays modifiers (`modified`), which move where its heads are and when they
-    are dark, the published dark entries and phases read are those without them, so the
-    record says it may not hold."""
+    each head judged on its own wheel change time, on the dark phases the new section's first
+    part plays (with its modifiers, `_parts`). Where a part on either side of the boundary
+    plays modifiers (`plays`), which move where its heads are as they enter, the published
+    dark entries read are measured without them, so the record says what may happen, not
+    what will."""
+    modified = {section_id for (section_id, _), play in (plays or {}).items() if play.applied}
     repairs: list[PlanRepair] = []
     beats = beat_grid.beat_boundaries
     bars = beat_grid.bar_boundaries
@@ -1452,7 +1454,7 @@ def _boundary_repairs(
         }
         if not slow:
             continue
-        template = offer.templates.get(successor)
+        template = _parts(offer, after, variants, plays)[0][3].templates.get(successor)
         variant = None
         if template is not None:
             preset = (variants or {}).get((after.section_id, 0)) or after.parts[0].preset_id
@@ -1475,10 +1477,11 @@ def _boundary_repairs(
             f"({'/'.join(str(ms) for ms in sorted(set(slow.values())))} ms dark) does not fit "
             f"half the beat before the section ({beat / 2:.0f} ms)"
         )
+        uncertain = bool({before.section_id, after.section_id} & modified)
         hedge = (
-            "; its parts play modifiers, which this prediction does not count: the render "
-            "decides on its own frames"
-            if {before.section_id, after.section_id} & set(modified)
+            "; its parts play modifiers, whose entries this prediction does not count: the "
+            "render decides on its own frames"
+            if uncertain
             else ""
         )
         if never:
@@ -1489,7 +1492,8 @@ def _boundary_repairs(
                     action=RepairAction.RECORDED,
                     reason=f"{why}, and its template has no dark moment long enough to turn "
                     f"the wheel: where {', '.join(never)} play straight into the section they "
-                    "keep the previous section's colour; change colour where the heads enter "
+                    + ("may keep" if uncertain else "keep")
+                    + " the previous section's colour; change colour where the heads enter "
                     "dark, or choose a template with a dark phase" + hedge,
                 )
             )
@@ -1501,7 +1505,8 @@ def _boundary_repairs(
                     item=f"colour change from section '{before.section_id}'",
                     action=RepairAction.RECORDED,
                     reason=f"{why}: where {', '.join(late)} play straight into the section the "
-                    f"change waits for the template's first dark moment long enough, beat "
+                    f"change {'may wait' if uncertain else 'waits'} for the template's first "
+                    "dark moment long enough, beat "
                     f"{round_beats(first)} of its cycle, past half the section" + hedge,
                 )
             )

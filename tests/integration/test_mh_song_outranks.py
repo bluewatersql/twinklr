@@ -359,3 +359,130 @@ def test_a_registered_unit_kind_is_built_up_from_the_reference(
     assert pipeline.unit_choice("probe:s") == "on"
     assert pipeline.unit_gave_way("probe:s") is None
     assert pipeline.arrangement_renders == 2  # the reference and the one candidate
+
+
+@pytest.mark.parametrize(
+    ("tempo", "per_bar", "family"),
+    [(120.0, 4, "masked_wheel_flick"), (150.0, 3, "target_orbit")],
+)
+def test_a_faster_step_the_rig_does_not_admit_plays_its_narrower_reach(
+    tempo: float, per_bar: int, family: str
+) -> None:
+    """The review's repro (no events): from an introduced `wide`, FASTER's `wide+fast` is
+    not admitted at 150 degree/s, so the step resolves to the source; the render must
+    still try the narrower reach (`fast`) and, costing nothing, play it."""
+    beat_grid = m.pickup_grid(60_000 / tempo, 12, pickup=0, beats_per_bar=per_bar)
+    fg = slow(rig())
+    admission = gate(fg, beat_grid)
+    assert "wide+fast" not in admission.offer.templates[family].variants
+    pipeline, _ = played(
+        [
+            m.plan_section("s1", 1, 4, family, motif_id="m", preset_id="wide"),
+            m.plan_section("s2", 5, 8, family, motif_id="m", variation="FASTER"),
+            m.plan_section("s3", 9, 12, family),
+        ],
+        fg,
+        beat_grid,
+        admission,
+    )
+
+    assert pipeline.render_record is not None
+    looks = {look["section_id"]: look for look in pipeline.render_record["section_looks"]}
+    step = looks["s2"]["arrangement"]["variation"]
+    assert (step["from"], step["plays"]) == ("wide", "fast")
+    assert "'wide+fast'" in step["note"] and "not admitted" in step["note"]
+    assert pipeline.unit_choice("variation:s2") == "fallback"
+
+
+def test_the_owner_shaped_faster_tries_its_narrower_reach(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """On the owner-shaped plan at 150 degree/s, the break's FASTER tries `narrow+fast`
+    (whatever the render then decides) unless the step itself is accepted."""
+    from twinklr.core.sequencer.moving_heads import pipeline as module
+
+    tried: list[str] = []
+    real = module.worse
+
+    def spy(reference: RenderingPipeline, trial: RenderingPipeline) -> list[str]:
+        if trial is not reference:
+            tried.append(trial._arranged()["break"][0].parts[0].plays)
+        return real(reference, trial)
+
+    monkeypatch.setattr(module, "worse", spy)
+    beat_grid = m.pickup_grid(60_000 / 79.5, 12, pickup=2)
+    fg = slow(owner_like_rig())
+    admission = gate(fg, beat_grid)
+    pipeline, _ = played(owner_shaped("FASTER", beat_grid), fg, beat_grid, admission)
+
+    if pipeline.unit_choice("variation:break") != "step":
+        assert "narrow+fast" in tried
+
+
+def _flashes(pipeline: RenderingPipeline, head: str, start_ms: int, end_ms: int) -> int:
+    """Lit runs in `[start_ms, end_ms)` on the encoded frames (read independently of
+    `worse`)."""
+    from tests.unit.sequencer.moving_heads.test_events_render import Frames
+
+    dark = Frames(pipeline).dark(head)[start_ms // 20 : end_ms // 20]
+    return sum(1 for i, d in enumerate(dark) if not d and (i == 0 or dark[i - 1]))
+
+
+@pytest.mark.parametrize(
+    ("tempo", "per_bar", "family", "variation", "action"),
+    [
+        (120.0, 4, "fly_in_cascade", "SLOWER", "pulse"),
+        (150.0, 3, "masked_wheel_flick", "FASTER", "strobe_slow"),
+    ],
+)
+def test_a_variation_that_drops_later_flashes_gives_way(
+    tempo: float, per_bar: int, family: str, variation: str, action: str
+) -> None:
+    """The review's span repros, reduced: the step drops flashes of a pulse or strobe past
+    its first 25 frames. `worse` judges the whole traced span, so the render does not
+    play the step, and no head shows fewer flashes than in the reference."""
+    beat_grid = m.pickup_grid(60_000 / tempo, 8, pickup=0, beats_per_bar=per_bar)
+    fg = slow(rig())
+    admission = gate(fg, beat_grid)
+    sections = [
+        m.plan_section("s1", 1, 3, family, motif_id="m"),
+        m.plan_section(
+            "s2", 4, 7, family, motif_id="m", variation=variation, events=[event(5, 3, action)]
+        ),
+    ]
+
+    def forced(mode: str) -> RenderingPipeline:
+        repaired = repair_rig_intent(
+            ChoreographyPlan(sections=sections, overall_strategy=""), admission.offer, {}, beat_grid
+        )
+        pipeline = RenderingPipeline(
+            choreography_plan=repaired,
+            beat_grid=beat_grid,
+            fixture_group=fg,
+            job_config=m.family_job(HEADS),
+            media_file="silence.wav",
+            admission=admission,
+        )
+        pipeline._settled = True
+        pipeline._choices = {"variation:s2": mode}
+        pipeline.render()
+        return pipeline
+
+    reference, step = forced("reference"), forced("step")
+    final, _ = played(sections, fg, beat_grid, admission)
+    assert reference.render_record is not None
+    (entry,) = (
+        e
+        for look in reference.render_record["section_looks"]
+        for e in look.get("events", [])
+        if e["action"] == action
+    )
+    spans = {head: (o["from_ms"], o["to_ms"]) for head, o in entry["heads"].items()}
+    assert any(
+        _flashes(step, head, *span) < _flashes(reference, head, *span)
+        for head, span in spans.items()
+    )
+    assert any("fewer flashes" in said for said in worse_than(reference, step))
+    for head, span in spans.items():
+        assert _flashes(final, head, *span) >= _flashes(reference, head, *span), head
+    assert worse_than(reference, final) == []
