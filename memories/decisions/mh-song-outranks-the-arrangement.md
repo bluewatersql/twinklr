@@ -12,26 +12,22 @@ tags: [moving-heads, rendering, arrangement]
 _Integrator decision on 2026-11-18, after an owner-rig render in which a variation lost a
 downbeat hit. It is reversible by the owner and is listed in
 [owner decisions pending](../../changes/2026_11_12_mh_true_up/plan/owner-decisions-pending.md)
-(V7). Built on `feat/mh-true-up-p3` in `08c50a92`, revised in `f9894cc8` and `934b2635`._
+(V7). Built on `feat/mh-true-up-p3` in `08c50a92`, revised in `f9894cc8` and `934b2635`. The combined renderer and verification are
+recorded in the [Phase 3 integration evidence](../../changes/2026_11_12_mh_true_up/evidence/2026-11-18-p3-recovery/README.md)._
 
 ## Decision
 
-A section's arrangement choice may never make any of the song's events worse than the
-reference arrangement does. Today the choice is a variation step; density and modifiers
-plug in the same way. The reference is the song with every choice at its source: each
-part plays what it would with variation NONE.
+An arrangement choice may never make a song event or transition worse than the
+reference. The reference uses the source variant, BALANCED in place of SPARSE or
+BUSY, and no modifiers. REST remains part of the plan.
 
-The render builds the arrangement up from the reference, unit by unit in plan order:
-
-- it keeps the first candidate under which no event, transition or head is worse
-  (`pipeline.worse`);
-- a unit with no such candidate gives way, traced with the first event it would have
-  worsened;
-- units that gave way are retried with the later acceptances in place.
-
-The tie-break: where two units cannot both play, the earlier one in plan order keeps its
-choice. Repair predicts, for the planner, where a variation may give way; the render
-decides on its own frames.
+The renderer first tries all planned units together. It accepts that render if
+`pipeline.worse` reports no worsened event or transition and the modifier cue-drop
+check passes. Otherwise it builds up the arrangement in plan order. It keeps the
+first candidate that passes those checks, traces what made a unit yield, and retries
+yielded units after accepting later choices. In this fallback, an earlier conflicting
+unit gets first choice. Repair predicts where units may yield. The renderer decides
+from the frames.
 
 ## Context
 
@@ -49,12 +45,14 @@ reference, and it never gives up a choice that costs nothing given the earlier o
 
 ## Consequences
 
-- **Render cost.** One reference render plus one per distinct candidate tried. The
-  owner's song takes 16–28 s against 6.5 s without the loop.
-- **A variation can silently not play;** the trace and the diagnostics say why.
-- **New arrangement features must register as units** (`ArrangementUnit`,
-  `register_arrangement_units` in `sequencer/moving_heads/pipeline.py`) and be judged
-  only by `worse`.
+- **Render cost.** The common path renders the reference and a combined trial. The
+  fallback renders each distinct candidate tried. See the integration evidence for
+  the current replay and the handoff for the timing follow-up.
+- **Trace.** Diagnostics and the arrangement trace explain a choice that gives way.
+- **New arrangement features register as units** (`ArrangementUnit` and
+  `register_arrangement_units`). Every trial preserves song outcomes under
+  `pipeline.worse`. An added modifier also cannot drop more of a cue in its part or
+  the following part.
 - **Every move rule may only improve on the unmoved outcome.**
 
 ## Related

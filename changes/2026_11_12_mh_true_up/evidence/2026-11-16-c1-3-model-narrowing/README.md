@@ -759,4 +759,3 @@ and the planner-visible bytes. Results are in §4, §6 and below.
 - **P1 request:** the fingerprints are unchanged from §4 (`50e6b255…d4df`,
   `7a96d383…5315`). The `.xsq`, `.xmap` and `.xtiming` equal the baseline's.
 - **Planner-visible bytes:** identical to the baseline.
-

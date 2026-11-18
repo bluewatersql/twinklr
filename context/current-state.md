@@ -154,9 +154,9 @@ See [product/overview.md](product/overview.md).
     identity), and no two offered variants play alike. A colour or gobo change shown
     only briefly moves to a beat where it is shown half a beat (never losing a head that
     showed it, never worse than the unmoved outcome), else is traced `brief`. The song
-    outranks the arrangement: the arrangement is built up greedily from the reference
-    (every variation step off); a variation that makes any event worse gives way
-    (render-decided, repair-predicted).
+    outranks the arrangement. The renderer tries all planned arrangement units together,
+    then tries them in plan order when the combined trial worsens an event or drops a
+    cue under the modifier guard. See the [arrangement decision](../memories/decisions/mh-song-outranks-the-arrangement.md).
     ([user guide](../docs/user-guide.md#how-a-sections-motif-and-variation-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-w10bc-motif-variation/README.md))
   - **Density** (W10d, 2026-11-18, not yet seen by the owner). Density plays on the light:
@@ -235,8 +235,9 @@ This page owns the rolling gate snapshot. Latest recorded full gate: `6f2a9f6`
 optional or local-only boundaries. Last recorded coverage: 89% at `03b75e9` (2026-08-30).
 There are no accepted failures. The gate includes an offline regression harness (`tests/regression/`):
 the moving-head output pins and a hermetic display replay. The unmerged
-`feat/mh-true-up-p3` branch has its own gate record in its
-[change handoff](../changes/2026_11_12_mh_true_up/plan/handoff.md).
+`feat/mh-true-up-p3` implementation passed `make validate` at `d08ef508`
+on 2026-11-18 (7,785 passed and 30 skipped). See the
+[Phase 3 integration evidence](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-p3-recovery/README.md).
 
 ## Live evidence
 

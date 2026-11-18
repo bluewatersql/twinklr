@@ -234,11 +234,11 @@ def test_every_mode_is_distinct_from_the_others_and_from_no_transition() -> None
     and each from the render without a transition."""
     b = frame_of(grid(120).bar_boundaries[4])
     span = range(b - 60, b + 100)
-    bytes_of = {
-        mode: [Frames(render(pair(transition("ENTRY", mode)))).raw("MH1")[i] for i in span]
-        for mode in MODES
-    }
-    bytes_of["none"] = [Frames(render(pair())).raw("MH1")[i] for i in span]
+    bytes_of = {}
+    for mode in (*MODES, None):
+        sections = pair(transition("ENTRY", mode)) if mode is not None else pair()
+        frames = Frames(render(sections)).raw("MH1")
+        bytes_of[mode or "none"] = [frames[i] for i in span]
 
     names = sorted(bytes_of)
     for i, a in enumerate(names):
