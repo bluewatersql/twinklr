@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 BACKEND_ID = "xlights_dmx"
 """The backend the renderer writes: xLights DMX effects in an `.xsq`."""
 
-RENDERER_REVISION = "20"
+RENDERER_REVISION = "21"
 """Bumped by hand in the commit that intentionally changes the renderer's output; the
 render identity also carries the frame encoder's own version. 3: a section's colour and
 gobo are rendered (song-intent rendering W4), so a plan that sets them renders
@@ -93,12 +93,14 @@ is built up greedily from the reference (every variation step off) and judged by
 `pipeline.worse` over every event, transition and head; a hit or colour move may only
 improve on the unmoved outcome, bounded in beats. 19: a FASTER step the rig does not
 admit (resolving to its source) no longer ends the unit's candidates, so its narrower
-reach is tried and plays where it costs no event. 20 (W10d): a section's density plays
-(`density`): REST dark (a synthetic `closed`), SPARSE half the heads dark in turn on the
-played variant's cycle, BUSY an accent each bar on each head's first lit beat, SPARSE and
-BUSY joining the arrangement's units (they give way where an event would be worse than at
-BALANCED); a `closed` on a head that cannot go dark plays nothing there (traced) instead of
-failing the render. A plan whose sections are all BALANCED renders revision 19's frames."""
+reach is tried and plays where it costs no event. 20: a strobe or pulse whose first
+flash on a head comes more than a frame later than in the reference is worse, so a
+variation that delays it gives way. 21 (W10d): a section's density plays (`density`): REST
+dark (a synthetic `closed`), SPARSE half the heads dark in turn on the played variant's
+cycle, BUSY an accent each bar on each head's first lit beat, SPARSE and BUSY joining the
+arrangement's units (they give way where an event would be worse than at BALANCED); a
+`closed` on a head that cannot go dark plays nothing there (traced) instead of failing the
+render. A plan whose sections are all BALANCED renders revision 20's frames."""
 
 
 def render_fingerprint(

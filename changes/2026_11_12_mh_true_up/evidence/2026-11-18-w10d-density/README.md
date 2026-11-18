@@ -234,10 +234,11 @@ parents'.
   compiled, before its entry window, transitions, intensity and hits), which is why the
   owner-rig frames read lower.
 - **One trial for every unit.** Where a density unit is in the plan, the arrangement first
-  tries every unit on its first candidate at once (`ArrangementUnit.together`); where that
-  plays nothing worse one trial settles it, else the unit-by-unit build runs as before. A
-  plan without density builds unit by unit as on main: 80 random variation plans render
-  the same frames as c2198e26 (`varhash.py`, below).
+  tried every unit on its first candidate at once (`ArrangementUnit.together`, 2484b50d);
+  where that played nothing worse one trial settled it. A plan without density built unit
+  by unit as on main: 80 random variation plans rendered the same frames as c2198e26
+  (`varhash.py`, below). Superseded after merging cd13034a, whose optimistic first trial
+  does the same for every plan; `together` is removed (below).
 
 **Numbers after these fixes.**
 
@@ -257,6 +258,15 @@ strobe's or pulse's whole span, a colour's lit run): nothing is left to darken, 
 After the last edit (merge of c2198e26 and these fixes): full suite 7696 passed, 30
 skipped, 0 failed (20 min 31 s); `ruff check .` passed; `ruff format --check .` 1318
 files formatted; `mypy packages` no issues in 654 files.
+
+## After merging cd13034a
+
+Main's `_choose_arrangement` tries every unit as planned in one trial first (accepted whole
+where `worse` finds nothing worse; `_greedy_only` for tests), which replaces this branch's
+`ArrangementUnit.together`: removed. `worse` also flags a strobe or pulse whose first
+flash on a head comes later; SPARSE already keeps every head as BALANCED over a strobe's
+or pulse's whole span, so its first flash never moves, and BUSY's accents never darken a
+frame. `RENDERER_REVISION` 21 (main took 20); fingerprints re-recorded only.
 
 ## Not built, or not as asked
 

@@ -486,3 +486,230 @@ def test_a_variation_that_drops_later_flashes_gives_way(
     for head, span in spans.items():
         assert _flashes(final, head, *span) >= _flashes(reference, head, *span), head
     assert worse_than(reference, final) == []
+
+
+def _random_plan(rnd: random.Random) -> list[Any]:
+    sections, bar = [], 1
+    for index in range(4):
+        length = rnd.choice([2, 3])
+        family = rnd.choice(FAMILIES)
+        events = [
+            event(
+                rnd.randint(bar, bar + length - 1),
+                rnd.randint(1, 4),
+                rnd.choice(["hit", "hit", "color", "pulse", "strobe_slow"]),
+            )
+            for _ in range(rnd.choice([0, 1, 2]))
+        ]
+        for e in events:
+            if e["action"] == "color":
+                e["color"] = rnd.choice(["red", "blue", "white"])
+        sections.append(
+            m.plan_section(
+                f"s{index + 1}",
+                bar,
+                bar + length - 1,
+                family,
+                motif_id=rnd.choice([None, "m", "m"]),
+                variation=rnd.choice(["NONE", "NARROW", "WIDEN", "SLOWER", "FASTER", "FASTER"]),
+                events=list({(e["bar"], e["beat"], e["action"]): e for e in events}.values()),
+            )
+        )
+        bar += length
+    return sections
+
+
+def test_the_optimistic_trial_keeps_the_greedy_guarantees() -> None:
+    """Random plans, rendered with the optimistic all-planned trial and with pure greedy
+    (`_greedy_only`): the final render is never worse than the reference; a unit that
+    plays a variation under pure greedy still plays one; where the optimistic trial was
+    not accepted the result is pure greedy's; where it departs from it, every unit plays as
+    planned."""
+    beat_grid = m.pickup_grid(500.0, 12, pickup=0)
+    fg = slow(rig())
+    admission = gate(fg, beat_grid)
+    outcomes = {"differs": 0, "gave way": 0, "two renders": 0}
+    for seed in range(20):
+        sections = _random_plan(random.Random(seed))
+        repaired = repair_rig_intent(
+            ChoreographyPlan(sections=sections, overall_strategy=""), admission.offer, {}, beat_grid
+        )
+
+        def run(
+            greedy_only: bool,
+            choices: dict[str, str] | None = None,
+            plan: ChoreographyPlan = repaired,
+        ) -> RenderingPipeline:
+            pipeline = RenderingPipeline(
+                choreography_plan=plan,
+                beat_grid=beat_grid,
+                fixture_group=fg,
+                job_config=m.family_job(HEADS),
+                media_file="silence.wav",
+                admission=admission,
+            )
+            pipeline._greedy_only = greedy_only
+            if choices is not None:
+                pipeline._settled = True
+                pipeline._choices = choices
+            pipeline.render()
+            return pipeline
+
+        fast, greedy = run(False), run(True)
+        assert fast._choices is not None and greedy._choices is not None
+        reference = run(True, dict.fromkeys(greedy._choices, "reference"))
+        assert worse_than(reference, fast) == [], seed
+        for key, choice in greedy._choices.items():
+            if choice != "reference":
+                assert fast._choices[key] != "reference", (seed, key)
+        if fast._choices != greedy._choices:
+            # Only an accepted optimistic trial departs from pure greedy: every unit as
+            # planned, none given way.
+            outcomes["differs"] += 1
+            assert not fast._gave_way, seed
+            assert all(choice != "reference" for choice in fast._choices.values()), seed
+        else:
+            assert fast._gave_way == greedy._gave_way, seed
+        if fast._gave_way:
+            outcomes["gave way"] += 1
+        if fast.arrangement_renders <= 2:
+            outcomes["two renders"] += 1
+    assert outcomes["gave way"] and outcomes["two renders"], outcomes
+
+
+def _seed_12_plan() -> list[Any]:
+    """The review's plain170 seed 12 plan (synthetic): s5's SLOWER moves the cascade's
+    dark phase so its pulse's first lit beats come later on MH2 and MH3, with as many
+    flashes and lit frames over the span."""
+    return [
+        m.plan_section(
+            "s1",
+            1,
+            3,
+            "target_orbit",
+            motif_id="m1",
+            variation="NARROW",
+            color="blue",
+            moment_cues=["c0"],
+            events=[
+                event(3, 1, "color", color="white"),
+                event(2, 3, "hit", moment_cue_id="c0", cue_ms=2203),
+            ],
+        ),
+        m.plan_section(
+            "s2",
+            4,
+            5,
+            "fly_out_cascade",
+            motif_id="m1",
+            events=[event(4, 2, "hit"), event(4, 1, "hit")],
+        ),
+        m.plan_section(
+            "s3",
+            6,
+            8,
+            "mirror_wings",
+            variation="FASTER",
+            intensity="INTENSE",
+            moment_cues=["c2"],
+            events=[event(8, 1, "hit", moment_cue_id="c2", cue_ms=10144), event(8, 4, "pulse")],
+        ),
+        m.plan_section(
+            "s4",
+            9,
+            11,
+            "finite_snap_hold",
+            variation="FASTER",
+            events=[
+                event(10, 3, "gobo", gobo="stars"),
+                event(9, 3, "gobo", gobo="dots"),
+                event(10, 3, "strobe_fast"),
+            ],
+        ),
+        m.plan_section(
+            "s5", 12, 15, "fly_in_cascade", variation="SLOWER", events=[event(12, 4, "pulse")]
+        ),
+        m.plan_section(
+            "s6",
+            16,
+            19,
+            "fly_out_cascade",
+            motif_id="m1",
+            variation="NARROW",
+            intensity="INTENSE",
+            color="blue",
+            events=[
+                event(19, 3, "hit"),
+                event(18, 3, "color", color="blue"),
+                event(19, 2, "closed"),
+                event(19, 1, "open"),
+            ],
+        ),
+    ]
+
+
+def test_a_variation_that_delays_a_pulse_first_flash_gives_way() -> None:
+    """A strobe or pulse whose first flash on a head comes more than a frame later than in
+    the reference is worse (as a colour shown later): s5's SLOWER, which delays the
+    pulse's first flash on MH2 and MH3, does not play."""
+    from tests.unit.sequencer.moving_heads.test_events_render import Frames
+
+    beat_grid = m.pickup_grid(60_000 / 170, 24, pickup=0)
+    fg = rig()
+    admission = gate(fg, beat_grid)
+    sections = _seed_12_plan()
+    repaired = repair_rig_intent(
+        ChoreographyPlan(sections=sections, overall_strategy=""), admission.offer, {}, beat_grid
+    )
+
+    def forced(choices: dict[str, str] | None) -> RenderingPipeline:
+        pipeline = RenderingPipeline(
+            choreography_plan=repaired,
+            beat_grid=beat_grid,
+            fixture_group=fg,
+            job_config=m.family_job(HEADS),
+            media_file="silence.wav",
+            admission=admission,
+        )
+        if choices is not None:
+            pipeline._settled = True
+            pipeline._choices = choices
+        pipeline.render()
+        return pipeline
+
+    final = forced(None)
+    assert final._choices is not None
+    reference = forced(dict.fromkeys(final._choices, "reference"))
+    step = forced({**dict.fromkeys(final._choices, "reference"), "variation:s5": "step"})
+
+    def first_lit(pipeline: RenderingPipeline, head: str, span: tuple[int, int]) -> int | None:
+        dark = Frames(pipeline).dark(head)
+        return next((t for t in range(span[0], span[1], 20) if not dark[t // 20]), None)
+
+    assert reference.render_record is not None
+    (entry,) = (
+        e
+        for look in reference.render_record["section_looks"]
+        if look["section_id"] == "s5"
+        for e in look.get("events", [])
+        if e["action"] == "pulse"
+    )
+    spans = {head: (o["from_ms"], o["to_ms"]) for head, o in entry["heads"].items()}
+    later = [
+        head
+        for head, span in spans.items()
+        if (was := first_lit(reference, head, span)) is not None
+        and ((now := first_lit(step, head, span)) is None or now > was + 20)
+    ]
+    assert later
+    assert any(
+        f"first flash later on {head}" in said
+        for said in worse_than(reference, step)
+        for head in later
+    )
+    assert final.unit_choice("variation:s5") == "reference"
+    for head, span in spans.items():
+        was = first_lit(reference, head, span)
+        now = first_lit(final, head, span)
+        assert was is None or (now is not None and now <= was + 20), head
+    assert worse_than(reference, final) == []

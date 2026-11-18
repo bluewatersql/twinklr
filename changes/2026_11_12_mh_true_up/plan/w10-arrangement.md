@@ -156,9 +156,9 @@ here:
   around them); SPARSE keeps off the planned transitions' reach at its part's edges (from
   the plan as given, so the render without transitions agrees) and off a colour still lit
   from an earlier part; BUSY's accents are decided once on the plan without transitions
-  and dropped only inside a transition that plays on the head. Where a density unit is in
-  the plan, every unit's first candidate is tried at once first
-  (`ArrangementUnit.together`).
+  and dropped only inside a transition that plays on the head. Density units use main's
+  optimistic first trial (cd13034a: every unit as planned in one trial); the interim
+  `ArrangementUnit.together` was removed when it landed. Revision 21.
 - *Offer and contract.* `RigOffer.sparse_halves` (left out of dumps when None) and a
   per-template cycle note in the prompt; the `density` field's description and the
   planner and judge prompts now say what renders (re-keys the planner cache).

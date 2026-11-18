@@ -147,9 +147,17 @@ These lessons are promoted to `memories/` (see below).
    case today (`pipeline._dark_over_spans` raises). Decide how such a head is parked, and
    state it.
 5. **Render cost of the arrangement loop.** The owner's song renders in 6.5 s without
-   it and 16–28 s with it. On REALISTIC: 25.9 s with variation against 3.4 s without,
-   which is 7 arrangement renders (1 reference, 4 candidates, 2 retries), each with its
-   transition-free pass.
+   it and 16–28 s with it. Since `2a1272fa`, a plan where nothing gives way takes 2
+   arrangement renders: the reference, and one trial with every unit as planned. When
+   anything gives way the loop is plain greedy. On REALISTIC that is 7 renders, about
+   21 s against 2.8 s without variation, each render with its transition-free pass.
+   Sketch for a faster search, which would no longer match pure greedy:
+   - after a failed all-planned trial, bisect the units: accept the largest
+     plan-order prefix whose all-planned trial is not worse, then recurse on the rest;
+   - the existing retry pass re-checks every unit that gave way against the final set.
+
+   Both guarantees still hold: the final render is never worse than the reference, and
+   no harmless variation is given up.
 6. **SPARSE swaps cut hard:** the heads that alternate under SPARSE swap with a hard
    cut, not a fade (density branch).
 7. **OpenAI acceptance of the planner schema** is unverified: only Claude was probed

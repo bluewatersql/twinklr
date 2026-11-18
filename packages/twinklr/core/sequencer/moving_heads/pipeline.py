@@ -513,10 +513,6 @@ class ArrangementUnit:
     """Its place among units: (the plan section's index, the kind's own order)."""
     candidates: tuple[str, ...]
     """Tried in order after the reference; each a name the kind's render code reads."""
-    together: bool = False
-    """Where any unit has it, every unit's first candidate is tried at once first
-    (`RenderingPipeline._choose_arrangement`): units costing a render each (density) that
-    usually cost nothing settle in one trial."""
 
 
 ArrangementUnits = Callable[["RenderingPipeline"], list[ArrangementUnit]]
@@ -2026,7 +2022,6 @@ def _density_units(pipeline: RenderingPipeline) -> list[ArrangementUnit]:
             key=f"density:{section.section_id}",
             order=(index, 1),
             candidates=("planned",),
-            together=True,
         )
         for index, section in enumerate(pipeline.choreography_plan.sections)
         if section.density.value in (SPARSE, BUSY)
@@ -2053,9 +2048,9 @@ def worse(reference: RenderingPipeline, trial: RenderingPipeline) -> list[str]:
     - a hit farther from its lyric cue (else its planned frame), or with a lower peak level
       over its first four frames;
     - a colour or gobo change shown later, or for less time (lit, holding its state);
-    - a `closed` with more lit frames, a strobe or `pulse` with fewer flashes (lit runs)
-      or fewer lit frames, over the whole span the reference traced on the head (whether
-      or not it plays: a replaced one still asked for that);
+    - a `closed` with more lit frames, a strobe or `pulse` with fewer flashes (lit runs),
+      its first flash later or fewer lit frames, over the whole span the reference traced
+      on the head (whether or not it plays: a replaced one still asked for that);
     - a transition that plays on a head in the reference and not in the trial.
 
     Public: the render's arrangement units are judged by it (`ArrangementUnit`)."""
@@ -2142,15 +2137,22 @@ def worse(reference: RenderingPipeline, trial: RenderingPipeline) -> list[str]:
                 # The whole span the reference traced on this head (else 25 frames from
                 # its frame): a `closed` by its dark frames, a strobe or pulse by its
                 # flashes (lit runs: a strobe turned solid has more lit frames, not more
-                # flashes) and its lit frames.
+                # flashes), its first flash (later, as a colour shown later) and its lit
+                # frames.
                 start = outcome.get("from_ms", entry.get("frame_ms") or 0)
                 end = outcome.get("to_ms", start + 25 * FRAME)
-                lit_was, flashes_was = of(reference, fixture_id).lit_runs(start, end)
-                lit_now, flashes_now = of(trial, fixture_id).lit_runs(start, end)
+                lit_was, flashes_was, first_was = of(reference, fixture_id).lit_runs(start, end)
+                lit_now, flashes_now, first_now = of(trial, fixture_id).lit_runs(start, end)
                 if action == "closed" and lit_now > lit_was + 1:
                     said.append(f"{what} (lit inside on {fixture_id})")
                 elif action != "closed" and flashes_now < flashes_was:
                     said.append(f"{what} (fewer flashes on {fixture_id})")
+                elif (
+                    action != "closed"
+                    and first_was is not None
+                    and (first_now is None or first_now > first_was + FRAME)
+                ):
+                    said.append(f"{what} (first flash later on {fixture_id})")
                 elif action != "closed" and lit_now < lit_was - 1:
                     said.append(f"{what} (fewer lit frames on {fixture_id})")
     current_transitions = transitions(trial)
@@ -2202,11 +2204,13 @@ class _Frames:
             t += FRAME
         return t - start
 
-    def lit_runs(self, start: int, end: int) -> tuple[int, int]:
-        """Lit frames and lit runs (flashes) in `[start, end)`."""
-        lit = [self.frames.lit.get(t, False) for t in range(start, end, FRAME)]
+    def lit_runs(self, start: int, end: int) -> tuple[int, int, int | None]:
+        """Lit frames, lit runs (flashes) and the first lit frame in `[start, end)`."""
+        times = range(start, end, FRAME)
+        lit = [self.frames.lit.get(t, False) for t in times]
         runs = sum(1 for i, on in enumerate(lit) if on and (i == 0 or not lit[i - 1]))
-        return sum(lit), runs
+        first = next((t for t, on in zip(times, lit, strict=True) if on), None)
+        return sum(lit), runs, first
 
 
 TWIN_POSE_DEG = 3.0
@@ -3430,6 +3434,8 @@ class RenderingPipeline:
         self._time_markers: list[TimeMarker] = []
         self.arrangement_renders = 0
         """How many whole-song renders choosing the arrangement took (0 without units)."""
+        self._greedy_only = False
+        """Tests: skip the optimistic all-planned trial (`_choose_arrangement`)."""
         self.transition_free: RenderingPipeline | None = None
         """Set by a `render()` whose plan has transitions: the same plan rendered without
         them, which the played rule and the hits a transition may not lose are read
@@ -5192,25 +5198,39 @@ class RenderingPipeline:
     def _choose_arrangement(self) -> None:
         """**The song outranks the arrangement.** Every arrangement unit (`ArrangementUnit`,
         `register_arrangement_units`: a section's variation step, and the units density
-        and modifiers register) is built up greedily from the reference, the song with
-        every unit at "reference" (every part on its source variant): unit by unit in plan
-        order, each candidate in turn renders the whole song with the units accepted so
-        far plus it, and the first under which no event anywhere is worse than in the
-        reference (`worse`) is accepted; a unit with none stays at "reference" and gives
-        way, traced with the first worse event; once every unit is decided, each unit that
-        gave way is tried again with the later acceptances in place, until none changes
-        (each acceptance shrinks the set, so this ends). The final render is the last
-        accepted trial, reused (`_reuse`). So the render is never worse than the reference,
-        and no unit gives way that its candidates would play at no cost with every other
-        unit as finally chosen; where two units cannot both play, the earlier in plan
-        order keeps its choice (the tie-break). A candidate that resolves to the same
-        arrangement as the accepted one (a step the rig cannot play) needs no render; an
-        arrangement already rendered is not rendered again. Cost: 1 reference render, then
-        (where a unit asks, `ArrangementUnit.together`) 1 for every unit on its first
-        candidate at once, which settles the arrangement where it plays nothing worse; else
-        1 per distinct candidate
-        tried (each with its transition-free pass where the plan has transitions), and one
-        per candidate retried for a unit that gave way; none for a plan without units."""
+        and modifiers register) is chosen against the reference, the song with every unit
+        at "reference" (every part on its source variant), judged by `worse`.
+
+        **Optimistic first.** After the reference, one trial plays every unit as planned:
+        unit by unit in plan order, its first candidate that plays differently from the
+        units before it (as the greedy loop below would try first, assuming each earlier
+        unit accepted). If no event anywhere is worse than in the reference, that is the
+        arrangement: 2 renders, the common case.
+
+        **Else greedy, in plan order:** each candidate in turn renders the whole song with
+        the units accepted so far plus it, and the first under which no event is worse is
+        accepted; a unit with none stays at "reference" and gives way, traced with the
+        first worse event; once every unit is decided, each unit that gave way is tried
+        again with the later acceptances in place, until none changes (each acceptance
+        shrinks the set, so this ends). Where two units cannot both play, the earlier in
+        plan order keeps its choice (the tie-break).
+
+        **Equivalence.** Where the greedy loop runs, its result is the pure greedy result
+        (the optimistic trial only adds one cached render). Where the optimistic trial is
+        accepted, the result can differ from pure greedy: "every unit planned is not
+        worse" does not imply that every greedy prefix is not worse (a later unit can
+        mask an earlier unit's damage, so greedy may give the earlier one up). Both
+        guarantees hold either way: the final render is never worse than the reference,
+        and no unit that pure greedy plays as planned is given up (an accepted optimistic
+        trial plays every unit as planned).
+
+        The final render is the last accepted trial, reused (`_reuse`). A candidate that
+        resolves to the same arrangement as the accepted one (a step the rig cannot play)
+        needs no render; an arrangement already rendered is not rendered again. Cost: 1
+        reference render plus 1 optimistic trial (none where it plays as the reference);
+        where that trial is worse, 1 per distinct candidate the greedy loop tries (each
+        with its transition-free pass where the plan has transitions) and one per
+        candidate retried for a unit that gave way; none for a plan without units."""
         self._settled = True
         units = sorted((unit for kind in _UNIT_KINDS for unit in kind(self)), key=lambda u: u.order)
         if not units:
@@ -5236,27 +5256,31 @@ class RenderingPipeline:
         reference = trial(accepted, gave_way)
         last = reference
 
-        def unchanged(choices: dict[str, str]) -> bool:
+        def signature(choices: dict[str, str]) -> tuple[Any, ...]:
             probe = copy.copy(self)
             probe._choices = choices
             probe._arrangement_cache = None
-            return probe._signature() == last._signature()
+            return probe._signature()
 
-        # Where a unit asks for it (`ArrangementUnit.together`), every unit on its first
-        # candidate at once first: where that plays nothing worse (most plans) one trial
-        # settles the arrangement, as the unit-by-unit build and its retries mostly would
-        # (each unit on its first candidate). Taken only where each first candidate
-        # changes the arrangement on its own, so no later candidate (a FASTER step's
-        # narrower reach) is passed over. A plan whose units do not ask builds unit by unit.
-        together = {unit.key: unit.candidates[0] for unit in units}
-        if (
-            len(units) > 1
-            and any(unit.together for unit in units)
-            and not any(unchanged({**accepted, unit.key: unit.candidates[0]}) for unit in units)
-        ):
-            tried = trial(together, gave_way)
-            if not worse(reference, tried):
-                accepted, last, units = together, tried, []
+        def unchanged(choices: dict[str, str]) -> bool:
+            return signature(choices) == last._signature()
+
+        if not self._greedy_only:
+            planned = dict(accepted)
+            for unit in units:
+                before = signature(planned)
+                pick = next(
+                    (c for c in unit.candidates if signature({**planned, unit.key: c}) != before),
+                    unit.candidates[0] if unit.candidates else "reference",
+                )
+                planned = {**planned, unit.key: pick}
+            optimistic = trial(planned, gave_way)
+            if not worse(reference, optimistic):
+                self._choices = planned
+                self._gave_way = {}
+                self._arrangement_cache = None
+                self._reuse = optimistic
+                return
 
         for unit in units:
             first_worse: str | None = None
