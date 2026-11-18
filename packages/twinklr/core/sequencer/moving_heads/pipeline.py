@@ -1992,9 +1992,9 @@ def worse(reference: RenderingPipeline, trial: RenderingPipeline) -> list[str]:
     - a hit farther from its lyric cue (else its planned frame), or with a lower peak level
       over its first four frames;
     - a colour or gobo change shown later, or for less time (lit, holding its state);
-    - a `closed` with more lit frames, a strobe or `pulse` with fewer flashes (lit runs)
-      or fewer lit frames, over the whole span the reference traced on the head (whether
-      or not it plays: a replaced one still asked for that);
+    - a `closed` with more lit frames, a strobe or `pulse` with fewer flashes (lit runs),
+      its first flash later or fewer lit frames, over the whole span the reference traced
+      on the head (whether or not it plays: a replaced one still asked for that);
     - a transition that plays on a head in the reference and not in the trial.
 
     Public: the render's arrangement units are judged by it (`ArrangementUnit`)."""
@@ -2081,15 +2081,22 @@ def worse(reference: RenderingPipeline, trial: RenderingPipeline) -> list[str]:
                 # The whole span the reference traced on this head (else 25 frames from
                 # its frame): a `closed` by its dark frames, a strobe or pulse by its
                 # flashes (lit runs: a strobe turned solid has more lit frames, not more
-                # flashes) and its lit frames.
+                # flashes), its first flash (later, as a colour shown later) and its lit
+                # frames.
                 start = outcome.get("from_ms", entry.get("frame_ms") or 0)
                 end = outcome.get("to_ms", start + 25 * FRAME)
-                lit_was, flashes_was = of(reference, fixture_id).lit_runs(start, end)
-                lit_now, flashes_now = of(trial, fixture_id).lit_runs(start, end)
+                lit_was, flashes_was, first_was = of(reference, fixture_id).lit_runs(start, end)
+                lit_now, flashes_now, first_now = of(trial, fixture_id).lit_runs(start, end)
                 if action == "closed" and lit_now > lit_was + 1:
                     said.append(f"{what} (lit inside on {fixture_id})")
                 elif action != "closed" and flashes_now < flashes_was:
                     said.append(f"{what} (fewer flashes on {fixture_id})")
+                elif (
+                    action != "closed"
+                    and first_was is not None
+                    and (first_now is None or first_now > first_was + FRAME)
+                ):
+                    said.append(f"{what} (first flash later on {fixture_id})")
                 elif action != "closed" and lit_now < lit_was - 1:
                     said.append(f"{what} (fewer lit frames on {fixture_id})")
     current_transitions = transitions(trial)
@@ -2141,11 +2148,13 @@ class _Frames:
             t += FRAME
         return t - start
 
-    def lit_runs(self, start: int, end: int) -> tuple[int, int]:
-        """Lit frames and lit runs (flashes) in `[start, end)`."""
-        lit = [self.frames.lit.get(t, False) for t in range(start, end, FRAME)]
+    def lit_runs(self, start: int, end: int) -> tuple[int, int, int | None]:
+        """Lit frames, lit runs (flashes) and the first lit frame in `[start, end)`."""
+        times = range(start, end, FRAME)
+        lit = [self.frames.lit.get(t, False) for t in times]
         runs = sum(1 for i, on in enumerate(lit) if on and (i == 0 or not lit[i - 1]))
-        return sum(lit), runs
+        first = next((t for t, on in zip(times, lit, strict=True) if on), None)
+        return sum(lit), runs, first
 
 
 TWIN_POSE_DEG = 3.0
