@@ -62,6 +62,7 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
 from twinklr.core.sequencer.moving_heads.compile.preset import apply_preset
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import frame_times
 from twinklr.core.sequencer.moving_heads.pipeline import (
+    VARIATION_PRESETS,
     RenderingPipeline,
     TemplateAdmission,
     admit_templates,
@@ -85,7 +86,9 @@ _STRICT = {"reposition_fallback": "error", "on_unplayable": "error"}
 def test_catalog_holds_the_families_each_explicit_and_degradable() -> None:
     """Each family (the six of P2.4c and the P2.5 zoom pilot) lints, sets on every step
     both start angles (no rig position preset is required), authors its
-    dimmer, declares `drop_accent` and declares reach and rate variants as presets."""
+    dimmer, declares `drop_accent` and declares the reach and rate variants as presets:
+    the ladder's `narrow` and `slow` first, then the variation variants (`wide`, `fast`
+    and the four reach+rate combinations)."""
     paths = sorted(TEMPLATE_CATALOG_DIR.glob("*.json"))
     assert tuple(path.stem for path in paths) == CATALOG_IDS
     for path in paths:
@@ -99,7 +102,50 @@ def test_catalog_holds_the_families_each_explicit_and_degradable() -> None:
             assert step.component_refs is None, path.name
             assert step.dimmer is not None or step.visibility is not None
             assert step.reposition_fallback == "drop_accent", path.name
-        assert {preset.preset_id for preset in document.presets} == {"narrow", "slow"}
+        assert [preset.preset_id for preset in document.presets] == [
+            "narrow",
+            "slow",
+            "wide",
+            "fast",
+            "narrow+slow",
+            "narrow+fast",
+            "wide+slow",
+            "wide+fast",
+        ]
+        assert {p.preset_id for p in document.presets} - {"narrow", "slow"} == VARIATION_PRESETS
+
+
+def test_each_variation_variant_is_its_reach_and_rate_patches() -> None:
+    """`wide` widens every extent `narrow` narrows by half again, `fast` halves every period
+    `slow` doubles, and each combination is exactly its reach patch then its rate patch."""
+    for path in sorted(TEMPLATE_CATALOG_DIR.glob("*.json")):
+        document = load_template_document(path)
+        steps = {step.step_id: step for step in document.template.steps}
+        patches = {
+            preset.preset_id: {
+                step_id: patch.model_dump(exclude_none=True)
+                for step_id, patch in preset.step_patches.items()
+            }
+            for preset in document.presets
+        }
+        for step_id, reach_patch in patches["narrow"].items():
+            base = steps[step_id].movement.model_dump()
+            assert patches["wide"][step_id]["movement"] == {
+                key: round(base[key] * 1.5, 1) for key in reach_patch["movement"]
+            }, path.name
+        for step_id, rate_patch in patches["slow"].items():
+            base = steps[step_id].movement.model_dump()
+            assert patches["fast"][step_id]["movement"] == {
+                key: base[key] / 2 for key in rate_patch["movement"]
+            }, path.name
+        for reach in ("narrow", "wide"):
+            for rate in ("slow", "fast"):
+                merged: dict[str, dict[str, dict[str, float]]] = {}
+                for source in (patches[reach], patches[rate]):
+                    for step_id, step_patch in source.items():
+                        for group, fields in step_patch.items():
+                            merged.setdefault(step_id, {}).setdefault(group, {}).update(fields)
+                assert patches[f"{reach}+{rate}"] == merged, (path.name, reach, rate)
 
 
 def test_a_family_preset_keeps_the_flick_overlay() -> None:
@@ -283,7 +329,9 @@ def _meter_grid(beats_per_bar: int, beat_ms: float, bars: int) -> BeatGrid:
 
 
 _BOTH = ("narrow", "slow")
-"""Every family's presets, in the order each declares them."""
+"""Every family's ladder presets, in the order each declares them."""
+_ALL = (*_BOTH, "wide", "fast", "narrow+slow", "narrow+fast", "wide+slow", "wide+fast")
+"""Every family's presets: the ladder's, then the variation variants."""
 
 
 @pytest.mark.parametrize("beats_per_bar", [2, 3, 6])
@@ -305,7 +353,7 @@ def test_in_other_meters_every_family_is_offered_with_both_variants(
 
     assert admission.admitted == template_ids
     assert admission.exclusions == () and admission.preset_exclusions == ()
-    assert admission.admitted_presets == dict.fromkeys(template_ids, _BOTH)
+    assert admission.admitted_presets == dict.fromkeys(template_ids, _ALL)
     assert admission.effective_preset == dict.fromkeys(template_ids)
     assert admission.entry_dips.keys() == set(template_ids)
 
@@ -1001,3 +1049,125 @@ def test_a_minimal_rig_is_admitted_and_delivered_byte_identical_to_the_explicit_
     assert profile is not None and "axes.pan.unit" in profile.defaulted
     for record in minimal.render_record["fixtures"]:
         assert record["defaulted"] == list(profile.defaulted)
+
+
+# --- Variation variants (song-intent W10a) ---------------------------------------------
+
+
+def _slow_heads(speed: float) -> FixtureGroup:
+    """`family_rig` whose pan and tilt travel at `speed` degrees a second."""
+    payload = family_rig(HEADS).model_dump(mode="json")
+    for fixture in payload["fixtures"]:
+        for axis in ("pan", "tilt"):
+            fixture["config"]["physical_profile"]["axes"][axis]["travel_speed_per_s"] = speed
+    return FixtureGroup.model_validate(payload)
+
+
+def test_every_combined_variant_is_dry_compiled_never_inferred() -> None:
+    """At 240 BPM on 720-degree heads the cascades' `fast` passes (up to about 306 BPM) and
+    so does `wide` (about 407), but `wide+fast` does not (about 204): speeds multiply, so the
+    gate compiles each combination and refuses it alone, with its reason."""
+    with family_catalog():
+        admission = _gate(
+            FAMILY_IDS, bars_grid(*([250.0] * 16)), family_rig(HEADS), family_job(HEADS)
+        )
+
+    for cascade in ("fly_in_cascade", "fly_out_cascade"):
+        presets = admission.admitted_presets[cascade]
+        assert "fast" in presets and "wide" in presets and "wide+fast" not in presets
+        (refused,) = [
+            e
+            for e in admission.preset_exclusions
+            if e["template_id"] == cascade and e["preset_id"] == "wide+fast"
+        ]
+        assert refused["reason"]
+        assert "wide+fast" not in admission.offer.templates[cascade].variants
+
+
+def test_variation_variants_never_decide_admission_or_the_effective_variant() -> None:
+    """On 300-degree heads at 170 BPM the cascades' `fast` and `wide` fail while
+    `narrow+fast` passes: the families are admitted and play their effective variant by
+    the ladder (base, `narrow`, `slow`) exactly as before the variation variants existed;
+    the variation variants that pass are offered, those that fail are recorded."""
+    with family_catalog():
+        admission = _gate(
+            FAMILY_IDS, bars_grid(*([60_000 / 170] * 16)), _slow_heads(300.0), family_job(HEADS)
+        )
+
+    assert set(admission.effective_preset.values()) <= {None, "narrow", "slow"}
+    cascade = admission.offer.templates["fly_in_cascade"]
+    assert "fast" not in cascade.variants and "wide" not in cascade.variants
+    assert "narrow+fast" in cascade.variants
+    refused = {
+        (e["template_id"], e["preset_id"])
+        for e in admission.preset_exclusions
+        if e["preset_id"] in VARIATION_PRESETS
+    }
+    assert ("fly_in_cascade", "fast") in refused and ("fly_in_cascade", "wide") in refused
+
+
+def test_a_variation_variant_moves_wider_or_faster_than_the_base() -> None:
+    """Each family's `wide` reaches further on the axes `narrow` narrows and `fast` turns
+    over more often on the steps `slow` slows, read from the compiled pan and tilt."""
+    from twinklr.core.sequencer.models.context import TemplateCompileContext
+    from twinklr.core.sequencer.models.enum import ChannelName
+    from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
+    from twinklr.core.sequencer.models.moving_heads.topology import rig_topology
+    from twinklr.core.sequencer.moving_heads.compile.template_compiler import compile_template
+    from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
+    from twinklr.core.sequencer.moving_heads.templates import get_template
+    from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map, cue_limits
+
+    rig = zoom_rig(HEADS)
+    grid = bars_grid(*([500.0] * 4))
+    phase_map = build_musical_phase_map(grid)
+    fixtures = build_fixture_contexts(rig_profile_from_fixture_group(rig), rig)
+
+    def motion(template_id: str, preset_id: str | None) -> tuple[float, int]:
+        """The widest pan or tilt swing on MH1 and how often its direction turns."""
+        document = get_template(template_id)
+        preset = next((p for p in document.presets if p.preset_id == preset_id), None)
+        context = TemplateCompileContext(
+            section_id="s",
+            template_id=template_id,
+            preset_id=preset_id,
+            fixtures=fixtures,
+            beat_grid=grid,
+            start_bar=1,
+            duration_bars=4,
+            presets=rig.presets,
+            topology=rig_topology(rig),
+            fixture_group_id=rig.group_id,
+        )
+        start_limit, end_limit = cue_limits(phase_map, int(grid.duration_ms))
+        cues = compile_template(
+            document.template,
+            context,
+            preset,
+            phase_map=phase_map,
+            start_limit_ms=start_limit,
+            end_limit_ms=end_limit,
+        )
+        values: dict[ChannelName, list[float]] = {ChannelName.PAN: [], ChannelName.TILT: []}
+        for cue in sorted(cues.segments, key=lambda c: c.t0_ms):
+            if cue.fixture_id != "MH1":
+                continue
+            for channel, series in values.items():
+                held = cue.channels.get(channel)
+                points = getattr(getattr(held, "physical", None), "points", ())
+                series += [point.value for point in points]
+        swing = max(max(s) - min(s) for s in values.values() if s)
+        turns = 0
+        for series in values.values():
+            steps = [b - a for a, b in pairwise(series) if b != a]
+            turns += sum(1 for a, b in pairwise(steps) if a * b < 0)
+        return swing, turns
+
+    with family_catalog():
+        for template_id in CATALOG_IDS:
+            base_swing, base_turns = motion(template_id, None)
+            wide_swing, _ = motion(template_id, "wide")
+            _, fast_turns = motion(template_id, "fast")
+            assert wide_swing > base_swing, template_id
+            if template_id != "finite_snap_hold":  # one move, then a hold: no turns
+                assert fast_turns > base_turns, template_id

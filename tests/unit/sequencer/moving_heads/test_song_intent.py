@@ -643,3 +643,23 @@ def test_the_prompt_says_how_long_each_transition_length_is_and_how_fast_the_aim
     assert (lengths["BEAT"], lengths["HALF_BAR"], lengths["BAR"]) == (500, 750, 1500)
     assert lengths["EIGHT_BARS"] == 12000
     assert shown["full_travel_ms"] == {"pan": 750, "tilt": 375}
+
+
+def test_a_variation_variant_excludes_its_own_states_only_where_it_plays() -> None:
+    """A variation variant whose overlay masks hold fewer states than its template's ladder
+    removes them only from the offer a section playing that variant reads."""
+    offer = m.tagged_offer(("MH1", "MH2")).model_copy(
+        update={
+            "templates": {
+                "masked_wheel_flick": TemplateOffer(
+                    variants={},
+                    excluded={"MH1": {"color": ("blue",)}},
+                    variant_excluded={"fast": {"MH2": {"color": ("blue",)}}},
+                )
+            }
+        }
+    )
+
+    assert set(offer.for_templates({"masked_wheel_flick"}).color("blue").heads) == {"MH2"}
+    assert set(offer.for_templates({"masked_wheel_flick"}, "slow").color("blue").heads) == {"MH2"}
+    assert not offer.for_templates({"masked_wheel_flick"}, "fast").color("blue").heads

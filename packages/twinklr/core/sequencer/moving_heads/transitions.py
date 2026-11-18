@@ -484,7 +484,7 @@ def window_for(
             "the beat grid does not reach its length before the boundary; it starts at the "
             "grid's first beat it reaches"
         )
-        start = max(earliest_ms, quantize_cue(round(phase_map.covered_start_ms)).actual_ms)
+        start = max(earliest_ms, math.ceil(phase_map.covered_start_ms / FRAME) * FRAME)
     elif start < earliest_ms:
         notes.append("it starts no earlier than the part it leaves")
         start = earliest_ms
@@ -493,7 +493,8 @@ def window_for(
             "the beat grid does not reach its length after the boundary; it ends at the "
             "grid's last beat"
         )
-        end = min(latest_ms, quantize_cue(round(phase_map.covered_end_ms)).actual_ms)
+        # The covered grid's last frame, as `cue_limits` takes it: no cue plays past it.
+        end = min(latest_ms, math.floor(phase_map.covered_end_ms / FRAME) * FRAME)
     elif end > latest_ms:
         notes.append("it ends no later than the part it enters")
         end = latest_ms

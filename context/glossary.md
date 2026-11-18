@@ -37,7 +37,8 @@ updated: 2026-11-17
   templates; they never invent them. (Not to be confused with the root `templates/`
   directory of documentation starters, or the display's recipe templates.)
 - **Preset** — a named variant of a template that patches some of its steps (the
-  catalog's are `narrow` and `slow`).
+  catalog's ladder variants are `narrow` and `slow`; its variation variants `wide`,
+  `fast` and their reach+rate combinations are offered but never a fallback).
 - **Gate** (`render_preflight`) — the pre-planning check that dry-compiles every offered
   template and preset on the rig over the song and admits each family through its first
   passing variant, its **effective variant**.

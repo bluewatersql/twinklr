@@ -1205,15 +1205,25 @@ def _swap_wheels(
     return cue.model_copy(update={"channels": channels})
 
 
+VARIATION_PRESETS = frozenset(
+    {"wide", "fast", "narrow+slow", "narrow+fast", "wide+slow", "wide+fast"}
+)
+"""The catalog's variation variants beyond `narrow` and `slow` (song-intent W10a): reach
+`narrow|wide` by rate `slow|fast` and their combinations. Each is dry-compiled and offered
+when it passes, but none is ever a template's effective variant: they ask for more reach
+or rate, or would admit a template its ladder (base, `narrow`, `slow`) refuses."""
+
+
 @dataclass(frozen=True)
 class TemplateAdmission:
     """What the pre-planning gate offers the planner (`admit_templates`).
 
     A template's rungs are its base (no preset), then each preset it declares, in that
-    order; a template is admitted when any rung passes. `admitted` keeps the order the
+    order. Its ladder is those rungs without the variation variants (`VARIATION_PRESETS`);
+    a template is admitted when a ladder rung passes. `admitted` keeps the order the
     templates were given in. `effective_preset` holds each admitted template's first
-    passing rung, its effective variant on this rig and song (None for the base): what a
-    section naming no preset, or a preset that is not admitted, renders.
+    passing ladder rung, its effective variant on this rig and song (None for the base):
+    what a section naming no preset, or a preset that is not admitted, renders.
     `admitted_presets` holds each admitted template's admitted presets in the order it
     declares them. `exclusions` holds one `{"template_id", "reason"}` per catalog
     template no rung of which passes, and `preset_exclusions` one
@@ -1309,9 +1319,13 @@ def admit_templates(
     fixture and the unknown profile terms. Each admitted template's worst-case dip is
     reported (`TemplateAdmission.entry_dips`, and logged).
 
-    A template is admitted through the first of its rungs that passes, the base (no
-    preset) and then each preset in the order it declares them: that rung is its
-    effective variant, and each failing rung is recorded with its reason. That applies
+    A template is admitted through the first of its ladder's rungs that passes, the base
+    (no preset) and then each preset in the order it declares them, leaving out the
+    variation variants (`VARIATION_PRESETS`): that rung is its effective variant, and each
+    failing rung, a variation variant's included, is recorded with its reason. Every
+    passing rung is offered with its dark phases; the entry dips and `dark_entries` are
+    measured over all of them, the overlay exclusions over the ladder, a variation
+    variant's own beyond them recorded for it (`TemplateOffer.variant_excluded`). That applies
     to a template in `excludable` (the shipped family catalog), which is left out of
     the offer with the reasons when no rung passes, instead of refusing the run. Any
     other template that fails on any rung refuses the run, so its effective variant is
@@ -1488,7 +1502,11 @@ def admit_templates(
     excluded = {
         template_id: _overlay_exclusions(
             get_template(template_id),
-            {c: compiles for c, compiles in whole_compiles.items() if c[0] == template_id},
+            {
+                c: compiles
+                for c, compiles in whole_compiles.items()
+                if c[0] == template_id and c[1] not in VARIATION_PRESETS
+            },
             heads,
             profiles=profiles,
             initial_states=initial_states,
@@ -1501,6 +1519,41 @@ def admit_templates(
         for template_id in template_ids
         if any(c[0] == template_id and c not in failures for c in whole_compiles)
     }
+    # A variation variant's own overlay exclusions, beyond its template's ladder's.
+    variant_excluded: dict[str, dict[str, dict[str, dict[str, tuple[str, ...]]]]] = {}
+    for (template_id, preset_id), compiles in whole_compiles.items():
+        if preset_id not in VARIATION_PRESETS or (template_id, preset_id) in failures:
+            continue
+        own = _overlay_exclusions(
+            get_template(template_id),
+            {(template_id, preset_id): compiles},
+            heads,
+            profiles=profiles,
+            initial_states=initial_states,
+            phase_map=phase_map,
+            failure_mode=failure_mode,
+            sequence_end_ms=sequence_end_ms,
+            start_limit_ms=start_limit,
+            end_limit_ms=end_limit,
+        )
+        ladder_excluded = excluded.get(template_id, {})
+        beyond = {
+            fixture_id: {
+                wheel: extra
+                for wheel, states in wheels.items()
+                if (
+                    extra := tuple(
+                        s
+                        for s in states
+                        if s not in ladder_excluded.get(fixture_id, {}).get(wheel, ())
+                    )
+                )
+            }
+            for fixture_id, wheels in own.items()
+        }
+        beyond = {fixture_id: wheels for fixture_id, wheels in beyond.items() if wheels}
+        if beyond:
+            variant_excluded.setdefault(template_id, {})[preset_id] = beyond
     offered = {
         template_id: {
             head.fixture_id: {
@@ -1534,16 +1587,20 @@ def admit_templates(
         for combination, reason in (certain or unbounded).items():
             failures.setdefault(combination, []).append(reason)
             del rungs[combination]
-    # Each template's rungs, base first, then its presets in declared order.
+    # Each template's rungs, base first, then its presets in declared order; its ladder
+    # leaves out the variation variants, which never decide admission or the effective
+    # variant.
     passing = {
         t: [p for p in (None, *presets_of[t]) if (t, p) not in failures] for t in template_ids
     }
+    ladder = {t: [p for p in passing[t] if p not in VARIATION_PRESETS] for t in template_ids}
 
-    def reasons(template_id: str) -> list[str]:
-        """Every failure of the template's rungs, base first."""
+    def reasons(template_id: str, *, rungs: Collection[str | None] | None = None) -> list[str]:
+        """Every failure of the template's rungs (or of `rungs`), base first."""
         return [
             reason
             for preset_id in (None, *presets_of[template_id])
+            if rungs is None or preset_id in rungs
             for reason in failures.get((template_id, preset_id), ())
         ]
 
@@ -1554,16 +1611,23 @@ def admit_templates(
             "cannot render: " + "; ".join(refused)
         )
     exclusions = tuple(
-        {"template_id": t, "reason": "; ".join(reasons(t))} for t in template_ids if not passing[t]
+        {
+            "template_id": t,
+            "reason": "; ".join(
+                reasons(t, rungs=[p for p in (None, *presets_of[t]) if p not in VARIATION_PRESETS])
+            ),
+        }
+        for t in template_ids
+        if not ladder[t]
     )
-    admitted = tuple(t for t in template_ids if passing[t])
+    admitted = tuple(t for t in template_ids if ladder[t])
     if not admitted:
         raise UnsupportedRenderModeError(
             "the moving-head renderer has no template this rig can render, so no "
             "template remains to offer the planner: "
             + ("; ".join(exclusion["reason"] for exclusion in exclusions) or "none is loaded")
         )
-    effective_preset = {t: passing[t][0] for t in admitted}
+    effective_preset = {t: ladder[t][0] for t in admitted}
     offer = rig_offer(
         fixture_group,
         beat_grid,
@@ -1576,6 +1640,7 @@ def admit_templates(
                     for p in passing[t]
                 },
                 excluded=excluded.get(t, {}),
+                variant_excluded=variant_excluded.get(t, {}),
             )
             for t in admitted
         },
@@ -3020,7 +3085,10 @@ class RenderingPipeline:
                 heads
                 if self.admission is None
                 else list(
-                    self.admission.offer.for_templates({template_doc.template.template_id}).heads
+                    self.admission.offer.for_templates(
+                        {template_doc.template.template_id},
+                        None if preset is None else preset.preset_id,
+                    ).heads
                 )
             )
             palette = section_palette_for(self.palettes, section.section_id)

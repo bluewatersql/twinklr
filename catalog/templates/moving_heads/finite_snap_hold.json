@@ -80,6 +80,70 @@
           }
         }
       }
+    },
+    {
+      "preset_id": "wide",
+      "step_patches": {
+        "snap": {
+          "movement": {
+            "tilt_extent_deg": 67.5
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "fast",
+      "step_patches": {
+        "snap": {
+          "movement": {
+            "period_beats": 0.5
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+slow",
+      "step_patches": {
+        "snap": {
+          "movement": {
+            "tilt_extent_deg": 25.0,
+            "period_beats": 2.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+fast",
+      "step_patches": {
+        "snap": {
+          "movement": {
+            "tilt_extent_deg": 25.0,
+            "period_beats": 0.5
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+slow",
+      "step_patches": {
+        "snap": {
+          "movement": {
+            "tilt_extent_deg": 67.5,
+            "period_beats": 2.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+fast",
+      "step_patches": {
+        "snap": {
+          "movement": {
+            "tilt_extent_deg": 67.5,
+            "period_beats": 0.5
+          }
+        }
+      }
     }
   ]
 }

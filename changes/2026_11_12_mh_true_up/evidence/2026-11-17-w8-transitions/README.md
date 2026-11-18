@@ -959,3 +959,31 @@ window and the lost-hit trace do not exist) and 8 agreement cases (the caveat on
 `/private/tmp/claude-501/-Users-ondeck-work-github-twinklr/9cfb5b66-fff4-47db-adcb-766b50dc61e9/scratchpad/w8fix3/`
 (`matrix_fix.py`, `matrix_fix.jsonl`, `compare_frames.txt`, `rvr_final.txt`,
 `minpass*.py`, `realexit.py`, `base_fd85/`).
+
+## Follow-ups after the confirmation review of `1eca8998` (LOW, 2026-11-18)
+
+- **LOW-1 (`transitions.window_for`).** Where the detected beats do not reach a window's
+  length, its start and end now stop on the covered grid's first and last whole frame
+  (ceil and floor, as `cue_limits` takes them), never rounded past them: the review's
+  `windows_edge.py` case (129 BPM, one pickup beat, ENTRY crossfade EIGHT_BARS on a
+  section past the grid's end) traced its ENTRY window to 15380 ms, past the section's
+  EXIT boundary (15360); now 15360. Over all 336 cases of `windows_edge.py`: frames
+  identical to `1eca8998`, no ENTRY window past its section's EXIT boundary.
+- **LOW-2 (`rig_repair._darkness_bound_ms`).** The bound is now `RigOffer.dark_change_ms`:
+  the render's own `worst_case_entry_ms` over every head's whole pan, tilt **and zoom**
+  range and every wheel state (its terms include going dark, the axis latency and settle
+  and the residual), so it covers every transition's darkness need by construction. The
+  review's `repair_vs_render.py`: warned 520 of 1,080 (376 with the old bound), every one
+  of the 54 head skips warned, none on a dark mode, 0 disagreements. Test
+  `test_the_offer_bounds_a_dark_change_over_every_axis_the_heads_move` (a slower zoom
+  raises it).
+- **LOW-4 (a lit move's fallback, recorded).** Repair now records, for a `crossfade`,
+  `morph` or `sweep` between two sections, that a head may move in a dark cut instead
+  (or play no transition where that cut does not fit) where the window, as the render
+  places it, is shorter than the slowest head's whole-range travel times the steepest
+  slope its easing reaches (warped by the split; a `sweep` from its split point). The
+  offer does not carry the templates' poses, so it says what may happen, not which
+  heads; where even a whole-range move fits lit it says nothing. Test
+  `test_repair_says_where_a_lit_move_may_fall_back_to_a_dark_cut` (300°/s heads, lit modes
+  × lengths × 120/170 BPM × two template pairs: every fallback the render traces was
+  recorded; the sweep reaches at least one).

@@ -146,7 +146,7 @@ _Source: `packages/twinklr/core/sequencer/moving_heads/templates/` (loader and r
 
 Moving-head templates are strict JSON `TemplateDoc` documents. Each step states its motion, dimmer or shutter pulse, wheel states, optional zoom, and how its phase spreads across the heads, in physical units; the renderer compiles that data against each fixture's profile. The LLM selects templates and presets; it never invents movement patterns or fixture math.
 
-The validating registry loads the seven-family catalog on every run and then any `--template-dir` documents, with explicit collision/override rules. A document that uses a removed or renamed key is refused when it loads. Each template can declare presets (`narrow`, `slow` in the catalog) and metadata used by LLM and deterministic selection. Before planning, the `render_preflight` gate dry-compiles every template and preset on the rig over the song and offers only what passes.
+The validating registry loads the seven-family catalog on every run and then any `--template-dir` documents, with explicit collision/override rules. A document that uses a removed or renamed key is refused when it loads. Each template can declare presets (`narrow` and `slow` in the catalog, plus the variation variants `wide`, `fast` and their reach+rate combinations, which are never a fallback) and metadata used by LLM and deterministic selection. Before planning, the `render_preflight` gate dry-compiles every template and preset on the rig over the song and offers only what passes.
 
 ### Sequencer & Rendering
 

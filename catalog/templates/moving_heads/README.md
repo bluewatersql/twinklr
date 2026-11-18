@@ -7,9 +7,10 @@ sees only the families the run's gate admitted, each with its effective variant
 
 Before planning, the render preflight dry-compiles each family with no preset and with
 each preset on the run's rig and song (`admit_templates`). A family is offered
-when any of its variants passes there, tried as a ladder: the base (no preset) first,
-then its presets in the order it declares them (`narrow`, then `slow`). The first that
-passes is the family's **effective variant** on this rig and song: a section naming no
+when any variant of its ladder passes there: the base (no preset) first, then its
+presets in the order it declares them (`narrow`, then `slow`), leaving out the variation
+variants (below). The first that passes is the family's **effective variant** on this
+rig and song: a section naming no
 preset renders it, and so does a section naming a preset that was not admitted or that
 the family does not declare (with a warning naming why and what plays instead). A
 section naming an admitted preset renders that preset. Each variant that fails, the
@@ -24,11 +25,22 @@ admitted family's worst-case section-entry dip, over its admitted variants.
 Every family sets explicit start angles and names no rig position preset, authors its
 dimmer, and declares `reposition_fallback: drop_accent` on every step, so a
 job that sets `moving_heads.reposition_fallback: drop_accent` plays a cue it cannot
-reposition into dark. Each declares two variants as presets: `narrow` (less reach) and
+reposition into dark. Each declares two ladder variants as presets: `narrow` (less reach) and
 `slow` (half the rate). Both ask for less speed than the base, so on a head too slow for
 the base at the song's tempo, or a beat too short for the flick's mask, the family
 usually still plays through one of them; a variant can also fail where the base plays,
-and is then left out on its own. The owner accepted the look of the six zoomless
+and is then left out on its own.
+
+Each also declares the **variation variants** (song-intent W10a): `wide` (every extent
+`narrow` narrows, half again: ×1.5), `fast` (every period `slow` doubles, halved) and the
+four reach+rate combinations `narrow+slow`, `narrow+fast`, `wide+slow`, `wide+fast`, each
+exactly its reach patch then its rate patch. They ask for more reach or rate, so they are
+never a fallback: they are left out of the ladder and never decide whether a family is
+offered or which variant plays by default. The gate dry-compiles every one, the
+combinations included (their speeds multiply: a cascade's `wide+fast` needs about 1.5 ×
+2 its base's pan speed), offers those that pass with their dark phases, and records
+those that fail. Nothing chooses them yet but a section naming one by `preset_id`; the
+planner's `variation` will (W10c). Their look has not been viewed. The owner accepted the look of the six zoomless
 families, each on its base variant, as rendered for one song on their rig in the xLights
 house preview on 2026-11-16
 ([record](../../../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p3-viewing-render/README.md)).

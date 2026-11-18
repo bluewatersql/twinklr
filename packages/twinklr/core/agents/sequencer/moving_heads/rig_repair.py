@@ -67,6 +67,7 @@ from twinklr.core.sequencer.moving_heads.transitions import (
     SPLIT_SHARE,
     Window,
     closing_boundary_ms,
+    easing,
     length_beats,
     part_frames,
     resolved_strategies,
@@ -1132,6 +1133,10 @@ def _transition_repairs(
                         "lit around it; where its window is shorter than that, the heads "
                         "enter as without a transition",
                     )
+            if kept.mode in LIT_MODES and outgoing is not None and incoming is not None:
+                said_move = _lit_move_record(kept, outgoing, incoming, beat_grid, offer)
+                if said_move is not None:
+                    note(RepairAction.RECORDED, said_move)
             changed.append(kept)
         if changed != list(section.transitions):
             out[index] = section.model_copy(update={"transitions": changed})
@@ -1284,14 +1289,52 @@ def _yields_to_events(
     return said
 
 
+def _lit_move_record(
+    transition: PlanTransition,
+    outgoing: PlanSection,
+    incoming: PlanSection,
+    beat_grid: BeatGrid,
+    offer: RigOffer,
+) -> str | None:
+    """Where a lit transition's window may be too short for the heads' move between the two
+    looks, so that a head moves in a dark cut at the split point instead (or, where that cut
+    does not fit, plays no transition): the window, as the render places it, is shorter
+    than the slowest head's whole-range travel times the steepest slope the move's easing
+    reaches (its curve, warped by the split for `crossfade` and `morph`; a `sweep` travels
+    only after its split point). The offer does not carry the templates' poses, so this is
+    said as what may happen; where even a whole-range move fits lit, nothing is said."""
+    window = played_window(transition, outgoing, incoming, beat_grid)
+    if window is None or window.not_played is not None or not offer.full_travel_ms:
+        return None
+    shape, _ = easing(transition.curve)
+    samples = [shape(i / 256) for i in range(257)]
+    slope = max(abs(b - a) * 256 for a, b in pairwise(samples))
+    if transition.mode is TransitionMode.SWEEP:
+        room = window.end_ms - window.split_ms
+    else:
+        split = window.split
+        room = window.end_ms - window.start_ms
+        if 0 < split < 1:
+            slope *= max(0.5 / split, 0.5 / (1 - split))
+    slowest = max(offer.full_travel_ms.values())
+    if room <= 0 or room >= slowest * slope:
+        return None
+    return (
+        f"its lit move has {room} ms: a head that must cross more of its range than it can "
+        f"travel lit in that time (its whole range takes {slowest} ms, the {transition.curve.value} "
+        "easing steepest at "
+        f"{slope:.1f}× its mean rate) moves in a dark cut at the split point instead, or plays "
+        "no transition where that cut does not fit; the offer does not carry the templates' "
+        "poses, so which heads is the render's to say"
+    )
+
+
 def _darkness_bound_ms(offer: RigOffer) -> int | None:
     """The most darkness a head may need for a transition's move or turn, as the offer
-    bounds it: the slowest head's travel over its whole pan or tilt range plus the slowest
-    wheel change (which includes going dark and the state's settle); None where a term is
-    unknown."""
-    if not offer.full_travel_ms or offer.wheel_change_ms is None:
-        return None
-    return max(offer.full_travel_ms.values()) + offer.wheel_change_ms
+    bounds it (`RigOffer.dark_change_ms`: the render's own `worst_case_entry_ms` over every
+    head's whole pan, tilt and zoom range and every wheel state, so safe by construction);
+    None where a term is unknown."""
+    return offer.dark_change_ms
 
 
 def _held_at_start(

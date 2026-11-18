@@ -47,7 +47,9 @@ from twinklr.core.config.fixtures.state_tags import (
 )
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.models.enum import ChannelName
+from twinklr.core.sequencer.models.moving_heads.physical import AXIS_KEYS, DISCRETE_KEYS
 from twinklr.core.sequencer.models.transition import TransitionLength
+from twinklr.core.sequencer.moving_heads.compile.preposition import worst_case_entry_ms
 from twinklr.core.sequencer.moving_heads.intensity import describe_intensity
 from twinklr.core.sequencer.moving_heads.libraries.color import (
     COLOR_PRESET_HEX,
@@ -544,7 +546,11 @@ class TemplateOffer(BaseModel):
     """Dark phases per admitted variant: `base`, or the preset id."""
     excluded: dict[str, dict[str, tuple[str, ...]]] = {}
     """Per fixture and wheel, offered states this template cannot hold: its overlay masks
-    are too short to turn to them and back (left out when there are none)."""
+    are too short to turn to them and back (left out when there are none). Over the
+    variants of its effective-variant ladder (base, `narrow`, `slow`)."""
+    variant_excluded: dict[str, dict[str, dict[str, tuple[str, ...]]]] = {}
+    """Per variation variant off the ladder (`pipeline.VARIATION_PRESETS`), the states it
+    cannot hold beyond `excluded`, per fixture and wheel (left out when none)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -584,6 +590,11 @@ class RigOffer(BaseModel):
     """Per pose axis (`pan`, `tilt`), how long the slowest head takes to travel its whole
     range, which bounds a transition's lit move; left out where a head's speed is
     unknown."""
+    dark_change_ms: int | None = None
+    """The most darkness any head needs to move across its whole pan, tilt and zoom range
+    and turn any wheel to any state (`worst_case_entry_ms` over the full ranges, the
+    function a transition's dark cut is sized by), so a bound on every transition's darkness
+    need by construction; None where a head leaves a term unknown."""
     dark_entries: dict[str, dict[str, tuple[str, ...]]] = {}
     """Per admitted template id and admitted predecessor template id, the heads that
     always enter it dark after that template (the gate's check, on every pair of their
@@ -611,15 +622,19 @@ class RigOffer(BaseModel):
             and self.wheel_change_ms <= self.beat_ms / 2
         )
 
-    def for_templates(self, template_ids: Collection[str]) -> RigOffer:
+    def for_templates(self, template_ids: Collection[str], variant: str | None = None) -> RigOffer:
         """This offer with each head's states that any of `template_ids` cannot hold
-        left out."""
+        left out, playing `variant` (a preset id; None for the template's ladder)."""
         excluded: dict[str, dict[str, set[str]]] = {}
         for template_id in template_ids:
             template = self.templates.get(template_id)
-            for fixture_id, wheels in (template.excluded if template else {}).items():
-                for wheel, states in wheels.items():
-                    excluded.setdefault(fixture_id, {}).setdefault(wheel, set()).update(states)
+            if template is None:
+                continue
+            own = template.variant_excluded.get(variant, {}) if variant else {}
+            for by_fixture in (template.excluded, own):
+                for fixture_id, wheels in by_fixture.items():
+                    for wheel, states in wheels.items():
+                        excluded.setdefault(fixture_id, {}).setdefault(wheel, set()).update(states)
         if not excluded:
             return self
         return self.model_copy(
@@ -683,6 +698,29 @@ def rig_offer(
                 settle = profile.discrete[channel].states[name].settle_ms
                 assert settle is not None  # offered states have one
                 changes.append(wheel_change_ms(profile, settle))
+    dark_changes: list[int | None] = []
+    for profile in profiles.values():
+        ranges = {
+            channel: (profile.axes[key].physical_min, profile.axes[key].physical_max)
+            for channel, key in AXIS_KEYS.items()
+            if channel in (ChannelName.PAN, ChannelName.TILT, ChannelName.ZOOM)
+            and key in profile.axes
+        }
+        every = {
+            channel: tuple(profile.discrete[DISCRETE_KEYS[channel]].states)
+            for channel in (ChannelName.COLOR, ChannelName.GOBO)
+            if DISCRETE_KEYS[channel] in profile.discrete
+        }
+        dark_changes.append(
+            worst_case_entry_ms(
+                profile,
+                entry_pose={channel: (low, low) for channel, (low, _) in ranges.items()},
+                entry_wheels=every,
+                pose_envelope={channel: (high, high) for channel, (_, high) in ranges.items()},
+                frame_ms=EFFECT_GRID_MS,
+                held_wheels=every,
+            )
+        )
     intervals = sorted(b - a for a, b in pairwise(beat_grid.beat_boundaries))
     travels: dict[str, list[int | None]] = {}
     for profile in profiles.values():
@@ -707,6 +745,9 @@ def rig_offer(
         beat_ms=intervals[len(intervals) // 2] if intervals else None,
         templates=dict(templates or {}),
         beats_per_bar=beat_grid.beats_per_bar,
+        dark_change_ms=None
+        if not dark_changes or None in dark_changes
+        else max(change for change in dark_changes if change is not None),
         full_travel_ms={
             name: max(v for v in values if v is not None)
             for name, values in travels.items()

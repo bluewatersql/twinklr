@@ -1,0 +1,177 @@
+# W10 — render motif, variation, density and modifiers (plan, 2026-11-17)
+
+**Status.** Design revised after an independent critic (PROCEED WITH CHANGES); W10a built
+([record](../evidence/2026-11-17-w10a-variants/README.md)). Linked from
+[song-intent-rendering.md](song-intent-rendering.md#work-sequence).
+
+**Integrator decisions (2026-11-17, reversible; the owner may overrule any).**
+
+| # | Question | Decision |
+|---|---|---|
+| I1 | REST | Dark (owner D3); the planner and judge prompts are corrected to say so |
+| I2 | A restated motif on another template | Carry the reach/rate class; colour and gobo are fed back, never overwritten (the contract has no "unset"); no accent replay |
+| I3 | Equal `motif_id`s | The same idea, with or without a macro plan |
+| I4 | Variation's source; a disagreeing `preset_id` | With a motif, the motif source's part at the same index; without, the previous section on the same family, else the part's own preset; a disagreeing `preset_id` is recorded and fed back |
+| I5 | `wide`/`fast` | Authored for all seven families, with the four combinations |
+| I6 | Modifier key | Stays a free string; the prompt and repair learn a closed set |
+| I7 | Critic M1–M9 | As written in the sections below |
+
+
+Proposal against `1eca8998`, revised with the critic's findings (PROCEED WITH CHANGES) and the
+integrator's decisions of 2026-11-17. Integrator decisions are reversible; owner look questions are
+PENDING-OWNER. "Proposed" marks every value nobody has chosen.
+
+## 0. Constraints from the code
+
+- **Presets are the variant mechanism.** A family's `presets[].step_patches` deep-merge into its steps;
+  `StepPatch` carries only `movement`, `dimmer`, `timing` (`models/template.py:669-684`). All seven
+  families declare `narrow` (extents) and `slow` (period); the two touch disjoint keys.
+- **The gate** (`pipeline.admit_templates`) dry-compiles every declared rung; the effective-variant
+  ladder is base then presets in declared order. A family is admitted when a rung passes.
+- **Render identity hashes the plan dump and every template doc** (`identity._plan_payload`,
+  `templates`): new catalog presets move every fingerprint of a plan using that family (no frame);
+  a new plan field must stay out of the payload at its default.
+- **Macro motif threads** carry one `evolution` per thread (`planning/models.py:113-121`) and reach
+  the MH planner only in its prompt; relation and source are derived at plan time and carried on
+  the plan as code-owned fields (as `cue_ms`).
+- **The colour/gobo contract has no "unset"**: `as_authored` is the planner's explicit choice
+  (`models.py:244-250`), so code may not overwrite it.
+- **Per-head darkness is new.** `dark_spans` and `closed` are rig-wide (`pipeline.py:194-200`,
+  `events.apply_section_events`); `_dark_over_spans` raises on a head with no commandable darkness
+  (`pipeline.py:300-305`).
+- **Repair predicts the render** (`rig_repair.py:1-7`; wheel plays `:511`, `:753`, `:906-907` read the
+  variant's dark phases) and must keep doing so for every rule below.
+
+## 1. Variation (W10a catalog, W10c resolution)
+
+**Audience.** The section moves visibly tighter (NARROW), broader (WIDEN), at half rate (SLOWER) or at
+double rate (FASTER) than what it varies.
+
+**Grid.** Reach `narrow | base | wide` × rate `slow | base | fast`: nine variants per family, authored
+in the catalog as presets `narrow`, `slow` (as today), `wide`, `fast`, and the four combinations
+`narrow+slow`, `narrow+fast`, `wide+slow`, `wide+fast` (each exactly the merge of its two single
+patches, a test pins that). `wide` = extents × 1.5, `fast` = period halved (proposed).
+- **Off the ladder.** The effective variant and admission stay the base → `narrow` → `slow` ladder;
+  the six new ids are never a fallback (they ask for more, or would admit a family the ladder
+  refuses). Every variant is dry-compiled by the gate; the offer publishes each admitted one.
+- **Speeds multiply in combinations** (critic M9: cascade `wide+fast` 204 BPM at 720°/s against `fast`
+  alone 306), so every combination is dry-compiled, never inferred from its parts.
+- **Offer-wide data stays honest per variant.** Entry dips and `dark_entries` are measured over
+  every admitted variant; `excluded` (overlay masks) stays over the ladder's variants, and where a
+  variation variant excludes more wheel states the offer records them for that variant
+  (`TemplateOffer.variant_excluded`) and the render's colour resolution reads the variant it
+  plays (W10a), so no existing plan's frames move.
+
+**Source (integrator decision 4).** With a motif: the motif source's part at the same index (the last
+source part where it has fewer). Without one: the previous section using the same template family
+(the prompt says "relative to where it appeared before"), else the part's own `preset_id` (else the
+family's effective variant). One step on one axis; off the grid, or not admitted on this rig and
+song, is recorded and plays the source variant. A planner `preset_id` that disagrees with its
+variation is recorded and fed back; the variation's resolution plays.
+
+**Where.** Repair (plan time) writes the resolved variant into the part's `preset_id`; the render
+plays presets as today. Fixed repair order (critic M5): motif relation → variation/preset → density
+darkness → existing event/wheel/transition repair, each reading the resolved variant's phases.
+
+**Owner look questions (PENDING-OWNER).** `wide` ×1.5 and `fast` ×2; `finite_snap_hold` SLOWER/FASTER
+barely differ (its one move is 1 beat; `slow` 2, `fast` 0.5).
+
+## 2. Density (W10d)
+
+**REST (owner D3): dark.** A synthetic section-wide `closed` in `apply_section_events`, so it follows
+the closed rules exactly (`events.py:343-346`, `:1406`, `:1420`). Planner intent wins: a planner `open`
+ends it, a planner hit lights a head from the darkness (`lit_from_dark`); on the same frame the planner
+event takes precedence over the synthetic closed. Repair records REST on heads `offer.dark` excludes
+(never a refusal; those heads play as BALANCED, traced) and records look intent that cannot be seen
+in a fully dark REST (colour, gobo, intensity). Transitions into/out of REST see a dark look (the W8
+machinery: handover at dark, `nothing` where dark on both sides).
+
+**SPARSE: half the heads lit, alternating on the variant's own cycle.** Heads are grouped by their
+folded distribution slot (`topology.py` fold `min(i, n-1-i)`), so mirror partners stay together; the
+two halves of the slots alternate per cycle of the section's resolved variant (`whole_period_cycle`),
+never per bar. Rejected at plan time and recorded (playing BALANCED) where any head would be dark for
+the whole section (a section shorter than two cycles, or a one-slot rig). ONCE families
+(`finite_snap_hold`): the move is lit on every head and only the hold alternates. No tempo fallback.
+New mechanism: per-head darkness spans, commanded like `_dark_over_spans` on the head's own cues,
+skipping heads with no commandable darkness (recorded). Hits on a darkened head follow the hit rules
+(the head is dark between its cues: no hit there; the lost-hit invariant is against the SPARSE render
+without transitions, so it holds). Transitions see the darkened heads as dark looks. Offer: a per
+family note of the cycle SPARSE alternates on; repair overlays SPARSE darkness on the variant's
+published phases before wheel/hit predictions.
+
+**BALANCED.** Identity.
+
+**BUSY: one accent per bar, on each head's first lit beat of the bar** (critic M3: cascades are dark on
+the downbeat, `events.py:1406`, `:1539-1549`), decided per head by `apply_hits`' own visibility rule;
+HIGH emphasis where intensity is shaped (DRAMATIC already accents the downbeat, `intensity.py:146-153`).
+An accent that is not visible per the played rule is traced as such (no blanket "adds nothing under
+INTENSE"). Density accents never enter `yield_spans` (critic M2): an accent inside a planned transition
+window or a planner event's seen span is dropped and recorded. Planner intent wins. Never a strobe.
+Traced as `density_accents`. The 25 % BUSY budget is repair feedback (lowest energy first), not a
+refusal.
+
+**Multi-part (critic M6).** Allowed; density counts bars and cycles across the whole section.
+
+**Prompts (critic M8).** Planner `developer.j2:169-173`, `user.j2:259` and judge `developer.j2:89`,
+`user.j2:148` define density as movement; rewrite them to say exactly what renders (dark; half the
+heads alternating per cycle; the template's own; an accent each bar). The integrator puts the meaning
+to the owner.
+
+## 3. Motif (W10b)
+
+**Relation (integrator decision 3).** Equal `motif_id`s are the same idea, with or without a macro
+plan. With a thread: its first section in plan order introduces, later ones take the thread's
+`evolution` (a repeated INTRODUCE becomes RESTATE, traced). Without one: plan order (first introduces,
+later restate). A section naming a motif no thread lists is recorded and treated by plan order. No
+refusals (the earlier "forward reference refused" is removed). Code-owned `motif_source_id`,
+`motif_relation` on `PlanSection`, left out of the identity payload when null.
+
+**What carries it (integrator decision 2).** RESTATE: the source's variant class per part (§1
+source rule); VARY: plus the one variation step; RESOLVE: SLOWER, else NARROW, else restate. A
+different template than the source's is kept (explicit intent): the reach/rate class carries, and the
+mismatch is fed back. Colour and gobo are never overwritten (no "unset" in the contract): where the
+restating section's colour or gobo differs from the source's, repair feeds it back. No accent replay.
+
+**Order.** W10b (motif) lands before W10c (variation resolution), since the source is derived first.
+
+## 4. Modifiers (W10e, redesigned against the code; critic M7)
+
+The key stays a free string (integrator decision 6). `direction` via `transform.reverse` is refused
+on most families (`template.py:192-208`: transform only on relative shapes), `StepPatch` has no
+`distribution` field (`compile/preset.py:28-44`, `patch.py:36`), and aim/spread are relative ops a
+static merge cannot express. Proposed: a computed patch layer in code (after the preset), each key a
+function of the step (`aim: low|high` → `start_tilt_deg ± 10°`; `spread: unison|wave|wide_wave` →
+`distribution.spread_cycles` 0 / authored / ×2 where the step has a distribution; `direction: reverse`
+only where the step's shape takes a transform). The offer publishes per family only the keys and
+values that change frames there, proven by a test per family and key that the bytes change; unknown
+or not-offered keys are recorded and fed back. Gate admission per offered value.
+
+## 5. Cross-cutting
+
+- **Revision.** `RENDERER_REVISION` bumps in each task that changes output for an existing input.
+- **Trace.** `section_looks[].arrangement{motif, variation, density, modifiers}`, only where set; the
+  "not rendered" diagnostic loses a name per task and goes with the last.
+- **Cache.** Each task that changes a prompt or the offer re-keys the planner cache (paid re-plan).
+- **Tests the critic asked for.** Per family × rule a byte change; under SPARSE every head lit at
+  least once per variant; transitions into/out of REST and BUSY in all modes with window lengths
+  asserted; repair = render for SPARSE, REST and composite variants; multi-part motif + variation;
+  REST on a rig with heads that cannot go dark; `wide+fast` gate refusal; gate time before/after.
+
+## 6. Tasks and order
+
+| # | Task | Depends on | Size |
+|---|---|---|---|
+| W10a | Catalog `wide`/`fast` + four combinations, off the ladder; gate admission; per-variant offer data; render reads its variant's exclusions; gate timing | — | M |
+| W10b | Motif relation + code-owned fields + feedback | W10a | M |
+| W10c | Variation resolution in repair (source rule, grid, feedback); prompt lists admitted variations | W10b | M |
+| W10d | Density: REST, SPARSE (per-head darkness), BUSY accents, budget; prompts and judge | W10a | L (2 commits) |
+| W10e | Modifiers: computed patch layer, offer, repair | W10a | M |
+| W10f | Remove the diagnostic; docs, context, pins | all | S |
+
+## 7. PENDING-OWNER
+
+1. The meaning of density as rendered (dark / half the heads alternating per cycle / the template /
+   an accent a bar), against the prompts' "movement" wording.
+2. Looks: `wide`/`fast` extents and rate; SPARSE's alternation; BUSY's accent per bar; SPARSE on
+   `finite_snap_hold`; snap SLOWER/FASTER.
+3. Cost: gate wall time with nine variants (W10a measures it); a restricted grid if it is too slow.

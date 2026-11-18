@@ -91,6 +91,75 @@
           }
         }
       }
+    },
+    {
+      "preset_id": "wide",
+      "step_patches": {
+        "wings": {
+          "movement": {
+            "pan_extent_deg": 52.5,
+            "tilt_extent_deg": 22.5
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "fast",
+      "step_patches": {
+        "wings": {
+          "movement": {
+            "period_beats": 2.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+slow",
+      "step_patches": {
+        "wings": {
+          "movement": {
+            "pan_extent_deg": 20.0,
+            "tilt_extent_deg": 10.0,
+            "period_beats": 8.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+fast",
+      "step_patches": {
+        "wings": {
+          "movement": {
+            "pan_extent_deg": 20.0,
+            "tilt_extent_deg": 10.0,
+            "period_beats": 2.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+slow",
+      "step_patches": {
+        "wings": {
+          "movement": {
+            "pan_extent_deg": 52.5,
+            "tilt_extent_deg": 22.5,
+            "period_beats": 8.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+fast",
+      "step_patches": {
+        "wings": {
+          "movement": {
+            "pan_extent_deg": 52.5,
+            "tilt_extent_deg": 22.5,
+            "period_beats": 2.0
+          }
+        }
+      }
     }
   ]
 }

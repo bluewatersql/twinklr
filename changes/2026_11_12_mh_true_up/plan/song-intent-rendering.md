@@ -298,7 +298,7 @@ has the renderer that applies song intent.
 | W7 | Colour and gobo events — **view** | Reveal on the beat; dark lead within half a beat; spacing repaired |
 | W8 | Entry and exit transitions — **view** | SWEEP→DIP fallback recorded |
 | W9 | Show: palette and focal role — **view** (combined show); the focal role applied at render and traced | The two W9 parity rows |
-| then | Motif, variation, density (former T3–T5); T4's arrangement work | — |
+| W10 | Motif, variation, density, modifiers (former T3–T5) — **view**; plan in [w10-arrangement.md](w10-arrangement.md) (W10a variants built) | Per-family byte changes; null intent identical |
 
 **Consequences to tell the owner before merge.** W2's contract change re-keys the
 moving-head planner caches (every song plans again once, paid) and makes plan

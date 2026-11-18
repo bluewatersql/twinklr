@@ -1303,3 +1303,60 @@ def test_hits_a_transition_still_loses_after_the_last_pass_are_traced_and_warned
         "still lose a hit to a transition" in d["message"]
         for d in once.render_record["diagnostics"]
     )
+
+
+def test_repair_says_where_a_lit_move_may_fall_back_to_a_dark_cut() -> None:
+    """On 300-degree heads, across lit modes, lengths, tempos and template pairs with
+    different poses, every head the render moves in a dark cut instead of lit (traced
+    `fallback`) is one repair said may: the window is shorter than the slowest head's
+    whole-range travel at the easing's steepest slope. Where repair says nothing, no head
+    falls back."""
+    payload = rig().model_dump(mode="json")
+    for fixture in payload["fixtures"]:
+        for axis in ("pan", "tilt"):
+            fixture["config"]["physical_profile"]["axes"][axis]["travel_speed_per_s"] = 300.0
+    slow = FixtureGroup.model_validate(payload)
+    fell_back = 0
+    for bpm in (120, 170):
+        g = grid(bpm, bars=4)
+        for mode in ("crossfade", "morph", "sweep"):
+            for length in ("BEAT", "HALF_BAR", "BAR"):
+                for first, second in (
+                    ("finite_snap_hold", "mirror_wings"),
+                    ("target_orbit", "fly_in_cascade"),
+                ):
+                    sections = [
+                        m.plan_section("s1", 1, 2, first),
+                        m.plan_section(
+                            "s2", 3, 4, second, transitions=[transition("ENTRY", mode, length)]
+                        ),
+                    ]
+                    repaired = repair_rig_intent(
+                        ChoreographyPlan(sections=sections, overall_strategy=""),
+                        rig_offer(slow, g),
+                        {},
+                        g,
+                    )
+                    said = " ".join(
+                        r.reason for r in repaired.repairs if r.item.startswith("entry transition")
+                    )
+                    (entry,) = transitions_of(
+                        render(repaired.sections, beat_grid=g, fixture_group=slow)
+                    )
+                    if any("fallback" in o for o in entry["heads"].values()):
+                        fell_back += 1
+                        assert "its lit move has" in said, (bpm, mode, length, first)
+    assert fell_back  # the sweep reaches the case it guards
+
+
+def test_the_offer_bounds_a_dark_change_over_every_axis_the_heads_move() -> None:
+    """The darkness bound repair warns by is the render's own `worst_case_entry_ms` over the
+    whole pan, tilt and zoom range: slowing the zoom alone raises it."""
+    g = grid(120, bars=4)
+    fast = rig_offer(m.zoom_rig(HEADS), g).dark_change_ms
+    payload = m.zoom_rig(HEADS).model_dump(mode="json")
+    for fixture in payload["fixtures"]:
+        fixture["config"]["physical_profile"]["axes"]["zoom"]["travel_speed_per_s"] = 5.0
+    slow = rig_offer(FixtureGroup.model_validate(payload), g).dark_change_ms
+
+    assert fast is not None and slow is not None and slow > fast

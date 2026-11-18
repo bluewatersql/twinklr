@@ -87,6 +87,70 @@
           }
         }
       }
+    },
+    {
+      "preset_id": "wide",
+      "step_patches": {
+        "sway": {
+          "movement": {
+            "pan_extent_deg": 30.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "fast",
+      "step_patches": {
+        "sway": {
+          "movement": {
+            "period_beats": 2.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+slow",
+      "step_patches": {
+        "sway": {
+          "movement": {
+            "pan_extent_deg": 10.0,
+            "period_beats": 8.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+fast",
+      "step_patches": {
+        "sway": {
+          "movement": {
+            "pan_extent_deg": 10.0,
+            "period_beats": 2.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+slow",
+      "step_patches": {
+        "sway": {
+          "movement": {
+            "pan_extent_deg": 30.0,
+            "period_beats": 8.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+fast",
+      "step_patches": {
+        "sway": {
+          "movement": {
+            "pan_extent_deg": 30.0,
+            "period_beats": 2.0
+          }
+        }
+      }
     }
   ]
 }
