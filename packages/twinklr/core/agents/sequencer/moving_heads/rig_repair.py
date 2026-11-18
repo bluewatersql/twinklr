@@ -36,7 +36,9 @@ from twinklr.core.sequencer.moving_heads.events import (
     HIT_LATE_FRAMES,
     HIT_MIN_LIT_FRAMES,
     HIT_MOVE_BARS,
+    section_events,
     strobe_beats,
+    yield_spans,
 )
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import quantize_cue
 from twinklr.core.sequencer.moving_heads.intensity import SHAPED_LEVELS
@@ -59,13 +61,15 @@ from twinklr.core.sequencer.moving_heads.song_intent import (
     unshown_gobo_reason,
 )
 from twinklr.core.sequencer.moving_heads.transitions import (
+    DARK_MODES,
     LIT_MODES,
-    MIN_WINDOW_FRAMES,
     SPLIT_ON_BOUNDARY,
     SPLIT_SHARE,
     length_beats,
     resolved_strategies,
+    window_for,
 )
+from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map
 
 if TYPE_CHECKING:
     from twinklr.core.sequencer.timing.beat_grid import BeatGrid
@@ -1102,9 +1106,8 @@ def _transition_repairs(
             )
             for said in _plays_nothing(kept, outgoing, incoming, offer):
                 note(RepairAction.RECORDED, said)
-            if outgoing is not None:
-                for said in _yields_to_events(kept, outgoing, incoming, beat_grid):
-                    note(RepairAction.RECORDED, said)
+            for said in _yields_to_events(kept, outgoing, incoming, beat_grid):
+                note(RepairAction.RECORDED, said)
             if kept.mode in LIT_MODES and outgoing is not None and incoming is not None:
                 turns = []
                 for wheel in ("colour", "gobo"):
@@ -1164,52 +1167,93 @@ def _plays_nothing(
 
 def _yields_to_events(
     transition: PlanTransition,
-    outgoing: PlanSection,
+    outgoing: PlanSection | None,
     incoming: PlanSection | None,
     beat_grid: BeatGrid,
 ) -> list[str]:
-    """A colour, gobo or hit event of the part the transition leaves that must still be
-    seen when its window would begin: until half a beat after its beat (at least: a head
-    dark on the beat shows it later) and, bound to a lyric cue, a quarter beat after the
-    cue. The window starts after it, no later than the boundary; where what is left is
-    shorter than the mode needs (`MIN_WINDOW_FRAMES`), the transition does not play."""
-    bars, beats = beat_grid.bar_boundaries, beat_grid.beat_boundaries
-    if len(beats) < 2:
+    """What the transition yields to, by the render's own placement (`transitions.window_for`
+    over `events.yield_spans`, the seen rule): each event of the parts it joins that
+    clamps its window, and where what is left is shorter than its mode needs, that it does
+    not play. Read from the plan's beats: a head dark on an event's beat reveals it later
+    in the render, and a hit that moves plays elsewhere, so the render may yield further."""
+    bars = beat_grid.bar_boundaries
+    if len(beat_grid.beat_boundaries) < 2 or (outgoing is None and incoming is None):
         return []
-    end_bar = outgoing.end_bar
-    boundary = bars[end_bar] if end_bar < len(bars) else beat_grid.duration_ms
-    at = min(max(bisect.bisect_left(beats, boundary), 1), len(beats) - 1)
-    beat = beats[at] - beats[at - 1]
-    length = float(length_beats(transition.length, beat_grid.beats_per_bar))
-    split = float(SPLIT_SHARE[transition.split])
-    if transition.mode is TransitionMode.SNAP or incoming is None:
-        before, after = length, 0.0
-    elif transition.mode in SPLIT_ON_BOUNDARY:
-        before, after = split * length, (1 - split) * length
+
+    def at(bar: int) -> int:
+        ms = bars[bar - 1] if bar - 1 < len(bars) else beat_grid.duration_ms
+        return quantize_cue(round(ms)).actual_ms
+
+    def frames(section: PlanSection, first: bool) -> tuple[int, int]:
+        _, start, end = section.part_bars()[0 if first else -1]
+        return at(start), at(end + 1)
+
+    def yields(
+        section: PlanSection, window: tuple[int, int], said: str, *, hits: bool, until: bool
+    ) -> list[tuple[str, int]]:
+        spans = yield_spans(section_events(section, beat_grid), window, beat_grid, hits=hits)
+        return [(f"{said} {label}", end if until else start) for label, start, end in spans]
+
+    if incoming is None:
+        assert outgoing is not None
+        last = frames(outgoing, first=False)
+        window = window_for(
+            transition,
+            TransitionEdge.EXIT,
+            boundary_ms=last[1],
+            phase_map=build_musical_phase_map(beat_grid),
+            beats_per_bar=beat_grid.beats_per_bar,
+            earliest_ms=last[0],
+            latest_ms=last[1],
+            rest="after",
+            not_before=yields(
+                outgoing, last, "it starts after the part plays its", hits=True, until=True
+            ),
+        )
     else:
-        before, after = length / 2, length / 2
-    start, end = boundary - before * beat, boundary + after * beat
-    said = []
-    for event in outgoing.events:
-        if event.action.value not in ("color", "gobo", "hit"):
-            continue
-        frame = beat_grid.beat_time_ms(event.bar, event.beat)
-        if frame is None or not start - beat <= frame < boundary:
-            continue
-        seen = max(frame + beat / 2, -math.inf if event.cue_ms is None else event.cue_ms + beat / 4)
-        if seen <= start:
-            continue
-        left = end - min(seen, boundary)
-        least = MIN_WINDOW_FRAMES[transition.mode] * EFFECT_GRID_MS
+        entered = frames(incoming, first=True)
+        left = None if outgoing is None else frames(outgoing, first=False)
+        window = window_for(
+            transition,
+            transition.edge,
+            boundary_ms=bars[incoming.start_bar - 1]
+            if incoming.start_bar - 1 < len(bars)
+            else entered[0],
+            phase_map=build_musical_phase_map(beat_grid),
+            beats_per_bar=beat_grid.beats_per_bar,
+            earliest_ms=entered[0] if left is None else left[0],
+            latest_ms=entered[1],
+            rest="before" if outgoing is None else None,
+            not_before=[]
+            if outgoing is None or left is None
+            else yields(
+                outgoing,
+                left,
+                "it starts after the part it leaves plays its",
+                hits=True,
+                until=True,
+            ),
+            not_after=yields(
+                incoming,
+                entered,
+                "it ends before the part it enters plays its",
+                hits=transition.mode in DARK_MODES,
+                until=False,
+            ),
+        )
+    said = [
+        f"the window yields: {clamp}"
+        for clamp in window.clamps
+        if clamp.startswith(("it starts after the part", "it ends before the part"))
+    ]
+    if window.not_played is not None:
+        said.append(f"{window.not_played}: it does not play")
+    elif said:
+        room = window.end_ms - window.start_ms
         said.append(
-            f"the event at {event.describe()} must be seen until about "
-            f"{round(seen - boundary):+d} ms from the boundary: the window starts after it"
-            + (
-                f", which leaves {max(0, round(left))} ms, less than the {least} ms a "
-                f"{transition.mode.value} needs: it does not play"
-                if left < least
-                else ""
-            )
+            f"it leaves {room} ms: a head that needs longer in the dark to move or turn "
+            "there (its templates' poses and wheels decide, which the offer does not carry) "
+            "plays no transition"
         )
     return said
 

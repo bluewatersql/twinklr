@@ -116,7 +116,7 @@ See [product/overview.md](product/overview.md).
     it within a beat, else not played. The trace records every event
     per head (unplaceable ones too) and every lyric cue with its offset from the lyric;
     the offer says what each event plays at the song's tempo; repair records, with the
-    render's tests, what will play otherwise. Renderer revision 11.
+    render's tests, what will play otherwise. Renderer revision 12.
     ([user guide](../docs/user-guide.md#how-a-sections-events-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w6-w7-events/README.md))
   - **Transitions** (W8, 2026-11-17, not yet seen by the owner). Each boundary plays its
@@ -128,14 +128,14 @@ See [product/overview.md](product/overview.md).
     `fade_via_black` out, change in the dark, up, `blackout` dark over the window;
     per-channel strategies override. A wheel never turns lit (a lit transition across a
     colour change dips dark at its split point, in place of the boundary's dip); a lit
-    move too fast for the head moves dark; events in the window play (it yields, and
-    starts only after a colour, gobo or hit before it has been seen), hits play on it, and
-    a head whose dark cut would cover a hit plays none; intensity resumes after it on an
-    accent. The song's first ENTRY and last EXIT play against the heads at rest. A
+    move too fast for the head moves dark; events in the window play (it yields, starts
+    only after every visible event before it has been seen, and a dark mode ends before
+    an incoming hit), hits play on it, and no transition loses a hit (a head that would
+    plays none); intensity resumes after it on an accent. The song's first ENTRY and last EXIT play against the heads at rest. A
     transition counts as played on a head only where its frames differ from the plan
     rendered without transitions (else traced `nothing`, warned). Repair shortens one
     longer than its parts and records what plays otherwise; the trace lists each per
-    head. Renderer revision 11.
+    head. Renderer revision 12.
     ([user guide](../docs/user-guide.md#how-a-sections-transitions-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w8-transitions/README.md))
   - **Not rendered yet: motif variation, density and modifiers.** Accepted and ignored (a

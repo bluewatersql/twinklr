@@ -37,6 +37,7 @@ from twinklr.core.agents.sequencer.moving_heads.models import (
     PlanSection,
 )
 from twinklr.core.agents.sequencer.moving_heads.rig_repair import repair_rig_intent
+from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.sequencer.models.transition import PlanTransition
 from twinklr.core.sequencer.moving_heads.song_intent import rig_offer
 from twinklr.core.sequencer.moving_heads.transitions import CROSSFADE_FLOOR, describe_transitions
@@ -556,7 +557,10 @@ def test_repair_predicts_a_window_yielding_to_an_event_seen_before_it(
     pipeline = render(sections, beat_grid=beat_grid)
     (entry,) = transitions_of(pipeline)
 
-    assert any("must be seen until" in why for why in said)
+    assert any(
+        "the window yields: it starts after the part it leaves plays its color" in why
+        for why in said
+    )
     assert any("color at bar 2 beat 4" in why for why in entry["clamped"])
     assert entry["window_ms"][0] == entry["boundary_ms"]
     if plays:
@@ -991,3 +995,212 @@ def test_random_plans_with_events_inside_transition_windows_render_honestly(seed
         assert set(entry["heads"]) == set(HEADS)
         for outcome in entry["heads"].values():
             assert ("plays" in outcome) != ("not_played" in outcome)
+    # No transition loses a hit: one that plays on a head without them plays with them.
+    free = pipeline.transition_free
+    assert free is not None or not any(s.transitions for s in sections)
+    if free is not None:
+        for key, by_head in free.hit_frames.items():
+            assert set(by_head) <= set(pipeline.hit_frames.get(key, {})), key
+
+
+# --- fix round 2: every visible event seen, no hit lost, dark modes yield, short sides ---
+
+
+def test_an_open_before_a_blackout_is_seen_for_half_a_beat() -> None:
+    """A `closed` on 4.1 and an `open` on bar 4's last beat, then an ENTRY blackout split
+    half a bar: the light the `open` brings back stays on for half a beat before the
+    blackout begins (it was lit for one frame)."""
+    g = grid(120)
+    sections = pair(transition("ENTRY", "blackout", split="HALF"), first="mirror_wings")
+    sections[0] = sections[0].model_copy(
+        update={
+            "events": [
+                PlanEvent.model_validate(event(4, 1, "closed")),
+                PlanEvent.model_validate(event(4, 4, "open")),
+            ]
+        }
+    )
+    pipeline = render(sections, beat_grid=g)
+    frames = Frames(pipeline)
+    (entry,) = transitions_of(pipeline)
+    opened = beat_frame(g, 4, 4)
+
+    assert entry["window_ms"][0] >= opened * FRAME + 250
+    assert any("open at bar 4 beat 4" in why for why in entry["clamped"])
+    for head in HEADS:
+        dark = frames.dark(head)
+        assert not any(dark[i] for i in range(opened, entry["window_ms"][0] // FRAME))
+        assert all(dark[i] for i in window_frames(entry))
+
+
+def test_no_head_loses_a_hit_to_a_transition_and_its_reason_is_true() -> None:
+    """170 BPM, `target_orbit` into `zoom_wave` with a hit on 5.2 and an ENTRY
+    fade_via_black: without the transition every head is dark on 5.2 and the hit moves to
+    5.3 on all four. With it, two heads fade up lit on 5.2: the hit still plays on every
+    head that plays it without the transition (moved where all of them show it), and no
+    head gives up the transition for a hit its darkness does not cover."""
+    g = grid(170)
+    sections = [
+        m.plan_section("s1", 1, 4, "target_orbit"),
+        m.plan_section(
+            "s2",
+            5,
+            8,
+            "zoom_wave",
+            events=[event(5, 2, "hit")],
+            transitions=[transition("ENTRY", "fade_via_black", split="HALF")],
+        ),
+    ]
+    payload = m.zoom_rig(HEADS).model_dump(mode="json")
+    for fixture in payload["fixtures"]:
+        profile = fixture["config"]["physical_profile"]
+        profile["visibility"].update(close_latency_ms=20, open_latency_ms=20)
+        for wheel in ("color", "gobo"):
+            for state in profile["discrete"].get(wheel, {}).get("states", {}).values():
+                state["settle_ms"] = 150
+    pipeline = render(
+        sections,
+        beat_grid=g,
+        fixture_group=FixtureGroup.model_validate(payload),
+        job_config=m.zoom_job(HEADS),
+    )
+    free = pipeline.transition_free
+    assert free is not None
+    (entry,) = transitions_of(pipeline)
+    hit = next(e for e in looks(pipeline)["s2"]["events"] if e["action"] == "hit")
+
+    assert set(free.hit_frames[("s2", 0)]) == set(HEADS)
+    assert set(pipeline.hit_frames[("s2", 0)]) == set(HEADS)
+    for head in HEADS:
+        assert "moved" in hit["heads"][head]
+        outcome = entry["heads"][head]
+        if "not_played" in outcome and "would cover the hit" in outcome["not_played"]:
+            a, b = (int(x) for x in outcome["not_played"].split("(")[1].split(" ms")[0].split("-"))
+            assert a <= free.hit_frames[("s2", 0)][head] < b
+
+
+def test_a_dark_mode_ends_before_an_incoming_hit_instead_of_being_dropped() -> None:
+    """An ENTRY blackout over a BAR (split half) with a hit on 5.2: the window ends before
+    the hit (it was dropped on every head), and the hit plays."""
+    g = grid(120)
+    pipeline = render(
+        pair(transition("ENTRY", "blackout", split="HALF"), events=[event(5, 2, "hit")]),
+        beat_grid=g,
+    )
+    frames = Frames(pipeline)
+    (entry,) = transitions_of(pipeline)
+    hit = next(e for e in looks(pipeline)["s2"]["events"] if e["action"] == "hit")
+    at = beat_frame(g, 5, 2)
+
+    assert entry["window_ms"][1] <= at * FRAME
+    assert any("hit at bar 5 beat 2" in why for why in entry["clamped"])
+    for head in HEADS:
+        assert "not_played" not in entry["heads"][head]
+        assert all(frames.dark(head)[i] for i in window_frames(entry))
+        assert "played_ms" in hit["heads"][head]
+
+
+def test_a_fade_side_too_short_to_fade_cuts_and_says_so() -> None:
+    """170 BPM, a hit on 4.4 bound to a lyric 0.6 beat after it, then an ENTRY
+    fade_via_black over a BAR split half: the window starts two frames before the boundary,
+    too short a fade-out; the light cuts to dark at the boundary, never a two-frame fade."""
+    g = grid(170)
+    at = g.beat_time_ms(4, 4)
+    assert at is not None
+    late = int(at + 0.6 * 60_000 / 170)
+    sections = pair(transition("ENTRY", "fade_via_black", split="HALF"), first="mirror_wings")
+    sections[0] = sections[0].model_copy(
+        update={
+            "events": [
+                PlanEvent.model_validate(
+                    event(4, 4, "hit", moment_cue_id="c", cue_ms=late, cue_emphasis="MED")
+                )
+            ],
+            "moment_cues": ["c"],
+        }
+    )
+    pipeline = render(sections, beat_grid=g)
+    frames = Frames(pipeline)
+    (entry,) = transitions_of(pipeline)
+    boundary = entry["boundary_ms"] // FRAME
+
+    assert 0 < entry["boundary_ms"] - entry["window_ms"][0] < 4 * FRAME
+    for head, outcome in entry["heads"].items():
+        if "not_played" in outcome:
+            continue
+        assert outcome["plays"].startswith("cuts to dark at the boundary")
+        level, dark = frames.dimmer(head), frames.dark(head)
+        before = range(entry["window_ms"][0] // FRAME, boundary)
+        assert len({level[i] for i in before if not dark[i]}) <= 1
+        assert dark[boundary]
+
+
+def test_the_second_render_logs_nothing_and_leaves_the_logger_alone(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A render with transitions renders again without them; that render's warnings are
+    held (never logged twice) and the module logger is never disabled."""
+    import logging
+
+    from twinklr.core.sequencer.moving_heads import pipeline as module
+
+    with caplog.at_level(logging.WARNING):
+        render(pair())
+    alone = [r.getMessage() for r in caplog.records]
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        render(pair(transition("ENTRY", "crossfade")))
+    assert [r.getMessage() for r in caplog.records] == alone
+    assert not module.logger.disabled
+
+
+AGREEMENT = [
+    (bpm, action, cue, mode)
+    for bpm in (120, 170)
+    for action in ("hit", "color", "open")
+    for cue in (None, 0.9)
+    for mode in MODES
+    if not (action == "open" and cue is not None)
+]
+
+
+@pytest.mark.parametrize(("bpm", "action", "cue", "mode"), AGREEMENT)
+def test_repair_and_render_agree_on_what_a_transition_yields_to(
+    bpm: int, action: str, cue: float | None, mode: str
+) -> None:
+    """An event on the outgoing section's last beat (a hit, a colour change or an `open`
+    after a `closed`, bound or not to a lyric late in the beat) and a BEAT transition of
+    every mode: repair and render read the same placement (`window_for` over
+    `events.yield_spans`), so they agree on whether the window yields to the event and on
+    whether too little is left to play. Where the render then plays on no head for a
+    head's own darkness need, repair has said that it may."""
+    g = grid(bpm, bars=4)
+    at = g.beat_time_ms(2, 4)
+    assert at is not None
+    fields: dict[str, Any] = {"color": "blue"} if action == "color" else {}
+    if cue is not None:
+        fields.update(moment_cue_id="c", cue_ms=int(at + cue * 60_000 / bpm))
+    events = [event(2, 4, action, **fields)]
+    if action == "open":
+        events.insert(0, event(2, 1, "closed"))
+    sections = [
+        m.plan_section("s1", 1, 2, "mirror_wings", events=events),
+        m.plan_section(
+            "s2", 3, 4, "finite_snap_hold", transitions=[transition("ENTRY", mode, "BEAT")]
+        ),
+    ]
+    repaired = repair_rig_intent(
+        ChoreographyPlan(sections=sections, overall_strategy=""),
+        rig_offer(rig(), g),
+        {},
+        g,
+    )
+    said = " ".join(r.reason for r in repaired.repairs if r.item.startswith("entry transition"))
+    (entry,) = transitions_of(render(repaired.sections, beat_grid=g))
+
+    clamped = any(f"{action} at bar 2 beat 4" in why for why in entry.get("clamped", []))
+    assert clamped == (f"plays its {action} at bar 2 beat 4" in said)
+    assert (entry.get("not_played") is not None) == ("it does not play" in said)
+    heads_np = [o for o in entry["heads"].values() if "not_played" in o]
+    if heads_np and entry.get("not_played") is None:
+        assert "plays no transition" in said

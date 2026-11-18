@@ -22,6 +22,7 @@ from twinklr.core.sequencer.models.template import (
     RepeatContract,
     RepeatMode,
 )
+from twinklr.core.sequencer.moving_heads import render_log
 from twinklr.core.sequencer.timing.musical_phase import exact_decimal
 
 logger = logging.getLogger(__name__)
@@ -271,7 +272,8 @@ def _cycle_placements(
         if span > contract.cycle_bars + _EPSILON_BARS:
             # The registration validator rejects this shape; a preset patching step
             # durations can still produce it at runtime.
-            logger.warning(
+            render_log.warn(
+                logger,
                 "Loop steps span %.3f bars but the cycle is %.3f bars; the overrun "
                 "will be clipped at the section boundary",
                 span,

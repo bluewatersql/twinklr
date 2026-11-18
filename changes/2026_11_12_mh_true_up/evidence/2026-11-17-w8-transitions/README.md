@@ -674,3 +674,207 @@ Scratch (session-local, not committed):
 10. **The intro from rest** (M5): dark until the split point, the head easing onto its
     moving orbit as the light comes up, instead of pre-positioned and lit at full from the
     boundary.
+
+## Fix round 2 (second review of `3115b545`, 2026-11-17)
+
+**Provenance.** The second review confirmed every first-round finding fixed with no
+regression and asked for the items below; its scripts (`w8rev2/tools/`) were rerun against
+this tree. Same worktree, same executor, uncommitted; no provider call, no network, no
+xLights, nothing under `~/xlights`, `data/` or `artifacts/`; `make validate` not run (the
+integrator's). Every value is still a proposal for the owner's W8 view.
+
+### H1: the seen rule, for every event that shows something, in one place
+
+`events.seen_until` states the rule once: an event stays visible until half a beat after it
+is shown and, bound to a lyric cue, a quarter beat after the cue, whichever is later.
+`events.yield_spans` (which the render and the repair both read) says, per kind, from where
+it is shown: a colour or gobo change from its reveal; a hit from the frame it plays on (the
+latest head's, as the plan renders without transitions); an `open` from its frame (it had
+a one-frame span); a strobe or `pulse` from its start, for a full beat or to its own end
+(its commanded span, which a window never cuts into, always reaches that far). The
+review's repro (`repro_open_seen.py`: `closed` 4.1, `open` on bar 4's last beat, ENTRY
+blackout / fade_via_black / morph BAR HALF, at 120 BPM, 78.3 BPM with two pickup beats and
+3/4): the `open`'s light is now lit 13 frames (20 at 78.3) before the window, where it was
+one. A strobe on the last beat still ends with its own last flash (two lit frames) on the
+boundary: its span already runs to the boundary, which the window starts at. Test
+`test_an_open_before_a_blackout_is_seen_for_half_a_beat`.
+
+### H2: no transition loses a hit, and the reason is true
+
+The invariant is on outcomes. `RenderingPipeline.render` now renders a plan with
+transitions **first** without them (`transition_free`), and that render's per-head hit
+frames (`hit_frames`) drive the render with them:
+
+- `apply_hits(required=…)`: a hit's beat serves only where every head that plays it
+  without transitions can show it there; else it moves, by the hit's own rules, to the beat
+  where they all do (traced `moved`, reason "a head that plays it without the transitions is
+  dark on its beat with them"); a hit decided with the transitions applied.
+- `HeadContext.protected`, per head, the frame the hit plays on without transitions, from
+  the window's start through the part it enters (a dark cut may outlast the window): the
+  reason "its darkness (a–b ms) would cover the hit at bar … beat …, which plays on this
+  head at t ms without the transition" is then true by construction.
+- A pass that still loses a hit on a head (`_lost_hits`, by comparing the two renders'
+  `hit_frames`) gives up the transition nearest that hit on that head and renders again,
+  at most `TRANSITION_PASSES` (3) times; only the last pass's warnings are logged.
+
+The review's repro (`repro_lost_hit.py`: 170 BPM, `target_orbit` → `zoom_wave`, hit on
+5.2, ENTRY fade_via_black BAR HALF, the zoom rig): all four heads play the transition and
+the hit (moved to 5.3 on all four, 6360 ms), where MH1 and MH2 gave up the transition and
+lost the hit, with a false reason. Test
+`test_no_head_loses_a_hit_to_a_transition_and_its_reason_is_true`, and the random-plans
+test now asserts the invariant on all 12 seeds.
+
+### M1: dark modes end before an incoming hit; shortened, not dropped
+
+`DARK_MODES` (`snap`, `fade_via_black`, `blackout`) add the incoming part's hits (from the
+earliest frame they play on without transitions) to the events they end before. Where a
+dark cut would still cover a hit's frame, a `fade_via_black` or `blackout` moves its
+darkness to end on that frame where it still fits after the window's start, the change
+turning inside it ("fades to dark before the boundary, changes in the dark, and is lit on
+it for its hit"); only otherwise does the head play none (the true reason above). The
+review's sweep (`sweep_ev.py`, 15,876 renders): heads not playing a dark mode for a hit
+2,352 blackout and 1,117 fade_via_black at `3115b545`, **0 and 4** now. Repair reads both
+sections' events (M3). Test `test_a_dark_mode_ends_before_an_incoming_hit_instead_of_being_dropped`.
+
+### M2: a side too short to fade cuts
+
+`transitions.MIN_SIDE_FRAMES` (proposed: 4) applies per side: a fade into or out of a dark
+cut shorter than that cuts (`_Light.cut_sides`; traced "cuts to dark at the boundary,
+changes in the dark, fades up", or "…cutting into it and fading out" on a lit mode's dark
+cut), and a `crossfade` with either side of its handover shorter eases its level across
+the window (the round-1 one-sided form, now also for a side of a frame or two). The
+review's case (170 BPM, a cue-bound hit on 4.4 with its lyric 0.6 beat later, ENTRY
+fade_via_black BAR HALF: window [5620, 6360], boundary 5660): the light holds then cuts to
+dark at the boundary, where it faded 255 → 128 → 0. Test
+`test_a_fade_side_too_short_to_fade_cuts_and_says_so`. The sweep's 84 window-edge jumps
+(all such fades) are gone.
+
+### M3: repair and render share the placement
+
+`rig_repair._yields_to_events` now builds the window with the render's own function
+(`transitions.window_for`, the clamp and the minimum) over the render's own spans
+(`events.yield_spans` on `events.section_events`), from the plan's beats, for both
+sections' events (outgoing: everything seen; incoming: what commands darkness or a wheel,
+and hits for the dark modes). It records each event clamp in the render's words ("the
+window yields: it starts after the part it leaves plays its hit at bar 4 beat 4"), that the
+transition does not play where the minimum is not left, and, where events shorten a
+window, that a head needing longer in the dark plays none there. The review's
+`repair_vs_render.py` (5 grids × 3 events × 2 lyric bindings × 6 modes × 3 lengths × 2
+template pairs, 1,080 cases): **0 disagreements** on whether the window yields and whether
+it plays (92 at `3115b545`: rounding at the seen time, a seen time past the boundary, the
+incoming side unread). Remaining (counted, not fixed: they need the templates' poses and
+wheels at the boundary, which the offer does not carry): **54 cases where heads do not
+play for their own darkness need** — 18 where a lit mode's dark cut for a move does not fit
+the window left (on all four heads), 36 where a `snap`'s dark lead does not (on one to four
+heads); in each, repair says the window yields and that "a head that needs longer in the
+dark … plays no transition", but not which heads. Test `test_repair_and_render_agree_on_what_a_transition_yields_to` (60
+cases: 120 and 170 BPM × a hit, a colour change and an `open` after a `closed` on the last
+beat, bound or not to a late lyric, × 6 modes).
+
+### LOW
+
+- **A hit's seen time** counts from the frame it plays on (the latest head's, from the
+  transition-free render), not its beat.
+- **The second render is quiet without touching logger state**: `render_log` (`held()`, a
+  context variable for that render's call) collects what the render path logs through
+  `render_log.warn`/`note` — the pipeline's warnings and the scheduler's loop-overrun
+  warning; `logging.disabled` is never set. Test
+  `test_the_second_render_logs_nothing_and_leaves_the_logger_alone`.
+- **The played rule compares the whole song per head**, laying each differing frame at the
+  transition playing on that head nearest it (`_transitions_played`); the second render
+  happens only when the plan has transitions.
+- **Cost**: a plan with transitions renders twice (a pass more where a head would lose a
+  hit). On `REALISTIC` (62 bars, 7 transitions, owner-like rig) the reviewer's
+  `double_render.py`: 2.44 s with transitions (2.49 s again) against 1.21 s without;
+  frames, fingerprint and trace deterministic across runs, the plan object untouched, one
+  warning with transitions as without (none twice). The integrator's measure on the
+  owner's song (before this round): render stage 17.2 s with transitions against 7.0 s
+  without.
+
+### Revision, pins, caches
+
+- **`RENDERER_REVISION` 11 → 12.**
+- **Pins:** every pin re-recorded fingerprint only, refusing any moved frame (`PINS`,
+  `MULTI_PIN`, `GATED_PIN`, `INTENT_PIN`, `FAST_INTENT_PIN`, `INTENSITY_PINS`,
+  `EVENT_PINS`, `TRANSITION_PINS`): frames and `.xsq` unchanged. Combined-show golden
+  moving-head fingerprint `ec32a76a…` → `e509125a…`.
+- **Planner cache:** re-keyed (the developer prompt changed): every song plans again once
+  (paid). **Contract:** unchanged.
+
+### Byte matrix, sweeps and fuzzing (fix round 2)
+
+- **Byte matrix** (`w8fix2/matrix_fix.py`, the round-1 harness with plan F, 567
+  configurations; base `git archive 3115b545`; `w8fix2/compare_fix.txt`,
+  `w8fix2/compare_fix_frames.txt`): **identical on every leaf in all 567**: the gate, plans
+  A and B, plan C without its transition, plan D (one crossfade, no events) at all six
+  levels, with and without its transition. Different, by design: plan F (events inside
+  every window) in 567; plan E (every mode) in 54, every one the per-side minimum (M2:
+  equal to `3115b545` with `MIN_SIDE_FRAMES` set to 1 in a scratch copy, `w8fix2/noM2`,
+  54 of 54); plan C at every level in 18 (`fam4_notopo` on the two 3/4 grids, every timing
+  and policy: one rig, plan and meter), not M2 (they differ from `3115b545` with it off
+  too): examined on `fam4_notopo/base/waltz/default`, a hit `3115b545` lost to the
+  crossfade (H2: the hit on 6.1 plays on 5.1 without the transition; the crossfade's dark
+  cut for the colour turn covered it, so no head played it; now the heads whose cut would
+  cover it play no transition there, with that reason, and the hit plays on all four). No render errored on either
+  tree; every wheel byte change dark in plans C (six levels), C without its transition, E
+  and F: 567 each.
+- **The review's events sweep** (`sweep_ev.py`, 6 grids × 9 event sets × 7 × 7 template
+  pairs × 6 modes, 15,876 renders; `w8fix2/out_an_ev.txt`): 0 errors, 0 lit wheel changes,
+  0 lit moves beyond speed, 0 windows off the grid; **0 events lost** to a transition (8 at
+  `3115b545`); **0 trace-against-frames mismatches** over the whole song; heads not
+  playing a dark mode for an incoming hit 0 blackout / 4 fade_via_black (2,352 / 1,117).
+  Its seen check flags 7 renders (one outgoing case, 170 BPM, `fly_out_cascade` with a
+  hit on 4.4 into a blackout, against each of the 7 incoming templates): that hit plays on 4.3 (moved earlier: no
+  head shows 4.4), so it is seen from 4.3 and the window starts after that; the check
+  reads the planned beat. Its 243 window-edge "jumps" are all the incoming hit's own
+  dip-and-snap (153 → full) on the frame the dark mode now ends on (84 at `3115b545`, all
+  two-frame fades, now gone).
+- **The review's fuzzer** (`fuzz.py`, seeds 0–1199, with a lost-hit check added,
+  `w8fix2/fuzz_lost.py`): 0 errors, 0 lit wheel changes, 0 lit moves beyond speed, **0
+  hits lost**; window-edge dimmer jumps in 9 seeds (13 at `3115b545`; 710, 1047, 1061 and
+  1132 gone with M2), each a hit's or strobe's own flash on the edge frame (round 1's
+  check: they vanish with the events stripped).
+- **Transition-free identity** (`ident.py`, 648 renders): plans A, B and C (events, no
+  transition) identical to `3115b545` in 486 of 486 (the other 162 the harness's invalid
+  level, refused alike).
+- **The review's probes**: `repro_open_seen.py` (H1, above), `repro_lost_hit.py` (H2,
+  above), `repair_vs_render.py` (M3, above), `double_render.py` (LOW, above),
+  `probe_m4.py` 1,296 head outcomes, 0 problems.
+
+### Tests and verification (fix round 2; this tree, fresh, after the last code edit)
+
+New in `test_transitions_render.py`: the `open` seen before a blackout (H1); no head loses
+a hit and the reason is true (H2, the review's repro on its rig timings); a dark mode
+ends before an incoming hit (M1); a fade side too short cuts (M2); repair and render agree
+on what a transition yields to (M3, 60 cases); the second render logs nothing and leaves
+the logger alone (LOW); the random-plans test asserts no hit lost (12 seeds). Run on
+`3115b545`'s code with this test file: the H1, H2, M1 and M2 cases fail there, 34 of the
+60 agreement cases, and the 12 random plans (there the new `transition_free` attribute does
+not exist, so these say nothing about that tree's hits); the logging case passes on both.
+
+| Command | Result |
+|---|---|
+| `uv run pytest -q --no-cov` | 7222 passed, 30 skipped (7157 at `3115b545`; 65 new cases) |
+| `uv run pytest tests/regression/test_mh_pins.py tests/golden -q --no-cov` | 62 passed, 1 skipped |
+| `uv run pytest tests/regression/test_mh_intent_parity.py -q --no-cov` | 26 passed; `--runxfail`: 26 passed |
+| `uv run ruff check .` | All checks passed |
+| `uv run ruff format --check .` | 1308 files already formatted |
+| `uv run mypy .` | No issues in 655 source files |
+
+Scratch (session-local, not committed):
+`/private/tmp/claude-501/-Users-ondeck-work-github-twinklr/9cfb5b66-fff4-47db-adcb-766b50dc61e9/scratchpad/w8fix2/`
+(`matrix_fix.py`, `run_matrix.sh`, `matrix_base.jsonl`, `matrix_fix.jsonl`,
+`compare_fix.txt`, `compare_fix_frames.txt`, `noM2/`, `attrib_ce.py`, `cdiff.py`, `sw/`
+and `out_an_ev.txt` (the events sweep), `fz/` and `fuzz_lost.py`, `fuzz_summary.txt`,
+`id/`, `repair_vs_render2.py`, `rvr_final.txt`, `base_3115/`).
+
+### Look questions added (PENDING-OWNER)
+
+11. **The seen rule for every kind** (an `open` held half a beat before a transition
+    darkens it; a strobe's own last flash on the boundary).
+12. **A dark mode before an incoming hit**: shortened to end on the hit (a
+    `fade_via_black` then goes dark before the boundary and is lit on it for the hit).
+13. **`MIN_SIDE_FRAMES` 4**: a shorter fade cuts; a crossfade with a short side eases
+    across instead.
+14. **A hit moved so no head loses it** (the review's case: on 5.3 on all four heads,
+    where without the transition it is on 5.3 too).

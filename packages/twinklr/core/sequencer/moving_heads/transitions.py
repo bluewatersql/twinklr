@@ -22,13 +22,14 @@ share, is where the change turns (`split_ms`).
   held at that cut); its curve and split shape nothing.
 
 A window stays inside the two parts it joins, ends before the incoming part's first event
-that commands darkness or a wheel (`closed`, a strobe, `pulse`, `color`, `gobo`) and
-starts after the outgoing part's last such event's span, and after its colour, gobo and hit
-events have been seen (`pipeline._seen_until`; the event plays, the transition yields), and
-starts after the previous boundary's window; each clamp lands on the frame grid and is
-recorded, and where less of the window is left than its mode needs (`MIN_WINDOW_FRAMES`)
-it plays on no head. A hit inside it plays on the transition's level; a head whose dark
-cut would cover a hit that plays on it without the transition plays no transition.
+that commands darkness or a wheel (`closed`, a strobe, `pulse`, `open`, `color`, `gobo`)
+and, for `DARK_MODES`, its first hit; starts after the outgoing part's last such event's
+span and after every event that shows something has been seen (`events.yield_spans`,
+`events.seen_until`: the event plays, the transition yields); and starts after the previous
+boundary's window. Each clamp lands on the frame grid and is recorded, and where less of
+the window is left than its mode needs (`MIN_WINDOW_FRAMES`) it plays on no head. A hit
+inside it plays on the transition's level; a head whose darkness would cover the frame a
+hit plays on it without the transition plays no transition (`HeadContext.protected`).
 
 **What each channel does** (`MODE_STRATEGIES`, overridden per channel by the plan's
 `channels`; `zoom` follows `pan`):
@@ -219,6 +220,11 @@ _STRATEGY: dict[TransitionStrategy, Behaviour] = {
     TransitionStrategy.SEQUENCE: "sequence",
 }
 
+MIN_SIDE_FRAMES = 4
+"""Proposed (W8 fix round 2). The least, in frames, a fade into or out of a dark cut or a
+crossfade's side of its handover lasts; shorter, the light cuts there (a crossfade eases
+its level across the window instead), never a fade of a frame or two."""
+
 MIN_WINDOW_FRAMES: dict[TransitionMode, int] = {
     TransitionMode.SNAP: 1,
     TransitionMode.CROSSFADE: 4,
@@ -229,6 +235,12 @@ MIN_WINDOW_FRAMES: dict[TransitionMode, int] = {
 }
 """Proposed (W8 fix round). The least of its window, in frames, a transition the events
 it yields to have shortened still plays in; less, it plays on no head."""
+
+DARK_MODES = frozenset(
+    {TransitionMode.SNAP, TransitionMode.FADE_VIA_BLACK, TransitionMode.BLACKOUT}
+)
+"""The modes that darken the heads by their nature: their window ends before an incoming
+hit, as before any incoming event that must be seen (`events.yield_spans`)."""
 
 LIT_MODES = frozenset({TransitionMode.CROSSFADE, TransitionMode.MORPH, TransitionMode.SWEEP})
 SPLIT_ON_BOUNDARY = frozenset(
@@ -928,11 +940,13 @@ def _attempt(
     one_sided = (
         light == "crossfade"
         and window.rest is None
-        and sides.split_ms in (sides.start_ms, sides.end_ms)
+        and min(sides.split_ms - sides.start_ms, sides.end_ms - sides.split_ms)
+        < MIN_SIDE_FRAMES * FRAME
     )
     if one_sided:
-        # Clamped to one side of the boundary there is no handover point: the level
-        # eases from the outgoing look to the incoming one (no jump at either edge).
+        # With a side too short to blend (clamped to one side of the boundary, or nearly)
+        # there is no handover: the level eases from the outgoing look to the incoming
+        # one over the window (no jump at either edge).
         light = "smooth"
     dark_by = [*_POSE, *_WHEELS, ChannelName.SHUTTER, ChannelName.DIMMER]
     edges_fade = any(behaviours.get(c) == "fade" for c in dark_by)
@@ -953,13 +967,33 @@ def _attempt(
         return gap
     if mode is TransitionMode.SNAP:
         wheels_turn = sides.wheels_turn()  # read again at the cut
+    early = False
     if gap is not None:
-        covered = [label for label, at in context.protected if gap[0] <= at < gap[1]]
+        covered = [(at, label) for label, at in context.protected if gap[0] <= at < gap[1]]
+        if covered and mode in (TransitionMode.FADE_VIA_BLACK, TransitionMode.BLACKOUT):
+            # A dark mode ends its darkness before the hit (shortened, not dropped) where
+            # the darkness still fits after the window's start.
+            first = min(covered)[0]
+            split, length = sides.split_ms, gap[1] - gap[0]
+            exact: int | None = None
+            for _ in range(4):
+                moved = (first - length, first)
+                sides.split_ms = max(sides.start_ms, moved[0])  # the change turns in the dark
+                exact = sides.need_ms(moved[0] - FRAME, moved[1])
+                if exact is None or exact <= length:
+                    break
+                length = exact
+            if (
+                moved[0] >= sides.start_ms
+                and exact is not None
+                and exact <= moved[1] - moved[0]
+                and not any(moved[0] <= at < moved[1] for _, at in context.protected)
+            ):
+                gap, covered, early = moved, [], moved[1] <= window.boundary_ms
+            else:
+                sides.split_ms = split
         if covered:
-            return (
-                f"its darkness ({gap[0]}-{gap[1]} ms) would cover the {covered[0]}, which "
-                "plays on this head without the transition"
-            )
+            return f"its darkness ({gap[0]}-{gap[1]} ms) would cover the {min(covered)[1]}"
         if (
             mode in (TransitionMode.FADE_VIA_BLACK, TransitionMode.BLACKOUT)
             and gap[1] > sides.end_ms
@@ -986,7 +1020,15 @@ def _attempt(
     levels = lighting.levels()
     record: dict[str, Any] = {
         "plays": _describe(
-            mode, gap, wheels_turn, dark_pose, window.rest, one_sided, _ends(levels, spans)
+            mode,
+            gap,
+            wheels_turn,
+            dark_pose,
+            window.rest,
+            one_sided,
+            _ends(levels, spans),
+            lighting.cut_sides,
+            early,
         )
     }
     if mode not in (TransitionMode.SNAP, TransitionMode.BLACKOUT):
@@ -1025,13 +1067,17 @@ def _lighting(
     fade_gap: tuple[int, int] | None,
 ) -> _Light:
     """How the transition's dimmer is made on each of its frames: the two looks' levels,
-    the progress, and (with `fade_gap`) the fade into and out of the dark cut."""
+    the progress, and (with `fade_gap`) the fade into and out of the dark cut; a side of
+    the cut shorter than `MIN_SIDE_FRAMES` is no fade: the light cuts there (`cut_sides`)."""
     w0, w1 = sides.start_ms, sides.end_ms
+    least = MIN_SIDE_FRAMES * FRAME
+    cut_out = fade_gap is not None and 0 < fade_gap[0] - w0 < least
+    cut_in = fade_gap is not None and 0 < w1 - fade_gap[1] < least
     frames: list[tuple[int, float, float, float, float]] = []
     for a, b in spans:
         for t in range(a, b, FRAME):
             factor = 1.0
-            if fade_gap is not None:
+            if fade_gap is not None and not (cut_out if t < fade_gap[0] else cut_in):
                 if t < fade_gap[0]:
                     factor = 1.0 - sides.shape(
                         min(1.0, (t - w0 + FRAME) / max(FRAME, fade_gap[0] - w0))
@@ -1050,6 +1096,7 @@ def _lighting(
         curve=sides.window.transition.curve,
         behaviour=light,
         frames=tuple(frames),
+        cut_sides=(cut_out, cut_in),
     )
 
 
@@ -1138,6 +1185,9 @@ class _Light:
     curve: CurveLibrary
     behaviour: Behaviour
     frames: tuple[tuple[int, float, float, float, float], ...]
+    cut_sides: tuple[bool, bool] = (False, False)
+    """Whether the light cuts, rather than fades, into the dark cut and out of it (a side
+    shorter than `MIN_SIDE_FRAMES`)."""
 
     def levels(self, out_gain: float = 1.0) -> dict[int, float]:
         """Each frame's level, the outgoing look's levels scaled by `out_gain`."""
@@ -1381,8 +1431,11 @@ def _describe(
     rest: Literal["before", "after"] | None,
     one_sided: bool,
     ends: tuple[float, float],
+    cut_sides: tuple[bool, bool] = (False, False),
+    early: bool = False,
 ) -> str:
-    """What the transition plays on a head, in words, as its frames show it."""
+    """What the transition plays on a head, in words, as its frames show it (`early`: its
+    darkness ends by the boundary, before a hit on it)."""
     if rest is not None:
         coming = "comes up from" if rest == "before" else "comes to"
         how = {
@@ -1403,15 +1456,19 @@ def _describe(
         TransitionMode.MORPH: "every continuous channel eases across",
         TransitionMode.SWEEP: "the outgoing look holds to the split point, then the head "
         "travels lit to the incoming one",
-        TransitionMode.FADE_VIA_BLACK: "fades to dark at the boundary, changes in the dark, "
-        "fades up",
+        TransitionMode.FADE_VIA_BLACK: f"{'cuts' if cut_sides[0] else 'fades'} to dark "
+        + (
+            "before the boundary, changes in the dark, and is lit on it for its hit"
+            if early
+            else f"at the boundary, changes in the dark, {'cuts' if cut_sides[1] else 'fades'} up"
+        ),
         TransitionMode.BLACKOUT: "dark over the whole window",
     }[mode]
     if mode in LIT_MODES:
         if one_sided:
             said = (
-                "clamped to one side of the boundary: the level eases from the outgoing look "
-                "to the incoming one, the aim eases across"
+                "a side of the boundary too short to blend (clamped to one side): the level "
+                "eases from the outgoing look to the incoming one, the aim eases across"
             )
         if last == 0:
             said += "; it ends dark (the incoming look is dark there)"
@@ -1420,6 +1477,11 @@ def _describe(
     if gap is not None and mode in LIT_MODES:
         why = [f"{c.value} turns" for c in wheels_turn] + [f"{c.value} moves" for c in dark_pose]
         said += f"; a dark cut at the split point ({', '.join(why) or 'a dark strategy'})"
+        if any(cut_sides):
+            said += (
+                f", the light {'cutting' if cut_sides[0] else 'fading'} into it and "
+                f"{'cutting' if cut_sides[1] else 'fading'} out (a side too short to fade)"
+            )
     return said
 
 

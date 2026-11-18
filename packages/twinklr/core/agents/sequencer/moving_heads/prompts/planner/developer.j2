@@ -200,10 +200,12 @@ their home aim). Deterministic code places and plays each:
   `morph` or `sweep` dips dark at its split point for the turn and plays lit around it,
   as does a lit move faster than the heads travel; where the dip does not fit the window
   the heads enter as without a transition. An event inside the window (but a hit) plays
-  and the window yields to it, and it begins only after a colour, gobo or hit event before
-  it has been seen (half a beat, and a quarter beat after its lyric cue); a hit plays on
-  the transition's level, and a head whose dark dip would cover a hit plays no
-  transition. A section's
+  and the window yields to it; it begins only after every event before it that shows
+  something (a colour or gobo change, a hit, an `open`, a strobe or pulse) has been seen
+  for half a beat (and a quarter beat after its lyric cue), and a `snap`,
+  `fade_via_black` or `blackout` ends before an incoming hit. A hit plays on a lit
+  transition's level, and no transition loses a hit: a head that would lose one plays
+  no transition there. A section's
   intensity resumes after the transition with an accent.
 - `length`: how long the change lasts, from one beat to eight bars, on the song's beats;
   measure it against the phrase: a beat or half a bar for a cut-like change, one or two

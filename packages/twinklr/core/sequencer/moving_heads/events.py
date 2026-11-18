@@ -56,7 +56,8 @@ not.
   window after the beat long enough that reveals it within `WHEEL_LATE_BEATS` (recorded,
   late); else it does not play on that head (recorded). A head dark on the beat (or a
   frame or two after it) turns in that darkness and shows the change from its next
-  reveal, lit for `HIT_MIN_LIT_FRAMES` frames running. The event plays on its beat where
+  reveal, its first lit frame however short; only lit for `HIT_MIN_LIT_FRAMES` frames
+  running does it count as showing it within a beat. The event plays on its beat where
   some head shows it within `WHEEL_LATE_BEATS`; a head never lit again before the
   section's end does not play it; where no head would, it moves, on every head, to the
   beat within `WHEEL_MOVE_BARS` where the most heads do, a later one first, else does not
@@ -70,7 +71,7 @@ planner, the cue binder and the plan repair count it.
 from __future__ import annotations
 
 import bisect
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from fractions import Fraction
 import functools
@@ -288,6 +289,80 @@ class SectionEvents:
 
     def hits(self) -> list[TimedEvent]:
         return [e for e in self.events if e.action == "hit"]
+
+
+def seen_until(shown_ms: float, cue_ms: int | None, beat_ms: float) -> float:
+    """**The seen rule**, one for every event that makes something visible: an event a
+    transition must not darken or hand over before it has been seen stays visible until
+    half a beat after it is shown and, bound to a lyric cue, a quarter beat after the cue,
+    whichever is later (proposed, W8 fix rounds). Each kind is shown from (`yield_spans`):
+    a colour or gobo change from its reveal (the latest head's first lit frame showing it);
+    a hit from the frame it plays on (the latest head's); an `open` from its frame; a
+    strobe or `pulse` from its start, for a full beat of it or to its own end if shorter.
+    A `closed`, a strobe and a `pulse` also command darkness over their whole span, which a
+    transition never cuts into, so the strobe's or pulse's own rule never reaches past it."""
+    return max(shown_ms + beat_ms / 2, -math.inf if cue_ms is None else cue_ms + beat_ms / 4)
+
+
+def yield_spans(
+    events: SectionEvents,
+    window: tuple[int, int],
+    beat_grid: BeatGrid,
+    *,
+    hits: bool,
+    records: Mapping[int, Mapping[str, Any]] | None = None,
+    hit_frames: Mapping[int, Sequence[int]] | None = None,
+) -> list[tuple[str, int, int]]:
+    """What a transition yields to in a part (`window`): `(label, from, until)` on the frame
+    grid (from floored, until ceiled) for each event that commands darkness or a wheel or
+    must be seen (`seen_until`): a `closed`, strobe or `pulse` over its span; an `open` from
+    its frame until seen; a colour or gobo change from its dark lead (or half the beat
+    before its beat) until seen from its reveal (`records`: its trace entry, with each
+    head's `dark_dip` and `reveal_ms`; without one, its beat's frame); with `hits`, a hit
+    from the earliest frame it plays on until seen from the latest (`hit_frames`: where it
+    plays on each head without the transition; without them, its beat's frame). A window
+    starts after the `until` of the part it leaves and ends before the `from` of the part
+    it enters. The render and the plan repair both read it (the repair without records)."""
+    spans: list[tuple[str, int, int]] = []
+    lo, hi = window
+    beats = beat_grid.beat_boundaries
+
+    def beat_of(event: TimedEvent) -> float:
+        i = event.beat_index
+        return beats[i + 1] - beats[i] if i + 1 < len(beats) else beats[-1] - beats[-2]
+
+    def on_grid(event: TimedEvent, start: float, end: float) -> None:
+        spans.append(
+            (
+                f"{event.action} at bar {event.bar} beat {event.beat}",
+                math.floor(start / FRAME) * FRAME,
+                math.ceil(end / FRAME) * FRAME,
+            )
+        )
+
+    for event, start, end in events.shutter_spans():
+        if start < hi and end > lo:
+            # Its span reaches at least as far as its seen time (a beat of it, or its end).
+            on_grid(event, start, end)
+    for event in events.events:
+        if not lo <= event.frame_ms < hi:
+            continue
+        length = beat_of(event)
+        if event.action == "open":
+            on_grid(event, event.frame_ms, seen_until(event.frame_ms, event.cue_ms, length))
+        elif event.action in WHEEL_ACTIONS:
+            heads = (records or {}).get(event.index, {}).get("heads", {}).values()
+            leads = [h["dark_dip"]["from_ms"] for h in heads if "dark_dip" in h]
+            reveals = [h["reveal_ms"] for h in heads if h.get("reveal_ms") is not None]
+            on_grid(
+                event,
+                min([*leads, event.frame_ms - length / 2]),
+                seen_until(max(reveals, default=event.frame_ms), event.cue_ms, length),
+            )
+        elif event.action == "hit" and hits:
+            frames = list((hit_frames or {}).get(event.index, ())) or [event.frame_ms]
+            on_grid(event, min(frames), seen_until(max(frames), event.cue_ms, length))
+    return spans
 
 
 def section_events(section: _Section, beat_grid: BeatGrid) -> SectionEvents:
@@ -1359,6 +1434,7 @@ def apply_hits(
     beat_grid: BeatGrid,
     dark_spans: Sequence[tuple[int, int]],
     flashing: Sequence[tuple[TimedEvent, int, int]] = (),
+    required: Mapping[int, Collection[str]] | None = None,
 ) -> tuple[list[FixtureSegment], dict[int, dict[str, Any]], dict[int, dict[str, list[str]]]]:
     """A part's cues as they will play (after every darkness and intensity) with its hits
     played (see the module docstring). A hit is one moment for the rig: it plays on its
@@ -1371,8 +1447,12 @@ def apply_hits(
     later one serves; else it does not play. A head counts it played only where its frames
     differ visibly from the render without it (`_play_hit`). A hit that lights frames a
     strobe or pulse (`flashing`, each with the frames it plays over) holds dark is traced
-    on both. Returns the cues, the trace entry per hit, and per flashing event and head
-    the hits that light its dark frames."""
+    on both. `required` (per hit, the heads that play it in the same plan rendered
+    without transitions) makes a beat serve only where every one of those heads can show
+    it, so a transition never loses a hit on a head: where its beat does not serve them,
+    the hit moves, by the same rules, to the beat that does (else it plays as without
+    them). Returns the cues, the trace entry per hit, and per flashing event and head the
+    hits that light its dark frames."""
     start, end = window
     records: dict[int, dict[str, Any]] = {}
     notes: dict[int, dict[str, list[str]]] = {}
@@ -1412,18 +1492,31 @@ def apply_hits(
             return able
 
         home = event.beat_index
-        chosen, able, direction = home, able_on(home), None
-        if not able and event.cue_ms is not None:
-            # A cue-bound hit moves to the beat nearest its lyric, the later of equals.
-            near = [
-                (abs(beats[home + offset] - event.cue_ms), -offset, home + offset, found)
-                for offset in (*range(1, reach + 1), *range(-1, -reach - 1, -1))
-                if 0 <= home + offset < len(beats) and (found := able_on(home + offset))
-            ]
-            if near:
-                _, _, chosen, able = min(near, key=lambda c: (c[0], c[1]))
-                direction = "later" if chosen > home else "earlier"
-        elif not able:
+        need = frozenset((required or {}).get(event.index, ()))
+
+        def serves(found: Mapping[str, Any], need: frozenset[str] = need) -> bool:
+            return bool(found) and need <= found.keys()
+
+        def moved(
+            serves: Callable[[Mapping[str, Any]], bool],
+            event: TimedEvent = event,
+            home: int = home,
+            able_on: Callable[[int], dict[str, tuple[int, str, int]]] = able_on,
+        ) -> tuple[int, dict[str, tuple[int, str, int]], str] | None:
+            """The beat the hit moves to among those that `serves`: a cue-bound hit's
+            nearest its lyric (the later of equals); another's the most heads show, a
+            later one first."""
+            if event.cue_ms is not None:
+                cue_ms = event.cue_ms
+                near = [
+                    (abs(beats[home + offset] - cue_ms), -offset, home + offset, found)
+                    for offset in (*range(1, reach + 1), *range(-1, -reach - 1, -1))
+                    if 0 <= home + offset < len(beats) and serves(found := able_on(home + offset))
+                ]
+                if near:
+                    _, _, at, found = min(near, key=lambda c: (c[0], c[1]))
+                    return at, found, "later" if at > home else "earlier"
+                return None
             for side, offsets in (
                 ("later", range(1, reach + 1)),
                 ("earlier", range(-1, -reach - 1, -1)),
@@ -1431,12 +1524,29 @@ def apply_hits(
                 candidates = [
                     (len(found), -abs(offset), home + offset, found)
                     for offset in offsets
-                    if 0 <= home + offset < len(beats) and (found := able_on(home + offset))
+                    if 0 <= home + offset < len(beats) and serves(found := able_on(home + offset))
                 ]
                 if candidates:
-                    _, _, chosen, able = max(candidates, key=lambda c: (c[0], c[1]))
-                    direction = side
-                    break
+                    _, _, at, found = max(candidates, key=lambda c: (c[0], c[1]))
+                    return at, found, side
+            return None
+
+        chosen, able, direction = home, able_on(home), None
+        reason = (
+            "every head is dark on the event's beat (a show's rest, a repositioning or a "
+            "wheel change)"
+        )
+        if not serves(able):
+            found = moved(serves)
+            if found is None and not able:
+                found = moved(bool)
+            elif found is not None and able:
+                reason = (
+                    "a head that plays it without the transitions is dark on its beat with "
+                    "them; it moves where every such head shows it"
+                )
+            if found is not None:
+                chosen, able, direction = found
         beat = beats[chosen]
         position = beat_grid.bar_and_beat(chosen)
         for fixture_id in by_head:
@@ -1495,8 +1605,7 @@ def apply_hits(
                     "rule": "the beat nearest its lyric cue"
                     if event.cue_ms is not None
                     else "the beat the most heads show, a later one first",
-                    "reason": "every head is dark on the event's beat (a show's rest, a "
-                    "repositioning or a wheel change)",
+                    "reason": reason,
                 }
             heads[fixture_id] = outcome
     return _in_order(cues, by_head), records, notes

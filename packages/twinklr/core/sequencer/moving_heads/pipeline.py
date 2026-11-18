@@ -55,6 +55,7 @@ from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixt
 from twinklr.core.sequencer.models.moving_heads.topology import rig_topology
 from twinklr.core.sequencer.models.template import RepeatMode
 from twinklr.core.sequencer.models.transition import TransitionEdge
+from twinklr.core.sequencer.moving_heads import render_log
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     FALLBACK_METADATA_KEY,
@@ -92,6 +93,7 @@ from twinklr.core.sequencer.moving_heads.events import (
     cue_summary,
     events_message,
     section_events,
+    yield_spans,
 )
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     ENCODER_VERSION,
@@ -135,6 +137,7 @@ from twinklr.core.sequencer.moving_heads.song_intent import (
 )
 from twinklr.core.sequencer.moving_heads.templates import get_template
 from twinklr.core.sequencer.moving_heads.transitions import (
+    DARK_MODES,
     TRANSITION_METADATA_KEY,
     HeadContext,
     HeadTransition,
@@ -435,65 +438,32 @@ def _cue_level(cue: FixtureSegment, profile: FixtureCapabilities, time_ms: int) 
     )
 
 
-def _event_spans(
-    events: SectionEvents,
-    records: Mapping[int, Mapping[str, Any]],
-    window: tuple[int, int],
-    beat_grid: BeatGrid,
-    *,
-    hits: bool,
-) -> list[tuple[str, int, int]]:
-    """Where a part's events command darkness or a wheel, or must be seen, `(label, start,
-    end)` on the frame grid (start floored, end ceiled): a closed, strobe or pulse event
-    over its span, an `open` on its frame, a colour or gobo event from its dark lead (or
-    half the beat before it) until it has been seen (`_seen_until`), and with `hits` a hit
-    from its beat until it has been seen. A transition yields to them."""
-    spans: list[tuple[str, int, int]] = []
-    lo, hi = window
-
-    def on_grid(label: str, start: float, end: float) -> None:
-        spans.append(
-            (
-                label,
-                math.floor(start / EFFECT_GRID_MS) * EFFECT_GRID_MS,
-                math.ceil(end / EFFECT_GRID_MS) * EFFECT_GRID_MS,
-            )
-        )
-
-    for event, start, end in events.shutter_spans():
-        if start < hi and end > lo:
-            on_grid(f"{event.action} at bar {event.bar} beat {event.beat}", start, end)
-    for event in events.events:
-        if not lo <= event.frame_ms < hi:
-            continue
-        label = f"{event.action} at bar {event.bar} beat {event.beat}"
-        beat = beat_grid.beat_boundaries
-        length = (
-            beat[event.beat_index + 1] - beat[event.beat_index]
-            if event.beat_index + 1 < len(beat)
-            else beat[-1] - beat[-2]
-        )
-        if event.action == "open":
-            on_grid(label, event.frame_ms, event.frame_ms + EFFECT_GRID_MS)
-        elif event.action in WHEEL_ACTIONS:
-            heads = records.get(event.index, {}).get("heads", {}).values()
-            starts = [h["dark_dip"]["from_ms"] for h in heads if "dark_dip" in h]
-            reveals = [h["reveal_ms"] for h in heads if h.get("reveal_ms") is not None]
-            on_grid(
-                label,
-                min([*starts, event.frame_ms - length / 2]),
-                _seen_until(max(reveals, default=event.frame_ms), event.cue_ms, length),
-            )
-        elif event.action == "hit" and hits:
-            on_grid(label, event.frame_ms, _seen_until(event.frame_ms, event.cue_ms, length))
-    return spans
+TRANSITION_PASSES = 3
+"""How many times a render with transitions plays at most: a pass that loses a hit to a
+transition on a head plays again with no transition on that head there."""
 
 
-def _seen_until(shown_ms: float, cue_ms: int | None, beat_ms: float) -> float:
-    """Until when an event shown at `shown_ms` must stay seen before a transition may darken
-    or hand over the look: half a beat after it, and for one bound to a lyric cue a quarter
-    beat after the cue's own time, whichever is later (proposed, W8 fix round)."""
-    return max(shown_ms + beat_ms / 2, -math.inf if cue_ms is None else cue_ms + beat_ms / 4)
+def _plays(outcome: Mapping[str, Any] | None) -> bool:
+    """Whether a transition's outcome on a head plays something (not `nothing`, not
+    `not_played`)."""
+    return (
+        outcome is not None
+        and "not_played" not in outcome
+        and not outcome["plays"].startswith("nothing: ")
+    )
+
+
+def _head_span(entry: Mapping[str, Any], outcome: Mapping[str, Any]) -> tuple[int, int]:
+    """A transition's frames on a head: its window (the head's own) and its darkness."""
+    start, end = outcome.get("window_ms", entry["window_ms"])
+    dark = outcome.get("dark_ms", [start, end])
+    return min(start, dark[0]), max(end, dark[1])
+
+
+def _distance(t: int, span: tuple[int, int]) -> int:
+    """How far frame `t` lies from the span `[start, end)` (0 inside it)."""
+    start, end = span
+    return 0 if start <= t < end else min(abs(t - start), abs(t - end + EFFECT_GRID_MS))
 
 
 @dataclass
@@ -542,12 +512,14 @@ def _play_boundary(
     initial_states: Mapping[str, InitialFixtureState],
     locks: Sequence[RenderLock],
     darken: Callable[[Sequence[FixtureSegment]], list[FixtureSegment]],
-    protected: Sequence[tuple[str, int]] = (),
+    protected: Mapping[str, Sequence[tuple[str, int]]] | None = None,
+    skip: Mapping[str, str] | None = None,
 ) -> _BoundaryPlay:
     """`window`'s transition on every head (`transitions.play_head`, its own cues then
     `darken`ed over the show's rests), from each head's `outgoing` cues and how it stands
-    `before` them; `protected` the frames of events its darkness may not cover. A window
-    the events it yields to left too short plays on no head."""
+    `before` them; `protected`, per head, the frames of hits its darkness may not cover
+    (each with what to say); `skip`, per head, why it plays none (a hit it would lose). A
+    window the events it yields to left too short plays on no head."""
     record = window.record()
     edge = "entry" if window.edge is TransitionEdge.ENTRY else "exit"
     heads_record: dict[str, Any] = {}
@@ -559,8 +531,9 @@ def _play_boundary(
         by_head_in[cue.fixture_id].append(cue)
     for fixture_id in sorted(by_head_in.keys() | outgoing.keys()):
         own_out, own_in = list(outgoing.get(fixture_id, ())), by_head_in[fixture_id]
-        if window.not_played is not None:
-            heads_record[fixture_id] = {"not_played": window.not_played}
+        why_not = window.not_played or (skip or {}).get(fixture_id)
+        if why_not is not None:
+            heads_record[fixture_id] = {"not_played": why_not}
             new_incoming += own_in
             continue
         prefix = before.get(fixture_id, ())
@@ -573,7 +546,7 @@ def _play_boundary(
                 initial=initial_states.get(fixture_id),
                 locks=locks,
                 before=prefix[-1] if prefix else None,
-                protected=protected,
+                protected=(protected or {}).get(fixture_id, ()),
             ),
             identity=own_in[0] if own_in else own_out[-1],
             edge_label=edge,
@@ -2670,6 +2643,13 @@ class RenderingPipeline:
         self.unplayable_warning: str | None = None
         """Set by a `render()` that kept cues dark under `on_unplayable`:
         the one warning it logged, with the counts."""
+        self.hit_frames: dict[tuple[str, int], dict[str, int]] = {}
+        """Set by `render()`: per plan section and hit (its index in the section's
+        events), the frame the hit plays on, per head that plays it."""
+        self.transition_free: RenderingPipeline | None = None
+        """Set by a `render()` whose plan has transitions: the same plan rendered without
+        them, which the played rule and the hits a transition may not lose are read
+        against."""
 
         # Create rig profile from fixture group
         self.rig_profile = rig_profile_from_fixture_group(fixture_group)
@@ -2799,7 +2779,72 @@ class RenderingPipeline:
 
     def render(self) -> list[FixtureSegment]:
         """Render the choreography plan on the frame grid and, with an output path,
-        deliver it.
+        deliver it (`_render_pass`).
+
+        A plan with transitions is first rendered without them (`transition_free`, its
+        warnings held: they are this render's own). That render says where each hit plays
+        on each head, which a transition yields to and may not lose, and is what the
+        played rule compares against. Where, even so, a head would lose a hit to a
+        transition, that head plays no transition at that boundary (traced with why) and
+        the plan renders again, at most `TRANSITION_PASSES` times; only the last pass's
+        warnings are logged.
+
+        Returns:
+            The planned segments: the cues with their transactions and parks.
+
+        Raises:
+            RenderRefusedError: If the transaction pass reports an error.
+            CompileError, PhysicalChannelError, OutputError,
+                ValueError: For a step, value, model or output the renderer refuses.
+        """
+        plan = self.choreography_plan
+        self.transition_free = None
+        if any(section.transitions for section in plan.sections):
+            free = copy.copy(self)
+            free.choreography_plan = plan.model_copy(
+                update={
+                    "sections": [s.model_copy(update={"transitions": []}) for s in plan.sections]
+                }
+            )
+            free.output_path = None
+            with render_log.held():
+                free.render()
+            self.transition_free = free
+        skip: dict[int, dict[str, str]] = {}
+        for _ in range(TRANSITION_PASSES):
+            with render_log.held() as said:
+                segments, time_markers, lost = self._render_pass(skip)
+            if not lost:
+                break
+            for (boundary_ms, fixture_id), why in lost.items():
+                skip.setdefault(boundary_ms, {})[fixture_id] = why
+        render_log.replay(logger, said)
+        if self.output_path:
+            assert self.render_record is not None
+            xsq = build_sequence(
+                list(self.requests),
+                time_markers,
+                media_file=self.media_file,
+                duration_ms=int(self.beat_grid.duration_ms),
+                song=self.song,
+                artist=self.artist,
+                timeline_tracks=self.timeline_tracks,
+            )
+            self.artifacts = export_delivery(
+                xsq,
+                self.runs,
+                output_path=self.output_path,
+                policy=self.job_config.moving_heads,
+                render=self.render_record,
+            )
+            self.sequence = xsq
+        return segments
+
+    def _render_pass(
+        self, skip: Mapping[int, Mapping[str, str]]
+    ) -> tuple[list[FixtureSegment], list[TimeMarker], dict[tuple[int, str], str]]:
+        """Render the choreography plan on the frame grid, every head at a boundary in
+        `skip` (by its boundary's frame) playing no transition there.
 
         Each section's template compiles on the frame grid against the musical phase
         of the detected grid, within its covered span (`cue_limits`); the
@@ -2811,15 +2856,44 @@ class RenderingPipeline:
         anything is written,
         and the delivery itself is published only once its size fits the budgets.
 
-        Returns:
-            The planned segments: the cues with their transactions and parks.
-
-        Raises:
-            RenderRefusedError: If the transaction pass reports an error.
-            CompileError, PhysicalChannelError, OutputError,
-                ValueError: For a step, value, model or output the renderer refuses.
+        Returns the planned segments, the sections' time markers, and per boundary and
+        head a transition that loses a hit there, with why (`_lost_hits`).
         """
         logger.debug("Starting plan rendering...")
+        self.unplayable_warning = None
+        self.hit_frames = {}
+        free = self.transition_free
+        hits_free = {} if free is None else free.hit_frames
+
+        def hit_frames_of(section_id: str) -> dict[int, list[int]]:
+            """Per hit of the plan section, the frames it plays on without transitions."""
+            return {
+                index: sorted(by_head.values())
+                for (sid, index), by_head in hits_free.items()
+                if sid == section_id
+            }
+
+        def protected_in(
+            section_ids: Sequence[str], start_ms: int, end_ms: int
+        ) -> dict[str, list[tuple[str, int]]]:
+            """Per head, the hits of these plan sections it plays inside the window without
+            transitions: a transition's darkness may not cover them."""
+            out: dict[str, list[tuple[str, int]]] = defaultdict(list)
+            for (sid, index), by_head in sorted(hits_free.items()):
+                if sid not in section_ids:
+                    continue
+                event = next(e for e in timed[sid].events if e.index == index)
+                for fixture_id, at in by_head.items():
+                    if start_ms <= at < end_ms:
+                        out[fixture_id].append(
+                            (
+                                f"hit at bar {event.bar} beat {event.beat}, which plays on "
+                                f"this head at {at} ms without the transition",
+                                at,
+                            )
+                        )
+            return out
+
         policy = self.job_config.moving_heads
         topology = rig_topology(self.fixture_group)
         phase_map = build_musical_phase_map(self.beat_grid)
@@ -2836,10 +2910,11 @@ class RenderingPipeline:
         if self.layout_models is not None:
             check_models(fixtures, self.layout_models)
         else:
-            logger.warning(
+            render_log.warn(
+                logger,
                 "moving heads: the xLights model check was not performed (no layout given); "
                 "each fixture's model must be a single-color DMX model of at least its "
-                "profile's footprint, which nothing has verified"
+                "profile's footprint, which nothing has verified",
             )
 
         cues: list[FixtureSegment] = []
@@ -3207,15 +3282,16 @@ class RenderingPipeline:
                         prior = previous.section_id
                         not_before += [
                             (f"it starts after the part it leaves plays its {label}", end)
-                            for label, _, end in _event_spans(
+                            for label, _, end in yield_spans(
                                 timed[prior],
-                                {
-                                    i: event_records.get((prior, i), {})
-                                    for i in range(len(previous.events))
-                                },
                                 left[1],
                                 self.beat_grid,
                                 hits=True,
+                                records={
+                                    i: event_records.get((prior, i), {})
+                                    for i in range(len(previous.events))
+                                },
+                                hit_frames=hit_frames_of(prior),
                             )
                         ]
                         if prior in transition_end:
@@ -3227,8 +3303,14 @@ class RenderingPipeline:
                             )
                     not_after = [
                         (f"it ends before the part it enters plays its {label}", start)
-                        for label, start, _ in _event_spans(
-                            events, played_box[0].records, window, self.beat_grid, hits=False
+                        for label, start, _ in yield_spans(
+                            events,
+                            window,
+                            self.beat_grid,
+                            # A dark mode ends before an incoming hit; a lit one plays it.
+                            hits=chosen.mode in DARK_MODES,
+                            records=played_box[0].records,
+                            hit_frames=hit_frames_of(base_id),
                         )
                     ]
                     boundary_window = window_for(
@@ -3255,11 +3337,13 @@ class RenderingPipeline:
                         initial_states=policy.initial_states,
                         locks=self.locks,
                         darken=rested,
-                        protected=[
-                            (f"hit at bar {e.bar} beat {e.beat}", e.frame_ms)
-                            for e in events.hits()
-                            if boundary_window.start_ms <= e.frame_ms < boundary_window.end_ms
-                        ],
+                        # Through the part it enters: a dark cut may outlast the window.
+                        protected=protected_in(
+                            [base_id] if previous is None else [previous.section_id, base_id],
+                            boundary_window.start_ms,
+                            max(boundary_window.end_ms, window[1]),
+                        ),
+                        skip=skip.get(boundary_window.boundary_ms),
                     )
                     _cut_outgoing(cues, kept, standing, leaving_cues, play, profiles)
                     section_cues, entered_by, transition_record = (
@@ -3376,7 +3460,8 @@ class RenderingPipeline:
                 default=None,
             )
             if window_end is not None and window_end >= context.end_ms:
-                logger.warning(
+                render_log.warn(
+                    logger,
                     "moving heads: section %r (%s-%s ms) is shorter than its entry window, "
                     "which ends at %s ms; it renders dark",
                     section.section_id,
@@ -3403,15 +3488,16 @@ class RenderingPipeline:
                 rest="after",
                 not_before=[
                     (f"it starts after the part plays its {label}", span_end)
-                    for label, _, span_end in _event_spans(
+                    for label, _, span_end in yield_spans(
                         timed[last_section.section_id],
-                        {
-                            i: event_records.get((last_section.section_id, i), {})
-                            for i in range(len(last_section.events))
-                        },
                         (part_start, part_end),
                         self.beat_grid,
                         hits=True,
+                        records={
+                            i: event_records.get((last_section.section_id, i), {})
+                            for i in range(len(last_section.events))
+                        },
+                        hit_frames=hit_frames_of(last_section.section_id),
                     )
                 ],
             )
@@ -3425,6 +3511,10 @@ class RenderingPipeline:
                 initial_states=policy.initial_states,
                 locks=self.locks,
                 darken=rested,
+                protected=protected_in(
+                    [last_section.section_id], closing.start_ms, max(closing.end_ms, end)
+                ),
+                skip=skip.get(closing.boundary_ms),
             )
             _cut_outgoing(cues, kept, standing, leaving_cues, play, profiles)
             cues.extend(play.incoming)
@@ -3432,7 +3522,8 @@ class RenderingPipeline:
             part_records[part_id].setdefault("transitions", []).append(play.record)
         section_looks.extend(record for record in part_records.values() if len(record) > 1)
         if dropped:
-            logger.warning(
+            render_log.warn(
+                logger,
                 "moving heads: %d cue(s) start outside the frames %s-%s ms that the covered "
                 "phase span and the song allow and are dropped (held dark); the trace's "
                 "dropped_cues lists them",
@@ -3441,13 +3532,15 @@ class RenderingPipeline:
                 end_limit,
             )
         if in_window:
-            logger.warning(
+            render_log.warn(
+                logger,
                 "moving heads: %d cue(s) lie inside their section's entry window and are "
                 "dropped (held dark); the trace's dropped_cues and entry_windows list them",
                 len(in_window),
             )
         if self.dark_spans:
-            logger.info(
+            render_log.note(
+                logger,
                 "moving heads: every fixture is held dark over %d span(s), its cues playing "
                 "on there along their authored paths; the trace's dark_spans lists them",
                 len(self.dark_spans),
@@ -3552,9 +3645,20 @@ class RenderingPipeline:
                 beat_grid=self.beat_grid,
                 dark_spans=self.dark_spans,
                 flashing=flashing,
+                required={
+                    event.index: set(hits_free.get((base, event.index), {})) for event in hits
+                },
             )
             for i, cue in zip(index, struck, strict=True):
                 cues[i] = cue
+            for event in hits:
+                for fixture_id, outcome in (
+                    hit_outcomes.get(event.index, {}).get("heads", {}).items()
+                ):
+                    if "played_ms" in outcome:
+                        self.hit_frames.setdefault((base, event.index), {})[fixture_id] = outcome[
+                            "played_ms"
+                        ]
             for event_entry in record["events"]:
                 for event in hits:
                     if event_entry is event_records.get((base, event.index)):
@@ -3626,7 +3730,7 @@ class RenderingPipeline:
                 )
                 + "); the trace's dropped_cues lists them"
             )
-            logger.warning(self.unplayable_warning)
+            render_log.warn(logger, "%s", self.unplayable_warning)
 
         frames: list[EncodedFixtureFrame] = []
         for fixture in fixtures:
@@ -3643,8 +3747,10 @@ class RenderingPipeline:
         self.frames = tuple(frames)
         self.runs = runs
         self.requests = requests
-        if any(section.transitions for section in self.choreography_plan.sections):
-            diagnostics += self._transitions_played(section_looks)
+        lost: dict[tuple[int, str], str] = {}
+        if free is not None:
+            lost = self._lost_hits(section_looks, timed)
+            diagnostics += self._transitions_played(section_looks, free)
         self.render_record = {
             "render_fingerprint": self.fingerprint(),
             "renderer_revision": RENDERER_REVISION,
@@ -3790,50 +3896,66 @@ class RenderingPipeline:
             # Each cue played without an optional attribute its fixture lacks, by the
             # step's declared alternative; left out when none was, like the exclusions.
             self.render_record["omitted_optional"] = omitted
-        if self.output_path:
-            xsq = build_sequence(
-                requests,
-                time_markers,
-                media_file=self.media_file,
-                duration_ms=duration_ms,
-                song=self.song,
-                artist=self.artist,
-                timeline_tracks=self.timeline_tracks,
-            )
-            self.artifacts = export_delivery(
-                xsq, runs, output_path=self.output_path, policy=policy, render=self.render_record
-            )
-            self.sequence = xsq
-        return list(result.segments)
+        return list(result.segments), time_markers, lost
 
-    def _transitions_played(self, section_looks: Sequence[dict[str, Any]]) -> list[MHDiagnostic]:
-        """The played rule for transitions, as for hits: a transition counts as played on a
-        head only where the head's frames over its window (and its darkness) differ from
-        the same plan rendered without transitions; on a head where they do not, its trace
-        entry says `nothing` and why. Returns one warning per section where a transition
-        played nothing or did not play on some head."""
-        baseline = copy.copy(self)
-        baseline.choreography_plan = self.choreography_plan.model_copy(
-            update={
-                "sections": [
-                    s.model_copy(update={"transitions": []})
-                    for s in self.choreography_plan.sections
+    def _lost_hits(
+        self,
+        section_looks: Sequence[Mapping[str, Any]],
+        timed: Mapping[str, SectionEvents],
+    ) -> dict[tuple[int, str], str]:
+        """The hits a transition loses: per head, a hit that plays in the transition-free
+        render and not in this one. Each is laid at the transition playing on that head
+        nearest the frame the hit plays on without transitions (by its boundary's frame),
+        with why that head is to play none there."""
+        assert self.transition_free is not None
+        lost: dict[tuple[int, str], str] = {}
+        entries = [t for look in section_looks for t in look.get("transitions", [])]
+        for (section_id, index), by_head in sorted(self.transition_free.hit_frames.items()):
+            event = next(e for e in timed[section_id].events if e.index == index)
+            for fixture_id, at in sorted(by_head.items()):
+                if fixture_id in self.hit_frames.get((section_id, index), {}):
+                    continue
+                playing = [
+                    (_distance(at, _head_span(entry, entry["heads"][fixture_id])), entry)
+                    for entry in entries
+                    if _plays(entry.get("heads", {}).get(fixture_id))
                 ]
-            }
-        )
-        baseline.output_path = None
-        quiet = logger.disabled
-        logger.disabled = True  # its warnings are this render's own, already logged
-        try:
-            baseline.render()
-        finally:
-            logger.disabled = quiet
-        frames: dict[str, dict[int, Any]] = defaultdict(dict)
-        for frame in self.frames:
-            frames[frame.fixture_id][frame.time_ms] = frame.channels
+                if not playing:
+                    continue
+                _, entry = min(playing, key=lambda c: c[0])
+                lost[(entry["boundary_ms"], fixture_id)] = (
+                    f"with it the hit at bar {event.bar} beat {event.beat} would not play on "
+                    f"this head (it plays at {at} ms without the transition)"
+                )
+        return lost
+
+    def _transitions_played(
+        self, section_looks: Sequence[dict[str, Any]], free: RenderingPipeline
+    ) -> list[MHDiagnostic]:
+        """The played rule for transitions, as for hits: each frame where a head differs
+        from the same plan rendered without transitions (`free`), over the whole song, is
+        laid at the transition playing on that head nearest it; a transition counts as
+        played on a head only where some difference is laid at it, and otherwise its
+        trace entry says `nothing` and why. Returns one warning per section where a
+        transition played nothing or did not play on some head."""
         without: dict[str, dict[int, Any]] = defaultdict(dict)
-        for frame in baseline.frames:
+        for frame in free.frames:
             without[frame.fixture_id][frame.time_ms] = frame.channels
+        differ: dict[str, list[int]] = defaultdict(list)
+        for frame in self.frames:
+            if without[frame.fixture_id].get(frame.time_ms) != frame.channels:
+                differ[frame.fixture_id].append(frame.time_ms)
+        entries = [t for look in section_looks for t in look.get("transitions", [])]
+        shown: set[tuple[int, str]] = set()
+        for fixture_id, times in differ.items():
+            playing = [
+                (_head_span(entry, entry["heads"][fixture_id]), id(entry))
+                for entry in entries
+                if _plays(entry.get("heads", {}).get(fixture_id))
+            ]
+            for t in times:
+                if playing:
+                    shown.add((min(playing, key=lambda c: _distance(t, c[0]))[1], fixture_id))
         said = {
             TransitionMode.SNAP: "the plain cut: its darkness before the boundary changes no "
             "frame (the head enters as it would without it)",
@@ -3842,7 +3964,6 @@ class RenderingPipeline:
         diagnostics = []
         for look in section_looks:
             for entry in look.get("transitions", []):
-                start, end = entry["window_ms"]
                 nothing, not_played = [], []
                 for fixture_id, outcome in sorted(entry.get("heads", {}).items()):
                     if "not_played" in outcome:
@@ -3851,17 +3972,13 @@ class RenderingPipeline:
                     if outcome["plays"].startswith("nothing: "):
                         nothing.append(fixture_id)
                         continue
-                    a = min(start, *outcome.get("dark_ms", [start]))
-                    b = max(end, *outcome.get("dark_ms", [end]), *outcome.get("window_ms", [end]))
-                    times = range(a, b, EFFECT_GRID_MS)
-                    if all(frames[fixture_id].get(t) == without[fixture_id].get(t) for t in times):
-                        mode = TransitionMode(entry["mode"])
+                    if (id(entry), fixture_id) not in shown:
                         kept = {
                             k: v for k, v in outcome.items() if k == "strategies_played_otherwise"
                         }
                         outcome.clear()
                         outcome["plays"] = "nothing: " + said.get(
-                            mode, "it changes no frame on this head"
+                            TransitionMode(entry["mode"]), "it changes no frame on this head"
                         )
                         outcome.update(kept)
                         nothing.append(fixture_id)

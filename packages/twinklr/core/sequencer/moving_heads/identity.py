@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 BACKEND_ID = "xlights_dmx"
 """The backend the renderer writes: xLights DMX effects in an `.xsq`."""
 
-RENDERER_REVISION = "11"
+RENDERER_REVISION = "12"
 """Bumped by hand in the commit that intentionally changes the renderer's output; the
 render identity also carries the frame encoder's own version. 3: a section's colour and
 gobo are rendered (song-intent rendering W4), so a plan that sets them renders
@@ -65,7 +65,12 @@ frame however short, a transition's window yields to the colour, gobo and hit ev
 before it until they have been seen and plays on no head where too little is left, a
 head whose transition would darken an incoming hit plays none, `blackout` is dark over
 its whole window on every head, `snap` turns the wheels held at its dark cut, and a
-crossfade clamped to one side of the boundary eases its level instead of jumping."""
+crossfade clamped to one side of the boundary eases its level instead of jumping. 12 (W8
+fix round 2): an `open` is seen half a beat before a transition darkens it, a hit is seen
+from the frame it plays on, a dark mode ends before an incoming hit instead of being
+dropped, a fade side or a crossfade side too short to blend cuts (or eases across), and a
+hit that plays without the transitions plays with them (moved where every such head shows
+it)."""
 
 
 def render_fingerprint(
