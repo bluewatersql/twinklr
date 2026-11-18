@@ -10,6 +10,8 @@ updated: 2026-11-18
 
 ## Start here — current state, 2026-11-18
 
+**Latest recovery assessment:** [Claude spend-limit interruption, exact worktree state and next steps](capacity-recovery-2026-11-18.md). Integration HEAD is `cd13034a`, revision 20; both side worktrees have unfinished merges. Read this assessment before the older snapshot below.
+
 Read this section first. It is enough to carry on without any chat history. The dated log
 below it is history.
 
