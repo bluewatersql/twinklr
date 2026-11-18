@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 BACKEND_ID = "xlights_dmx"
 """The backend the renderer writes: xLights DMX effects in an `.xsq`."""
 
-RENDERER_REVISION = "17"
+RENDERER_REVISION = "18"
 """Bumped by hand in the commit that intentionally changes the renderer's output; the
 render identity also carries the frame encoder's own version. 3: a section's colour and
 gobo are rendered (song-intent rendering W4), so a plan that sets them renders
@@ -88,7 +88,10 @@ takes its next candidate or gives way; FASTER falls back one reach step at most;
 within 3 degrees of an earlier one are not offered; a lyric hit that moves prefers the beat
 after its own; a colour move keeps every head that showed it; shown time is counted on the
 planned frames. A plan whose variations cost no event, with no such hit or colour move,
-renders the same frames."""
+renders the same frames. 18 (the song outranks the arrangement, revised): the arrangement
+is built up greedily from the reference (every variation step off) and judged by
+`pipeline.worse` over every event, transition and head; a hit or colour move may only
+improve on the unmoved outcome, bounded in beats."""
 
 
 def render_fingerprint(

@@ -89,6 +89,67 @@ fingerprint-only with every frame unchanged, and the new tests below pin the new
   a first appearance has nothing before it); stated in the module, both planner prompts
   and the user guide.
 
+## The song outranks the arrangement, revised (after 08c50a92: review)
+
+**Why.** Blame misattributed (the owner's chorus_2 gave up `wide` for an event the break
+cost), the four-pass limit had no fallback, and a one-bar clamp counted in frames lost
+events in plans with no variation (fuzz seeds 4, 688, 810, 216).
+
+**Built (revision 18).** No blame. `RenderingPipeline._choose_arrangement` builds the
+arrangement up from the reference R (every unit at "reference": each part plays what it
+would with its section's variation NONE, inherited variants included): unit by unit in
+plan order, each candidate (the step, then a FASTER step's one-step-narrower reach) renders
+the whole song with the units accepted so far plus it; the first under which `worse(R,
+trial)` is empty is accepted, else the unit stays at its reference, traced "the variation
+gave way to <the first worse event>". Once every unit is decided, each that gave way is
+tried again with the later acceptances in place, until none changes. The final render is
+the last accepted trial, reused; renders are cached by resolved arrangement; the
+transition-free copy never chooses. Tie-break: where two units cannot both play, the
+earlier in plan order keeps its choice.
+
+- `pipeline.worse(reference, trial) -> list[str]` (public): an event or a head missing; a
+  head losing it; a hit farther from its cue or beat, or a flash peak lower; a colour or
+  gobo shown later or more briefly; a `closed` with more lit frames, a strobe or pulse with
+  fewer (over 25 frames from its frame, played or not); a transition no longer playing on a
+  head. One frame of tolerance.
+- Units are generic (`ArrangementUnit(key, order, candidates)`, `register_arrangement_units`,
+  `unit_choice`, `unit_gave_way`); `_variation_units` is the only kind today.
+- Move rules improve only on the unmoved outcome: a hit move keeps every head that played
+  it on its own beat (unless it moves for heads a transition would lose it on); a colour or
+  gobo move keeps every head the rule as it was showed it on; moves are bounded in beats.
+  Repair mirrors both. Repair's wording: "the variation may give way".
+
+**Acceptance.**
+- Reviewer's `strict_worse.py`, 200 plans per setup: 0 worse on plain, plain170, slow79
+  and slow3/4 (run before and after the retry pass, 0 errors).
+- `variation_regress.py`: 0 of 288 on plain and on allowed150.
+- `restore_measure.py` (on `worse`): 37 sections flagged in 100 plans (17 plain, 20 slow79),
+  none a configuration the render can play at no cost. 12 are no reinstatement: the
+  repair-predicted "asked" variant equals what the section plays after giving way, so the
+  trial is the final arrangement. 25 reinstate a motif introducer or family predecessor
+  while its carriers keep the plays they resolved from its reference variant; the unit
+  re-resolves them, and every unit candidate is worse. Re-measured as units (the section
+  with what re-resolves from it), 0 of 37 are free.
+- Fuzz vs 5825ff0a (1,200 plans, every event per head): 0 lost that played before
+  (seeds 4, 688, 810, 216 included), 6 gained.
+- `recount_shown`: frame-checked before an EXIT blackout and before the next section's
+  entry repositioning (`test_shown_time_matches_the_encoded_frames`).
+
+**Cost (REALISTIC, the reviewer's `timing.py`).** Without variation: 3.4 s, 2 passes. With
+variation: 25.9 s, 14 passes = 7 arrangement renders (1 reference, 4 candidates, 2
+retries of the break-like chorus_1 after chorus_2 was accepted), the final reused; was
+26.8 s / 14 passes. Without the retry it would be 5 renders.
+
+**Strobe question (owner look list, not changed).** A strobe only adds darkness (a square
+wave through the dimmer or shutter, or the fixture's strobe state on frames whose shutter
+is open), so it never lights a frame the template holds closed: a probe over 81 template
+pairs and two strobe speeds on the owner-like 150 degree/s rig found 0 such frames. With an
+EXIT transition (blackout or snap) on the section, the strobe's lit phases play over the
+transition's dark window on every head (180 cases): by the rule as written ("a closed,
+strobe or pulse commands darkness over its whole span, which a transition never cuts
+into"). If the owner's break has a transition there, frame 191 is that rule; if the
+template itself closes the shutter there, it is a bug not reproduced synthetically.
+
 ## The song outranks the arrangement (after bcefff0f: owner render and review)
 
 **Why.** At bcefff0f the owner's break played FASTER as `narrow+fast` and lost chorus_2's

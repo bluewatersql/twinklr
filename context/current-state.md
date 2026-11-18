@@ -116,7 +116,7 @@ See [product/overview.md](product/overview.md).
     it within a beat, else not played. The trace records every event
     per head (unplaceable ones too) and every lyric cue with its offset from the lyric;
     the offer says what each event plays at the song's tempo; repair records, with the
-    render's tests, what will play otherwise. Renderer revision 17.
+    render's tests, what will play otherwise. Renderer revision 18.
     ([user guide](../docs/user-guide.md#how-a-sections-events-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w6-w7-events/README.md))
   - **Transitions** (W8, 2026-11-17, not yet seen by the owner). Each boundary plays its
@@ -135,7 +135,7 @@ See [product/overview.md](product/overview.md).
     transition counts as played on a head only where its frames differ from the plan
     rendered without transitions (else traced `nothing`, warned). Repair shortens one
     longer than its parts and records what plays otherwise; the trace lists each per
-    head. Renderer revision 17.
+    head. Renderer revision 18.
     ([user guide](../docs/user-guide.md#how-a-sections-transitions-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w8-transitions/README.md))
   - **Motif and variation** (W10b/W10c, 2026-11-18, not yet seen by the owner). Each
@@ -154,9 +154,10 @@ See [product/overview.md](product/overview.md).
     period (wide x1.4-x1.2; fast toward `narrow`'s reach at the halved period; render
     identity), and no two offered variants play alike. A colour or gobo change shown
     only briefly moves to a beat where it is shown half a beat (never losing a head that
-    showed it), else is traced `brief`. The song outranks the arrangement: a variation
-    that would make any event worse than its source variant gives way (render-decided,
-    repair-predicted). Renderer revision 17.
+    showed it, never worse than the unmoved outcome), else is traced `brief`. The song
+    outranks the arrangement: the arrangement is built up greedily from the reference
+    (every variation step off); a variation that makes any event worse gives way
+    (render-decided, repair-predicted). Renderer revision 18.
     ([user guide](../docs/user-guide.md#how-a-sections-motif-and-variation-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-w10bc-motif-variation/README.md))
   - **Not rendered yet: density and modifiers.** Accepted and ignored (a per-section

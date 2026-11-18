@@ -160,9 +160,10 @@ Departures from §1 and §3, each recorded here:
   alike; FASTER falls back to a narrower reach.
 - *The song outranks the arrangement* (integrator decision after the owner render at
   bcefff0f, revision 17): a variation may never make a lyric-bound or planned event worse
-  than its source variant; the render renders the plan with steps off and as resolved and
-  gives way where an event worsens (`_settle_arrangement`); repair predicts it for the
-  planner. FASTER falls back one reach step at most; near-twin variants (3 degrees) are
+  than its source variant; revision 18 builds the arrangement up greedily from the
+  reference (every step off), unit by unit in plan order, accepting the first candidate
+  under which no event is worse (`pipeline.worse`, `ArrangementUnit`); repair predicts
+  where a variation may give way. FASTER falls back one reach step at most; near-twin variants (3 degrees) are
   not offered.
 - *Code-owned relation* (W10b/c review M1): plan time derives and overwrites
   `motif_relation`/`motif_source_id`; the render derives them again, keeping only a
