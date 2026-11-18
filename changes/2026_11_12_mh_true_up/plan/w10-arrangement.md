@@ -214,6 +214,9 @@ or not-offered keys are recorded and fed back. Gate admission per offered value.
 
 ## 7. PENDING-OWNER
 
+All open owner questions are collected in one list:
+[owner decisions pending](owner-decisions-pending.md).
+
 1. The meaning of density as rendered (dark / half the heads alternating per cycle / the template /
    an accent a bar), against the prompts' "movement" wording.
 2. Looks: `wide`/`fast` extents and rate; SPARSE's alternation; BUSY's accent per bar; SPARSE on

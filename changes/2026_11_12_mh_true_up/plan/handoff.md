@@ -3,44 +3,179 @@ type: handoff
 status: active
 area: research-and-planning
 change: 2026_11_12_mh_true_up
-updated: 2026-11-17
+updated: 2026-11-18
 ---
 
 # Handoff — Moving-head technical design and implementation plans
 
-## Start here — current state, 2026-11-17
+## Start here — current state, 2026-11-18
 
-Status: **single-renderer cutover C1.1–C1.5 complete on `feat/mh-true-up-p3` (not
-merged, not pushed), with a known regression: the planner's song intent is not rendered.
-Next: song-intent rendering, tasks W0–W9 of
-[song-intent-rendering.md](song-intent-rendering.md) (plan of record; it replaces T1),
-then motif, variation and density.** Worktree
-`/Users/ondeck/work/github/twinklr-mh-true-up`, cut from `main` at `7356b376`. The dated
-log below this section is history; the plan of record is
-[phase-3-arrangement.md](phase-3-arrangement.md) (read its dated sections from
-"Single-path direction" on).
+Read this section first. It is enough to carry on without any chat history. The dated log
+below it is history.
 
-Moving heads now have one renderer: the profile-based renderer that `physical_v2` used to
-select. The old renderer, its 37 built-in templates, `moving_heads.mode`, `transitions`,
-schema `3.0`, `template-export`, the old fixture and template keys and the old goldens
-are gone; a job or file naming a removed key is refused by name.
+### What the branch is
 
-**Known regression.** The renderer applies each section's template, preset and bars
-only. The planner's intensity, section colour, shutter and gobo events, lyric moment cues
-bound to events and section transitions are not applied
-(`sequencer/moving_heads/pipeline.py:1713-1726`), and `twinklr show` does not project the
-macro palette or focal role onto the heads (`pipeline/show_stages.py:63-68`). The
-renderer deleted in `0ec65d47` rendered them; the cutover regressed them. The owner
-directed on 2026-11-17 that all of it be rendered on the single path and that nothing be
-cut from the planner contract
-([plan](phase-3-arrangement.md#2026-11-17-owner-direction--the-planners-song-intent-must-be-rendered-not-cut)).
-The T1 design draft of 2026-11-16, which cut the unread fields, and decision D7 are
-withdrawn. What is true now is in
-[context/current-state.md](../../../context/current-state.md#implemented) and the
-decision [mh-single-renderer](../../../memories/decisions/mh-single-renderer.md).
+`feat/mh-true-up-p3` lives in the worktree `twinklr-mh-true-up`. It was cut from `main` at
+`7356b376` (Phases 0–2 merged) and its head is `934b2635`. **It is not merged and not
+pushed. Merging and pushing are the owner's decision.**
 
-Commits on the branch since `main` (code and record commits; the handoff-only commits
-`6caf7cba` and `462ad93e` are left out):
+The branch does three things:
+
+- **The cutover (C1.1–C1.5).** Moving heads now have one renderer, the profile-based one.
+  The old renderer, its 37 templates, `moving_heads.mode`, `transitions`, schema `3.0`,
+  `template-export`, the old keys and the old goldens are deleted. A job or file that
+  names a removed key is refused by name.
+- **Song intent rendered again.** The cutover had regressed the planner's song intent. The
+  owner directed on 2026-11-17 that all of it be rendered and nothing be cut from the
+  planner contract; W0–W8 and W10a–c have done that, with W9 delivered inside W4 and W5
+  (see the [plan](song-intent-rendering.md)).
+- **What is rendered on the branch, renderer revision 19:**
+  - section colour and gobo, from the wheel tags in each fixture profile (W1, W3/W4);
+  - intensity on the dimmer (W5);
+  - the plan's events: hit, `closed`/`open`, strobes, pulse, colour and gobo changes, with
+    lyric moment cues bound to them (W6/W7);
+  - section transitions (W8);
+  - under `twinklr show`, the macro palette and the heads' focal role (W9, folded into W4
+    and W5);
+  - motif and variation with variants fitted to the rig, plus the rule that the song
+    outranks the arrangement (W10a–c).
+
+  What is true now is in
+  [context/current-state.md](../../../context/current-state.md#implemented), and the user
+  guide explains it to the user.
+- **Not on this branch:** density and modifiers. Each was built on its own side branch
+  (below). Until they are merged, the renderer records them in a trace diagnostic and
+  plays nothing for them.
+
+### Side branches
+
+| Work | Branch | State | Final commit |
+|---|---|---|---|
+| W10d density (SPARSE/BALANCED/BUSY as arrangement units) | `feat/mh-true-up-p3-density` (worktree `twinklr-mh-density`) | `16d1b0f6` under review; its author is merging `f9894cc8` and wiring density as units. Final: <integrator fills at merge> | <integrator fills at merge> |
+| W10e modifiers (per part, as arrangement units) | `feat/mh-true-up-p3-modifiers` (worktree `twinklr-mh-modifiers`) | In progress from `08c50a92`. Final: <integrator fills at merge> | <integrator fills at merge> |
+
+Both plug into the arrangement loop as **units**: `ArrangementUnit`,
+`register_arrangement_units`, `RenderingPipeline.unit_choice` and `unit_gave_way`, all in
+`sequencer/moving_heads/pipeline.py`. Every unit is judged by the public
+`pipeline.worse(reference, trial)`. How a unit kind is added is in the `ArrangementUnit`
+docstring.
+
+### Commits since the C1.5 documents
+
+The table covers code and record commits. It continues the
+[cutover table](#commits-on-the-branch-through-c15) further down.
+
+| Work | Commits | Record |
+|---|---|---|
+| Do not merge before song intent; plan revised | `7c31919d` | [song-intent rendering](song-intent-rendering.md), [gap inventory](../evidence/2026-11-17-song-intent-gap-inventory/README.md) |
+| W0 intent-parity harness | `af504809` | [record](../evidence/2026-11-17-w0-intent-parity/README.md) |
+| W1 profile tags | `10f3ac49` | [record](../evidence/2026-11-17-w1-profile-tags/README.md) |
+| W2 planner contract (Claude compiles; three live probes) | `1f953f96`, `85595b98`, `5c2a20d8`, `2cdb19e8`, `897c4501`, `89e4208d`, `f9e348da`, `9deb95df` | [record](../evidence/2026-11-17-w2-planner-contract/README.md) |
+| W3/W4 rig offer, section colour and gobo | `e611164f`, `cbf4a684`, `f0e2cff6` | [record](../evidence/2026-11-17-w3-w4-offer-colour/README.md) |
+| W5 intensity, focal role (W9 half) | `9d607f45`, `7c6c2b08` | [record](../evidence/2026-11-17-w5-intensity/README.md) |
+| W6/W7 events and lyric cues; intensity re-review | `c0ee6a40`, `0e02e969` | [record](../evidence/2026-11-17-w6-w7-events/README.md) |
+| W8 transitions | `82bd2b0a`, `3115b545`, `fd85b8db`, `1eca8998` | [record](../evidence/2026-11-17-w8-transitions/README.md) |
+| W10a wide and fast variants | `d1125419` | [record](../evidence/2026-11-17-w10a-variants/README.md) |
+| W10b/c motif and variation | `5b708b26` | [record](../evidence/2026-11-18-w10bc-motif-variation/README.md), [plan](w10-arrangement.md) |
+| Motif steps from its introducer | `e922bc52` | same record |
+| Gate on rigs whose allowed range is narrower than physical | `2c961b58` | same record |
+| Variants fitted to the rig | `5825ff0a` | same record |
+| Fitted variant keeps its period; colour shown long enough | `bcefff0f` | same record |
+| The song outranks the arrangement (blame; superseded) | `08c50a92` | same record |
+| Arrangement built up from the reference; move rules only improve | `f9894cc8` | same record, "revised (after 08c50a92)" |
+| Every candidate tried (a FASTER the rig does not admit plays its narrower reach); strobe, pulse and `closed` judged over their whole span | `934b2635` | same record, "Review fixes (after f9894cc8)" |
+| W10d density | <integrator fills at merge> | <integrator fills at merge> |
+| W10e modifiers | <integrator fills at merge> | <integrator fills at merge> |
+
+### How to validate and review
+
+- **Validation runs in its own worktree.** The integrator checks out a commit there in a
+  detached HEAD (`twinklr-mh-validate*`) and runs `make validate`. Implementing agents
+  never run it in their own tree. `make validate` rewrites files and needs a clean tree;
+  see the [operating model](../../../context/agents/operating-model.md).
+- **Reviewers work on a `git archive` of the commit under review,** extracted into a
+  scratch folder. To compare with an earlier commit, archive that commit as well. Each
+  reviewer writes measurement scripts and hands them over. The authoring agent reruns
+  them on its fix, and the next reviewer reruns them again.
+- **The measures that settled each round:**
+  - an event-level before/after comparison of the same plans on two trees: which head
+    plays each event, and when;
+  - seeded fuzz plans on several rigs and grids, including slow heads (150°/s), narrowed
+    allowed ranges, 3/4 and fast tempos;
+  - for the arrangement, `worse(reference, render)` over every event, transition and head.
+- **Owner-rig renders.** This is a method; its paths are session-local and are not
+  recorded here.
+  1. Render the owner's song from its saved plan (`final.json`, read in place) with the
+     owner-rig fixture and job configs (owner-local, authorized for this change).
+  2. Gate offline with no provider call.
+  3. Write the sequence into an expendable xLights show under `~/xlights/_twinklr_verify/`,
+     never the owner's show.
+  4. Check that xLights reproduces the bytes.
+  5. Export the house-preview video for the owner.
+
+  The [P3 viewing render](../evidence/2026-11-16-p3-viewing-render/README.md) is the worked
+  example. The owner's rig profile timings are chosen, not measured.
+
+### Lessons that cost time
+
+These lessons are promoted to `memories/` (see below).
+
+- **Unrealistic test rigs hid defects.** The synthetic rigs' allowed ranges equalled their
+  physical ranges, so the gate crashed on the owner's rig (`2c961b58`). The fast,
+  symmetric heads hid every defect that needs slow heads: losses at variant entry,
+  fitted variants, events lost to dark entries. Test every new mechanism on
+  `tests.support.moving_heads.allowed_rig` with heads at about 150°/s.
+- **Owner-rig renders found what the tests did not.** Examples: the lost downbeat hit,
+  lyric hits moved before their lyrics, and chorus_2 giving up its variation for nothing.
+  Plan for a render of the owner's song after each feature.
+- **Judge a rule change by comparing events before and after,** on the same plans across
+  two trees. Unchanged pins or green tests did not show that a move rule lost events
+  (seeds 4, 688, 810, 216) or that blame was misattributed.
+
+### What remains, in order
+
+1. **Wire and merge density and modifiers**, if not already done: rebase on `934b2635`,
+   register as arrangement units, then review and validate. Then merge the branch, which
+   is the owner's decision.
+2. **A real end-to-end paid run.** The planner prompts and cache keys changed many times
+   (W2 to W10). No full `twinklr run` or `show` has planned and rendered a real song on
+   the final contract. It needs the owner's authorization, logged in the brief.
+3. **Early entry repositioning,** so that a variation and a downbeat hit in the next
+   section can coexist. Today the variation gives way instead (D1 in the
+   [W10b/c record](../evidence/2026-11-18-w10bc-motif-variation/README.md)).
+4. **Park after the last cue, on a head that cannot go dark:** the render refuses this
+   case today (`pipeline._dark_over_spans` raises). Decide how such a head is parked, and
+   state it.
+5. **Render cost of the arrangement loop.** The owner's song renders in 6.5 s without
+   it and 16–28 s with it. On REALISTIC: 25.9 s with variation against 3.4 s without,
+   which is 7 arrangement renders (1 reference, 4 candidates, 2 retries), each with its
+   transition-free pass.
+6. **SPARSE swaps cut hard:** the heads that alternate under SPARSE swap with a hard
+   cut, not a fade (density branch).
+7. **OpenAI acceptance of the planner schema** is unverified: only Claude was probed
+   (W2 record).
+8. **`inject`/`regenerate` against a real xLights** with a scratch sequence is unverified:
+   the sixteen checks in the [C1.1c record](../evidence/2026-11-16-c1-1c-live-port/README.md)
+   have run against a fake client only.
+9. **Hardware:** no real fixture has been driven, and every profile timing is chosen.
+10. **Owner decisions and look questions:** collected in one list,
+    [owner-decisions-pending.md](owner-decisions-pending.md).
+11. **Open from earlier phases:**
+    - three songs are still analysed at 147.7 BPM;
+    - the three-arm experiment and Phase 5 (inventory F6);
+    - the other four planner schemas are not enforced by the provider on Claude;
+    - the planner prompt does not say that the song's tail lies beyond the beat grid;
+    - the planner caches re-key on merge, so the first `run`/`show` of each song plans
+      again (paid) and `regenerate` refuses sequences injected before the cutover
+      ([learning](../../../memories/learnings/model-dump-hashes-rekey-caches.md)).
+12. **After the merge,** remove the side worktrees and their branches:
+    `twinklr-mh-density`, `twinklr-mh-modifiers`, `twinklr-mh-validate` and
+    `twinklr-mh-validate2`.
+
+### Commits on the branch through C1.5
+
+Code and record commits from `main` through C1.5. The handoff-only commits `6caf7cba`
+and `462ad93e` are left out.
 
 | Work | Commits | Record |
 |---|---|---|
@@ -59,67 +194,6 @@ Commits on the branch since `main` (code and record commits; the handoff-only co
 | C1.3 shared models narrowed | `079831df` | [record](../evidence/2026-11-16-c1-3-model-narrowing/README.md) |
 | C1.4 names of the second path removed | `24c22b79` | [record](../evidence/2026-11-17-c1-4-renames/README.md) |
 | C1.5 documents, context, memories, scripts | `9e7205cf`; reviewed (changes requested), corrections in a follow-up commit | [record](../evidence/2026-11-17-c1-5-docs-context/README.md) |
-| W0 intent-parity harness | in progress, uncommitted | [record](../evidence/2026-11-17-w0-intent-parity/README.md) |
-
-Validation: `uv run pytest tests -q --no-cov` on `24c22b79`: 6,515 passed, 30 skipped
-([C1.4 record](../evidence/2026-11-17-c1-4-renames/README.md#46-checks-run-on-the-final-tree-this-session));
-the integrator reported `make validate` green on `24c22b79` with the same counts. C1.5's
-checks are in its record. `make validate` has not been run on `9e7205cf` or later.
-
-**Do not merge this branch yet.** `main` still has the renderer that applies the
-planner's song intent. Merging `feat/mh-true-up-p3` before the song-intent work (W0–W9)
-lands would put the regression on `main`, so the branch stays unmerged until then unless
-the owner says otherwise.
-
-Owner-gated, not done:
-
-- **Merge and push** `feat/mh-true-up-p3`, after W0–W9 (above) unless the owner rules
-  otherwise.
-- **Field mapping of the planner contract:** W2 does not start until the owner has seen
-  the old→new mapping table in [song-intent rendering](song-intent-rendering.md) and given
-  their word on every row marked narrower.
-- **Reading the owner's xLights layout to derive wheel tags (W1):** not authorized for
-  this purpose. W1 builds profile tags with paste-ready guidance and a derivation tested
-  on a synthetic layout only; running it on the owner's layout waits for their word.
-- **Hardware:** no real fixture has been driven; every profile timing is chosen, not
-  measured.
-- **Live `inject`/`regenerate`** against a running xLights with a scratch sequence: the
-  sixteen checks in the [C1.1c record](../evidence/2026-11-16-c1-1c-live-port/README.md)
-  (proven against a fake client only).
-- **Paid provider requests:** authorized on 2026-11-13 at the minimum that answers the
-  question, logged in the evidence record (W2's one live schema probe falls under it).
-- Any look verdict beyond the one given for Need A Favor on 2026-11-16, including the
-  views that end W4–W9. That render applied no planner intensity, colour, events or cues;
-  its acceptance covers the templates' motion and timing, not the absence of song intent.
-
-Answered on 2026-11-17: palette-role colour and lyric moment cues stay in the planner
-contract and are rendered; `variation` stays a planner choice
-([song-intent rendering](song-intent-rendering.md)).
-
-Open owner questions:
-
-1. The integrator decisions listed in
-   [song-intent rendering](song-intent-rendering.md) (reversible; the owner may overrule
-   any).
-2. **Three-arm experiment and Phase 5 (inventory F6):** `reference_policy.py` and its
-   arm were deleted in C1.2 under the integrator's note, without an owner ruling; after
-   the selector port the experiment's preconditions are probably unmet and arm A can
-   fail ([plan](phase-3-arrangement.md#three-arm-experiment-after-the-selector-port-what-the-owner-must-know--2026-11-16)).
-   The owner decides whether to rescope Phase 5's comparison.
-3. **Open items from the plan:** the three songs still analysed at 147.7 BPM; whether to
-   keep a tempo-change output (removed as unused); commanding darkness early to cover
-   the profile's close latency at rest-span edges in `twinklr show` (not built); the
-   sixteen real-xLights checks for live `inject`; the four other planner schemas (audio
-   profile, macro plan, group planner, holistic corrector) not provider-enforced on
-   Claude.
-
-Also for the owner, before any merge: W2's contract change re-keys the planner caches
-again and makes old checkpoints and live plans unreadable (refused by name). After this
-branch is merged, the first `twinklr run` or `show` of
-each song plans again (paid), `twinklr regenerate` refuses sequences injected before
-the cutover until `twinklr inject` runs again, and `eval-report` on an older checkpoint
-reports a fingerprint mismatch
-([learning](../../../memories/learnings/model-dump-hashes-rekey-caches.md)).
 
 ## Planning handoff — 2026-11-12
 

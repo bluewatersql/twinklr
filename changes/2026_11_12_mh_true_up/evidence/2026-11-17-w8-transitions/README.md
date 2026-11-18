@@ -383,6 +383,9 @@ reason was the window being shorter than the dark cut a colour change needed.
 
 ## Look questions for the owner (PENDING-OWNER)
 
+All open owner questions are collected in one list:
+[owner decisions pending](../../plan/owner-decisions-pending.md).
+
 1. **CROSSFADE's handover** at half the lower look's level on the boundary: is a single
    beam's crossfade a visible dip, or should it hold full and only move?
 2. **MORPH vs SWEEP**: MORPH moves from the window's start, SWEEP holds then travels. Is

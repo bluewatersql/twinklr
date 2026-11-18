@@ -343,6 +343,9 @@ timings × 5 grids × 3 policies), 14 renders each; final run after the last cod
 
 ## What the owner should look for (W6/W7 view; PENDING-OWNER)
 
+All open owner questions are collected in one list:
+[owner decisions pending](../../plan/owner-decisions-pending.md).
+
 Render a song on a tagged rig with a plan that has events (e.g. the owner's test song):
 
 1. **Hit at full level** is a dip into the beat and a snap back (120 BPM MED: about 120 ms

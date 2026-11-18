@@ -89,6 +89,36 @@ fingerprint-only with every frame unchanged, and the new tests below pin the new
   a first appearance has nothing before it); stated in the module, both planner prompts
   and the user guide.
 
+## Review fixes (after f9894cc8)
+
+**Why.** The review of `f9894cc8` found two HIGH defects:
+
+- A FASTER whose step variant the rig does not admit never tried its narrower reach. The
+  step resolves to the source, which played the same as the accepted arrangement, so it
+  was accepted and the loop stopped there.
+- `worse` judged a strobe, pulse or `closed` on its first 25 frames only, so a variation
+  that removed later flashes was accepted (15 of 292 plans in the review's sweep).
+
+**Built (`934b2635`, revision 19).**
+
+- A candidate that plays the same as the accepted arrangement is skipped, not accepted.
+  The unit keeps it, with its own trace, only when no other candidate plays and none is
+  worse.
+- The fallback's note says why the step does not play: "FASTER: 'wide+fast' … is not
+  admitted …; faster here needs a narrower reach: it plays 'fast'".
+- `worse` judges a shutter event over the span the reference traced on each head:
+  - a strobe or pulse by its flashes (lit runs) and its lit frames;
+  - a `closed` by its lit frames.
+
+**Evidence.** Both repros of the review behave correctly:
+
+- `probe_faster.py`: the FASTER now plays `fast`.
+- `repro_span.py`: the section gives way, and every head keeps its reference flashes.
+
+Each repro is a test in `tests/integration/test_mh_song_outranks.py`, and both fail on
+`f9894cc8`. `variation_regress.py`: 0 of 288 on plain and on allowed150. The related
+suites pass (611).
+
 ## The song outranks the arrangement, revised (after 08c50a92: review)
 
 **Why.** Blame misattributed (the owner's chorus_2 gave up `wide` for an event the break
@@ -453,6 +483,9 @@ settling or pulsing at the variant's period after the lift; (c) leave snap rate-
 offer reach only. (a) is the most legible; it is a catalog change with a gate re-run.
 
 ## PENDING-OWNER
+
+All open owner questions are collected in one list:
+[owner decisions pending](../../plan/owner-decisions-pending.md).
 
 1. Look: does a WIDEN / FASTER variation read as "the same idea, bigger / quicker"
    across templates (verse_2 → chorus_1, break, chorus_2 on the owner song)?
