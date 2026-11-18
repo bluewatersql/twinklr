@@ -23,7 +23,12 @@ from tests.support.moving_heads import (
     p1_templates,
     sections_plan,
 )
-from twinklr.core.agents.sequencer.moving_heads.models import Density, PlanColor, PlanSection
+from twinklr.core.agents.sequencer.moving_heads.models import (
+    Density,
+    PlanColor,
+    PlanModifier,
+    PlanSection,
+)
 from twinklr.core.config.models import JobConfig
 from twinklr.core.formats.xlights.sequence.models.xsq import TimingTrack
 from twinklr.core.sequencer.models.enum import Intensity, TemplateRole
@@ -138,7 +143,16 @@ def test_intent_no_renderer_rendered_yet_is_not_called_a_regression() -> None:
     regressed ones."""
     plan = sections_plan(("mirror_wings", 1, 4))
     section = plan.sections[0].model_copy(
-        update={"density": Density.BUSY, "motif_id": "pulse", "intensity": Intensity.FAST}
+        update={
+            "density": Density.BUSY,
+            "motif_id": "pulse",
+            "intensity": Intensity.FAST,
+            "parts": [
+                plan.sections[0]
+                .parts[0]
+                .model_copy(update={"modifiers": [PlanModifier(key="aim", value="low")]})
+            ],
+        }
     )
     pipeline = RenderingPipeline(
         choreography_plan=plan.model_copy(update={"sections": [section]}),
@@ -151,8 +165,9 @@ def test_intent_no_renderer_rendered_yet_is_not_called_a_regression() -> None:
     (diagnostic,) = _unrendered(pipeline)
     assert "intensity" not in diagnostic["message"]
     assert "known regression" not in diagnostic["message"]
-    # The motif renders (W10b); density does not yet.
-    assert "density: not rendered by any renderer yet" in diagnostic["message"]
+    # The motif (W10b) and density (W10d) render; modifiers do not yet.
+    assert "modifiers: not rendered by any renderer yet" in diagnostic["message"]
+    assert "density" not in diagnostic["message"]
     assert "motif" not in diagnostic["message"]
     assert "plan/song-intent-rendering.md" in diagnostic["message"]
 

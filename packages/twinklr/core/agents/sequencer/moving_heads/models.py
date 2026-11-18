@@ -84,7 +84,9 @@ class Variation(StrEnum):
 
 
 class Density(StrEnum):
-    """How busy a section's movement is."""
+    """How much of the rig's light a section plays (`sequencer/moving_heads/density.py`):
+    REST dark, SPARSE half the heads dark in turn, BALANCED the template's own, BUSY an
+    accent each bar."""
 
     REST = "REST"
     SPARSE = "SPARSE"
@@ -255,7 +257,10 @@ class PlanSection(BaseModel):
     )
     motif_id: str | None = Field(description="The macro motif this section carries, or null")
     variation: Variation = Field(description="How this section varies its motif")
-    density: Density = Field(description="How busy the movement is")
+    density: Density = Field(
+        description="How much of the rig's light plays: REST dark, SPARSE half the heads "
+        "dark in turn, BALANCED the template's own, BUSY an accent every bar"
+    )
     motif_relation: SkipJsonSchema[Literal["INTRODUCE", "RESTATE", "VARY", "RESOLVE"] | None] = (
         Field(
             default=None,

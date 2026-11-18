@@ -110,6 +110,11 @@ plays as its wheel colour, not darker or paler (`intensity` shapes the dimmer).
 {% for t in rig_offer.wheel_beats %}
     - `{{ t.template_id }}` (a cycle of {{ t.cycle_beats }} beats from the part's first beat): {% if t.every %}every head on beat{% if t.every | length > 1 %}s{% endif %} {{ t.every | join(', ') }}{% else %}no beat with every head{% endif %}{% if t.some %}; some heads on beat{% if t.some | length > 1 %}s{% endif %} {{ t.some | join(', ') }} (the others from their next reveal){% endif %}{% if t.late %}; no head on the beat but some within a beat on beat{% if t.late | length > 1 %}s{% endif %} {{ t.late | join(', ') }}{% endif %}{% if t.moves %}; it moves from beat{% if t.moves | length > 1 %}s{% endif %} {{ t.moves | join(', ') }}{% endif +%}
 {% endfor %}
+{% set dn = rig_offer.density %}
+- **Density** on this rig:
+  - `REST` {% if dn.dark == "none" %}cannot go dark here, so it plays as `BALANCED`{% elif dn.dark == "some" %}is dark on the heads that can go dark (the others play their template){% else %}is dark on every head{% endif %}.
+  - `SPARSE` {% if dn.sparse_plays %}darkens {{ dn.halves[1] }} while {{ dn.halves[0] }} play, then the other way, swapping every cycle of the template{% if dn.cycles %} ({% for c in dn.cycles %}`{{ c.template_id }}` {{ c.cycle_beats }} beats{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}{% else %}cannot divide this rig (its heads are one mirror pair, or cannot go dark), so it plays as `BALANCED`{% endif %}.
+  - `BUSY` accents {% if dn.hit == "all" %}every head{% elif dn.hit == "some" %}the heads with a dimmer{% else %}no head (no dimmer), so it plays as `BALANCED`{% endif %}.
 {% if rig_offer.transitions.lengths %}
 - **Transitions** at this song's median beat: {% for l in rig_offer.transitions.lengths %}`{{ l.length }}` {{ l.ms }} ms{% if not loop.last %}, {% endif %}{% endfor %}.{% if rig_offer.transitions.full_travel_ms %} The slowest head crosses its whole range in {% for axis, ms in rig_offer.transitions.full_travel_ms.items() %}{{ ms }} ms ({{ axis }}){% if not loop.last %}, {% endif %}{% endfor %}: a lit transition (`crossfade`, `morph`, `sweep`; a `sweep` moves only after its split point) carries a move up to that fast, and dips dark at its split point to make a faster one{% endif %}{% if rig_offer.transitions.wheel_change_ms %}; a colour or gobo change across a lit transition dips dark there for the turn ({{ rig_offer.transitions.wheel_change_ms }} ms){% endif %}.
 {% endif %}
@@ -262,7 +267,7 @@ The MacroPlanner has defined the following strategic guidance for each section. 
 
 **IMPORTANT:** Your templates and song intent should support these macro-level directives:
 - **Energy targets** indicate how aggressive, balanced, rising, or restrained the section's `intensity` should feel
-- **Motion density** indicates fast, balanced, or restrained activity (`density` and template choice)
+- **Motion density** indicates fast, balanced, or restrained activity: answer it with the template and `variation` (the movement) and with `density` (the light: what each level plays is in your instructions); a quiet section the music still carries is `SPARSE`, not dark
 - **Choreography style** indicates narrative, patterned, or mixed intent
 - **Palette** is the section's colour story: a palette-role `color` takes its colours from it
 - **Motifs** indicate visual patterns emphasized in this section (template geometry and movement, `motif_id` and `variation`)

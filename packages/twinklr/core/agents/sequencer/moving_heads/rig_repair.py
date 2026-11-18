@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
+    Density,
     EventAction,
     PlanColor,
     PlanEvent,
@@ -37,6 +38,11 @@ from twinklr.core.sequencer.moving_heads.arrangement import (
     SectionArrangement,
     options_from_variants,
     resolve_arrangement,
+)
+from twinklr.core.sequencer.moving_heads.density import (
+    BUSY_SONG_SHARE,
+    SPARSE_UNITS,
+    dark_half,
 )
 from twinklr.core.sequencer.moving_heads.events import (
     HIT_LATE_FRAMES,
@@ -478,6 +484,8 @@ def repair_rig_intent(
     played = _played(plan, offer, arranged)
     repairs += _arrangement_repairs(plan, offer, arranged)
     repairs += _give_way(plan, offer, arranged, played, palettes, beat_grid)
+    # Then density, on the variant each part plays, before the events it darkens.
+    repairs += _density_repairs(plan, offer, played, beat_grid)
     sections: list[PlanSection] = []
     for section in plan.sections:
         palette = palettes.get(section.section_id)
@@ -606,7 +614,15 @@ def repair_rig_intent(
             events.append(event)
         if changed_events:
             update["events"] = events
-        for item, reason in _event_records(section, events, parts, offer, beat_grid, palette):
+        for item, reason in _event_records(
+            section,
+            events,
+            parts,
+            offer,
+            beat_grid,
+            palette,
+            rest=section.density is Density.REST and offer.dark != "none",
+        ):
             note(item, RepairAction.RECORDED, reason)
         sections.append(section.model_copy(update=update) if update else section)
     if beat_grid is not None:
@@ -627,10 +643,13 @@ def _event_records(
     offer: RigOffer,
     beat_grid: BeatGrid | None,
     palette: SectionPalette | None = None,
+    *,
+    rest: bool = False,
 ) -> list[tuple[str, str]]:
     """What the render will play differently from what an event asks, for the planner
     (`(item, reason)`; the plan keeps the event, the render decides and traces), each on
-    the bar grid (`BeatGrid.beat_index`) and with the render's own tests:
+    the bar grid (`BeatGrid.beat_index`) and with the render's own tests (with `rest`, the
+    section's REST darkens it from its first beat as a `closed` there, `density.with_rest`):
 
     - a shutter event on a rig whose heads cannot go dark;
     - a strobe or pulse slower than asked on some beat of its span at this tempo, or not
@@ -662,6 +681,9 @@ def _event_records(
         following = next((beats[i] for _, i in shutter[position + 1 :]), end_ms)
         if event.action.value == "closed":
             closed_from.append((beats[index], following))
+    first = beat_grid.beat_index(section.start_bar, 1)
+    if rest and first is not None:
+        closed_from.append((beats[first], beats[shutter[0][1]] if shutter else end_ms))
     held: dict[str, dict[str, str]] = {
         "color": _head_colors(section, offer, palette),
         "gobo": _head_gobos(section, offer),
@@ -860,7 +882,12 @@ def _head_wheel_turn(
             # The wheel turns in the `closed`'s darkness, which a hit there then cannot light
             # (its wheels change in that dark run); the head shows it from the `open`.
             if end >= end_ms:
-                return None, "the head is dark from a `closed` to the section's end", None, 0.0
+                return (
+                    None,
+                    "the head is dark from a `closed` (or the section's REST) to the section's end",
+                    None,
+                    0.0,
+                )
             return _frames_late(at, end), None, (start, end), math.inf
     if change is None:
         return (
@@ -1757,3 +1784,210 @@ def _held_at_end(
     if event.gobo is not None:
         return {**held, **part.gobo(event.gobo.value).states}
     return held
+
+
+def _density_repairs(
+    plan: ChoreographyPlan,
+    offer: RigOffer,
+    played: Mapping[tuple[str, int], str],
+    beat_grid: BeatGrid | None,
+) -> list[PlanRepair]:
+    """What each section's density plays other than asked (`density`), for the planner;
+    never a refusal, the render decides and traces:
+
+    - REST on a rig whose heads, some or all, cannot be commanded dark (they play their
+      template); and the colour, gobo or intensity a fully dark REST hides (no `open`,
+      strobe, `pulse` or hit lights the heads); its colour and gobo events are predicted
+      with its darkness (`_event_records`);
+    - SPARSE on a rig with no second half to light (`RigOffer.sparse_halves`) or whose
+      heads cannot go dark; a part where every cycle of its variant would leave a head
+      never lit, or would darken nothing, swaps every half cycle, else plays BALANCED
+      (`density.SPARSE_UNITS`, judged on the variant's published dark phases);
+    - BUSY on heads without a dimmer, and BUSY sections covering more than
+      `density.BUSY_SONG_SHARE` of the song, the lowest energy first."""
+    from twinklr.core.sequencer.moving_heads.templates import get_template
+
+    repairs: list[PlanRepair] = []
+
+    def note(section: PlanSection, reason: str) -> None:
+        repairs.append(
+            PlanRepair(
+                section_id=section.section_id,
+                item=f"density {section.density.value}",
+                action=RepairAction.RECORDED,
+                reason=reason,
+            )
+        )
+
+    darkness = {
+        "none": "no head of this rig can be commanded dark, so it plays as BALANCED (the "
+        "template's own light)",
+        "some": "only some heads of this rig can be commanded dark; the others play their "
+        "template's own light",
+    }
+    for section in plan.sections:
+        density = section.density
+        if density is Density.REST:
+            if offer.dark in darkness:
+                note(section, darkness[offer.dark])
+            lights = {"open", "pulse", "hit", *(a for a in SHUTTER_KINDS if "strobe" in a)}
+            hidden = [
+                f"{name} {_spelled(value)}"
+                for name, value in (
+                    ("colour", section.color),
+                    ("gobo", section.gobo),
+                    ("intensity", section.intensity),
+                )
+                if value is not None
+            ]
+            if (
+                hidden
+                and offer.dark != "none"
+                and not any(e.action.value in lights for e in section.events)
+            ):
+                note(
+                    section,
+                    f"REST is dark from its first beat to its end and no event lights the "
+                    f"heads (an `open`, a strobe, a `pulse` or a hit): its {', '.join(hidden)} "
+                    "is not seen",
+                )
+        elif density is Density.SPARSE:
+            if offer.sparse_halves is None:
+                note(
+                    section,
+                    "every head of this rig sits on a folded slot of one parity (mirror "
+                    "partners): there is no other half to light while one is dark, so it "
+                    "plays as BALANCED",
+                )
+                continue
+            if offer.dark in darkness:
+                note(section, darkness[offer.dark].replace("as BALANCED", "as BALANCED"))
+                if offer.dark == "none":
+                    continue
+            if beat_grid is None or not offer.beat_ms:
+                continue
+            frame = EFFECT_GRID_MS / offer.beat_ms
+            for index, (template_id, start, end, _, variant) in enumerate(
+                _parts(offer, section, played)
+            ):
+                phases = _phases(offer, template_id, variant)
+                if phases is None:
+                    continue
+                try:
+                    once = get_template(template_id).template.repeat.mode.value == "ONCE"
+                except Exception:  # an unknown template is the validator's to report
+                    continue
+                length = float(_part_beats(beat_grid, start, end))
+                tried = []
+                for name, divisor in SPARSE_UNITS:
+                    why = _sparse_misses(
+                        phases,
+                        offer.sparse_halves,
+                        length,
+                        phases.cycle_beats / divisor,
+                        once,
+                        frame,
+                    )
+                    if why is None:
+                        break
+                    tried.append(f"every {name}: {why}")
+                else:
+                    name = None
+                if tried:
+                    note(
+                        section,
+                        f"part {index + 1} ({template_id}, {length:g} beats, a cycle of "
+                        f"{round_beats(phases.cycle_beats)}): "
+                        + "; ".join(tried)
+                        + (
+                            f", so its halves swap every {name}"
+                            if name is not None
+                            else ", so it plays as BALANCED; give SPARSE a longer section"
+                        ),
+                    )
+        elif density is Density.BUSY and offer.hit != "all":
+            note(
+                section,
+                "no head has a dimmer axis, so its accents do not play (it plays as BALANCED)"
+                if offer.hit == "none"
+                else "only the heads with a dimmer axis play its accents",
+            )
+    if beat_grid is not None and beat_grid.duration_ms > 0:
+        bars = beat_grid.bar_boundaries
+
+        def span_ms(section: PlanSection) -> float:
+            start = bars[section.start_bar - 1] if section.start_bar - 1 < len(bars) else 0.0
+            end = bars[section.end_bar] if section.end_bar < len(bars) else beat_grid.duration_ms
+            return max(0.0, end - start)
+
+        busy = sorted(
+            (s for s in plan.sections if s.density is Density.BUSY),
+            key=lambda s: (s.energy_level if s.energy_level is not None else -1, s.start_bar),
+        )
+        total = sum(span_ms(s) for s in busy)
+        song = beat_grid.duration_ms
+        for section in busy:
+            if total <= BUSY_SONG_SHARE * song:
+                break
+            note(
+                section,
+                f"BUSY sections cover {total / song:.0%} of the song, more than "
+                f"{BUSY_SONG_SHARE:.0%}: an accent every bar loses its weight; this is the "
+                "lowest-energy of them, keep BUSY for the peaks",
+            )
+            total -= span_ms(section)
+    return repairs
+
+
+def _sparse_misses(
+    phases: DarkPhases,
+    halves: tuple[tuple[str, ...], tuple[str, ...]],
+    length: float,
+    unit: float,
+    once: bool,
+    frame: float,
+) -> str | None:
+    """Why SPARSE in units of `unit` beats does not play on a part of `length` beats of a
+    variant with these published dark phases (`density.play_sparse`, on the frames): a head
+    lit as BALANCED would never be lit for `HIT_MIN_LIT_FRAMES` running in its own units,
+    or nothing would go dark; None where it plays."""
+    least = HIT_MIN_LIT_FRAMES * frame
+
+    def lit(fixture_id: str, a: float, b: float) -> float:
+        """The beats of `[a, b)` (from the part's start) the head's template lights."""
+        cycle = phases.cycle_beats
+        first, last = math.floor(a / cycle) - 1, math.ceil(b / cycle) + 1
+        dark = sorted(
+            (w0 + k * cycle, w1 + k * cycle)
+            for k in range(first, last + 1)
+            for w0, w1 in phases.heads.get(fixture_id, ())
+        )
+        covered, at = 0.0, a
+        for w0, w1 in dark:
+            lo, hi = max(w0, at), min(w1, b)
+            if hi > lo:
+                covered += hi - lo
+                at = hi
+        return (b - a) - covered
+
+    units = [(k * unit, min((k + 1) * unit, length)) for k in range(math.ceil(length / unit))]
+    never: list[str] = []
+    darkened = False
+    for half, heads in enumerate(halves):
+        for fixture_id in heads:
+            if fixture_id not in phases.heads or lit(fixture_id, 0.0, length) < least:
+                continue
+            own = [(a, b) for k, (a, b) in enumerate(units) if dark_half(k, once=once) != half]
+            if not any(lit(fixture_id, a, b) >= least for a, b in own):
+                never.append(fixture_id)
+            if any(
+                lit(fixture_id, a, b) > 0
+                for k, (a, b) in enumerate(units)
+                if dark_half(k, once=once) == half
+            ):
+                darkened = True
+    if never:
+        return f"{', '.join(sorted(never))} would never be lit"
+    if not darkened:
+        return "nothing would go dark (one unit, or a ONCE template's move)"
+    return None

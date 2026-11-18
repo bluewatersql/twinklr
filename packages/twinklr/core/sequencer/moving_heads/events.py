@@ -110,6 +110,7 @@ from twinklr.core.sequencer.moving_heads.song_intent import (
     WHEEL_MOVE_BARS,
     HeadWheels,
     SectionPalette,
+    can_darken,
     color_offer,
     darkness_ms,
     dip_fits,
@@ -647,6 +648,13 @@ def _plan_shutter(
     """One head's plan for a closed, strobe or pulse event over `[start_ms, end_ms)`."""
     record: dict[str, Any] = {"from_ms": start_ms, "to_ms": end_ms}
     if event.action == "closed":
+        if not can_darken(profile):
+            # Never a refusal: the head plays its template's look (repair records it).
+            record["not_played"] = (
+                "the head cannot be commanded dark (no dimmer zero or closed shutter state "
+                "that extinguishes)"
+            )
+            return _ShutterPlan(record=record)
         record["plays"] = "dark"
         return _ShutterPlan(dark=[(start_ms, end_ms)], record=record)
     if event.action.startswith("strobe_") and use_strobe_state:

@@ -2,7 +2,7 @@
 type: context
 status: active
 area: overview
-updated: 2026-11-17
+updated: 2026-11-18
 ---
 
 # Twinklr — Current State
@@ -32,9 +32,8 @@ See [product/overview.md](product/overview.md).
   revision. Moving-head sections carry 1-3 template parts and categorical song intent
   (intensity, colour, gobo, timed events tied to lyric MomentCues, motif variation,
   density, entry/exit transitions; contract of 2026-11-17, sent to Claude as an enforced
-  structured output, compiled and enforced live on 2026-11-17); the moving-head renderer renders each
-  section's colour and gobo and not yet the rest of the intent, a known regression
-  (below).
+  structured output, compiled and enforced live on 2026-11-17); the moving-head renderer renders all of it but
+  the parts' modifiers, a known regression (below).
   [architecture/multi-agent-planning.md](architecture/multi-agent-planning.md)
 - **Providers** — OpenAI (default; Responses API strict structured outputs), Claude
   (`llm_provider: anthropic`), and Ollama cloud (`glm-5.3:cloud` through the loopback
@@ -159,10 +158,21 @@ See [product/overview.md](product/overview.md).
     repair-predicted). Renderer revision 17.
     ([user guide](../docs/user-guide.md#how-a-sections-motif-and-variation-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-w10bc-motif-variation/README.md))
-  - **Not rendered yet: density and modifiers.** Accepted and ignored (a per-section
-    trace diagnostic says so); no renderer has rendered them. The owner has directed
-    that all of the song intent be rendered on this renderer, with nothing cut from the
-    planner contract; the remaining work is density
+  - **Density** (W10d, 2026-11-18, not yet seen by the owner). Density plays on the light:
+    REST is dark (a synthetic `closed` the planner's events still play through), SPARSE
+    darkens half the heads (mirror partners together) in turn on the played variant's
+    cycle, BUSY adds an accent each bar on each head's first lit beat; BALANCED is
+    unchanged. SPARSE keeps every head as BALANCED around each event and BUSY drops its
+    accents there, so neither makes an event worse; a per-section give-way hook awaits
+    the arrangement's give-way loop. Repair records what does not play as asked and BUSY
+    over a quarter of the song. Whether density should mean light (as built) or movement
+    is put to the owner. Renderer revision 18.
+    ([user guide](../docs/user-guide.md#how-a-sections-density-reaches-the-lights),
+    [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-w10d-density/README.md))
+  - **Not rendered yet: modifiers.** Accepted and ignored (a per-section trace diagnostic
+    says so); no renderer has rendered them. The owner has directed that all of the song
+    intent be rendered on this renderer, with nothing cut from the planner contract; the
+    remaining work is modifiers
     ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 
   `twinklr run`, `show`, `eval-report`, `inject` and `regenerate` all use it;

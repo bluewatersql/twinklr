@@ -79,11 +79,13 @@ RENDERED_INTENT_FIELDS = frozenset(
         "exit",
         "motif_id",
         "variation",
+        "density",
     }
 )
 """The section song-intent fields (`PlanSection.set_intent_fields`) the renderer plays:
 colour and gobo here, intensity in `intensity.py`, events and the lyric cues they land on
-in `events.py`, transitions in `transitions.py`, motif and variation in `arrangement.py`."""
+in `events.py`, transitions in `transitions.py`, motif and variation in `arrangement.py`,
+density in `density.py`."""
 
 FIXED_ROLE_COLORS: dict[PaletteRole, ColorPreset] = {
     PaletteRole.PRIMARY: ColorPreset.RED,
@@ -626,6 +628,12 @@ class RigOffer(BaseModel):
     """The same per pair of variants where either is a variation variant, keyed
     `"<predecessor variant>><successor variant>"` (`base` for no preset): the heads that
     always enter for that pair (`dark_entry_heads` reads the right one)."""
+    sparse_halves: tuple[tuple[str, ...], tuple[str, ...]] | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
+    """The two halves SPARSE darkens in turn (`density.sparse_halves`: even and odd folded
+    slots); None where the rig has heads on one parity only, or for an offer made without
+    a rig."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -721,6 +729,8 @@ def rig_offer(
 ) -> RigOffer:
     """The rig's offer for one song (`RigOffer`); `templates` and `dark_entries` from the
     gate."""
+    from twinklr.core.sequencer.moving_heads.density import sparse_halves
+
     profiles = {
         fixture.fixture_id: fixture.config.physical_profile
         for fixture in fixture_group.expand_fixtures()
@@ -826,6 +836,7 @@ def rig_offer(
             }
             for t, after in (variant_dark_entries or {}).items()
         },
+        sparse_halves=sparse_halves(fixture_group),
     )
 
 
@@ -1170,6 +1181,7 @@ def offer_for_prompt(
         "exclusions": exclusions,
         "events": _events_for_prompt(offer),
         "transitions": _transitions_for_prompt(offer),
+        "density": _density_for_prompt(offer),
     }
 
 
@@ -1219,6 +1231,29 @@ def _transitions_for_prompt(offer: RigOffer) -> dict[str, Any]:
     }
 
 
+def _density_for_prompt(offer: RigOffer) -> dict[str, Any]:
+    """What `density` plays on this rig (`density`): whether the heads can go dark (REST,
+    SPARSE), the two halves SPARSE darkens in turn, and each template's cycle they swap on
+    (its base's; a slower variant's may be longer)."""
+    return {
+        "dark": offer.dark,
+        "halves": None
+        if offer.sparse_halves is None
+        else [", ".join(half) for half in offer.sparse_halves],
+        "cycles": [
+            {"template_id": template_id, "cycle_beats": round_beats(phases.cycle_beats)}
+            for template_id, template in offer.templates.items()
+            if (
+                phases := template.variants.get("base")
+                or next(iter(template.variants.values()), None)
+            )
+            is not None
+        ],
+        "hit": offer.hit,
+        "sparse_plays": offer.sparse_halves is not None and offer.dark != "none",
+    }
+
+
 def _events_for_prompt(offer: RigOffer) -> dict[str, Any]:
     """What `closed`/`open`, the strobes and `pulse` play on this rig at the song's median
     beat: each strobe's flashes per beat (the fixture's own where every head has a state
@@ -1260,7 +1295,8 @@ def describe_look(record: Mapping[str, Any]) -> list[str]:
     state, each boundary's dark dip, what its intensity plays
     (`intensity.describe_intensity`), what each event played (`events.describe_events`)
     and what its transitions played (`transitions.describe_transitions`), led by the
-    variant its motif and variation resolved to (`arrangement`), where it has one."""
+    variant its motif and variation resolved to (`arrangement`), where it has one, and what
+    its density played (`density.describe_density`)."""
     lines = []
     arrangement = record.get("arrangement") or {}
     motif = arrangement.get("motif")
@@ -1332,6 +1368,11 @@ def describe_look(record: Mapping[str, Any]) -> list[str]:
     from twinklr.core.sequencer.moving_heads.events import describe_events
 
     lines += describe_events(record.get("events", []))
+    from twinklr.core.sequencer.moving_heads.density import describe_density
+
+    density = arrangement.get("density")
+    if density is not None:
+        lines += describe_density(density)
     from twinklr.core.sequencer.moving_heads.transitions import describe_transitions
 
     lines += describe_transitions(record.get("transitions", []))

@@ -1,7 +1,8 @@
 # W10 — render motif, variation, density and modifiers (plan, 2026-11-17)
 
 **Status.** Design revised after an independent critic (PROCEED WITH CHANGES); W10a built
-([record](../evidence/2026-11-17-w10a-variants/README.md)). Linked from
+([record](../evidence/2026-11-17-w10a-variants/README.md)); W10b/W10c and W10d built (As
+built notes below). Linked from
 [song-intent-rendering.md](song-intent-rendering.md#work-sequence).
 
 **Integrator decisions (2026-11-17, reversible; the owner may overrule any).**
@@ -116,6 +117,40 @@ refusal.
 `user.j2:148` define density as movement; rewrite them to say exactly what renders (dark; half the
 heads alternating per cycle; the template's own; an accent each bar). The integrator puts the meaning
 to the owner.
+
+**As built (W10d, 2026-11-18; evidence
+[2026-11-18-w10d-density](../evidence/2026-11-18-w10d-density/README.md)).** `density.py`,
+renderer revision 18; BALANCED renders the same frames. Departures from §2, each recorded
+here:
+- *SPARSE yields to the song by construction.* Every head plays as BALANCED over each
+  planner event's seen span (`events.yield_spans` with hits) widened by a beat each side,
+  and over each colour or gobo change's whole lit run as BALANCED shows it (a shorter
+  protection made a colour "shown more briefly", which the song-outranks rule counts as
+  worse). SPARSE runs after the part's events, so repair does not overlay SPARSE darkness
+  on the published phases for its event predictions (§2's "repair overlays"): they are
+  BALANCED's, and the agreement tests prove the render's events equal BALANCED's.
+- *SPARSE's lit rule and fallback.* "Every head lit at least once" is judged on the
+  frames (three running, as a hit's lit run), per part; the alternation restarts in each
+  part on that part's variant's cycle. Fallback order: every cycle, every half cycle, then
+  the part plays BALANCED (traced, repair predicts it from the variant's dark phases).
+  §2's "rejected at plan time" became this render-decided fallback; a one-slot rig still
+  plays BALANCED. The ONCE template's first cycle (its move) is lit on every head.
+- *REST on heads that cannot go dark.* A `closed` (REST's or the planner's) on such a
+  head is traced `not_played` instead of failing the render (`events._plan_shutter`), and
+  repair records REST there; but the transaction pass cannot park such a head after its
+  last cue (`compile/preposition.py` `_dark_commands`), so no render of such a rig reaches
+  REST today. Tested at the events layer and in repair.
+- *BUSY's first lit beat* is read on the head's frames as played, a transition's own
+  cues included, so an accent whose beat falls inside a transition's window is dropped
+  (traced) rather than moved past it; an accent is also dropped where its beat or frames
+  fall inside a planner event's seen span widened by a beat (one rule with SPARSE).
+- *The give-way hook* is `RenderingPipeline.density_give_way` (`density.DensityGiveWay`:
+  play BALANCED, or drop named accents); the give-way loop being built for the arrangement
+  sets it (integration pending).
+- *Offer and contract.* `RigOffer.sparse_halves` (left out of dumps when None) and a
+  per-template cycle note in the prompt; the `density` field's description and the
+  planner and judge prompts now say what renders (re-keys the planner cache).
+- *Trace* `section_looks[].arrangement.density`, per part.
 
 ## 3. Motif (W10b)
 

@@ -90,6 +90,22 @@ from twinklr.core.sequencer.moving_heads.delivery import (
     build_sequence,
     export_delivery,
 )
+from twinklr.core.sequencer.moving_heads.density import (
+    BALANCED,
+    REST,
+    REST_INDEX,
+    SPARSE,
+    DensityGiveWay,
+    busy_emphasis,
+    event_spans,
+    play_busy,
+    play_sparse,
+    played_level,
+    rest_record,
+    shown_spans,
+    sparse_halves,
+    with_rest,
+)
 from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
 from twinklr.core.sequencer.moving_heads.events import (
     SHUTTER_ACTIONS,
@@ -2955,14 +2971,12 @@ def _unrendered_intent_message(section: PlanSection) -> str | None:
     """What of the section's song intent the renderer does not render yet (no renderer
     has); None for a section that sets none of it. Its colour and gobo
     (`song_intent.resolve_section_look`), its intensity (`intensity.shape_section`), its
-    events and their lyric cues (`events`), its transitions (`transitions`) and its motif
-    and variation (`arrangement`) render, so they are never listed."""
+    events and their lyric cues (`events`), its transitions (`transitions`), its motif
+    and variation (`arrangement`) and its density (`density`) render, so they are never
+    listed."""
     names = [
         name
-        for name, is_set in (
-            ("density", section.density.value != "BALANCED"),
-            ("modifiers", any(part.modifiers for part in section.parts)),
-        )
+        for name, is_set in (("modifiers", any(part.modifiers for part in section.parts)),)
         if is_set
     ]
     if not names:
@@ -3191,6 +3205,12 @@ class RenderingPipeline:
         self._steps = True
         """False for the render the song's events are judged against: every part plays
         its source variant."""
+        self.density_give_way: dict[str, DensityGiveWay] = {}
+        """Per plan section, how its density gives way to the song (`density`): it plays
+        BALANCED, or drops named BUSY accents, each traced with why. INTEGRATION POINT
+        for the give-way loop that settles the arrangement (`_settle_arrangement`): it
+        compares this render with the same plan at BALANCED and sets this; nothing else
+        does yet."""
         self._settled = False
         self.transition_free: RenderingPipeline | None = None
         """Set by a `render()` whose plan has transitions: the same plan rendered without
@@ -3538,6 +3558,10 @@ class RenderingPipeline:
         """Per plan section, where the transition it was entered by ends."""
         transition_heads: list[HeadTransition] = []
         """What each transition played on each head, to light again after intensity."""
+        accenting: list[tuple[str, tuple[int, int], int, int, str, dict[str, Any]]] = []
+        """Per BUSY part: its id, frames, bars, accent emphasis and density trace entry."""
+        halves = sparse_halves(self.fixture_group)
+        shortest_dark_ms, _ = _span_limits(self.fixture_group)
 
         def rested(own: Sequence[FixtureSegment]) -> list[FixtureSegment]:
             """A transition's own cues dark over the show's rests, as every cue is."""
@@ -3623,6 +3647,87 @@ class RenderingPipeline:
             level = effective_intensity(asked, focal_role)
             if level == asked:
                 focal_role = None  # it changes nothing here
+            asked_density = plan_sections[base_id].density.value
+            density = played_level(asked_density, self.density_give_way.get(base_id))
+            shutter_events = events
+            if density == REST:
+                # REST is a synthetic `closed` among the section's shutter events (`density`).
+                shutter_events = with_rest(
+                    events,
+                    start_bar=plan_sections[base_id].start_bar,
+                    start_ms=part_frames(
+                        self.beat_grid,
+                        plan_sections[base_id].start_bar,
+                        plan_sections[base_id].end_bar,
+                    )[0],
+                    beat_grid=self.beat_grid,
+                )
+                plays_events = True
+            sparse_box: list[dict[str, Any] | None] = [None]
+            """The part's SPARSE trace entry (`density.play_sparse`), from its last compile."""
+            sparse_cycle: tuple[Fraction, bool] | None = None
+            if density == SPARSE:
+                # The cycle of the variant the part plays, as the compiler places it.
+                cycled = whole_period_cycle(
+                    apply_preset(template_doc.template, preset)
+                    if preset
+                    else template_doc.template,
+                    self.beat_grid.beats_per_bar,
+                ).repeat
+                sparse_cycle = (
+                    Fraction(repr(cycled.cycle_bars)).limit_denominator(64),
+                    cycled.mode == RepeatMode.ONCE,
+                )
+
+            def densify(
+                cues: list[FixtureSegment],
+                records: Mapping[int, Mapping[str, Any]] | None,
+                sparse_cycle: tuple[Fraction, bool] | None = sparse_cycle,
+                context: TemplateCompileContext = context,
+                events: SectionEvents = events,
+                window: tuple[int, int] = window,
+                base_id: str = base_id,
+                sparse_box: list[dict[str, Any] | None] = sparse_box,
+                *,
+                probe: bool = False,
+            ) -> list[FixtureSegment]:
+                """A part's cues with SPARSE's darkness (`density.play_sparse`) where it
+                plays SPARSE, clear of its plan section's events as they played (`records`)."""
+                if sparse_cycle is None:
+                    return cues
+                sparse, entry = play_sparse(
+                    cues,
+                    window=window,
+                    cycle_bars=sparse_cycle[0],
+                    once=sparse_cycle[1],
+                    at_bars=lambda offset: context.bar_offset_to_ms(float(offset)),
+                    halves=halves,
+                    protected=event_spans(
+                        yield_spans(
+                            events,
+                            window,
+                            self.beat_grid,
+                            hits=True,
+                            records=records,
+                            hit_frames=hit_frames_of(base_id),
+                        ),
+                        self.beat_grid,
+                    )
+                    + shown_spans(records),
+                    profiles=profiles,
+                    darken=lambda head_cues, dark: _dark_over_spans(
+                        head_cues, dark, profiles, shortest_lit_ms=self._shortest_lit_ms
+                    ),
+                    snap=lambda spans: _snap_dark_spans(
+                        spans,
+                        shortest_dark_ms=shortest_dark_ms,
+                        shortest_lit_ms=self._shortest_lit_ms,
+                    ),
+                    shortest_dark_ms=shortest_dark_ms,
+                )
+                if not probe:
+                    sparse_box[0] = entry
+                return sparse
 
             def compile_section(
                 held_states: Mapping[str, Mapping[ChannelName, str]],
@@ -3631,18 +3736,19 @@ class RenderingPipeline:
                 preset: TemplatePreset | None = preset,
                 refused: int = refused,
                 compiled_steps: list[dict[str, str | int]] = compiled_steps,
-                events: SectionEvents = events,
+                events: SectionEvents = shutter_events,
                 window: tuple[int, int] = window,
                 plays_events: bool = plays_events,
                 played_box: list[EventsPlayed] = played_box,
                 template_heads: list[HeadWheels] = template_heads,
                 palette: SectionPalette | None = palette,
+                densify: Callable[..., list[FixtureSegment]] = densify,
                 *,
                 probe: bool = False,
             ) -> list[FixtureSegment]:
-                """The part compiled holding `held_states`, with its events; a `probe`
-                (the authored compile `_unplayable_holds` compares with) leaves the
-                section's events record alone."""
+                """The part compiled holding `held_states`, with its events (REST's among
+                them) and SPARSE's darkness; a `probe` (the authored compile
+                `_unplayable_holds` compares with) leaves the section's records alone."""
                 if unplayable is not None:
                     del unplayable[refused:]  # a recompile records its refusals again
                 result = compile_template(
@@ -3663,7 +3769,7 @@ class RenderingPipeline:
                     shortest_lit_ms=self._shortest_lit_ms,
                 )
                 if not plays_events:
-                    return spanned
+                    return densify(spanned, None, probe=probe)
                 # The plan's closed, strobe, pulse, colour and gobo events, after the
                 # template, the section's held states and the show's rests.
                 played, events_played = apply_section_events(
@@ -3694,7 +3800,8 @@ class RenderingPipeline:
                 )
                 if not probe:
                     played_box[0] = events_played
-                return played
+                # SPARSE after the events, clear of what they show (`density`).
+                return densify(played, events_played.records, probe=probe)
 
             section_cues = compile_section(held)
             key = (template_doc.template.template_id, context.preset_id)
@@ -3978,6 +4085,58 @@ class RenderingPipeline:
                                 f"section {section.section_id!r}: its variation "
                                 f"{variant.asked} does not play ({variant.reason})"
                             ),
+                            section_id=section.section_id,
+                            action="unchanged",
+                        )
+                    )
+            if asked_density != BALANCED:
+                # What the section's density played on this part (`density`).
+                gave_way = self.density_give_way.get(base_id)
+                density_entry: dict[str, Any] = {"level": asked_density}
+                if density == BALANCED:
+                    assert gave_way is not None and gave_way.balanced is not None
+                    density_entry["gave_way"] = gave_way.balanced
+                elif density == REST:
+                    first = played_box[0].records.get(REST_INDEX, {})
+                    density_entry = rest_record(
+                        shutter_events,
+                        window,
+                        sorted({cue.fixture_id for cue in section_cues}),
+                        profiles,
+                        first.get("heads"),
+                    )
+                elif density == SPARSE:
+                    assert sparse_box[0] is not None
+                    density_entry = sparse_box[0]
+                else:
+                    accenting.append(
+                        (
+                            section.section_id,
+                            window,
+                            section.start_bar,
+                            section.end_bar,
+                            busy_emphasis(shape_for(level) is not None),
+                            density_entry,
+                        )
+                    )
+                record.setdefault("arrangement", {})["density"] = density_entry
+                if (
+                    density_entry.get("plays") == "BALANCED"
+                    or "gave_way" in density_entry
+                    or density_entry.get("lit")
+                ):
+                    diagnostics.append(
+                        MHDiagnostic(
+                            code="unsupported_attribute",
+                            severity="warning",
+                            message=f"section {section.section_id!r}: density {asked_density} "
+                            + (
+                                "plays BALANCED"
+                                if density_entry.get("plays") == "BALANCED"
+                                or "gave_way" in density_entry
+                                else f"leaves {', '.join(density_entry['lit'])} lit"
+                            )
+                            + " (the trace's section_looks arrangement density)",
                             section_id=section.section_id,
                             action="unchanged",
                         )
@@ -4292,6 +4451,74 @@ class RenderingPipeline:
                     outcome = (flash_entry or {}).get("heads", {}).get(fixture_id)
                     if outcome is not None:
                         outcome.setdefault("lit_by_hits", []).extend(said)
+
+        if accenting:
+            # BUSY's accents, after the hits, on the level the section plays: never inside
+            # a transition's window on a head, nor a planner event's widened seen span.
+            blocked: dict[str, list[tuple[str, int, int]]] = defaultdict(list)
+            for part_record in part_records.values():
+                for transition in part_record.get("transitions", []):
+                    what = f"the {transition['edge']} {transition['mode']} transition's window"
+                    w0, w1 = transition["window_ms"]
+                    for fixture_id, outcome in transition.get("heads", {}).items():
+                        a, b = _head_span(transition, outcome) if _plays(outcome) else (w0, w1)
+                        blocked[fixture_id].append((what, min(a, w0), max(b, w1)))
+            seen: list[tuple[str, int, int]] = []
+            for sid, sid_events in timed.items():
+                seen += [
+                    (f"the planner's {label}'s seen span", a, b)
+                    for label, a, b in event_spans(
+                        yield_spans(
+                            sid_events,
+                            (0, len(times) * EFFECT_GRID_MS),
+                            self.beat_grid,
+                            hits=True,
+                            records={
+                                i: event_records.get((sid, i), {})
+                                for i in range(len(plan_sections[sid].events))
+                            },
+                            hit_frames={
+                                index: sorted(by_head.values())
+                                for (hit_sid, index), by_head in self.hit_frames.items()
+                                if hit_sid == sid
+                            },
+                        ),
+                        self.beat_grid,
+                    )
+                ]
+            for section_id, window, first_bar, last_bar, emphasis, busy_entry in accenting:
+                base, _, segment = section_id.partition("|")
+                # The part's cues and a transition's over its frames: a head lit first in
+                # a transition there has its first lit beat inside the window.
+                index = [
+                    i
+                    for i, cue in enumerate(cues)
+                    if (
+                        cue.section_id == base
+                        and cue.segment_id == (segment or "A")
+                        and TRANSITION_METADATA_KEY not in cue.metadata
+                    )
+                    or (
+                        TRANSITION_METADATA_KEY in cue.metadata
+                        and cue.t0_ms < window[1]
+                        and cue.t1_ms > window[0]
+                    )
+                ]
+                gave_way = self.density_give_way.get(base)
+                accented, played_entry = play_busy(
+                    [cues[i] for i in index],
+                    window=window,
+                    bars=range(first_bar, last_bar + 1),
+                    emphasis=emphasis,
+                    profiles=profiles,
+                    phase_map=phase_map,
+                    beat_grid=self.beat_grid,
+                    blocked={f: [*blocked.get(f, []), *seen] for f in profiles},
+                    give_way={} if gave_way is None else gave_way.accents,
+                )
+                for i, cue in zip(index, accented, strict=True):
+                    cues[i] = cue
+                busy_entry.update(played_entry)
 
         lyric_cues: list[dict[str, Any]] = []
         """Per lyric moment cue a plan section references, what played it, or why not."""
