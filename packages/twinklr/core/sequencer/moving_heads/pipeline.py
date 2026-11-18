@@ -3368,6 +3368,8 @@ class RenderingPipeline:
         self._time_markers: list[TimeMarker] = []
         self.arrangement_renders = 0
         """How many whole-song renders choosing the arrangement took (0 without units)."""
+        self._greedy_only = False
+        """Tests: skip the optimistic all-planned trial (`_choose_arrangement`)."""
         self.transition_free: RenderingPipeline | None = None
         """Set by a `render()` whose plan has transitions: the same plan rendered without
         them, which the played rule and the hits a transition may not lose are read
@@ -4813,23 +4815,39 @@ class RenderingPipeline:
     def _choose_arrangement(self) -> None:
         """**The song outranks the arrangement.** Every arrangement unit (`ArrangementUnit`,
         `register_arrangement_units`: a section's variation step, and the units density
-        and modifiers register) is built up greedily from the reference, the song with
-        every unit at "reference" (every part on its source variant): unit by unit in plan
-        order, each candidate in turn renders the whole song with the units accepted so
-        far plus it, and the first under which no event anywhere is worse than in the
-        reference (`worse`) is accepted; a unit with none stays at "reference" and gives
-        way, traced with the first worse event; once every unit is decided, each unit that
-        gave way is tried again with the later acceptances in place, until none changes
-        (each acceptance shrinks the set, so this ends). The final render is the last
-        accepted trial, reused (`_reuse`). So the render is never worse than the reference,
-        and no unit gives way that its candidates would play at no cost with every other
-        unit as finally chosen; where two units cannot both play, the earlier in plan
-        order keeps its choice (the tie-break). A candidate that resolves to the same
-        arrangement as the accepted one (a step the rig cannot play) needs no render; an
-        arrangement already rendered is not rendered again. Cost: 1 reference render plus
-        1 per distinct candidate tried (each with its transition-free pass where the plan
-        has transitions), and one per candidate retried for a unit that gave way; none for a
-        plan without units."""
+        and modifiers register) is chosen against the reference, the song with every unit
+        at "reference" (every part on its source variant), judged by `worse`.
+
+        **Optimistic first.** After the reference, one trial plays every unit as planned:
+        unit by unit in plan order, its first candidate that plays differently from the
+        units before it (as the greedy loop below would try first, assuming each earlier
+        unit accepted). If no event anywhere is worse than in the reference, that is the
+        arrangement: 2 renders, the common case.
+
+        **Else greedy, in plan order:** each candidate in turn renders the whole song with
+        the units accepted so far plus it, and the first under which no event is worse is
+        accepted; a unit with none stays at "reference" and gives way, traced with the
+        first worse event; once every unit is decided, each unit that gave way is tried
+        again with the later acceptances in place, until none changes (each acceptance
+        shrinks the set, so this ends). Where two units cannot both play, the earlier in
+        plan order keeps its choice (the tie-break).
+
+        **Equivalence.** Where the greedy loop runs, its result is the pure greedy result
+        (the optimistic trial only adds one cached render). Where the optimistic trial is
+        accepted, the result can differ from pure greedy: "every unit planned is not
+        worse" does not imply that every greedy prefix is not worse (a later unit can
+        mask an earlier unit's damage, so greedy may give the earlier one up). Both
+        guarantees hold either way: the final render is never worse than the reference,
+        and no unit that pure greedy plays as planned is given up (an accepted optimistic
+        trial plays every unit as planned).
+
+        The final render is the last accepted trial, reused (`_reuse`). A candidate that
+        resolves to the same arrangement as the accepted one (a step the rig cannot play)
+        needs no render; an arrangement already rendered is not rendered again. Cost: 1
+        reference render plus 1 optimistic trial (none where it plays as the reference);
+        where that trial is worse, 1 per distinct candidate the greedy loop tries (each
+        with its transition-free pass where the plan has transitions) and one per
+        candidate retried for a unit that gave way; none for a plan without units."""
         self._settled = True
         units = sorted((unit for kind in _UNIT_KINDS for unit in kind(self)), key=lambda u: u.order)
         if not units:
@@ -4855,11 +4873,31 @@ class RenderingPipeline:
         reference = trial(accepted, gave_way)
         last = reference
 
-        def unchanged(choices: dict[str, str]) -> bool:
+        def signature(choices: dict[str, str]) -> tuple[Any, ...]:
             probe = copy.copy(self)
             probe._choices = choices
             probe._arrangement_cache = None
-            return probe._signature() == last._signature()
+            return probe._signature()
+
+        def unchanged(choices: dict[str, str]) -> bool:
+            return signature(choices) == last._signature()
+
+        if not self._greedy_only:
+            planned = dict(accepted)
+            for unit in units:
+                before = signature(planned)
+                pick = next(
+                    (c for c in unit.candidates if signature({**planned, unit.key: c}) != before),
+                    unit.candidates[0] if unit.candidates else "reference",
+                )
+                planned = {**planned, unit.key: pick}
+            optimistic = trial(planned, gave_way)
+            if not worse(reference, optimistic):
+                self._choices = planned
+                self._gave_way = {}
+                self._arrangement_cache = None
+                self._reuse = optimistic
+                return
 
         for unit in units:
             first_worse: str | None = None

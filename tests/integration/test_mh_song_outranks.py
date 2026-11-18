@@ -486,3 +486,92 @@ def test_a_variation_that_drops_later_flashes_gives_way(
     for head, span in spans.items():
         assert _flashes(final, head, *span) >= _flashes(reference, head, *span), head
     assert worse_than(reference, final) == []
+
+
+def _random_plan(rnd: random.Random) -> list[Any]:
+    sections, bar = [], 1
+    for index in range(4):
+        length = rnd.choice([2, 3])
+        family = rnd.choice(FAMILIES)
+        events = [
+            event(
+                rnd.randint(bar, bar + length - 1),
+                rnd.randint(1, 4),
+                rnd.choice(["hit", "hit", "color", "pulse", "strobe_slow"]),
+            )
+            for _ in range(rnd.choice([0, 1, 2]))
+        ]
+        for e in events:
+            if e["action"] == "color":
+                e["color"] = rnd.choice(["red", "blue", "white"])
+        sections.append(
+            m.plan_section(
+                f"s{index + 1}",
+                bar,
+                bar + length - 1,
+                family,
+                motif_id=rnd.choice([None, "m", "m"]),
+                variation=rnd.choice(["NONE", "NARROW", "WIDEN", "SLOWER", "FASTER", "FASTER"]),
+                events=list({(e["bar"], e["beat"], e["action"]): e for e in events}.values()),
+            )
+        )
+        bar += length
+    return sections
+
+
+def test_the_optimistic_trial_keeps_the_greedy_guarantees() -> None:
+    """Random plans, rendered with the optimistic all-planned trial and with pure greedy
+    (`_greedy_only`): the final render is never worse than the reference; a unit that
+    plays a variation under pure greedy still plays one; where the optimistic trial was
+    not accepted the result is pure greedy's; where it departs from it, every unit plays as
+    planned."""
+    beat_grid = m.pickup_grid(500.0, 12, pickup=0)
+    fg = slow(rig())
+    admission = gate(fg, beat_grid)
+    outcomes = {"differs": 0, "gave way": 0, "two renders": 0}
+    for seed in range(20):
+        sections = _random_plan(random.Random(seed))
+        repaired = repair_rig_intent(
+            ChoreographyPlan(sections=sections, overall_strategy=""), admission.offer, {}, beat_grid
+        )
+
+        def run(
+            greedy_only: bool,
+            choices: dict[str, str] | None = None,
+            plan: ChoreographyPlan = repaired,
+        ) -> RenderingPipeline:
+            pipeline = RenderingPipeline(
+                choreography_plan=plan,
+                beat_grid=beat_grid,
+                fixture_group=fg,
+                job_config=m.family_job(HEADS),
+                media_file="silence.wav",
+                admission=admission,
+            )
+            pipeline._greedy_only = greedy_only
+            if choices is not None:
+                pipeline._settled = True
+                pipeline._choices = choices
+            pipeline.render()
+            return pipeline
+
+        fast, greedy = run(False), run(True)
+        assert fast._choices is not None and greedy._choices is not None
+        reference = run(True, dict.fromkeys(greedy._choices, "reference"))
+        assert worse_than(reference, fast) == [], seed
+        for key, choice in greedy._choices.items():
+            if choice != "reference":
+                assert fast._choices[key] != "reference", (seed, key)
+        if fast._choices != greedy._choices:
+            # Only an accepted optimistic trial departs from pure greedy: every unit as
+            # planned, none given way.
+            outcomes["differs"] += 1
+            assert not fast._gave_way, seed
+            assert all(choice != "reference" for choice in fast._choices.values()), seed
+        else:
+            assert fast._gave_way == greedy._gave_way, seed
+        if fast._gave_way:
+            outcomes["gave way"] += 1
+        if fast.arrangement_renders <= 2:
+            outcomes["two renders"] += 1
+    assert outcomes["gave way"] and outcomes["two renders"], outcomes
