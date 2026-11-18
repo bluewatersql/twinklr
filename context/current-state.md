@@ -32,9 +32,8 @@ See [product/overview.md](product/overview.md).
   revision. Moving-head sections carry 1-3 template parts and categorical song intent
   (intensity, colour, gobo, timed events tied to lyric MomentCues, motif variation,
   density, entry/exit transitions; contract of 2026-11-17, sent to Claude as an enforced
-  structured output, compiled and enforced live on 2026-11-17); the moving-head renderer renders each
-  section's colour and gobo and not yet the rest of the intent, a known regression
-  (below).
+  structured output, compiled and enforced live on 2026-11-17); the moving-head renderer renders all of it but
+  the parts' modifiers, a known regression (below).
   [architecture/multi-agent-planning.md](architecture/multi-agent-planning.md)
 - **Providers** — OpenAI (default; Responses API strict structured outputs), Claude
   (`llm_provider: anthropic`), and Ollama cloud (`glm-5.3:cloud` through the loopback
@@ -160,10 +159,20 @@ See [product/overview.md](product/overview.md).
     (render-decided, repair-predicted). Renderer revision 20.
     ([user guide](../docs/user-guide.md#how-a-sections-motif-and-variation-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-w10bc-motif-variation/README.md))
-  - **Not rendered on this branch: density and modifiers.** Accepted and ignored (a
-    per-section trace diagnostic says so). Each is built on its own side branch
-    (`feat/mh-true-up-p3-density`, `feat/mh-true-up-p3-modifiers`) as arrangement units
-    judged by `pipeline.worse`, and is not merged yet
+  - **Density** (W10d, 2026-11-18, not yet seen by the owner). Density plays on the light:
+    REST is dark (a synthetic `closed` the planner's events still play through), SPARSE
+    darkens half the heads (mirror partners together) in turn on the played variant's
+    cycle, BUSY adds an accent each bar on each head's first lit beat; BALANCED is
+    unchanged. SPARSE keeps every head as BALANCED around each event and transition and
+    BUSY drops its accents there; each SPARSE or BUSY section is an arrangement unit, so
+    it plays BALANCED (traced) wherever it would make any event worse. Repair records what
+    does not play as asked and BUSY over a quarter of the song. Whether density should
+    mean light (as built) or movement is put to the owner. Renderer revision 21.
+    ([user guide](../docs/user-guide.md#how-a-sections-density-reaches-the-lights),
+    [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-w10d-density/README.md))
+  - **Not rendered on this branch: modifiers.** Accepted and ignored (a per-section trace
+    diagnostic says so). Built on its own side branch (`feat/mh-true-up-p3-modifiers`) as
+    arrangement units judged by `pipeline.worse`, not merged yet
     ([handoff](../changes/2026_11_12_mh_true_up/plan/handoff.md#side-branches)).
 
   `twinklr run`, `show`, `eval-report`, `inject` and `regenerate` all use it;

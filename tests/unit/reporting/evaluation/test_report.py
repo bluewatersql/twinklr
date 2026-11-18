@@ -311,8 +311,8 @@ async def test_the_report_carries_each_sections_song_intent_and_the_plan_repairs
     tmp_path: Path,
 ) -> None:
     """The planner's song intent is reported per section as planned, with what the render
-    played of its colour, intensity and events and the fields the renderer does not render
-    yet; the plan's repairs are reported from the trace."""
+    played of its colour, intensity, events and density and the fields the renderer does
+    not render yet (none here); the plan's repairs are reported from the trace."""
     accented = PLAN.sections[0].model_copy(
         update={
             "intensity": Intensity.DRAMATIC,
@@ -347,9 +347,11 @@ async def test_the_report_carries_each_sections_song_intent_and_the_plan_repairs
     assert first is not None and second is not None
     assert (first.intensity, first.color, first.gobo) == ("DRAMATIC", "PALETTE_ACCENT", None)
     assert first.events == ["bar 2 beat 3: hit"]
-    assert first.not_rendered == ["density"]
-    # The motif and the variant it resolved to lead what played.
-    motif, variant, played, intensity, hit = first.played
+    assert first.not_rendered == []
+    # The motif and the variant it resolved to lead what played; density follows the events.
+    motif, variant, played, intensity, hit, density, *dropped = first.played
+    assert density.startswith("density BUSY: ")
+    assert all(line.startswith("accent on ") for line in dropped)
     assert motif == "motif m1: INTRODUCE"
     assert variant == "variant base: variation NONE from base (its effective variant)"
     # The family rig's colour wheel carries no tags: the colour plays on no head.
@@ -372,7 +374,8 @@ async def test_the_report_carries_each_sections_song_intent_and_the_plan_repairs
     markdown = (tmp_path / "report" / "report.md").read_text(encoding="utf-8")
     assert "**Song intent** (as planned):" in markdown
     assert "- intensity: DRAMATIC" in markdown and "- intensity: as authored" in markdown
-    assert "not rendered yet (density): no renderer has rendered them yet" in markdown
+    assert "not rendered yet" not in markdown
+    assert f"- played: {density}" in markdown
     assert "(plays: wide)" in markdown and f"- played: {variant}" in markdown
     assert f"- played: {hit}" in markdown
     assert f"- played: {played}" in markdown and f"- played: {intensity}" in markdown

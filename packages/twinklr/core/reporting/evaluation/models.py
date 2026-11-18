@@ -153,8 +153,8 @@ class SongIntentReport(BaseModel):
     Null fields and empty lists are "as the template is authored". `not_rendered` names
     the fields the planner set that the renderer does not render yet (a known regression,
     `changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md`); `played`, what the
-    render made of the colour, gobo, intensity and events (`song_intent.describe_look`) and
-    of each lyric cue (`events.describe_lyric_cue`).
+    render made of the colour, gobo, intensity, events and density
+    (`song_intent.describe_look`) and of each lyric cue (`events.describe_lyric_cue`).
     """
 
     intensity: str | None = Field(description="Intensity, or null for as authored")
@@ -164,7 +164,10 @@ class SongIntentReport(BaseModel):
     events: list[str] = Field(description="Timed accents, one line each")
     motif_id: str | None = Field(description="The macro motif carried, or null")
     variation: str = Field(description="Variation of the motif")
-    density: str = Field(description="Movement density")
+    density: str = Field(
+        description="Density: REST dark, SPARSE half the heads dark in turn, BALANCED the "
+        "template's own, BUSY an accent each bar"
+    )
     entry: str | None = Field(description="Transition into the section, or null")
     exit: str | None = Field(description="Transition out of the section, or null")
     not_rendered: list[str] = Field(description="Fields set that are not rendered yet")

@@ -14,7 +14,7 @@ import json
 import logging
 import math
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -54,7 +54,7 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
 from twinklr.core.sequencer.models.moving_heads.topology import rig_topology
 from twinklr.core.sequencer.models.template import RepeatMode
-from twinklr.core.sequencer.models.transition import TransitionEdge
+from twinklr.core.sequencer.models.transition import PlanTransition, TransitionEdge
 from twinklr.core.sequencer.moving_heads import render_log
 from twinklr.core.sequencer.moving_heads.arrangement import (
     BASE,
@@ -88,6 +88,22 @@ from twinklr.core.sequencer.moving_heads.delivery import (
     DeliveryArtifacts,
     build_sequence,
     export_delivery,
+)
+from twinklr.core.sequencer.moving_heads.density import (
+    BALANCED,
+    BUSY,
+    REST,
+    REST_INDEX,
+    SPARSE,
+    busy_emphasis,
+    carried_runs,
+    event_spans,
+    play_busy,
+    play_sparse,
+    rest_record,
+    sparse_halves,
+    sparse_protected,
+    with_rest,
 )
 from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic
 from twinklr.core.sequencer.moving_heads.events import (
@@ -343,8 +359,14 @@ def _enter_section(
     failure_mode: FailureMode,
     locks: Sequence[RenderLock] = (),
     played: Collection[str] = (),
+    decide_on: Sequence[FixtureSegment] | None = None,
 ) -> tuple[list[FixtureSegment], list[dict[str, Any]], list[dict[str, Any]]]:
     """Keep a section's uncut entry where it plays as authored, else open it with a window.
+
+    With `decide_on` (a REST part: the same part compiled without REST's darkness), each
+    fixture's window is decided on those cues and cuts `cues` the same, a cue cut dark to
+    its end kept (`apply_entry_window`'s `keep_dark`), so REST enters as BALANCED does and
+    the planner's events inside it find the same cues.
 
     A fixture in `played` enters through its section's transition, which already
     checked that the transaction pass plays it (`transitions.play_head`): it keeps its
@@ -375,6 +397,11 @@ def _enter_section(
     by_fixture: dict[str, list[FixtureSegment]] = defaultdict(list)
     for cue in sorted(cues, key=lambda cue: cue.t0_ms):
         by_fixture[cue.fixture_id].append(cue)
+    if decide_on is not None:
+        decided: dict[str, list[FixtureSegment]] = defaultdict(list)
+        for cue in sorted(decide_on, key=lambda cue: cue.t0_ms):
+            decided[cue.fixture_id].append(cue)
+        by_fixture = defaultdict(list, {f: decided.get(f) or own for f, own in by_fixture.items()})
     bounds: dict[str, int | None] = {}
     windows: dict[str, int | None] = {}
     skipped: set[str] = set()
@@ -416,7 +443,9 @@ def _enter_section(
         for fixture_id, end in windows.items()
         if fixture_id not in skipped
     }
-    entered, dropped = apply_entry_window(cues, window_ends, profiles=profiles)
+    entered, dropped = apply_entry_window(
+        cues, window_ends, profiles=profiles, keep_dark=decide_on is not None
+    )
     first = {}
     for cue in sorted(entered, key=lambda cue: -cue.t0_ms):
         first[cue.fixture_id] = cue.t0_ms
@@ -1982,6 +2011,33 @@ def _variation_units(pipeline: RenderingPipeline) -> list[ArrangementUnit]:
 register_arrangement_units(_variation_units)
 
 
+def _density_units(pipeline: RenderingPipeline) -> list[ArrangementUnit]:
+    """A unit per plan section whose density is SPARSE or BUSY (`density`), after its
+    variation: candidate "planned" (the density as asked); its reference plays BALANCED.
+    REST is not a unit: it is dark by definition, and the planner's events inside it still
+    play. BUSY is one whole candidate: its accents already keep clear of every event and
+    transition (`density.play_busy`), and `worse` names events, not the accents near them."""
+    return [
+        ArrangementUnit(
+            key=f"density:{section.section_id}",
+            order=(index, 1),
+            candidates=("planned",),
+        )
+        for index, section in enumerate(pipeline.choreography_plan.sections)
+        if section.density.value in (SPARSE, BUSY)
+    ]
+
+
+register_arrangement_units(_density_units)
+
+
+def _density_gave_way(event: str | None) -> str:
+    """The trace's words for a density unit at its reference (`_density_units`)."""
+    if event is None:
+        return "it plays BALANCED, the reference, while the arrangement is chosen"
+    return f"density gave way to {event}"
+
+
 def worse(reference: RenderingPipeline, trial: RenderingPipeline) -> list[str]:
     """Every way `trial` plays the song worse than `reference` (two renders of one plan),
     in words, first found first; empty where it plays nothing worse. Judged per event and
@@ -3136,14 +3192,12 @@ def _unrendered_intent_message(section: PlanSection) -> str | None:
     """What of the section's song intent the renderer does not render yet (no renderer
     has); None for a section that sets none of it. Its colour and gobo
     (`song_intent.resolve_section_look`), its intensity (`intensity.shape_section`), its
-    events and their lyric cues (`events`), its transitions (`transitions`) and its motif
-    and variation (`arrangement`) render, so they are never listed."""
+    events and their lyric cues (`events`), its transitions (`transitions`), its motif
+    and variation (`arrangement`) and its density (`density`) render, so they are never
+    listed."""
     names = [
         name
-        for name, is_set in (
-            ("density", section.density.value != "BALANCED"),
-            ("modifiers", any(part.modifiers for part in section.parts)),
-        )
+        for name, is_set in (("modifiers", any(part.modifiers for part in section.parts)),)
         if is_set
     ]
     if not names:
@@ -3321,6 +3375,9 @@ class RenderingPipeline:
         preflight_render_policy(job_config, fixture_group)
 
         self.choreography_plan = choreography_plan
+        self._planned = choreography_plan
+        """The plan as given: its transitions, which the render without them (and every
+        arrangement trial) still reads where density keeps clear of them."""
         self.fixture_group = fixture_group
         self.job_config = job_config
         self.beat_grid = beat_grid
@@ -3749,6 +3806,12 @@ class RenderingPipeline:
         """Per plan section, where the transition it was entered by ends."""
         transition_heads: list[HeadTransition] = []
         """What each transition played on each head, to light again after intensity."""
+        resting: set[str] = set()
+        """The parts with hits that play in their section's REST (`apply_hits`' `rest`)."""
+        accenting: list[tuple[str, tuple[int, int], int, int, str, dict[str, Any]]] = []
+        """Per BUSY part: its id, frames, bars, accent emphasis and density trace entry."""
+        halves = sparse_halves(self.fixture_group)
+        shortest_dark_ms, _ = _span_limits(self.fixture_group)
 
         def rested(own: Sequence[FixtureSegment]) -> list[FixtureSegment]:
             """A transition's own cues dark over the show's rests, as every cue is."""
@@ -3834,6 +3897,94 @@ class RenderingPipeline:
             level = effective_intensity(asked, focal_role)
             if level == asked:
                 focal_role = None  # it changes nothing here
+            asked_density = plan_sections[base_id].density.value
+            # SPARSE and BUSY are arrangement units (`_density_units`): at "reference"
+            # the section plays BALANCED.
+            density = (
+                asked_density
+                if asked_density == REST or self.unit_choice(f"density:{base_id}") == "planned"
+                else BALANCED
+            )
+            shutter_events = events
+            if density == REST:
+                # REST is a synthetic `closed` among the section's shutter events (`density`).
+                shutter_events = with_rest(
+                    events,
+                    start_bar=plan_sections[base_id].start_bar,
+                    start_ms=part_frames(
+                        self.beat_grid,
+                        plan_sections[base_id].start_bar,
+                        plan_sections[base_id].end_bar,
+                    )[0],
+                    beat_grid=self.beat_grid,
+                )
+                plays_events = True
+            sparse_box: list[dict[str, Any] | None] = [None]
+            """The part's SPARSE trace entry (`density.play_sparse`), from its last compile."""
+            sparse_cycle: tuple[Fraction, bool] | None = None
+            if density == SPARSE:
+                # The cycle of the variant the part plays, as the compiler places it.
+                cycled = whole_period_cycle(
+                    apply_preset(template_doc.template, preset)
+                    if preset
+                    else template_doc.template,
+                    self.beat_grid.beats_per_bar,
+                ).repeat
+                sparse_cycle = (
+                    Fraction(repr(cycled.cycle_bars)).limit_denominator(64),
+                    cycled.mode == RepeatMode.ONCE,
+                )
+
+            planned_windows: list[tuple[str, int, int]] = []
+            if density == SPARSE:
+                # SPARSE keeps off the planned transitions' windows at this part's edges,
+                # as the plan has them (the render without transitions too), so a
+                # transition plays on every head it plays on at BALANCED.
+                planned_windows = self._transition_reach(section, phase_map)
+
+            def densify(
+                cues: list[FixtureSegment],
+                records: Mapping[int, Mapping[str, Any]] | None,
+                sparse_cycle: tuple[Fraction, bool] | None = sparse_cycle,
+                context: TemplateCompileContext = context,
+                events: SectionEvents = events,
+                window: tuple[int, int] = window,
+                base_id: str = base_id,
+                sparse_box: list[dict[str, Any] | None] = sparse_box,
+                planned_windows: list[tuple[str, int, int]] = planned_windows,
+                *,
+                probe: bool = False,
+            ) -> list[FixtureSegment]:
+                """A part's cues with SPARSE's darkness (`density.play_sparse`) where it
+                plays SPARSE, clear of its plan section's events as they played (`records`)."""
+                if sparse_cycle is None:
+                    return cues
+                sparse, entry = play_sparse(
+                    cues,
+                    window=window,
+                    cycle_bars=sparse_cycle[0],
+                    once=sparse_cycle[1],
+                    at_bars=lambda offset: context.bar_offset_to_ms(float(offset)),
+                    halves=halves,
+                    protected=sparse_protected(
+                        events, window, records, hit_frames_of(base_id), self.beat_grid
+                    )
+                    + planned_windows,
+                    carried=carried_runs(event_records.values(), window[0]),
+                    profiles=profiles,
+                    darken=lambda head_cues, dark: _dark_over_spans(
+                        head_cues, dark, profiles, shortest_lit_ms=self._shortest_lit_ms
+                    ),
+                    snap=lambda spans: _snap_dark_spans(
+                        spans,
+                        shortest_dark_ms=shortest_dark_ms,
+                        shortest_lit_ms=self._shortest_lit_ms,
+                    ),
+                    shortest_dark_ms=shortest_dark_ms,
+                )
+                if not probe:
+                    sparse_box[0] = entry
+                return sparse
 
             def compile_section(
                 held_states: Mapping[str, Mapping[ChannelName, str]],
@@ -3842,18 +3993,19 @@ class RenderingPipeline:
                 preset: TemplatePreset | None = preset,
                 refused: int = refused,
                 compiled_steps: list[dict[str, str | int]] = compiled_steps,
-                events: SectionEvents = events,
+                events: SectionEvents = shutter_events,
                 window: tuple[int, int] = window,
                 plays_events: bool = plays_events,
                 played_box: list[EventsPlayed] = played_box,
                 template_heads: list[HeadWheels] = template_heads,
                 palette: SectionPalette | None = palette,
+                densify: Callable[..., list[FixtureSegment]] = densify,
                 *,
                 probe: bool = False,
             ) -> list[FixtureSegment]:
-                """The part compiled holding `held_states`, with its events; a `probe`
-                (the authored compile `_unplayable_holds` compares with) leaves the
-                section's events record alone."""
+                """The part compiled holding `held_states`, with its events (REST's among
+                them) and SPARSE's darkness; a `probe` (the authored compile
+                `_unplayable_holds` compares with) leaves the section's records alone."""
                 if unplayable is not None:
                     del unplayable[refused:]  # a recompile records its refusals again
                 result = compile_template(
@@ -3874,7 +4026,7 @@ class RenderingPipeline:
                     shortest_lit_ms=self._shortest_lit_ms,
                 )
                 if not plays_events:
-                    return spanned
+                    return densify(spanned, None, probe=probe)
                 # The plan's closed, strobe, pulse, colour and gobo events, after the
                 # template, the section's held states and the show's rests.
                 played, events_played = apply_section_events(
@@ -3905,7 +4057,8 @@ class RenderingPipeline:
                 )
                 if not probe:
                     played_box[0] = events_played
-                return played
+                # SPARSE after the events, clear of what they show (`density`).
+                return densify(played, events_played.records, probe=probe)
 
             section_cues = compile_section(held)
             key = (template_doc.template.template_id, context.preset_id)
@@ -3970,10 +4123,17 @@ class RenderingPipeline:
             keep: dict[str, dict[ChannelName, str]] = {}
             retries: dict[str, tuple[_BoundaryChange, int]] = {}
             half_beat = _half_beat_before(self.beat_grid, context.start_ms)
+            # A REST part decides its boundary as it would at BALANCED (`density`): REST's
+            # darkness is no reason to play through a boundary a head enters dark.
+            deciding = (
+                compile_section(held, events=events, probe=True)
+                if density == REST
+                else section_cues
+            )
             for fixture_id in sorted({cue.fixture_id for cue in section_cues}):
                 change = _boundary_change(
                     sorted(
-                        (cue for cue in section_cues if cue.fixture_id == fixture_id),
+                        (cue for cue in deciding if cue.fixture_id == fixture_id),
                         key=lambda cue: cue.t0_ms,
                     ),
                     kept[fixture_id],
@@ -4193,6 +4353,58 @@ class RenderingPipeline:
                             action="unchanged",
                         )
                     )
+            if asked_density != BALANCED:
+                # What the section's density played on this part (`density`).
+                density_entry: dict[str, Any] = {"level": asked_density}
+                if density == BALANCED:
+                    density_entry["gave_way"] = _density_gave_way(
+                        self.unit_gave_way(f"density:{base_id}")
+                    )
+                elif density == REST:
+                    first = played_box[0].records.get(REST_INDEX, {})
+                    density_entry = rest_record(
+                        shutter_events,
+                        window,
+                        sorted({cue.fixture_id for cue in section_cues}),
+                        profiles,
+                        first.get("heads"),
+                    )
+                elif density == SPARSE:
+                    assert sparse_box[0] is not None
+                    density_entry = sparse_box[0]
+                else:
+                    accenting.append(
+                        (
+                            section.section_id,
+                            window,
+                            section.start_bar,
+                            section.end_bar,
+                            busy_emphasis(shape_for(level) is not None),
+                            density_entry,
+                        )
+                    )
+                record.setdefault("arrangement", {})["density"] = density_entry
+                if (
+                    density_entry.get("plays") == "BALANCED"
+                    or "gave_way" in density_entry
+                    or density_entry.get("lit")
+                ):
+                    diagnostics.append(
+                        MHDiagnostic(
+                            code="unsupported_attribute",
+                            severity="warning",
+                            message=f"section {section.section_id!r}: density {asked_density} "
+                            + (
+                                "plays BALANCED"
+                                if density_entry.get("plays") == "BALANCED"
+                                or "gave_way" in density_entry
+                                else f"leaves {', '.join(density_entry['lit'])} lit"
+                            )
+                            + " (the trace's section_looks arrangement density)",
+                            section_id=section.section_id,
+                            action="unchanged",
+                        )
+                    )
             offered = (
                 None
                 if self.admission is None or preset is None
@@ -4226,8 +4438,24 @@ class RenderingPipeline:
                 for event_index, unplaced_entry in unplaced:
                     event_records[(base_id, event_index)] = unplaced_entry
                 record["events"] = entries + [entry for _, entry in unplaced]
+                rest_dark = record.get("arrangement", {}).get("density", {}).get("dark_ms")
+                if density == REST and rest_dark is not None:
+                    # A colour or gobo change REST keeps unseen says so on each head.
+                    for event_entry in entries:
+                        if event_entry.get("action") not in WHEEL_ACTIONS or not (
+                            rest_dark[0] <= event_entry.get("frame_ms", -1) < rest_dark[1]
+                        ):
+                            continue
+                        for outcome in event_entry.get("heads", {}).values():
+                            if "not_played" in outcome:
+                                outcome["rest"] = (
+                                    "the section's REST keeps the head dark here: only an "
+                                    "`open`, a strobe, a `pulse` or a hit lights it"
+                                )
                 if any(e.action == "hit" for e in part_events):
                     hitting.append((section.section_id, window, events, record))
+                    if density == REST:
+                        resting.add(section.section_id)
             if asked is not None or focal_role is not None or shape_for(level) is not None:
                 record["intensity"] = {
                     "asked": asked,
@@ -4274,6 +4502,10 @@ class RenderingPipeline:
                 failure_mode=policy.reposition_fallback,
                 locks=self.locks,
                 played=entered_by.keys(),
+                # A REST part enters as it would at BALANCED (`density`).
+                decide_on=compile_section(held, events=events, probe=True)
+                if density == REST
+                else None,
             )
             for fixture_id in sorted({cue.fixture_id for cue in entered}):
                 before = kept[fixture_id]
@@ -4482,6 +4714,7 @@ class RenderingPipeline:
                 required={
                     event.index: set(hits_free.get((base, event.index), {})) for event in hits
                 },
+                rest=section_id in resting,
             )
             for i, cue in zip(index, struck, strict=True):
                 cues[i] = cue
@@ -4503,6 +4736,90 @@ class RenderingPipeline:
                     outcome = (flash_entry or {}).get("heads", {}).get(fixture_id)
                     if outcome is not None:
                         outcome.setdefault("lit_by_hits", []).extend(said)
+
+        if accenting:
+            # BUSY's accents, after the hits, on the level the section plays: never inside
+            # a transition's window on a head, nor a planner event's widened seen span.
+            blocked: dict[str, list[tuple[str, int, int]]] = defaultdict(list)
+            for part_record in part_records.values():
+                for transition in part_record.get("transitions", []):
+                    what = f"the {transition['edge']} {transition['mode']} transition's window"
+                    w0, w1 = transition["window_ms"]
+                    for fixture_id, outcome in transition.get("heads", {}).items():
+                        # Only where it plays on the head: one that changes nothing there
+                        # keeps the head's accents.
+                        if _plays(outcome):
+                            a, b = _head_span(transition, outcome)
+                            blocked[fixture_id].append((what, min(a, w0), max(b, w1)))
+            seen: list[tuple[str, int, int]] = []
+            for sid, sid_events in timed.items():
+                seen += [
+                    (f"the planner's {label}'s seen span", a, b)
+                    for label, a, b in event_spans(
+                        yield_spans(
+                            sid_events,
+                            (0, len(times) * EFFECT_GRID_MS),
+                            self.beat_grid,
+                            hits=True,
+                            records={
+                                i: event_records.get((sid, i), {})
+                                for i in range(len(plan_sections[sid].events))
+                            },
+                            hit_frames={
+                                index: sorted(by_head.values())
+                                for (hit_sid, index), by_head in self.hit_frames.items()
+                                if hit_sid == sid
+                            },
+                        ),
+                        self.beat_grid,
+                    )
+                ]
+            for section_id, window, first_bar, last_bar, emphasis, busy_entry in accenting:
+                base, _, segment = section_id.partition("|")
+                # The part's cues and a transition's over its frames: a head lit first in
+                # a transition there has its first lit beat inside the window.
+                index = [
+                    i
+                    for i, cue in enumerate(cues)
+                    if (
+                        cue.section_id == base
+                        and cue.segment_id == (segment or "A")
+                        and TRANSITION_METADATA_KEY not in cue.metadata
+                    )
+                    or (
+                        TRANSITION_METADATA_KEY in cue.metadata
+                        and cue.t0_ms < window[1]
+                        and cue.t1_ms > window[0]
+                    )
+                ]
+                # Decided once, without the transitions (`transition_free`), where it ran.
+                fixed = (
+                    None
+                    if free is None or free.render_record is None
+                    else {
+                        f: set(at)
+                        for look in free.render_record.get("section_looks", [])
+                        if look["section_id"] == section_id
+                        for f, at in look.get("arrangement", {})
+                        .get("density", {})
+                        .get("placed", {})
+                        .items()
+                    }
+                )
+                accented, played_entry = play_busy(
+                    [cues[i] for i in index],
+                    window=window,
+                    bars=range(first_bar, last_bar + 1),
+                    emphasis=emphasis,
+                    profiles=profiles,
+                    phase_map=phase_map,
+                    beat_grid=self.beat_grid,
+                    blocked={f: [*blocked.get(f, []), *seen] for f in profiles},
+                    only=fixed,
+                )
+                for i, cue in zip(index, accented, strict=True):
+                    cues[i] = cue
+                busy_entry.update(played_entry)
 
         lyric_cues: list[dict[str, Any]] = []
         """Per lyric moment cue a plan section references, what played it, or why not."""
@@ -4810,6 +5127,63 @@ class RenderingPipeline:
             },
         )
 
+    def _transition_reach(
+        self, part: PlanSection, phase_map: MusicalPhaseMap
+    ) -> list[tuple[str, int, int]]:
+        """The windows the planned transitions at a flattened part's edges are placed in
+        before any event clamps them (`transitions.window_for`), from the plan as given
+        (`_planned`): the section's entry, or the previous section's exit, where the part
+        starts its section; the next section's entry, or the section's exit, where it ends
+        it."""
+        sections = list(self._planned.sections)
+        base = part.section_id.split("|")[0]
+        at = next((i for i, s in enumerate(sections) if s.section_id == base), None)
+        if at is None:
+            return []
+        section = sections[at]
+        previous = sections[at - 1] if at else None
+        following = sections[at + 1] if at + 1 < len(sections) else None
+        edges: list[
+            tuple[PlanTransition | None, TransitionEdge, int, Literal["before", "after"] | None]
+        ] = []
+        if part.start_bar == section.start_bar:
+            edge = TransitionEdge.ENTRY if section.entry is not None else TransitionEdge.EXIT
+            entering = section.entry or (previous.exit if previous else None)
+            edges.append(
+                (entering, edge, section.start_bar - 1, "before" if previous is None else None)
+            )
+        if part.end_bar == section.end_bar:
+            edge = (
+                TransitionEdge.ENTRY
+                if following is not None and following.entry is not None
+                else TransitionEdge.EXIT
+            )
+            leaving = (following.entry if following else None) or section.exit
+            edges.append((leaving, edge, section.end_bar, "after" if following is None else None))
+        out = []
+        song_end = len(frame_times(int(self.beat_grid.duration_ms))) * EFFECT_GRID_MS
+        for transition, edge, bar, rest in edges:
+            if transition is None:
+                continue
+            window = window_for(
+                transition,
+                edge,
+                boundary_ms=self.beat_grid.get_bar_start_ms(bar),
+                phase_map=phase_map,
+                beats_per_bar=self.beat_grid.beats_per_bar,
+                earliest_ms=0,
+                latest_ms=song_end,
+                rest=rest,
+            )
+            out.append(
+                (
+                    f"the {edge.value.lower()} {transition.mode.value} transition's window",
+                    window.start_ms,
+                    window.end_ms,
+                )
+            )
+        return out
+
     def unit_choice(self, key: str) -> str:
         """The candidate arrangement unit `key` plays in this render (`ArrangementUnit`):
         "planned" where the render is not choosing, else "reference" or a candidate."""
@@ -4966,11 +5340,18 @@ class RenderingPipeline:
         arranged = self._arranged()
         warnings = []
         for look in self.render_record.get("section_looks", []):
+            density = look.get("arrangement", {}).get("density")
+            if density is not None and "gave_way" in density:
+                density["gave_way"] = _density_gave_way(
+                    self.unit_gave_way(f"density:{look['section_id'].split('|')[0]}")
+                )
             found = arranged.get(look["section_id"])
             if found is None or "arrangement" not in look:
                 continue
             arrangement, index = found
             look["arrangement"] = arrangement.record(index)
+            if density is not None:
+                look["arrangement"]["density"] = density
             variant = arrangement.parts[index]
             if variant is not None and variant.reason:
                 warnings.append(

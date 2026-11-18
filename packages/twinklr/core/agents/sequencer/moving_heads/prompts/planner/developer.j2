@@ -179,11 +179,23 @@ match its motif; choose them yourself. `preset_id` is replaced where a motif's i
 look or a variation step decides the variant. A chorus can widen or quicken the verse that
 introduced the motif, a bridge narrow or slow it, a return restate it.
 
-**`density`**: how busy the movement is, shaping the arc with intensity:
-- `REST`: the heads mostly hold (a breakdown, a held note)
-- `SPARSE`: few, spaced moves (intros, quiet verses)
-- `BALANCED`: the template's own pace
-- `BUSY`: dense movement (choruses, peaks)
+**`density`**: how much of the rig's light plays, shaping the arc with intensity.
+Deterministic code plays it on the light; it never changes the movement (choose movement
+with the template and `variation`):
+- `REST`: dark. Every head is dark for the whole section; only your events light it: an
+  `open` ends the darkness from its beat, a strobe or `pulse` flashes from its beat, a
+  `hit` lights the heads for its accent. A colour, gobo or intensity is seen only where an
+  event lights the heads. For a breakdown, a stop, a held silence.
+- `SPARSE`: fewer heads lit at once. Half the heads (mirror partners together) are dark
+  while the other half play, swapping every cycle of the template (a one-move template:
+  every head plays the move, then its hold alternates). Every head is lit at some point,
+  and around each of your events every head plays as `BALANCED`. For intros and quiet
+  verses.
+- `BALANCED`: the template's own light, unchanged.
+- `BUSY`: an accent every bar: each head flashes on its first lit beat of each bar
+  (stronger under `DRAMATIC` or `INTENSE`), never inside your events or a transition.
+  For choruses and peaks; keep `BUSY` to about a quarter of the song, or the accents lose
+  their weight.
 
 **`transitions`**: how a section enters (`ENTRY`) and leaves (`EXIT`), at most one of
 each, chosen for the musical boundary. Both edges name the change at one boundary: where

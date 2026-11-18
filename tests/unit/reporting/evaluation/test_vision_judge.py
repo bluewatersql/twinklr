@@ -418,6 +418,6 @@ def test_the_judge_reads_every_song_intent_field_as_planned() -> None:
         "moment_cues=hook",
         "motif=pulse; variation=WIDEN; density=BUSY",
         "entry=sweep over TWO_BARS, curve linear, split HALF; exit=default",
-        "not_rendered_yet=density",
+        "not_rendered_yet=none",
     ):
         assert fragment in intent, fragment
