@@ -1081,29 +1081,26 @@ def _slow_heads(speed: float) -> FixtureGroup:
 def test_every_combined_variant_is_dry_compiled_never_inferred() -> None:
     """At 240 BPM on 720-degree heads the cascades' `fast` passes (up to about 306 BPM) and
     so does `wide` (about 407), but `wide+fast` does not (about 204): speeds multiply, so the
-    gate compiles each combination and refuses it alone, with its reason."""
+    gate compiles each combination and judges it alone; it plays only fitted to the rig
+    (`fitting`), at a strength the gate compiled, while `fast` and `wide` play as authored."""
     with family_catalog():
         admission = _gate(
             FAMILY_IDS, bars_grid(*([250.0] * 16)), family_rig(HEADS), family_job(HEADS)
         )
 
     for cascade in ("fly_in_cascade", "fly_out_cascade"):
-        presets = admission.admitted_presets[cascade]
-        assert "fast" in presets and "wide" in presets and "wide+fast" not in presets
-        (refused,) = [
-            e
-            for e in admission.preset_exclusions
-            if e["template_id"] == cascade and e["preset_id"] == "wide+fast"
-        ]
-        assert refused["reason"]
-        assert "wide+fast" not in admission.offer.templates[cascade].variants
+        offered = admission.offer.templates[cascade]
+        assert "fast" in offered.variants and "wide" in offered.variants
+        assert "fast" not in offered.fitted and "wide" not in offered.fitted
+        assert "wide+fast" in offered.variants and offered.fitted["wide+fast"]
 
 
 def test_variation_variants_never_decide_admission_or_the_effective_variant() -> None:
     """On 300-degree heads at 170 BPM the cascades' `fast` and `wide` fail while
     `narrow+fast` passes: the families are admitted and play their effective variant by
     the ladder (base, `narrow`, `slow`) exactly as before the variation variants existed;
-    the variation variants that pass are offered, those that fail are recorded."""
+    the variation variants that pass are offered, `fast` and `wide` only fitted to the rig
+    (`fitting`), those that fail are recorded."""
     with family_catalog():
         admission = _gate(
             FAMILY_IDS, bars_grid(*([60_000 / 170] * 16)), _slow_heads(300.0), family_job(HEADS)
@@ -1111,14 +1108,14 @@ def test_variation_variants_never_decide_admission_or_the_effective_variant() ->
 
     assert set(admission.effective_preset.values()) <= {None, "narrow", "slow"}
     cascade = admission.offer.templates["fly_in_cascade"]
-    assert "fast" not in cascade.variants and "wide" not in cascade.variants
+    assert {"fast", "wide"} <= cascade.fitted.keys()
     assert "narrow+fast" in cascade.variants
     refused = {
         (e["template_id"], e["preset_id"])
         for e in admission.preset_exclusions
         if e["preset_id"] in VARIATION_PRESETS
     }
-    assert ("fly_in_cascade", "fast") in refused and ("fly_in_cascade", "wide") in refused
+    assert ("fly_in_cascade", "fast") not in refused and ("fly_in_cascade", "wide") not in refused
 
 
 def test_a_variation_variant_moves_wider_or_faster_than_the_base() -> None:
@@ -1290,3 +1287,18 @@ def test_an_offer_fact_that_cannot_be_computed_is_unknown_not_a_failure(
 
     assert offer.dark_change_ms is None
     assert "is unknown on" in caplog.text
+
+
+def test_the_offer_times_a_full_crossing_over_the_allowed_range() -> None:
+    """How long the slowest head takes to cross its whole range is measured over the range
+    it may be commanded across (allowed), not the physical one: 285 of pan at 720 degree/s
+    is 396 ms (not 750), 125 of tilt 174 ms (not 375)."""
+    from twinklr.core.sequencer.moving_heads.song_intent import rig_offer
+
+    grid = bars_grid(*([500.0] * 4))
+
+    assert rig_offer(family_rig(HEADS), grid).full_travel_ms == {"pan": 750, "tilt": 375}
+    assert rig_offer(allowed_rig(family_rig(HEADS)), grid).full_travel_ms == {
+        "pan": 396,
+        "tilt": 174,
+    }

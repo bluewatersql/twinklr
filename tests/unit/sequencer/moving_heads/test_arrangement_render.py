@@ -407,6 +407,16 @@ def test_every_variation_changes_the_bytes_of_every_family_or_says_why(
     trace = arranged(pipeline)["b"]["variation"]
 
     assert bool(trace.get("reason")) == ((family, variation) in NOT_SHOWN), trace
+    warned = [
+        d["message"]
+        for d in pipeline.render_record["diagnostics"]
+        if d["section_id"] == "b" and "does not play" in d["message"]
+    ]
+    assert warned == (
+        [f"section 'b': its variation {variation} does not play ({trace['reason']})"]
+        if trace.get("reason")
+        else []
+    )
     if trace.get("reason"):
         assert trace["plays"] == trace["from"]
         assert Frames(pipeline).by_head == Frames(same).by_head
@@ -512,10 +522,10 @@ def test_repair_reads_the_variant_the_render_plays(name: str, bpm: int, slow: bo
 
 
 def test_repair_feeds_back_a_named_preset_the_gate_did_not_admit() -> None:
-    """On 300-degree heads at 170 BPM the cascades' `fast` is not admitted: a section
-    naming it plays its effective variant, and repair says so."""
+    """On 150-degree heads at 170 BPM the cascades' `fast` is not admitted at any fitted
+    strength: a section naming it plays its effective variant, and repair says so."""
     beat_grid = grid(170)
-    fg = _slow_heads()
+    fg = _slow_heads(150.0)
     admission = gate(beat_grid, fg)
     assert "fast" not in admission.offer.templates["fly_in_cascade"].variants
     repaired = repair_rig_intent(

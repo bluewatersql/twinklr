@@ -89,6 +89,59 @@ fingerprint-only with every frame unchanged, and the new tests below pin the new
   a first appearance has nothing before it); stated in the module, both planner prompts
   and the user guide.
 
+## Variant fitting (after 2c961b58)
+
+**Why.** On the owner's 150 degree/s heads at 79.5 BPM the gate refused most variation
+variants (cascades `wide` by 0.1 % of the speed limit, `fast`), so chorus_1's WIDEN and
+break's FASTER played base. Integrator decision: variants are fitted to the rig by code.
+
+**Built** (`sequencer/moving_heads/fitting.py`, the gate in `pipeline.admit_templates`):
+a variation variant of a template whose ladder passes that fails the gate (it differs from
+its base only in extents and period, so it fails on a speed, a range or a repositioning)
+is retried at reduced strengths, strongest first, and admitted at the first that passes:
+reach x1.4, x1.3, x1.25, x1.2 of the base's extent (each widened extent the same share of
+the way from base to the catalog's x1.5); rate on the next whole beat longer than the
+catalog's period, up to 3/4 of the base's (a 4-beat movement: 2, then 3 beats; the snap's
+1-beat move has no such beat, so its `fast` is never fitted); a combination reach-major
+(every rate at x1.5, then at x1.4, ...). Narrowing and slowing parts keep their values.
+Below x1.2 reach or 3/4 of the period nothing is offered; the "plays the same as base"
+check applies to fitted variants too. Fitted patches are derived in code from the base
+and the catalog target. `TemplateOffer.fitted` carries the strength; the render plays the
+fitted preset (`_section_preset`), its strength is in the fingerprint (a substitution
+`"wide fitted {...}"`), the trace says it (`section_looks[].fitted`), the planner prompt
+lists fitted variants, and repair records each part that plays one. A variation that
+does not play now also warns in the trace's diagnostics. Revision 15; pins re-recorded
+fingerprint-only, every frame held.
+
+**Also:** `full_travel_ms` (W8) now divides the operable range by the speed: on
+`allowed_rig` pan 750 → 396 ms, tilt 375 → 174 ms (the owner's reported 3600/1800 ms
+become about 1977/847 ms); unchanged on rigs whose allowed range is the physical one.
+
+**Admission on `allowed_rig` at 150 degree/s** (synthetic; the owner's geometry differs,
+so the variants refused there differ in detail):
+
+| BPM | Fitted | Not offered (why) |
+|---|---|---|
+| 79.5 | cascades `fast` 3-beat, `wide+fast` x1.2 / 3-beat; `mirror_wings`, `target_orbit` `wide+fast` 3-beat; snap `wide+fast` x1.25 | snap `fast` (plays as base) |
+| 120 | cascades `narrow+fast` 3-beat; `masked_wheel_flick` `wide+fast` 3-beat; `mirror_wings` `wide` x1.3, `fast` 3-beat; `target_orbit` `fast` 3-beat, `wide+fast` x1.4 / 3-beat | cascades `wide`, `fast`, `wide+fast`; snap `fast`, `wide+fast`; `mirror_wings` `wide+fast` — over the speed at every strength (the cascades' base already moves at ~the limit: x1.1 still exceeds it) |
+| 170 | cascades `wide+slow` x1.4; `masked_wheel_flick` `fast` 3-beat, `wide+fast` x1.25 / 3-beat; `mirror_wings` `narrow+fast` 3-beat; `target_orbit` `wide` x1.3, `fast` 3-beat | most `wide`/`fast` (over the speed at every strength; the cascades' and `mirror_wings`' own base fails here, they play `narrow`); `masked_wheel_flick` `wide` (dark repositioning) |
+
+Gate time on that rig: 4.62 → 6.11 s (79.5), 2.13 → 2.89 s (120), 1.31 → 1.83 s (170);
+on `family_rig` (nothing fitted) unchanged (5.40 → 5.39, 3.21 → 3.19, 3.10 → 3.13 s).
+Byte matrix (567 configs, 13,041 renders) against the W10b/c baseline: frames, segments,
+`.xsq`, `.xmap`, normalised trace and record, and gate data identical.
+
+**Tests** (`tests/integration/test_mh_variant_fitting.py`, all on `allowed_rig`): the
+ladder's order and minimums; a fitted patch derived from base and target; on 140 degree/s
+heads at 79.5 BPM the cascades play `wide` at x1.4 and `fast` on 3 beats (the strongest
+passing; synthetic geometry needs 140 where the owner's needs 150), visibly wider (pan span
+over x1.2 the base's) and unlike base, never a frame step over the head's speed plus one
+word, named in the offer, the trace and repair; the fitted strength is render identity; a
+fast enough rig fits nothing. `test_the_offer_times_a_full_crossing_over_the_allowed_range`.
+
+**PENDING-OWNER:** does a fitted x1.2-x1.4 reach or a 3-beat rate still read as the
+variation asked for?
+
 ## Owner-rig gate crash and confirmation-review LOW items (after e922bc52)
 
 - **Crash.** `rig_offer`'s transition-darkness bound (`dark_change_ms`, W10a LOW-2,

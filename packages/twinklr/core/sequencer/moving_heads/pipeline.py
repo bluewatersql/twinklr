@@ -116,6 +116,13 @@ from twinklr.core.sequencer.moving_heads.export.xsq_adapter import (
     check_models,
     run_requests,
 )
+from twinklr.core.sequencer.moving_heads.fitting import (
+    MIN_RATE,
+    MIN_REACH,
+    Fit,
+    fits_for,
+    fitted_preset,
+)
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
 from twinklr.core.sequencer.moving_heads.identity import (
     BACKEND_ID,
@@ -1367,6 +1374,8 @@ def admit_templates(
     failures: dict[tuple[str, str | None], list[str]] = {}
     reach: dict[tuple[str, str | None], dict[str, _Reach]] = {}
     presets_of: dict[str, tuple[str, ...]] = {}
+    fitted: dict[tuple[str, str | None], Fit] = {}
+    """Per variation rung that passes only at a reduced strength, that strength."""
     # Each rung's bar-1 compile over the whole song: its cues, context, preset and cycle.
     whole_compiles: dict[
         tuple[str, str | None],
@@ -1378,124 +1387,169 @@ def admit_templates(
         presets_of[template_id] = tuple(preset.preset_id for preset in document.presets)
         for preset in (None, *document.presets):
             combination = (template_id, preset.preset_id if preset else None)
-            where = f"template {template_id!r}" + (
-                f", preset {preset.preset_id!r}" if preset else ""
+            # A variation variant of a template its ladder admits differs from its base
+            # only in extents and period: where it fails, it is fitted to the rig
+            # (`fitting`), strongest first.
+            ladder_passes = any(
+                (template_id, rung) not in failures and (template_id, rung) in whole_compiles
+                for rung in (None, *presets_of[template_id])
+                if rung not in VARIATION_PRESETS
             )
-            # Bar 1 over the whole song first, from the initial state. Then every
-            # placement class a section can give the template: a repeating cycle at each
-            # alignment to the bars, cut short at every bar, and ending in every
-            # remainder at every bar (`_repeating_placements`), for the cycle the compile
-            # plays (`whole_period_cycle`, added once bar 1 compiles); a ONCE cycle at
-            # every start bar (added once bar 1 shows how far its motion runs).
-            placements = [(1, max(bars, 1), True)]
-            cycle_bars = repeat.cycle_bars
-            seen: set[tuple[Any, ...]] = set()
-            # A step instance over the same frames compiles the same at every placement.
-            # Only placements cut at section ends share instances, so without them the
-            # cache is kept for one placement: what it holds is no longer kept alive.
-            step_cache: dict[tuple[Any, ...], FixtureSegment] = {}
-            index = 0
-            while index < len(placements):
-                start_bar, duration_bars, plan = placements[index]
-                if on_unplayable != "error":
-                    step_cache = {}
-                whole = index == 0
-                index += 1
-                at = where
-                if not whole:
-                    at += f", placed at bar {start_bar}"
-                    if repeat.mode != RepeatMode.ONCE:
-                        at += f" for {duration_bars} bar(s)"
-                context = TemplateCompileContext(
-                    section_id="render_preflight",
-                    template_id=document.template.template_id,
-                    preset_id=preset.preset_id if preset else None,
-                    fixtures=fixtures,
-                    beat_grid=beat_grid,
-                    start_bar=start_bar,
-                    duration_bars=duration_bars,
-                    presets=fixture_group.presets,
-                    topology=topology,
-                    fixture_group_id=fixture_group.group_id,
+            attempts: list[Fit | None] = [None]
+            if preset is not None and preset.preset_id in VARIATION_PRESETS and ladder_passes:
+                attempts += fits_for(document, preset)
+            catalog_failure: list[str] | None = None
+            for fit in attempts:
+                if fit is not None:
+                    if catalog_failure is None:
+                        catalog_failure = failures.pop(combination)
+                    else:
+                        failures.pop(combination)
+                    reach.pop(combination, None)
+                    whole_compiles.pop(combination, None)
+                tried = (
+                    preset
+                    if fit is None or preset is None
+                    else fitted_preset(document, preset, fit)
                 )
-                if start_bar > 1:
-                    # Bar 1 is never deduplicated: there the head enters from its initial
-                    # state at the song start, so an equal key later may reposition
-                    # differently.
-                    key = _placement_key(context, phase_map, start_limit, end_limit)
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                # The previous placement's cues are released before this one is compiled.
-                compiled = None
-                try:
-                    compiled = compile_template(
-                        document.template,
-                        context,
-                        preset,
-                        phase_map=phase_map,
-                        start_limit_ms=start_limit,
-                        end_limit_ms=end_limit,
-                        step_cache=step_cache,
+                where = (
+                    f"template {template_id!r}"
+                    + (f", preset {preset.preset_id!r}" if preset else "")
+                    + ("" if fit is None else f" (fitted: {fit.record()})")
+                )
+                # Bar 1 over the whole song first, from the initial state. Then every
+                # placement class a section can give the template: a repeating cycle at each
+                # alignment to the bars, cut short at every bar, and ending in every
+                # remainder at every bar (`_repeating_placements`), for the cycle the compile
+                # plays (`whole_period_cycle`, added once bar 1 compiles); a ONCE cycle at
+                # every start bar (added once bar 1 shows how far its motion runs).
+                placements = [(1, max(bars, 1), True)]
+                cycle_bars = repeat.cycle_bars
+                seen: set[tuple[Any, ...]] = set()
+                # A step instance over the same frames compiles the same at every placement.
+                # Only placements cut at section ends share instances, so without them the
+                # cache is kept for one placement: what it holds is no longer kept alive.
+                step_cache: dict[tuple[Any, ...], FixtureSegment] = {}
+                index = 0
+                while index < len(placements):
+                    start_bar, duration_bars, plan = placements[index]
+                    if on_unplayable != "error":
+                        step_cache = {}
+                    whole = index == 0
+                    index += 1
+                    at = where
+                    if not whole:
+                        at += f", placed at bar {start_bar}"
+                        if repeat.mode != RepeatMode.ONCE:
+                            at += f" for {duration_bars} bar(s)"
+                    context = TemplateCompileContext(
+                        section_id="render_preflight",
+                        template_id=document.template.template_id,
+                        preset_id=tried.preset_id if tried else None,
+                        fixtures=fixtures,
+                        beat_grid=beat_grid,
+                        start_bar=start_bar,
+                        duration_bars=duration_bars,
+                        presets=fixture_group.presets,
+                        topology=topology,
+                        fixture_group_id=fixture_group.group_id,
                     )
-                except (
-                    CompileError,
-                    PhysicalChannelError,
-                    UnsupportedRigShapeError,
-                    ValueError,
-                ) as error:
-                    # A step's error carries a note naming its template, step and fixture.
-                    notes = "; ".join(getattr(error, "__notes__", ()))
-                    if notes:
-                        notes += at.removeprefix(f"template {template_id!r}")
-                    failures.setdefault(combination, []).append(f"{notes or at}: {error}")
-                    break
-                if whole:
-                    reach[combination] = _reach(compiled.segments, profiles)
-                    if repeat.mode != RepeatMode.ONCE:
-                        # It compiled, so `whole_period_cycle` gives the cycle it played.
-                        cycle_bars = whole_period_cycle(
-                            apply_preset(document.template, preset)
-                            if preset
-                            else document.template,
-                            beat_grid.beats_per_bar,
-                        ).repeat.cycle_bars
-                        placements += _repeating_placements(
-                            cycle_bars, bars, section_ends=on_unplayable == "error"
+                    if start_bar > 1:
+                        # Bar 1 is never deduplicated: there the head enters from its initial
+                        # state at the song start, so an equal key later may reposition
+                        # differently.
+                        key = _placement_key(context, phase_map, start_limit, end_limit)
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                    # The previous placement's cues are released before this one is compiled.
+                    compiled = None
+                    try:
+                        compiled = compile_template(
+                            document.template,
+                            context,
+                            tried,
+                            phase_map=phase_map,
+                            start_limit_ms=start_limit,
+                            end_limit_ms=end_limit,
+                            step_cache=step_cache,
                         )
-                    whole_compiles[combination] = (compiled.segments, context, preset, cycle_bars)
-                if not plan:
-                    continue
-                refusal = _plan_placement(
-                    compiled.segments,
-                    profiles,
-                    initial_states,
-                    section_start_ms=context.start_ms,
-                    first_cycle_end_ms=context.bar_offset_to_ms(cycle_bars),
-                    phase_map=phase_map,
-                    failure_mode=failure_mode,
-                    sequence_end_ms=sequence_end_ms,
-                    song_start=start_bar == 1,
-                )
-                if refusal:
-                    failures.setdefault(combination, []).append(
-                        f"{at}: dark repositioning between its own cues cannot be planned: "
-                        + refusal
-                    )
-                    break
-                if whole and repeat.mode == RepeatMode.ONCE:
-                    window = _once_window_bars(
+                    except (
+                        CompileError,
+                        PhysicalChannelError,
+                        UnsupportedRigShapeError,
+                        ValueError,
+                    ) as error:
+                        # A step's error carries a note naming its template, step and fixture.
+                        notes = "; ".join(getattr(error, "__notes__", ()))
+                        if notes:
+                            notes += at.removeprefix(f"template {template_id!r}")
+                        failures.setdefault(combination, []).append(f"{notes or at}: {error}")
+                        break
+                    if whole:
+                        reach[combination] = _reach(compiled.segments, profiles)
+                        if repeat.mode != RepeatMode.ONCE:
+                            # It compiled, so `whole_period_cycle` gives the cycle it played.
+                            cycle_bars = whole_period_cycle(
+                                apply_preset(document.template, tried)
+                                if tried
+                                else document.template,
+                                beat_grid.beats_per_bar,
+                            ).repeat.cycle_bars
+                            placements += _repeating_placements(
+                                cycle_bars, bars, section_ends=on_unplayable == "error"
+                            )
+                        whole_compiles[combination] = (
+                            compiled.segments,
+                            context,
+                            tried,
+                            cycle_bars,
+                        )
+                    if not plan:
+                        continue
+                    refusal = _plan_placement(
                         compiled.segments,
-                        phase_map,
+                        profiles,
+                        initial_states,
                         section_start_ms=context.start_ms,
-                        cycle_bars=repeat.cycle_bars,
-                        beats_per_bar=beat_grid.beats_per_bar,
+                        first_cycle_end_ms=context.bar_offset_to_ms(cycle_bars),
+                        phase_map=phase_map,
+                        failure_mode=failure_mode,
+                        sequence_end_ms=sequence_end_ms,
+                        song_start=start_bar == 1,
                     )
-                    placements += [
-                        (later, min(bars - later + 1, window), True)
-                        for later in range(2, bars + 1)
-                        if bars - later + 1 >= repeat.cycle_bars - 1e-9
-                    ]
+                    if refusal:
+                        failures.setdefault(combination, []).append(
+                            f"{at}: dark repositioning between its own cues cannot be planned: "
+                            + refusal
+                        )
+                        break
+                    if whole and repeat.mode == RepeatMode.ONCE:
+                        window = _once_window_bars(
+                            compiled.segments,
+                            phase_map,
+                            section_start_ms=context.start_ms,
+                            cycle_bars=repeat.cycle_bars,
+                            beats_per_bar=beat_grid.beats_per_bar,
+                        )
+                        placements += [
+                            (later, min(bars - later + 1, window), True)
+                            for later in range(2, bars + 1)
+                            if bars - later + 1 >= repeat.cycle_bars - 1e-9
+                        ]
+
+                if combination not in failures:
+                    if fit is not None:
+                        fitted[combination] = fit
+                    break
+            if catalog_failure is not None and combination in failures:
+                assert preset is not None
+                failures[combination] = [
+                    *catalog_failure,
+                    f"template {template_id!r}, preset {preset.preset_id!r}: no fitted "
+                    f"strength passes either (down to x{MIN_REACH:g} of the base's reach and "
+                    f"{MIN_RATE:g} of its period)",
+                ]
     # A rung without an entry bound fails, and leaves the envelope the other rungs' dips
     # and bounds are measured from. Rungs that lose their bound together may do so only
     # through each other: each pass removes those that have none even with every rung
@@ -1520,6 +1574,7 @@ def admit_templates(
             entered[template_id, preset_id, length] = _entered_frames(
                 template_id,
                 preset_id,
+                presets={c: compile_[2] for c, compile_ in whole_compiles.items()},
                 fixtures=fixtures,
                 fixture_group=fixture_group,
                 topology=topology,
@@ -1733,6 +1788,11 @@ def admit_templates(
                 },
                 excluded=excluded.get(t, {}),
                 variant_excluded=variant_excluded.get(t, {}),
+                fitted={
+                    p: fitted[t, p].record()
+                    for p in passing[t]
+                    if p is not None and (t, p) in fitted
+                },
                 plays_as_base=tuple(p for p in plays_as_base.get(t, ()) if p in passing[t]),
             )
             for t in admitted
@@ -1756,6 +1816,7 @@ def admit_templates(
                 failure_mode=failure_mode,
                 start_limit_ms=start_limit,
                 end_limit_ms=end_limit,
+                presets={c: compile_[2] for c, compile_ in whole_compiles.items()},
             )
         ),
     )
@@ -1808,6 +1869,7 @@ def _entered_frames(
     template_id: str,
     preset_id: str | None,
     *,
+    presets: Mapping[tuple[str, str | None], TemplatePreset | None],
     fixtures: Any,
     fixture_group: FixtureGroup,
     topology: Any,
@@ -1839,7 +1901,10 @@ def _entered_frames(
     def compiled(
         preset_id: str | None, start_bar: int, duration_bars: int
     ) -> tuple[list[FixtureSegment], TemplateCompileContext] | None:
-        preset = next((p for p in document.presets if p.preset_id == preset_id), None)
+        preset = presets.get(
+            (template_id, preset_id),
+            next((p for p in document.presets if p.preset_id == preset_id), None),
+        )
         context = TemplateCompileContext(
             section_id=f"render_preflight_{start_bar}",
             template_id=document.template.template_id,
@@ -2039,6 +2104,7 @@ def _dark_entries(
     failure_mode: FailureMode,
     start_limit_ms: int,
     end_limit_ms: int,
+    presets: Mapping[tuple[str, str | None], TemplatePreset | None] | None = None,
 ) -> tuple[dict[str, dict[str, tuple[str, ...]]], dict[str, dict[str, dict[str, tuple[str, ...]]]]]:
     """Per admitted template and admitted predecessor template, the heads that always
     enter it through a dark window after that one (`_enters_lit` false): for every pair
@@ -2058,7 +2124,10 @@ def _dark_entries(
         template_id: str, preset_id: str | None, start_bar: int, duration_bars: int
     ) -> dict[str, list[FixtureSegment]] | None:
         document = get_template(template_id)
-        preset = next((p for p in document.presets if p.preset_id == preset_id), None)
+        preset = (presets or {}).get(
+            (template_id, preset_id),
+            next((p for p in document.presets if p.preset_id == preset_id), None),
+        )
         context = TemplateCompileContext(
             section_id="render_preflight",
             template_id=document.template.template_id,
@@ -2669,6 +2738,10 @@ def _section_preset(
     """
     template_id = template_doc.template.template_id
     declared = {preset.preset_id: preset for preset in template_doc.presets}
+    offered = None if admission is None else admission.offer.templates.get(template_id)
+    for preset_id, fit in ({} if offered is None else offered.fitted).items():
+        # A variation variant the gate fitted to this rig plays at that strength.
+        declared[preset_id] = fitted_preset(template_doc, declared[preset_id], Fit.from_record(fit))
     if arranged is not None:
         return None if arranged.preset_id is None else declared[arranged.preset_id]
     fallback = None if admission is None else admission.effective_preset.get(template_id)
@@ -2971,6 +3044,17 @@ class RenderingPipeline:
                 None if arrangement is None else arrangement.parts[index],
             )
             rendered = None if preset is None else preset.preset_id
+            offered = (
+                None
+                if self.admission is None
+                else self.admission.offer.templates.get(
+                    get_template(part.template_id).template.template_id
+                )
+            )
+            fit = None if offered is None or rendered is None else offered.fitted.get(rendered)
+            if fit is not None:
+                # A variant fitted to the rig is render identity: its strength with it.
+                rendered = f"{rendered} fitted {json.dumps(fit, sort_keys=True)}"
             if rendered != (part.preset_id or None):
                 substitutions.append((section.section_id, rendered))
         return render_fingerprint(
@@ -3707,6 +3791,29 @@ class RenderingPipeline:
             if arrangement is not None:
                 # The section's motif relation and the variant this part plays.
                 record["arrangement"] = arrangement.record(part_index)
+                variant = arrangement.parts[part_index]
+                if variant is not None and variant.reason:
+                    diagnostics.append(
+                        MHDiagnostic(
+                            code="unsupported_attribute",
+                            severity="warning",
+                            message=(
+                                f"section {section.section_id!r}: its variation "
+                                f"{variant.asked} does not play ({variant.reason})"
+                            ),
+                            section_id=section.section_id,
+                            action="unchanged",
+                        )
+                    )
+            offered = (
+                None
+                if self.admission is None or preset is None
+                else self.admission.offer.templates.get(template_doc.template.template_id)
+            )
+            if offered is not None and preset is not None and preset.preset_id in offered.fitted:
+                record["fitted"] = Fit.from_record(offered.fitted[preset.preset_id]).describe(
+                    preset.preset_id
+                )
             if boundaries:
                 for boundary in boundaries:
                     if boundary["fixture_id"] in entered_by and "dark_dip" in boundary:

@@ -150,6 +150,11 @@ Departures from §1 and §3, each recorded here:
 - *The introducing section* steps from its own preset (else the effective variant), with
   or without a variation; a section without a motif steps from the previous section on
   its family when it has a step, else its own preset.
+- *Variant fitting* (integrator decision, 2026-11-18, after the owner-rig render at
+  2c961b58): the catalog's x1.5 and /2 are targets; a variation variant that fails the
+  gate is fitted to the rig (`fitting.py`: reach x1.4 → x1.2, rate on whole beats up to
+  3/4 of the base period, reach first in a combination), offered at the strongest passing
+  strength, in render identity. Revision 15.
 - *Code-owned relation* (W10b/c review M1): plan time derives and overwrites
   `motif_relation`/`motif_source_id`; the render derives them again, keeping only a
   plan-time RESOLVE (only a macro thread gives one; the render has no macro plan).

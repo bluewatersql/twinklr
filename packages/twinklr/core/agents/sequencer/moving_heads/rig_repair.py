@@ -47,6 +47,7 @@ from twinklr.core.sequencer.moving_heads.events import (
     yield_spans,
 )
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import quantize_cue
+from twinklr.core.sequencer.moving_heads.fitting import Fit
 from twinklr.core.sequencer.moving_heads.intensity import SHAPED_LEVELS
 from twinklr.core.sequencer.moving_heads.song_intent import (
     STROBE_FLASHES_PER_BEAT,
@@ -55,6 +56,7 @@ from twinklr.core.sequencer.moving_heads.song_intent import (
     DarkPhases,
     RigOffer,
     SectionPalette,
+    TemplateOffer,
     dip_fits,
     excluded_reason,
     is_late,
@@ -133,6 +135,9 @@ def _entry_heads(
     )
 
 
+_NO_TEMPLATE = TemplateOffer(variants={})
+
+
 def _arrangement_repairs(
     plan: ChoreographyPlan, offer: RigOffer, arranged: Mapping[str, SectionArrangement]
 ) -> list[PlanRepair]:
@@ -141,7 +146,8 @@ def _arrangement_repairs(
     not admitted here: the part plays its source's variant); a named preset the
     resolution replaces, or one the gate did not admit or the template does not declare;
     a motif carried onto another template than its source's (only its reach and rate
-    carry it); a colour or gobo that differs from the motif's source (never overwritten)."""
+    carry it); a colour or gobo that differs from the motif's source (never overwritten);
+    a variant the gate fitted to the rig at less than the catalog's strength (`fitting`)."""
     from twinklr.core.sequencer.moving_heads.templates import get_template
 
     repairs: list[PlanRepair] = []
@@ -160,6 +166,17 @@ def _arrangement_repairs(
             template_id = _canonical(part.template_id)
             variant = None if arrangement is None else arrangement.parts[index]
             label = f"part {index + 1} ({template_id})"
+            plays = (
+                variant.plays if variant is not None else part.preset_id if part.preset_id else None
+            )
+            fit = (offer.templates.get(template_id) or _NO_TEMPLATE).fitted.get(plays or "")
+            if fit is not None and plays is not None:
+                note(
+                    section.section_id,
+                    f"{label} variant {plays}",
+                    Fit.from_record(fit).describe(plays)
+                    + ", weaker than the catalog's: the rig's speed allows no more",
+                )
             if variant is not None:
                 if variant.reason:
                     note(

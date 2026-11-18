@@ -565,6 +565,12 @@ class TemplateOffer(BaseModel):
     """Per variation variant off the ladder (`pipeline.VARIATION_PRESETS`), the states it
     cannot hold beyond `excluded`, per fixture and wheel (left out when none)."""
     plays_as_base: tuple[str, ...] = Field(default=(), exclude_if=lambda value: not value)
+    fitted: dict[str, dict[str, float]] = Field(
+        default_factory=dict, exclude_if=lambda value: not value
+    )
+    """Per variation variant that plays only at a strength fitted to this rig
+    (`fitting.Fit.record`: its reach factor and movement period), that strength (left out
+    when none)."""
     """Ladder variants (`narrow`, `slow`) that play the same frames as the base here: still
     played where a section names one, never a variation's step (left out when none)."""
 
@@ -603,7 +609,7 @@ class RigOffer(BaseModel):
     beats_per_bar: int = 4
     """The song's meter, for transition lengths in bars."""
     full_travel_ms: dict[str, int] = {}
-    """Per pose axis (`pan`, `tilt`), how long the slowest head takes to travel its whole
+    """Per pose axis (`pan`, `tilt`), how long the slowest head takes to travel its whole operable
     range, which bounds a transition's lit move; left out where a head's speed is
     unknown."""
     dark_change_ms: int | None = None
@@ -786,7 +792,7 @@ def rig_offer(
                 travels.setdefault(name, []).append(
                     None
                     if not speed
-                    else math.ceil((axis.physical_max - axis.physical_min) / speed * 1000)
+                    else math.ceil((axis.operable_range[1] - axis.operable_range[0]) / speed * 1000)
                 )
     return RigOffer(
         heads=heads,
@@ -1106,6 +1112,15 @@ def offer_for_prompt(
         for template_id, template in offer.templates.items()
         if any(name in VARIATION_PRESETS for name in template.variants)
     ]
+    fitted = [
+        f"`{template_id}` {name} at "
+        + " and ".join(
+            ([f"x{fit['reach']:g} of the base's reach"] if "reach" in fit else [])
+            + ([f"a {fit['period_beats']:g}-beat movement"] if "period_beats" in fit else [])
+        )
+        for template_id, template in offer.templates.items()
+        for name, fit in template.fitted.items()
+    ]
     exclusions = []
     for template_id, template in offer.templates.items():
         states = sorted(
@@ -1121,6 +1136,7 @@ def offer_for_prompt(
                 {"template_id": template_id, **wheel_event_beats(phases, offer.beat_ms)}
             )
     return {
+        "fitted_variants": fitted,
         "variant_windows": variant_windows,
         "variations": variations,
         "colors": colors,
