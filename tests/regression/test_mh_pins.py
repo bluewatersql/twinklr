@@ -39,11 +39,10 @@ strobe rates); every frame and `.xsq` hash is unchanged but the event pins'. Rev
 (the W6/W7 second fix round and W8 transitions) re-recorded every fingerprint once more,
 every frame and `.xsq` hash unchanged, and added the transition pins (`TRANSITION_PINS`).
 Revisions 18 (the arrangement built up from the reference), 19 (a FASTER step's narrower
-reach tried) and 20 (W10d: density renders, as arrangement units) each re-recorded every
-fingerprint; every frame and `.xsq` hash is unchanged, every pinned plan being BALANCED. An intended
-output change bumps `RENDERER_REVISION` and re-records these pins in the same commit,
-saying why.
-The combined density and modifier build re-records only fingerprints at revision 22.
+reach tried), 20 (delayed first flash), 21 (W10d density), and 22 (W10e modifiers)
+re-recorded the fingerprints. The pinned plans keep their frame and `.xsq` hashes. An
+intended output change bumps `RENDERER_REVISION` and re-records these pins in the same
+commit, saying why.
 """
 
 from __future__ import annotations

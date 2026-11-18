@@ -27,7 +27,8 @@ and a section's entry, which can drop more of a head's first cue.
 
 **Offer** (`pipeline._admit_modifiers`). Per admitted template, the gate proves each
 recognised value it can apply (`candidates`) on the template's effective variant: compiled
-at bar 1 over the song, and its first bar and two cycles must not play like the
+on its first three cycles for spread and direction, or checked against the compiled
+tilt bounds for aim. Its first bar and two cycles must not play like the
 unmodified variant's (`pipeline._cues_alike`, the twin-variant rule). Those that pass are
 offered (`TemplateOffer.modifiers`) and the others recorded with why
 (`modifier_refusals`). On every admitted variant a value that does not fit it is

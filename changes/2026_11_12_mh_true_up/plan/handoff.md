@@ -10,57 +10,49 @@ updated: 2026-11-18
 
 ## Start here — current state, 2026-11-18
 
-**Latest recovery assessment:** [Claude spend-limit interruption, exact worktree state and next steps](capacity-recovery-2026-11-18.md). Integration HEAD is `cd13034a`, revision 20; both side worktrees have unfinished merges. Read this assessment before the older snapshot below.
+Phase 3 code is integrated locally on `feat/mh-true-up-p3` in `twinklr-mh-true-up`.
+`main` and its tracked remote remain at Phase 2 (`7356b376`). The single renderer
+cutover and W0–W10 restore the planner's song intent through palette, colour and gobo,
+intensity, transitions, beat and lyric events, variation, density and per-part modifiers.
+The merged renderer revision is 22. See [current state](../../../context/current-state.md)
+for the implemented behavior and the [owner decision list](owner-decisions-pending.md)
+for open choices.
 
-Read this section first. It is enough to carry on without any chat history. The dated log
-below it is history.
+| Work | Commit | Evidence |
+|---|---|---|
+| Arrangement first tries all planned units, and protects the first flash | `2a1272fa`, `cd13034a` | [W10b/c](../evidence/2026-11-18-w10bc-motif-variation/README.md) |
+| Density recovered and integrated | `763ae663`, `ca0f2683` | [W10d](../evidence/2026-11-18-w10d-density/README.md) |
+| Modifiers recovered and integrated | `4a0dfaca`, `d08ef508` | [W10e](../evidence/2026-11-18-w10e-modifiers/README.md) |
 
-### What the branch is
+The [interruption assessment](capacity-recovery-2026-11-18.md) records how Claude stopped.
+The [integration evidence](../evidence/2026-11-18-p3-recovery/README.md) records the recovered
+code, independent reviews, verification and viewing output. Both side worktrees are clean.
+Temporary backups preserved the pre-recovery worktree contents and indexes.
 
-`feat/mh-true-up-p3` lives in the worktree `twinklr-mh-true-up`. It was cut from `main` at
-`7356b376` (Phases 0–2 merged) and its head is `934b2635`. **It is not merged and not
-pushed. Merging and pushing are the owner's decision.**
+### What remains, in order
 
-The branch does three things:
-
-- **The cutover (C1.1–C1.5).** Moving heads now have one renderer, the profile-based one.
-  The old renderer, its 37 templates, `moving_heads.mode`, `transitions`, schema `3.0`,
-  `template-export`, the old keys and the old goldens are deleted. A job or file that
-  names a removed key is refused by name.
-- **Song intent rendered again.** The cutover had regressed the planner's song intent. The
-  owner directed on 2026-11-17 that all of it be rendered and nothing be cut from the
-  planner contract; W0–W8 and W10a–c have done that, with W9 delivered inside W4 and W5
-  (see the [plan](song-intent-rendering.md)).
-- **What is rendered on the branch, renderer revision 19:**
-  - section colour and gobo, from the wheel tags in each fixture profile (W1, W3/W4);
-  - intensity on the dimmer (W5);
-  - the plan's events: hit, `closed`/`open`, strobes, pulse, colour and gobo changes, with
-    lyric moment cues bound to them (W6/W7);
-  - section transitions (W8);
-  - under `twinklr show`, the macro palette and the heads' focal role (W9, folded into W4
-    and W5);
-  - motif and variation with variants fitted to the rig, plus the rule that the song
-    outranks the arrangement (W10a–c).
-
-  What is true now is in
-  [context/current-state.md](../../../context/current-state.md#implemented), and the user
-  guide explains it to the user.
-- **Not on this branch:** density and modifiers. Each was built on its own side branch
-  (below). Until they are merged, the renderer records them in a trace diagnostic and
-  plays nothing for them.
-
-### Side branches
-
-| Work | Branch | State | Final commit |
-|---|---|---|---|
-| W10d density (SPARSE/BALANCED/BUSY as arrangement units) | `feat/mh-true-up-p3-density` (worktree `twinklr-mh-density`) | `16d1b0f6` under review; its author is merging `f9894cc8` and wiring density as units. Final: <integrator fills at merge> | <integrator fills at merge> |
-| W10e modifiers (per part, as arrangement units) | `feat/mh-true-up-p3-modifiers` (worktree `twinklr-mh-modifiers`) | In progress from `08c50a92`. Final: <integrator fills at merge> | <integrator fills at merge> |
-
-Both plug into the arrangement loop as **units**: `ArrangementUnit`,
-`register_arrangement_units`, `RenderingPipeline.unit_choice` and `unit_gave_way`, all in
-`sequencer/moving_heads/pipeline.py`. Every unit is judged by the public
-`pipeline.worse(reference, trial)`. How a unit kind is added is in the `ArrangementUnit`
-docstring.
+1. Owner look review on the recovered build and the [open product decisions](owner-decisions-pending.md).
+2. Owner decision to merge and push Phase 3. Confirm authorization for a fresh paid
+   `twinklr run` or `show` using the final planner contract. The offline replay reused
+   a saved plan and cannot prove provider acceptance or fresh planning.
+3. Early entry repositioning, which could let a variation and the next section's downbeat
+   hit coexist. Today the variation gives way. See D1 in the [W10b/c record](../evidence/2026-11-18-w10bc-motif-variation/README.md).
+4. Decide how to park a head that cannot go dark after its final cue. The renderer
+   refuses that case today.
+5. Arrangement render cost when units give way. The common path tries all units in
+   one pass and the fallback tries individual choices in plan order. A possible
+   improvement is trying plan-order prefixes, followed by the existing retry pass.
+   That can change which arrangement wins a tie and needs its own behavior checks.
+6. Owner judgment on SPARSE's hard-cut swaps, BUSY's accents, the modifier looks,
+   calibrated hardware, and the rest of the [owner decision list](owner-decisions-pending.md).
+7. Provider acceptance of the OpenAI planner schema, real xLights `inject`/`regenerate`
+   on an approved scratch sequence, and physical fixture verification remain open.
+8. Earlier carries remain open: three songs at 147.7 BPM, the three-arm experiment and
+   Phase 5, four other Claude schemas that lack server-side enforcement, and audio
+   beyond the beat grid. Planner caches re-key and `regenerate` refuses sequences
+   injected before the cutover. See [cache learning](../../../memories/learnings/model-dump-hashes-rekey-caches.md).
+9. After merge, retire the two feature worktrees and the two detached validation
+   worktrees when the owner no longer needs them.
 
 ### Commits since the C1.5 documents
 
@@ -86,8 +78,8 @@ The table covers code and record commits. It continues the
 | The song outranks the arrangement (blame; superseded) | `08c50a92` | same record |
 | Arrangement built up from the reference; move rules only improve | `f9894cc8` | same record, "revised (after 08c50a92)" |
 | Every candidate tried (a FASTER the rig does not admit plays its narrower reach); strobe, pulse and `closed` judged over their whole span | `934b2635` | same record, "Review fixes (after f9894cc8)" |
-| W10d density | <integrator fills at merge> | <integrator fills at merge> |
-| W10e modifiers | <integrator fills at merge> | <integrator fills at merge> |
+| W10d density | `763ae663`, `ca0f2683` | [record](../evidence/2026-11-18-w10d-density/README.md) |
+| W10e modifiers | `4a0dfaca`, `d08ef508` | [record](../evidence/2026-11-18-w10e-modifiers/README.md) |
 
 ### How to validate and review
 
@@ -133,54 +125,6 @@ These lessons are promoted to `memories/` (see below).
 - **Judge a rule change by comparing events before and after,** on the same plans across
   two trees. Unchanged pins or green tests did not show that a move rule lost events
   (seeds 4, 688, 810, 216) or that blame was misattributed.
-
-### What remains, in order
-
-1. **Wire and merge density and modifiers**, if not already done: rebase on `934b2635`,
-   register as arrangement units, then review and validate. Then merge the branch, which
-   is the owner's decision.
-2. **A real end-to-end paid run.** The planner prompts and cache keys changed many times
-   (W2 to W10). No full `twinklr run` or `show` has planned and rendered a real song on
-   the final contract. It needs the owner's authorization, logged in the brief.
-3. **Early entry repositioning,** so that a variation and a downbeat hit in the next
-   section can coexist. Today the variation gives way instead (D1 in the
-   [W10b/c record](../evidence/2026-11-18-w10bc-motif-variation/README.md)).
-4. **Park after the last cue, on a head that cannot go dark:** the render refuses this
-   case today (`pipeline._dark_over_spans` raises). Decide how such a head is parked, and
-   state it.
-5. **Render cost of the arrangement loop.** The owner's song renders in 6.5 s without
-   it and 16–28 s with it. Since `2a1272fa`, a plan where nothing gives way takes 2
-   arrangement renders: the reference, and one trial with every unit as planned. When
-   anything gives way the loop is plain greedy. On REALISTIC that is 7 renders, about
-   21 s against 2.8 s without variation, each render with its transition-free pass.
-   Sketch for a faster search, which would no longer match pure greedy:
-   - after a failed all-planned trial, bisect the units: accept the largest
-     plan-order prefix whose all-planned trial is not worse, then recurse on the rest;
-   - the existing retry pass re-checks every unit that gave way against the final set.
-
-   Both guarantees still hold: the final render is never worse than the reference, and
-   no harmless variation is given up.
-6. **SPARSE swaps cut hard:** the heads that alternate under SPARSE swap with a hard
-   cut, not a fade (density branch).
-7. **OpenAI acceptance of the planner schema** is unverified: only Claude was probed
-   (W2 record).
-8. **`inject`/`regenerate` against a real xLights** with a scratch sequence is unverified:
-   the sixteen checks in the [C1.1c record](../evidence/2026-11-16-c1-1c-live-port/README.md)
-   have run against a fake client only.
-9. **Hardware:** no real fixture has been driven, and every profile timing is chosen.
-10. **Owner decisions and look questions:** collected in one list,
-    [owner-decisions-pending.md](owner-decisions-pending.md).
-11. **Open from earlier phases:**
-    - three songs are still analysed at 147.7 BPM;
-    - the three-arm experiment and Phase 5 (inventory F6);
-    - the other four planner schemas are not enforced by the provider on Claude;
-    - the planner prompt does not say that the song's tail lies beyond the beat grid;
-    - the planner caches re-key on merge, so the first `run`/`show` of each song plans
-      again (paid) and `regenerate` refuses sequences injected before the cutover
-      ([learning](../../../memories/learnings/model-dump-hashes-rekey-caches.md)).
-12. **After the merge,** remove the side worktrees and their branches:
-    `twinklr-mh-density`, `twinklr-mh-modifiers`, `twinklr-mh-validate` and
-    `twinklr-mh-validate2`.
 
 ### Commits on the branch through C1.5
 

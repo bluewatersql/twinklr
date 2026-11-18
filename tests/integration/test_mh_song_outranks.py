@@ -9,6 +9,7 @@ Every rig here narrows its allowed ranges
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import replace
 import random
 from typing import Any
 
@@ -16,7 +17,7 @@ import pytest
 
 from tests.support import moving_heads as m
 from tests.unit.sequencer.moving_heads.test_events_render import HEADS, owner_like_rig, rig
-from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanModifier
 from twinklr.core.agents.sequencer.moving_heads.rig_repair import repair_rig_intent
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.sequencer.moving_heads.pipeline import (
@@ -486,6 +487,41 @@ def test_a_variation_that_drops_later_flashes_gives_way(
     for head, span in spans.items():
         assert _flashes(final, head, *span) >= _flashes(reference, head, *span), head
     assert worse_than(reference, final) == []
+
+
+def test_modifier_plays_when_variation_yields_to_a_pulse() -> None:
+    family = "fly_in_cascade"
+    beat_grid = m.pickup_grid(500, 8, pickup=0)
+    fg = slow(rig())
+    admission = gate(fg, beat_grid)
+    template_offer = admission.offer.templates[family]
+    restricted = template_offer.model_copy(
+        update={"modifier_exclusions": {"slow": {"aim=high": "fixture bound"}}}
+    )
+    admission = replace(
+        admission,
+        offer=admission.offer.model_copy(
+            update={"templates": {**admission.offer.templates, family: restricted}}
+        ),
+    )
+    varied = m.plan_section(
+        "s2", 4, 7, family, motif_id="m", variation="SLOWER", events=[event(5, 3, "pulse")]
+    )
+    part = varied.parts[0].model_copy(update={"modifiers": [PlanModifier(key="aim", value="high")]})
+    final, _ = played(
+        [
+            m.plan_section("s1", 1, 3, family, motif_id="m"),
+            varied.model_copy(update={"parts": [part]}),
+        ],
+        fg,
+        beat_grid,
+        admission,
+    )
+
+    assert final.unit_choice("variation:s2") == "reference"
+    assert final.render_record is not None
+    (look,) = (look for look in final.render_record["section_looks"] if look["section_id"] == "s2")
+    assert look["arrangement"]["modifiers"]["applied"] == ["aim=high"]
 
 
 def _random_plan(rnd: random.Random) -> list[Any]:
