@@ -423,11 +423,23 @@ def _resolve_part(
         candidates = [target]
         if step == "FASTER" and place[0] > 0:
             candidates.append(grid_variant(place[0] - 1, place[1]))
+        note = None
         if mode == "step":
             candidates = candidates[:1]
         elif mode == "fallback":
             candidates = candidates[1:]
-        note = None
+            # The render tried the step first: it did not play, or made the song's events
+            # worse (`RenderingPipeline._choose_arrangement`).
+            unplayed = target in choice.plays_as_base or target not in choice.admitted
+            note = f"{step}: {target!r} of {template_id} " + (
+                (
+                    "plays the same as base here"
+                    if target in choice.plays_as_base
+                    else "is not admitted on this rig and song"
+                )
+                if unplayed
+                else "makes the song's events worse"
+            )
         chosen = None
         for candidate in candidates:
             if candidate in choice.plays_as_base or candidate not in choice.admitted:

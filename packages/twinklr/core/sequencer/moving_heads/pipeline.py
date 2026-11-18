@@ -1992,8 +1992,9 @@ def worse(reference: RenderingPipeline, trial: RenderingPipeline) -> list[str]:
     - a hit farther from its lyric cue (else its planned frame), or with a lower peak level
       over its first four frames;
     - a colour or gobo change shown later, or for less time (lit, holding its state);
-    - a `closed` with more lit frames, a strobe or `pulse` with fewer, over the 25 frames
-      from its frame (whether or not it plays: a replaced one still asked for that);
+    - a `closed` with more lit frames, a strobe or `pulse` with fewer flashes (lit runs)
+      or fewer lit frames, over the whole span the reference traced on the head (whether
+      or not it plays: a replaced one still asked for that);
     - a transition that plays on a head in the reference and not in the trial.
 
     Public: the render's arrangement units are judged by it (`ArrangementUnit`)."""
@@ -2077,11 +2078,18 @@ def worse(reference: RenderingPipeline, trial: RenderingPipeline) -> list[str]:
                 elif run_now + FRAME < run_was:
                     said.append(f"{what} (shown more briefly on {fixture_id})")
             elif shutter:
-                start = entry.get("frame_ms") or 0
-                lit_was = of(reference, fixture_id).lit_over(start, 25)
-                lit_now = of(trial, fixture_id).lit_over(start, 25)
+                # The whole span the reference traced on this head (else 25 frames from
+                # its frame): a `closed` by its dark frames, a strobe or pulse by its
+                # flashes (lit runs: a strobe turned solid has more lit frames, not more
+                # flashes) and its lit frames.
+                start = outcome.get("from_ms", entry.get("frame_ms") or 0)
+                end = outcome.get("to_ms", start + 25 * FRAME)
+                lit_was, flashes_was = of(reference, fixture_id).lit_runs(start, end)
+                lit_now, flashes_now = of(trial, fixture_id).lit_runs(start, end)
                 if action == "closed" and lit_now > lit_was + 1:
                     said.append(f"{what} (lit inside on {fixture_id})")
+                elif action != "closed" and flashes_now < flashes_was:
+                    said.append(f"{what} (fewer flashes on {fixture_id})")
                 elif action != "closed" and lit_now < lit_was - 1:
                     said.append(f"{what} (fewer lit frames on {fixture_id})")
     current_transitions = transitions(trial)
@@ -2133,8 +2141,11 @@ class _Frames:
             t += FRAME
         return t - start
 
-    def lit_over(self, t: int, count: int) -> int:
-        return sum(1 for k in range(count) if self.frames.lit.get(t + k * FRAME, False))
+    def lit_runs(self, start: int, end: int) -> tuple[int, int]:
+        """Lit frames and lit runs (flashes) in `[start, end)`."""
+        lit = [self.frames.lit.get(t, False) for t in range(start, end, FRAME)]
+        runs = sum(1 for i, on in enumerate(lit) if on and (i == 0 or not lit[i - 1]))
+        return sum(lit), runs
 
 
 TWIN_POSE_DEG = 3.0
@@ -4843,18 +4854,24 @@ class RenderingPipeline:
         gave_way: dict[str, str] = {}
         reference = trial(accepted, gave_way)
         last = reference
+
+        def unchanged(choices: dict[str, str]) -> bool:
+            probe = copy.copy(self)
+            probe._choices = choices
+            probe._arrangement_cache = None
+            return probe._signature() == last._signature()
+
         for unit in units:
             first_worse: str | None = None
+            same: dict[str, str] | None = None
             for candidate in unit.candidates:
                 choices = {**accepted, unit.key: candidate}
-                probe = copy.copy(self)
-                probe._choices = choices
-                probe._arrangement_cache = None
-                if probe._signature() == last._signature():
+                if unchanged(choices):
                     # Plays the same as the accepted arrangement (a step the rig cannot
-                    # play): kept, with its own trace, and no render.
-                    accepted = choices
-                    break
+                    # play resolves to its source): no render, and the next candidate
+                    # (a FASTER step's narrower reach) is still tried.
+                    same = same or choices
+                    continue
                 tried = trial(choices, gave_way)
                 found = worse(reference, tried)
                 if not found:
@@ -4865,6 +4882,10 @@ class RenderingPipeline:
             else:
                 if first_worse is not None:
                     gave_way[unit.key] = first_worse
+                elif same is not None:
+                    # Nothing differs: the unit keeps the first such candidate and its
+                    # own trace (e.g. "not admitted: it plays the source variant").
+                    accepted = same
         # A unit that gave way is tried again with every later acceptance in place (a
         # later unit can make it harmless); each acceptance shrinks the set, so this ends.
         changed = True
@@ -4875,6 +4896,8 @@ class RenderingPipeline:
                     continue
                 for candidate in unit.candidates:
                     choices = {**accepted, unit.key: candidate}
+                    if unchanged(choices):
+                        continue
                     tried = trial(choices, {k: v for k, v in gave_way.items() if k != unit.key})
                     if not worse(reference, tried):
                         accepted, last = choices, tried
