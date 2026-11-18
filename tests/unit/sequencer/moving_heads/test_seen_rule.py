@@ -107,3 +107,65 @@ def test_a_change_shown_well_on_its_beat_stays_there() -> None:
     for head in event["heads"].values():
         assert "moved" not in head and "brief" not in head
     assert "moves" not in said and "less than 0.5 beat" not in said
+
+
+def test_a_lyric_hit_on_a_dark_beat_moves_after_its_lyric_not_before() -> None:
+    """The shutter closed on every other beat (a darkness a hit cannot light): a hit
+    bound to a lyric just before a dark beat moves to the beat after (at or after the
+    lyric), not the nearer beat before it; repair agrees."""
+    beat_grid = grid(120)
+    fg = rig()
+    job = m.family_job(HEADS)
+    gaps = m.loop_template_doc(
+        "lit_half",
+        [
+            m.hold_step("lit", 0.0, tilt=30.0, duration=0.25),
+            m.hold_step("shut", 0.0, tilt=30.0, start=0.25, duration=0.25, shutter_state="closed"),
+        ],
+        cycle_bars=0.5,
+    )
+    with m.registered_templates(gaps):
+        admission = admit_templates(
+            ["lit_half"],
+            beat_grid=beat_grid,
+            fixture_group=fg,
+            initial_states=job.moving_heads.initial_states,
+            failure_mode=job.moving_heads.reposition_fallback,
+            on_unplayable=job.moving_heads.on_unplayable,
+        )
+        home = beat_grid.beat_index(2, 2)
+        assert home is not None
+        lyric = int(beat_grid.beat_boundaries[home] - 50)
+        section = m.plan_section(
+            "s",
+            1,
+            4,
+            "lit_half",
+            moment_cues=["c"],
+            events=[
+                {
+                    "bar": 2,
+                    "beat": 2,
+                    "action": "hit",
+                    "moment_cue_id": "c",
+                    "cue_ms": lyric,
+                    "color": None,
+                    "gobo": None,
+                }
+            ],
+        )
+        repaired = repair_rig_intent(
+            ChoreographyPlan(sections=[section], overall_strategy=""),
+            admission.offer,
+            {},
+            beat_grid,
+        )
+        pipeline = render(
+            repaired.sections, beat_grid=beat_grid, fixture_group=fg, admission=admission
+        )
+    (event,) = looks(pipeline)["s"]["events"]
+    for head in event["heads"].values():
+        assert head["moved"]["direction"] == "later"
+        assert head["played_ms"] >= lyric
+    said = " ".join(r.reason for r in repaired.repairs)
+    assert "moves later" in said and "the beat after its own, at or after its lyric" in said

@@ -59,6 +59,7 @@ from twinklr.core.sequencer.moving_heads import render_log
 from twinklr.core.sequencer.moving_heads.arrangement import (
     BASE,
     VARIATION_PRESETS,
+    GiveWay,
     PartVariant,
     SectionArrangement,
     options_from_variants,
@@ -100,6 +101,7 @@ from twinklr.core.sequencer.moving_heads.events import (
     carried_states,
     cue_summary,
     events_message,
+    recount_shown,
     section_events,
     yield_spans,
 )
@@ -455,6 +457,11 @@ def _cue_level(cue: FixtureSegment, profile: FixtureCapabilities, time_ms: int) 
 
 
 TRANSITION_PASSES = 3
+
+ARRANGEMENT_PASSES = 4
+"""How many times a plan whose variations worsen its events renders again
+(`RenderingPipeline._settle_arrangement`): each pass moves every section to blame to its
+next candidate (a FASTER step has two; any other step one before its source)."""
 """How many times a render with transitions plays at most: a pass that loses a hit to a
 transition on a head plays again with no transition on that head there."""
 
@@ -1632,9 +1639,10 @@ def admit_templates(
             unseen.add((template_id, preset_id))
         else:
             plays_as_base.setdefault(template_id, []).append(preset_id)
-    # No two offered variation variants play the same: one that plays as an earlier variant
-    # here (a fitted `fast` at the narrow reach, a snap whose rate does not show) is that
-    # variant, and is not offered again.
+    # No two offered variation variants play alike (`_alike`: the same darkness, wheels
+    # and level, every aim within `TWIN_POSE_DEG`): one that plays like an earlier variant
+    # here (a fitted `fast` near the narrow reach, a snap whose rate does not show) is that
+    # variant, and is not offered again; the earlier, stronger-named one stays.
     for template_id in template_ids:
         ordered = [
             p
@@ -1655,14 +1663,14 @@ def admit_templates(
                     if (template_id, earlier) not in failures
                     and earlier not in plays_as_base.get(template_id, ())
                     and frames is not None
-                    and frames == entered_frames(template_id, earlier, length)
+                    and _alike(frames, entered_frames(template_id, earlier, length), profiles)
                 ),
                 None,
             )
             if twin is not None:
                 failures.setdefault((template_id, preset_id), []).append(
-                    f"template {template_id!r}, preset {preset_id!r}: plays the same as "
-                    f"{twin!r} here"
+                    f"template {template_id!r}, preset {preset_id!r}: plays like {twin!r} "
+                    f"here (the same darkness, every aim within {TWIN_POSE_DEG:g} degrees)"
                 )
                 unseen.add((template_id, preset_id))
     excluded = {
@@ -1915,6 +1923,110 @@ def admit_templates(
         offer=offer,
         variant_entry_dips={t: v for t, v in variant_dips.items() if t in admitted},
     )
+
+
+def _event_outcomes(record: Mapping[str, Any]) -> dict[tuple[Any, ...], dict[str, Any]]:
+    """Each planned event's trace entry by (plan section, action, bar, beat, its count
+    among equals): what `_worse_events` compares."""
+    out: dict[tuple[Any, ...], dict[str, Any]] = {}
+    for look in record.get("section_looks", []):
+        base = look["section_id"].split("|")[0]
+        for entry in look.get("events", []):
+            key = (base, entry.get("action"), entry.get("bar"), entry.get("beat"))
+            n = sum(1 for k in out if k[:4] == key)
+            out[(*key, n)] = entry
+    return out
+
+
+def _worse_events(
+    before: Mapping[tuple[Any, ...], Mapping[str, Any]],
+    after: Mapping[tuple[Any, ...], Mapping[str, Any]],
+) -> list[tuple[str, str]]:
+    """Each event `after` plays worse than `before` (the reference), as (its plan
+    section, the event and how): lost on a head that played it; a hit farther from its
+    lyric cue (or its planned frame); a colour or gobo change shown later or more briefly
+    (a frame of grid tolerance)."""
+    worse: list[tuple[str, str]] = []
+    for key, entry in before.items():
+        later = after.get(key)
+        if later is None:
+            continue
+        section_id, action, bar, beat, _ = key
+        ref = entry.get("cue_ms") if entry.get("cue_ms") is not None else entry.get("frame_ms")
+        said: dict[str, list[str]] = {}
+        for fixture_id, outcome in entry.get("heads", {}).items():
+            then = later.get("heads", {}).get(fixture_id, {})
+            if "not_played" in outcome or "unchanged" in outcome:
+                continue
+            if "not_played" in then:
+                said.setdefault("lost", []).append(fixture_id)
+            elif action == "hit" and ref is not None:
+                was, now = outcome.get("played_ms"), then.get("played_ms")
+                if was is not None and now is not None and abs(now - ref) > abs(was - ref) + 20:
+                    said.setdefault("played farther from its beat", []).append(fixture_id)
+            elif action in WHEEL_ACTIONS:
+                was_at, now_at = outcome.get("reveal_ms"), then.get("reveal_ms")
+                if was_at is not None and now_at is not None and now_at > was_at + 20:
+                    said.setdefault("shown later", []).append(fixture_id)
+                elif (outcome.get("shown_for_ms") or 0) > (then.get("shown_for_ms") or 0) + 20:
+                    said.setdefault("shown more briefly", []).append(fixture_id)
+        if said:
+            how = "; ".join(f"{what} on {', '.join(heads)}" for what, heads in said.items())
+            worse.append((section_id, f"its {action} at bar {bar} beat {beat} ({how})"))
+    return worse
+
+
+TWIN_POSE_DEG = 3.0
+"""Proposed (W10 fitting review). Two variants whose frames differ only in aim, by less
+than this on every frame and axis, with the same darkness, level and wheels, play alike:
+a 3 degree offset is under a beam's width at the families' beam angles, so it does not
+read as another variant."""
+
+
+def _alike(
+    a: Sequence[EncodedFixtureFrame] | None,
+    b: Sequence[EncodedFixtureFrame] | None,
+    profiles: Mapping[str, FixtureCapabilities],
+) -> bool:
+    """Whether two variants' entered frames play alike (`TWIN_POSE_DEG`)."""
+    if a is None or b is None or len(a) != len(b):
+        return False
+    for x, y in zip(a, b, strict=True):
+        if (x.fixture_id, x.time_ms) != (y.fixture_id, y.time_ms):
+            return False
+        if x.channels == y.channels:
+            continue
+        profile = profiles[x.fixture_id]
+        pose = {name: axis for name, axis in profile.axes.items() if name in ("pan", "tilt")}
+        offsets = {
+            offset
+            for axis in pose.values()
+            for offset in (axis.coarse_offset, axis.fine_offset)
+            if offset is not None
+        }
+        cx, cy = dict(x.channels), dict(y.channels)
+        if any(cx[k] != cy[k] for k in cx if k not in offsets):
+            return False
+        for axis in pose.values():
+
+            def degrees(channels: Mapping[int, int], axis: Any = axis) -> float | None:
+                word = channels[axis.coarse_offset]
+                if axis.fine_offset is not None:
+                    word = word << 8 | channels[axis.fine_offset]
+                try:
+                    return float(axis.word_center(word))
+                except ValueError:  # a word no admitted value encodes: compared as is
+                    return None
+
+            here, there = degrees(cx), degrees(cy)
+            if here is None or there is None:
+                if here != there or any(
+                    cx[o] != cy[o] for o in (axis.coarse_offset, axis.fine_offset) if o
+                ):
+                    return False
+            elif abs(here - there) >= TWIN_POSE_DEG:
+                return False
+    return True
 
 
 def _limit(reason: str) -> str:
@@ -3073,6 +3185,13 @@ class RenderingPipeline:
         self._arrangement_cache: (
             tuple[ChoreographyPlan, dict[str, tuple[SectionArrangement, int]]] | None
         ) = None
+        self._give_way: dict[str, GiveWay] = {}
+        """Per plan section, the variants its variation gave way to its events with
+        (`_settle_arrangement`)."""
+        self._steps = True
+        """False for the render the song's events are judged against: every part plays
+        its source variant."""
+        self._settled = False
         self.transition_free: RenderingPipeline | None = None
         """Set by a `render()` whose plan has transitions: the same plan rendered without
         them, which the played rule and the hits a transition may not lose are read
@@ -3242,6 +3361,7 @@ class RenderingPipeline:
             CompileError, PhysicalChannelError, OutputError,
                 ValueError: For a step, value, model or output the renderer refuses.
         """
+        self._settle_arrangement()
         plan = self.choreography_plan
         self.transition_free = None
         if any(section.transitions for section in plan.sections):
@@ -4217,6 +4337,9 @@ class RenderingPipeline:
         )
         if result.has_errors:
             raise RenderRefusedError(result.diagnostics)
+        # How long each colour and gobo change is shown, on the planned frames (after the
+        # transitions and transactions laid after the events).
+        recount_shown(list(event_records.values()), result.segments, profiles, self.beat_grid)
         unplayable = [*(unplayable or ()), *result.unplayable]
         unplayable_totals: dict[str, dict[str, int]] = {}
         for record in unplayable:
@@ -4462,7 +4585,79 @@ class RenderingPipeline:
                 {t: offer.plays_as_base for t, offer in templates.items()},
             ),
             canonical=lambda t: get_template(t).template.template_id,
+            give_way=self._give_way,
+            steps=self._steps,
         )
+
+    def _settle_arrangement(self) -> None:
+        """**The song outranks the arrangement.** A variation never makes an event worse
+        than it is with every part playing its source variant (no step taken): no event of
+        the plan is lost on a head, played farther from its lyric cue or planned beat,
+        shown later or more briefly (`_worse_events`). The plan renders with every step
+        off (the reference) and as resolved; each worse event is laid at its own section
+        where that one varies, else at the section before it where that one varies (an
+        entry's darkness reaches across the boundary), and that section takes its next
+        candidate (a FASTER step's narrower reach, else its source variant: the variation
+        gives way, traced with the event). It renders again until no event is worse, at
+        most `ARRANGEMENT_PASSES` times. A plan with no variation step renders once, as
+        before."""
+        if not self._steps or self._settled:
+            return
+        stepped = {
+            section_id
+            for section_id, (arrangement, _) in self._arranged().items()
+            if any(part is not None and part.plays != part.source for part in arrangement.parts)
+        }
+        if not stepped or not any(s.events for s in self.choreography_plan.sections):
+            return
+        reference = copy.copy(self)
+        reference._steps = False
+        reference._arrangement_cache = None
+        reference.output_path = None
+        with render_log.held():
+            reference.render()
+        assert reference.render_record is not None
+        before = _event_outcomes(reference.render_record)
+        give_way: dict[str, GiveWay] = {}
+        order = [s.section_id for s in self.choreography_plan.sections]
+        for _ in range(ARRANGEMENT_PASSES):
+            trial = copy.copy(self)
+            trial._give_way = dict(give_way)
+            trial._settled = True
+            trial._arrangement_cache = None
+            trial.output_path = None
+            with render_log.held():
+                trial.render()
+            assert trial.render_record is not None
+            varied: dict[str, frozenset[str]] = {}
+            for arrangement, _ in trial._arranged().values():
+                played = frozenset(
+                    part.plays
+                    for part in arrangement.parts
+                    if part is not None and part.plays != part.source
+                )
+                if played:
+                    varied[arrangement.section_id] = played
+            blamed: dict[str, str] = {}
+            for section_id, because in _worse_events(before, _event_outcomes(trial.render_record)):
+                owner = section_id if section_id in varied else None
+                if owner is None and section_id in order:
+                    at = order.index(section_id)
+                    previous = order[at - 1] if at else None
+                    owner = previous if previous in varied else None
+                if owner is not None and owner not in blamed:
+                    blamed[owner] = because
+            if not blamed:
+                break
+            for owner, because in blamed.items():
+                previous_way = give_way.get(owner)
+                give_way[owner] = GiveWay(
+                    rejected=(previous_way.rejected if previous_way else frozenset())
+                    | varied[owner],
+                    because=because,
+                )
+        self._give_way = give_way
+        self._arrangement_cache = None
 
     def arrangement_changes(self, base: ChoreographyPlan, replanned: str) -> str | None:
         """Under `twinklr regenerate`, the warning naming each kept section whose parts now

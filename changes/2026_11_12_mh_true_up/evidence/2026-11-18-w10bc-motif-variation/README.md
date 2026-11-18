@@ -89,6 +89,67 @@ fingerprint-only with every frame unchanged, and the new tests below pin the new
   a first appearance has nothing before it); stated in the module, both planner prompts
   and the user guide.
 
+## The song outranks the arrangement (after bcefff0f: owner render and review)
+
+**Why.** At bcefff0f the owner's break played FASTER as `narrow+fast` and lost chorus_2's
+first-downbeat hit on two heads (D1), moved both lyric hits a beat before their lyrics
+(D2), and the review found a variation worsened an event in 30-41 % of plans with events.
+Integrator decision: a variation may never make a lyric-bound or planned event worse than
+the source variant does.
+
+**Built.** `RenderingPipeline._settle_arrangement`: a plan with a variation step and events
+renders once with every step off (the reference), then as resolved; every event worse than
+the reference (lost on a head, a hit farther from its lyric or beat, a colour or gobo
+change shown later or more briefly, by more than a frame) is laid at its own section where
+that varies, else at the section before it (an entry's darkness reaches across the
+boundary); that section takes its next candidate (`arrangement.GiveWay`: a FASTER step's
+one-step-narrower reach, else its source variant: "the variation gave way to its hit at
+bar 6 beat 3 (lost on MH1, MH4)"), traced in `arrangement` and the diagnostics; the plan
+renders again, at most `ARRANGEMENT_PASSES` (4) times. **Cost:** a plan with a variation
+step and events renders at least three times (reference, trial, final; each with its own
+transition-free render where it has transitions), one more per give-way round; a plan
+without either renders as before. Repair predicts the give-way for the planner from the
+published dark phases (`rig_repair._give_way`: an event record the source variant does not
+have, and a first-downbeat hit newly entering dark, this section's or the next's); the
+render decides on its own frames.
+
+**Acceptance (the reviewer's `variation_regress.py`, 288 plans per rig):** 0 plans worse on
+the plain rig and 0 on the 150 degree/s narrowed rig (were 69 and 70). Outcomes, plain:
+the asked variant plays in 157, the variation gives way in 71, it cannot play (off the
+grid, not offered) in 60; narrowed 150 degree/s: asked 96, a narrower-reach fallback 2,
+gave way 72, cannot play 118. **Repair agreement** on 216 plans per rig: 204 (plain) and
+195 (narrowed) agree with the render; the misses are first-beat hits whose loss depends on
+the boundary's exact phase (the offer's dark entries are claims over every phase).
+
+**Also in this round.**
+- A cue-bound hit that must move prefers the beat after its own where that is at or after
+  the lyric, else the nearest (`events.apply_hits`, repair mirrors it). The review's "within
+  one beat of the lyric" would never pick a later beat over a nearer earlier one when the
+  lyric is nearest its own beat, so the rule reads from the hit's own beat. No pinned or
+  REALISTIC frame moved.
+- A colour or gobo move never loses a head that showed the change on its own beat; moves
+  (and hit moves) stay within one bar counted in frames.
+- `shown_for_ms` is recounted on the planned frames (`events.recount_shown`): an EXIT or
+  repositioning laid after the events now ends it (D3).
+- FASTER falls back one reach step at most (from `wide`: `fast`, never `narrow+fast`).
+- Near-twins: variants with the same darkness, level and wheels whose aim differs by under
+  3 degrees on every frame (`TWIN_POSE_DEG`) play alike; the later is not offered.
+- **D1 (the early entry):** no rule lets an event pull a head's dark repositioning before
+  the boundary; the entry window only opens after it, and only a transition (`snap`,
+  `blackout`, ...) darkens the outgoing look. Not built. It would take an event-led early
+  entry in `_enter_section` (darken the outgoing part's tail by the worst-case entry bound
+  on heads whose next downbeat event would be lost, where that tail cuts no protected
+  event), with the gate's placement checks, repair's dark-entry prediction and tests.
+  Under this round's rule the break gives way instead.
+- **D4 (strobe newly lit frames):** not reproduced on synthetic rigs (a strobe into a
+  crossfade and a downbeat hit, plain and owner-like 150 degree/s): a strobe only darkens
+  its own frames, so frames "newly lit vs event-free" must come from the event-free render
+  being darker there for another reason (a transition window or a repositioning that the
+  events move); that it comes and goes with the variant fits. Finding which needs the
+  owner render's records; left open.
+- **D5 (PENDING-OWNER):** at the halved period the cascade's stagger is half a beat, so
+  MH2/MH3 reveal on the off-beat eighth in every window: acceptable look?
+
 ## Variant fitting revised (after 5825ff0a: owner render and review)
 
 **Why.** On the owner's rig the 3-beat `fast` (the old rate ladder) slid the break's

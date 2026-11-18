@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 BACKEND_ID = "xlights_dmx"
 """The backend the renderer writes: xLights DMX effects in an `.xsq`."""
 
-RENDERER_REVISION = "16"
+RENDERER_REVISION = "17"
 """Bumped by hand in the commit that intentionally changes the renderer's output; the
 render identity also carries the frame encoder's own version. 3: a section's colour and
 gobo are rendered (song-intent rendering W4), so a plan that sets them renders
@@ -82,7 +82,13 @@ keeps the catalog period and reduces only its reach (a fitted `fast` toward `nar
 extents), so its reveals stay on the catalog variant's beats; a variant that plays like an
 earlier one is not offered; a colour or gobo change shown only briefly moves to a beat
 where it is shown well. A rig where the catalog strength passes, and a plan whose colour
-and gobo changes are shown well, renders the same frames."""
+and gobo changes are shown well, renders the same frames. 17 (the song outranks the
+arrangement): a variation that would make an event worse than its source variant does
+takes its next candidate or gives way; FASTER falls back one reach step at most; variants
+within 3 degrees of an earlier one are not offered; a lyric hit that moves prefers the beat
+after its own; a colour move keeps every head that showed it; shown time is counted on the
+planned frames. A plan whose variations cost no event, with no such hit or colour move,
+renders the same frames."""
 
 
 def render_fingerprint(

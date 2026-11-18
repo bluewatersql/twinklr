@@ -9,7 +9,7 @@ the planner on its next revision, never a refusal. The resolution is the rendere
 from __future__ import annotations
 
 import bisect
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from fractions import Fraction
 from itertools import pairwise
 import math
@@ -97,9 +97,12 @@ def _canonical(template_id: str) -> str:
         return template_id
 
 
-def _arrangement(plan: ChoreographyPlan, offer: RigOffer) -> dict[str, SectionArrangement]:
+def _arrangement(
+    plan: ChoreographyPlan, offer: RigOffer, *, steps: bool = True
+) -> dict[str, SectionArrangement]:
     """The render's motif relations and resolved variants (`arrangement`), over the
-    gate's admitted variants (`RigOffer.templates`)."""
+    gate's admitted variants (`RigOffer.templates`); without `steps`, every part on its
+    source variant."""
     from twinklr.core.sequencer.moving_heads.templates import get_template
 
     def declared(template_id: str) -> list[str]:
@@ -116,7 +119,116 @@ def _arrangement(plan: ChoreographyPlan, offer: RigOffer) -> dict[str, SectionAr
             {t: template.plays_as_base for t, template in offer.templates.items()},
         ),
         canonical=_canonical,
+        steps=steps,
     )
+
+
+def _played(
+    plan: ChoreographyPlan, offer: RigOffer, arranged: Mapping[str, SectionArrangement]
+) -> dict[tuple[str, int], str]:
+    """Per (section, part index), the variant the render plays: the resolved one, else
+    the named preset where the gate admits it (as `_section_preset`)."""
+    played = {
+        (section_id, index): variant.plays
+        for section_id, arrangement in arranged.items()
+        for index, variant in enumerate(arrangement.parts)
+        if variant is not None
+    }
+    for section in plan.sections:
+        for index, part in enumerate(section.parts):
+            template = offer.templates.get(_canonical(part.template_id))
+            if (
+                (section.section_id, index) not in played
+                and part.preset_id
+                and template is not None
+                and part.preset_id in template.variants
+            ):
+                played[section.section_id, index] = part.preset_id
+    return played
+
+
+def _give_way(
+    plan: ChoreographyPlan,
+    offer: RigOffer,
+    arranged: Mapping[str, SectionArrangement],
+    played: Mapping[tuple[str, int], str],
+    palettes: Mapping[str, SectionPalette],
+    beat_grid: BeatGrid | None,
+) -> list[PlanRepair]:
+    """Each section whose variation would make one of the plan's events worse than its
+    source variant does (`RenderingPipeline._settle_arrangement`, which decides on its own
+    frames): predicted from the published dark phases (`_event_records` under each) and,
+    for a hit in the next section's first bar, the heads that always enter it dark after
+    each variant (`RigOffer.dark_entry_heads`). Recorded for the planner: move the
+    variation, or the event."""
+    if beat_grid is None:
+        return []
+    source = _played(plan, offer, _arrangement(plan, offer, steps=False))
+    out: list[PlanRepair] = []
+    sections = list(plan.sections)
+    for at, section in enumerate(sections):
+        arrangement = arranged.get(section.section_id)
+        if arrangement is None or all(
+            part is None or part.plays == part.source for part in arrangement.parts
+        ):
+            continue
+        palette = palettes.get(section.section_id)
+        now = _event_records(
+            section, section.events, _parts(offer, section, played), offer, beat_grid, palette
+        )
+        then = set(
+            _event_records(
+                section, section.events, _parts(offer, section, source), offer, beat_grid, palette
+            )
+        )
+        # An event whose outcome on the varied variant is one it does not have on the
+        # source (a record that is new, or says otherwise).
+        worse = [reason for item, reason in now if (item, reason) not in then]
+
+        def entry_lost(
+            into: PlanSection, out_of: PlanSection, what: str, worse: list[str] = worse
+        ) -> None:
+            """A hit on `into`'s first downbeat that heads newly enter dark after `out_of`."""
+            if not any(
+                e.action.value == "hit" and e.bar == into.start_bar and e.beat == 1
+                for e in into.events
+            ):
+                return
+            last = len(out_of.parts) - 1
+            after = _canonical(into.parts[0].template_id)
+            before = _canonical(out_of.parts[-1].template_id)
+
+            def dark(chosen: Mapping[tuple[str, int], str]) -> set[str]:
+                return set(
+                    offer.dark_entry_heads(
+                        after,
+                        before,
+                        chosen.get((into.section_id, 0), BASE),
+                        chosen.get((out_of.section_id, last), BASE),
+                    )
+                )
+
+            if lost := sorted(dark(played) - dark(source)):
+                worse.append(f"the hit on {what}: {', '.join(lost)} would enter it dark")
+
+        if at > 0:
+            entry_lost(section, sections[at - 1], "its own first downbeat")
+        if at + 1 < len(sections):
+            following = sections[at + 1]
+            entry_lost(following, section, f"section {following.section_id!r}'s first downbeat")
+        if worse:
+            out.append(
+                PlanRepair(
+                    section_id=section.section_id,
+                    item=f"variation {section.variation.value}",
+                    action=RepairAction.RECORDED,
+                    reason="the variation would make the song's events worse than its "
+                    f"source variant does ({'; '.join(worse)}): it gives way to them and "
+                    "plays the source variant (the render decides on its own frames); move "
+                    "the variation or the event",
+                )
+            )
+    return out
 
 
 def _entry_heads(
@@ -363,25 +475,9 @@ def repair_rig_intent(
     # Fixed order: the motif relations and the variant each part plays first, so every
     # later repair reads the variant the render plays.
     arranged = _arrangement(plan, offer)
-    played = {
-        (section_id, index): variant.plays
-        for section_id, arrangement in arranged.items()
-        for index, variant in enumerate(arrangement.parts)
-        if variant is not None
-    }
-    # A part no motif or variation resolves plays its named preset where the gate admits
-    # it (as the render's `_section_preset`): its dark phases are that variant's.
-    for section in plan.sections:
-        for index, part in enumerate(section.parts):
-            template = offer.templates.get(_canonical(part.template_id))
-            if (
-                (section.section_id, index) not in played
-                and part.preset_id
-                and template is not None
-                and part.preset_id in template.variants
-            ):
-                played[section.section_id, index] = part.preset_id
+    played = _played(plan, offer, arranged)
     repairs += _arrangement_repairs(plan, offer, arranged)
+    repairs += _give_way(plan, offer, arranged, played, palettes, beat_grid)
     sections: list[PlanSection] = []
     for section in plan.sections:
         palette = palettes.get(section.section_id)
@@ -907,8 +1003,15 @@ def _wheel_plays(
             if late is not None and late <= bound and lit >= least
         )
 
-    def search(score: Callable[[int, Any], int]) -> tuple[int, int, Any, str] | None:
-        """The beat within the move bounds (later first) the most heads `score`."""
+    frame_of = quantize_cue(round(beats[index])).actual_ms
+    bar_ms = _bar_length(beat_grid, index)
+
+    def search(
+        score: Callable[[int, Any], int], keep: Collection[str] = ()
+    ) -> tuple[int, int, Any, str] | None:
+        """The beat within the move bounds (later first, within one bar in frames) the
+        most heads `score`, among those where every head in `keep` still shows it in
+        time (`events._play_wheel_events`)."""
         first_bar, last_bar = part[1], part[2]
         reach = WHEEL_MOVE_BARS * beat_grid.beats_per_bar
         for side, offsets in (
@@ -923,7 +1026,14 @@ def _wheel_plays(
                     continue
                 if not since < i < until or beats[i] >= end_ms:
                     continue
+                frame = quantize_cue(round(beats[i])).actual_ms
+                if abs(frame - frame_of) > WHEEL_MOVE_BARS * bar_ms:
+                    continue
                 trial = outcomes(i)
+                bound = WHEEL_LATE_BEATS * _beat_length(beats, i) + EFFECT_GRID_MS
+                lates = [trial[f][0] for f in keep if f in trial]
+                if any(late is None or late > bound for late in lates):
+                    continue
                 if count := score(i, trial):
                     candidates.append((count, -abs(offset), i, trial))
             if candidates:
@@ -937,7 +1047,9 @@ def _wheel_plays(
     reasons: list[str] = []
     brief = False
     if not well(index, found):
-        better = search(well)
+        own_bound = WHEEL_LATE_BEATS * _beat_length(beats, index) + EFFECT_GRID_MS
+        kept = [f for f, (late, _, _, _) in found.items() if late is not None and late <= own_bound]
+        better = search(well, keep=kept)
         if better is not None:
             _, chosen, found, direction = better
             shown = in_time(chosen, found)
@@ -1013,6 +1125,15 @@ def _frames_late(at: float, reveal: float) -> float:
     return quantize_cue(round(reveal)).actual_ms - quantize_cue(round(at)).actual_ms
 
 
+def _bar_length(beat_grid: BeatGrid, index: int) -> float:
+    """The length of the bar the beat at `index` lies in (`events._bar_ms`)."""
+    position = beat_grid.bar_and_beat(index)
+    bars = beat_grid.bar_boundaries
+    if position is not None and position[0] < len(bars):
+        return float(bars[position[0]] - bars[position[0] - 1])
+    return beat_grid.beats_per_bar * _beat_length(beat_grid.beat_boundaries, index)
+
+
 def _beat_length(beats: Sequence[float], index: int) -> float:
     if index + 1 < len(beats):
         return beats[index + 1] - beats[index]
@@ -1065,8 +1186,9 @@ def _hit_move(
     """Where a hit no head can show on its beat moves (`events.apply_hits`): to a beat
     within `HIT_MOVE_BARS` inside the section the published dark phases leave some head
     lit on, outside every wheel turn's lead: one bound to a lyric cue to the one nearest
-    the lyric (the later of equals), another to the one the most heads show, later first;
-    with its direction and offset, or that it does not play."""
+    the lyric: the beat after its own where that is at or after the lyric, else the
+    nearest (the later of equals); another to the one the most heads show, later first; all within one bar in
+    frames; with its direction and offset, or that it does not play."""
     beats = beat_grid.beat_boundaries
     everyone = {h.fixture_id for h in offer.heads}
     reach = HIT_MOVE_BARS * beat_grid.beats_per_bar
@@ -1081,7 +1203,15 @@ def _hit_move(
         dark = _dark_heads_on(i, parts, offer, beat_grid, _beat_length(beats, i))
         return len(everyone) if dark is None else len(everyone - set(dark[1]))
 
-    offsets = [*range(1, reach + 1), *range(-1, -reach - 1, -1)]
+    frame_of = quantize_cue(round(beats[index])).actual_ms
+    bar_ms = _bar_length(beat_grid, index)
+    offsets = [
+        o
+        for o in (*range(1, reach + 1), *range(-1, -reach - 1, -1))
+        if 0 <= index + o < len(beats)
+        and abs(quantize_cue(round(beats[index + o])).actual_ms - frame_of)
+        <= HIT_MOVE_BARS * bar_ms
+    ]
     found = [(index + o, n) for o in offsets if (n := lit(index + o))]
     if not found:
         return (
@@ -1089,8 +1219,15 @@ def _hit_move(
             "so it does not play"
         )
     if event.cue_ms is not None:
-        chosen, count = min(found, key=lambda c: (abs(beats[c[0]] - event.cue_ms), -c[0]))
-        rule, offset = "the beat nearest its lyric cue", beats[chosen] - event.cue_ms
+        cue_ms = event.cue_ms
+        after = [c for c in found if c[0] == index + 1 and beats[c[0]] >= cue_ms - EFFECT_GRID_MS]
+        if after:
+            chosen, count = after[0]
+            rule = "the beat after its own, at or after its lyric cue"
+        else:
+            chosen, count = min(found, key=lambda c: (abs(beats[c[0]] - cue_ms), -c[0]))
+            rule = "the beat nearest its lyric cue"
+        offset = beats[chosen] - cue_ms
         anchor = "from the lyric"
     else:
         later = [c for c in found if c[0] > index]

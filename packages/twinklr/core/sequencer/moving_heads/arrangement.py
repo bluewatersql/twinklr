@@ -27,8 +27,11 @@ reach; SLOWER, FASTER on rate) from a source variant:
   variant.
 
 A FASTER step whose variant the rig does not play at the source's reach plays the
-same rate at the next narrower reach that it does (`wide+fast` → `fast` → `narrow+fast`),
-noted ("faster here needs a narrower reach"). So every carrier varies the introduced look
+same rate one reach step narrower where it does (never two: that would read as NARROW),
+noted ("faster here needs a narrower reach"). **The song outranks the arrangement:** a
+section whose step would make one of the plan's events worse than with every part on its
+source variant takes its next candidate, and at the last gives way to the event and plays
+its source (`GiveWay`, `RenderingPipeline._settle_arrangement`). So every carrier varies the introduced look
 by one step: a restating section plays the
 introducer's variant, and a RESOLVE with no variation set steps from it SLOWER, else
 NARROW, else restates. The step carries the source's reach and rate *class* across
@@ -258,14 +261,30 @@ def with_motif_relations(
     return plan.model_copy(update={"sections": sections, "repairs": repairs})
 
 
+@dataclass(frozen=True)
+class GiveWay:
+    """A section whose variation gave way to its events (`RenderingPipeline.render`): the
+    variants it may not play (each worsened an event against its source variant) and the
+    event it gave way to, in words."""
+
+    rejected: frozenset[str]
+    because: str
+
+
 def resolve_arrangement(
     plan: ChoreographyPlan,
     options: Callable[[str], VariantOptions],
     canonical: Callable[[str], str] = lambda template_id: template_id,
+    *,
+    give_way: Mapping[str, GiveWay] | None = None,
+    steps: bool = True,
 ) -> dict[str, SectionArrangement]:
     """Per plan section with a motif or a variation, its relation and each part's resolved
     variant (module docstring); `options` gives a template's (canonical id) effective and
-    admitted variants, `canonical` a template id's canonical form."""
+    admitted variants, `canonical` a template id's canonical form. `give_way`, per section,
+    the variants it may not play (the next candidate plays: a FASTER step's narrower
+    reach, else the source variant); without `steps` every part plays its source (the
+    song's events are judged against that)."""
     relations = motif_relations(plan, keep_resolve=True)
     played: dict[tuple[str, int], tuple[str, str]] = {}
     """Per (section, part index), the template and the variant it plays."""
@@ -293,7 +312,8 @@ def resolve_arrangement(
                 relation,
                 source_id,
                 played,
-                plan,
+                (give_way or {}).get(section.section_id),
+                steps,
             )
             played[section.section_id, index] = (template_id, variant.plays)
             parts.append(variant)
@@ -318,7 +338,8 @@ def _resolve_part(
     relation: str | None,
     source_id: str | None,
     played: Mapping[tuple[str, int], tuple[str, str]],
-    plan: ChoreographyPlan,
+    give_way: GiveWay | None = None,
+    stepping: bool = True,
 ) -> PartVariant:
     asked = section.variation.value
     source_parts = [k for k in played if k[0] == source_id]
@@ -347,12 +368,14 @@ def _resolve_part(
         else:
             source = own
             relative_to = "its own preset" if named and own == named else "its effective variant"
-    del plan
     steps: list[str] = []
-    if asked != "NONE":
+    if not stepping:
+        steps = []
+    elif asked != "NONE":
         steps = [asked]
     elif relation == "RESOLVE":
         steps = ["SLOWER", "NARROW"]
+    rejected = frozenset() if give_way is None else give_way.rejected
 
     def fallback(why: str) -> PartVariant:
         if source in choice.admitted:
@@ -392,28 +415,34 @@ def _resolve_part(
             reasons.append(f"{step}: {source!r} is already the {_EDGES[step]} variant")
             continue
         target = grid_variant(place[0], place[1])
+        # The candidates: the step, then for FASTER the same rate one reach step narrower
+        # (the rig's speed is a speed of reach per period; never two steps, which would
+        # read as NARROW).
+        candidates = [target]
+        if step == "FASTER" and place[0] > 0:
+            candidates.append(grid_variant(place[0] - 1, place[1]))
         note = None
-        if target in choice.plays_as_base or target not in choice.admitted:
-            why = (
-                f"{target!r} of {template_id} plays the same as base here"
-                if target in choice.plays_as_base
-                else f"{target!r} of {template_id} is not admitted on this rig and song"
-            )
-            # Faster at a narrower reach: the rig's speed is a speed of reach per period.
-            narrower = next(
-                (
-                    candidate
-                    for reach in (range(place[0] - 1, -1, -1) if step == "FASTER" else ())
-                    if (candidate := grid_variant(reach, place[1])) in choice.admitted
-                    and candidate not in choice.plays_as_base
-                ),
-                None,
-            )
-            if narrower is None:
-                reasons.append(f"{step}: {why}")
-                continue
-            note = f"{step}: {why}; faster here needs a narrower reach: it plays {narrower!r}"
-            target = narrower
+        chosen = None
+        for candidate in candidates:
+            if candidate in choice.plays_as_base or candidate not in choice.admitted:
+                why = (
+                    f"{candidate!r} of {template_id} plays the same as base here"
+                    if candidate in choice.plays_as_base
+                    else f"{candidate!r} of {template_id} is not admitted on this rig and song"
+                )
+            elif candidate in rejected:
+                assert give_way is not None
+                why = f"{candidate!r} gave way to {give_way.because}"
+            else:
+                chosen = candidate
+                break
+            note = f"{step}: {why}" if note is None else f"{note}; {why}"
+        if chosen is None:
+            reasons.append(note or step)
+            continue
+        if chosen != target:
+            note = f"{note}; faster here needs a narrower reach: it plays {chosen!r}"
+        target = chosen
         return PartVariant(
             section_id=section.section_id,
             part_index=index,
@@ -424,6 +453,11 @@ def _resolve_part(
             plays=target,
             named=named,
             note=note,
+        )
+    if give_way is not None and any("gave way to" in reason for reason in reasons):
+        return fallback(
+            f"the variation gave way to {give_way.because} ({'; '.join(reasons)}): it plays "
+            "the source variant"
         )
     return fallback("; ".join(reasons) + ": it plays the source variant")
 

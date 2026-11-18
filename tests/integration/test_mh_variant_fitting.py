@@ -293,9 +293,12 @@ def test_faster_needs_a_narrower_reach_where_fast_is_not_offered() -> None:
 
     b, c = resolved["b"].parts[0], resolved["c"].parts[0]
     assert b is not None and c is not None
-    assert (b.plays, b.reason) == ("narrow+fast", None)
-    assert b.note is not None and "faster here needs a narrower reach" in b.note
-    assert c.plays == "narrow+fast" and c.note is not None
+    # From `wide`: `wide+fast` and, one reach step narrower, `fast` are not offered; two
+    # steps narrower would read as NARROW, so the variation does not play.
+    assert b.plays == "wide" and b.reason is not None and "'fast' of" in b.reason
+    # From base: `fast` is not offered; one step narrower, `narrow+fast` plays.
+    assert c.plays == "narrow+fast"
+    assert c.note is not None and "faster here needs a narrower reach" in c.note
 
 
 def test_a_fitted_strength_is_render_identity() -> None:
@@ -356,3 +359,41 @@ def test_a_rig_fast_enough_for_the_catalog_fits_nothing(bpm: float) -> None:
     admission = gate(m.allowed_rig(m.family_rig(HEADS)), grid(bpm))
 
     assert all(not offered.fitted for offered in admission.offer.templates.values())
+
+
+def test_variants_whose_aim_differs_by_under_three_degrees_play_alike() -> None:
+    """`_alike`: the same darkness, level and wheels with every aim within `TWIN_POSE_DEG`
+    plays alike; a 3-degree aim difference, or any other channel, does not."""
+    from twinklr.core.sequencer.moving_heads.export.frame_encoder import EncodedFixtureFrame
+    from twinklr.core.sequencer.moving_heads.pipeline import TWIN_POSE_DEG, _alike
+
+    fg = m.allowed_rig(m.family_rig(HEADS))
+    profile = fg.expand_fixtures()[0].config.physical_profile
+    assert profile is not None
+    pan = profile.axes["pan"]
+
+    def frame(degrees: float, dimmer: int = 255) -> EncodedFixtureFrame:
+        word = pan.dmx_word(degrees)
+        channels = dict.fromkeys(range(1, profile.footprint + 1), 0)
+        if pan.fine_offset is not None:
+            channels[pan.coarse_offset], channels[pan.fine_offset] = word >> 8, word & 0xFF
+        else:
+            channels[pan.coarse_offset] = word
+        tilt = profile.axes["tilt"]
+        tilt_word = tilt.dmx_word(30.0)
+        if tilt.fine_offset is not None:
+            channels[tilt.coarse_offset], channels[tilt.fine_offset] = (
+                tilt_word >> 8,
+                tilt_word & 0xFF,
+            )
+        else:
+            channels[tilt.coarse_offset] = tilt_word
+        channels[profile.axes["dimmer"].coarse_offset] = dimmer
+        return EncodedFixtureFrame(
+            time_ms=0, fixture_id="MH1", channels=tuple(sorted(channels.items()))
+        )
+
+    profiles = {"MH1": profile}
+    assert _alike([frame(10.0)], [frame(10.0 + TWIN_POSE_DEG - 0.5)], profiles)
+    assert not _alike([frame(10.0)], [frame(10.0 + TWIN_POSE_DEG + 0.5)], profiles)
+    assert not _alike([frame(10.0)], [frame(10.0, dimmer=128)], profiles)
