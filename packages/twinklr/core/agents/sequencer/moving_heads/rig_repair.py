@@ -65,7 +65,10 @@ from twinklr.core.sequencer.moving_heads.transitions import (
     LIT_MODES,
     SPLIT_ON_BOUNDARY,
     SPLIT_SHARE,
+    Window,
+    closing_boundary_ms,
     length_beats,
+    part_frames,
     resolved_strategies,
     window_for,
 )
@@ -1106,7 +1109,7 @@ def _transition_repairs(
             )
             for said in _plays_nothing(kept, outgoing, incoming, offer):
                 note(RepairAction.RECORDED, said)
-            for said in _yields_to_events(kept, outgoing, incoming, beat_grid):
+            for said in _yields_to_events(kept, outgoing, incoming, beat_grid, offer):
                 note(RepairAction.RECORDED, said)
             if kept.mode in LIT_MODES and outgoing is not None and incoming is not None:
                 turns = []
@@ -1165,28 +1168,25 @@ def _plays_nothing(
     ]
 
 
-def _yields_to_events(
+def played_window(
     transition: PlanTransition,
     outgoing: PlanSection | None,
     incoming: PlanSection | None,
     beat_grid: BeatGrid,
-) -> list[str]:
-    """What the transition yields to, by the render's own placement (`transitions.window_for`
-    over `events.yield_spans`, the seen rule): each event of the parts it joins that
-    clamps its window, and where what is left is shorter than its mode needs, that it does
-    not play. Read from the plan's beats: a head dark on an event's beat reveals it later
-    in the render, and a hit that moves plays elsewhere, so the render may yield further."""
+) -> Window | None:
+    """The transition's window by the render's own placement (`transitions.window_for` over
+    `events.yield_spans`, the seen rule, the parts' frames `part_frames` and the song's
+    closing boundary `closing_boundary_ms`), read from the plan's beats: a head dark on an
+    event's beat reveals it later in the render, and a hit that moves plays elsewhere, so
+    the render may yield further. None without a beat grid to place it on."""
     bars = beat_grid.bar_boundaries
     if len(beat_grid.beat_boundaries) < 2 or (outgoing is None and incoming is None):
-        return []
-
-    def at(bar: int) -> int:
-        ms = bars[bar - 1] if bar - 1 < len(bars) else beat_grid.duration_ms
-        return quantize_cue(round(ms)).actual_ms
+        return None
+    phase_map = build_musical_phase_map(beat_grid)
 
     def frames(section: PlanSection, first: bool) -> tuple[int, int]:
         _, start, end = section.part_bars()[0 if first else -1]
-        return at(start), at(end + 1)
+        return part_frames(beat_grid, start, end)
 
     def yields(
         section: PlanSection, window: tuple[int, int], said: str, *, hits: bool, until: bool
@@ -1197,11 +1197,12 @@ def _yields_to_events(
     if incoming is None:
         assert outgoing is not None
         last = frames(outgoing, first=False)
+        last = (last[0], closing_boundary_ms(phase_map, int(beat_grid.duration_ms), last[1]))
         window = window_for(
             transition,
             TransitionEdge.EXIT,
             boundary_ms=last[1],
-            phase_map=build_musical_phase_map(beat_grid),
+            phase_map=phase_map,
             beats_per_bar=beat_grid.beats_per_bar,
             earliest_ms=last[0],
             latest_ms=last[1],
@@ -1219,7 +1220,7 @@ def _yields_to_events(
             boundary_ms=bars[incoming.start_bar - 1]
             if incoming.start_bar - 1 < len(bars)
             else entered[0],
-            phase_map=build_musical_phase_map(beat_grid),
+            phase_map=phase_map,
             beats_per_bar=beat_grid.beats_per_bar,
             earliest_ms=entered[0] if left is None else left[0],
             latest_ms=entered[1],
@@ -1241,6 +1242,23 @@ def _yields_to_events(
                 until=False,
             ),
         )
+    return window
+
+
+def _yields_to_events(
+    transition: PlanTransition,
+    outgoing: PlanSection | None,
+    incoming: PlanSection | None,
+    beat_grid: BeatGrid,
+    offer: RigOffer,
+) -> list[str]:
+    """What the transition yields to (`played_window`): each event of the parts it joins
+    that clamps its window, and where what is left is shorter than its mode needs, that it
+    does not play. Where a `snap` or a lit mode is left less time than the longest darkness
+    the offer bounds (`_darkness_bound_ms`), that a head needing longer may play none."""
+    window = played_window(transition, outgoing, incoming, beat_grid)
+    if window is None:
+        return []
     said = [
         f"the window yields: {clamp}"
         for clamp in window.clamps
@@ -1248,14 +1266,32 @@ def _yields_to_events(
     ]
     if window.not_played is not None:
         said.append(f"{window.not_played}: it does not play")
-    elif said:
-        room = window.end_ms - window.start_ms
-        said.append(
-            f"it leaves {room} ms: a head that needs longer in the dark to move or turn "
-            "there (its templates' poses and wheels decide, which the offer does not carry) "
-            "plays no transition"
+    elif said and transition.mode not in (TransitionMode.BLACKOUT, TransitionMode.FADE_VIA_BLACK):
+        room = (
+            window.boundary_ms - window.start_ms
+            if transition.mode is TransitionMode.SNAP
+            else window.end_ms - window.start_ms
         )
+        bound = _darkness_bound_ms(offer)
+        if bound is None or room < bound:
+            said.append(
+                f"it leaves {room} ms, less than the "
+                + ("darkness" if bound is None else f"{bound} ms of darkness")
+                + " a head may need to move or turn there: a head that needs longer (its "
+                "templates' poses and wheels decide, which the offer does not carry) plays no "
+                "transition"
+            )
     return said
+
+
+def _darkness_bound_ms(offer: RigOffer) -> int | None:
+    """The most darkness a head may need for a transition's move or turn, as the offer
+    bounds it: the slowest head's travel over its whole pan or tilt range plus the slowest
+    wheel change (which includes going dark and the state's settle); None where a term is
+    unknown."""
+    if not offer.full_travel_ms or offer.wheel_change_ms is None:
+        return None
+    return max(offer.full_travel_ms.values()) + offer.wheel_change_ms
 
 
 def _held_at_start(

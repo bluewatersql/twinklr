@@ -971,10 +971,12 @@ def _fuzz_plan(rnd: random.Random, beat_grid: BeatGrid) -> list[PlanSection]:
 
 
 @pytest.mark.parametrize("seed", range(12))
-def test_random_plans_with_events_inside_transition_windows_render_honestly(seed: int) -> None:
-    """Seeded random plans (events near the boundaries, every mode, intensity, parts and
-    a show's rest): none raises, no wheel changes lit, every transition is traced on every
-    head with what it plays or why not, and every window lies on the frame grid."""
+def test_smoke_random_plans_with_events_inside_transition_windows(seed: int) -> None:
+    """Smoke test, not a regression pin: seeded random plans (events near the boundaries,
+    every mode, intensity, parts and a show's rest) render without raising, no wheel
+    changes lit, every transition is traced on every head with what it plays or why not,
+    every window lies on the frame grid, and no transition loses a hit. The targeted
+    tests above pin each behaviour; these only sweep for surprises."""
     rnd = random.Random(seed)
     beat_grid = _fuzz_grid(rnd)
     sections = _fuzz_plan(rnd, beat_grid)
@@ -1203,4 +1205,101 @@ def test_repair_and_render_agree_on_what_a_transition_yields_to(
     assert (entry.get("not_played") is not None) == ("it does not play" in said)
     heads_np = [o for o in entry["heads"].values() if "not_played" in o]
     if heads_np and entry.get("not_played") is None:
-        assert "plays no transition" in said
+        assert "plays no transition" in said  # warned covers every head that skips
+    if mode in ("blackout", "fade_via_black"):
+        assert "plays no transition" not in said  # darkness is their whole look
+
+
+# --- fix round 3: repair's song end, its darkness caveat, hits still lost ----------------
+
+
+def _review_zoom_rig() -> FixtureGroup:
+    """The zoom rig with the review's timings: close and open latency 20 ms, every wheel
+    state settling in 150 ms, colours and gobos tagged by name."""
+    payload = m.zoom_rig(HEADS).model_dump(mode="json")
+    for fixture in payload["fixtures"]:
+        profile = fixture["config"]["physical_profile"]
+        profile["visibility"].update(close_latency_ms=20, open_latency_ms=20)
+        for name, state in profile["discrete"]["color"]["states"].items():
+            state["hex"] = name
+        for name, state in profile["discrete"]["gobo"]["states"].items():
+            state["pattern"] = {"star": "stars"}.get(name, name)
+        for wheel in ("color", "gobo"):
+            for state in profile["discrete"][wheel]["states"].values():
+                state["settle_ms"] = 150
+    return FixtureGroup.model_validate(payload)
+
+
+def test_repair_places_the_songs_last_exit_where_the_render_does() -> None:
+    """78.3 BPM with two pickup beats, a colour change on 8.3 and an EXIT blackout over a
+    BEAT on the song's last section: repair's window is the render's (the closing boundary
+    on the covered beat grid, not the song's last frame past it), so it does not size the
+    blackout from the whole last part."""
+    from twinklr.core.agents.sequencer.moving_heads.rig_repair import played_window
+
+    g = m.pickup_grid(60_000 / 78.3, 8, pickup=2)
+    sections = [
+        m.plan_section("s1", 1, 4, "mirror_wings"),
+        m.plan_section(
+            "s2",
+            5,
+            8,
+            "mirror_wings",
+            events=[event(8, 3, "color", color="blue")],
+            transitions=[transition("EXIT", "blackout", "BEAT", split="HALF")],
+        ),
+    ]
+    window = played_window(sections[1].exit, sections[1], None, g)  # type: ignore[arg-type]
+    repaired = repair_rig_intent(
+        ChoreographyPlan(sections=sections, overall_strategy=""), rig_offer(rig(), g), {}, g
+    )
+    said = " ".join(r.reason for r in repaired.repairs if r.item.startswith("exit transition"))
+    (entry,) = transitions_of(render(sections, beat_grid=g))
+
+    assert window is not None
+    assert [window.start_ms, window.end_ms] == entry["window_ms"]
+    assert window.boundary_ms == entry["boundary_ms"]
+    assert "plays no transition" not in said and "it does not play" not in said
+
+
+def test_hits_a_transition_still_loses_after_the_last_pass_are_traced_and_warned(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A sweep into `mirror_wings` with a hit on 4.1 and two gobo changes loses the hit on
+    every head in the first pass and needs a second. With one pass allowed, the loss is
+    traced (`hits_lost_to_transitions`) and warned; with the default, nothing is lost."""
+    from twinklr.core.sequencer.moving_heads import pipeline as module
+
+    sections = [
+        m.plan_section("s1", 2, 3, "zoom_wave", events=[event(3, 4, "closed")]),
+        m.plan_section(
+            "s2",
+            4,
+            4,
+            "mirror_wings",
+            events=[
+                event(4, 2, "gobo", gobo="stars"),
+                event(4, 3, "gobo", gobo="dots"),
+                event(4, 1, "hit"),
+            ],
+            transitions=[transition("ENTRY", "sweep", "HALF_BAR", split="THIRD")],
+        ),
+    ]
+    fields = {"fixture_group": _review_zoom_rig(), "job_config": m.zoom_job(HEADS)}
+    whole = render(sections, beat_grid=grid(120), **fields)
+    assert whole.render_record is not None
+    assert "hits_lost_to_transitions" not in whole.render_record
+    free = whole.transition_free
+    assert free is not None
+    assert set(free.hit_frames[("s2", 2)]) <= set(whole.hit_frames.get(("s2", 2), {}))
+
+    monkeypatch.setattr(module, "TRANSITION_PASSES", 1)
+    once = render(sections, beat_grid=grid(120), **fields)
+    assert once.render_record is not None
+    lost = once.render_record["hits_lost_to_transitions"]
+    assert {entry["fixture_id"] for entry in lost} == set(HEADS)
+    assert all("hit at bar 4 beat 1" in entry["reason"] for entry in lost)
+    assert any(
+        "still lose a hit to a transition" in d["message"]
+        for d in once.render_record["diagnostics"]
+    )

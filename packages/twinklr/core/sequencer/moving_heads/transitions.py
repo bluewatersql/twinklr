@@ -125,9 +125,11 @@ from twinklr.core.sequencer.moving_heads.compile.preposition import (
 )
 from twinklr.core.sequencer.moving_heads.compile.step import slice_segment
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import quantize_cue
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.timing.musical_phase import (
     MusicalPhaseError,
     MusicalPhaseMap,
+    cue_limits,
     musical_time_at,
 )
 
@@ -414,6 +416,24 @@ class Window:
         return record
 
 
+def part_frames(beat_grid: BeatGrid, start_bar: int, end_bar: int) -> tuple[int, int]:
+    """A part's frames over bars `start_bar`..`end_bar` (inclusive), as the render places it:
+    each bar's downbeat (`BeatGrid.get_bar_start_ms`, extrapolated past the last detected
+    one) on the frame grid. The render and the plan repair both read it."""
+    return (
+        quantize_cue(int(beat_grid.get_bar_start_ms(start_bar - 1))).actual_ms,
+        quantize_cue(int(beat_grid.get_bar_start_ms(end_bar))).actual_ms,
+    )
+
+
+def closing_boundary_ms(phase_map: MusicalPhaseMap, duration_ms: int, part_end_ms: int) -> int:
+    """Where the song's last EXIT comes to rest at the latest: its part's end, no later than
+    the frames a cue may occupy (`cue_limits`: the covered beat grid, the song's last whole
+    frame). The render then takes the part's cues' own end where earlier; the plan repair
+    reads this."""
+    return min(part_end_ms, cue_limits(phase_map, duration_ms)[1])
+
+
 def _at(phase_map: MusicalPhaseMap, origin_ms: float, beats: Fraction) -> int | None:
     try:
         return quantize_cue(
@@ -457,13 +477,25 @@ def window_for(
     start = _at(phase_map, boundary_ms, -before) if before else boundary
     end = _at(phase_map, boundary_ms, after) if after else boundary
     notes: list[str] = []
-    if start is None or start < earliest_ms:
-        if start is not None:
-            notes.append("it starts no earlier than the part it leaves")
-        start = max(earliest_ms, 0 if start is None else start)
-    if end is None or end > latest_ms:
-        if end is not None:
-            notes.append("it ends no later than the part it enters")
+    if start is None:
+        # The detected beats do not reach that far before the boundary: say so, never
+        # silently take the part's whole start.
+        notes.append(
+            "the beat grid does not reach its length before the boundary; it starts at the "
+            "grid's first beat it reaches"
+        )
+        start = max(earliest_ms, quantize_cue(round(phase_map.covered_start_ms)).actual_ms)
+    elif start < earliest_ms:
+        notes.append("it starts no earlier than the part it leaves")
+        start = earliest_ms
+    if end is None:
+        notes.append(
+            "the beat grid does not reach its length after the boundary; it ends at the "
+            "grid's last beat"
+        )
+        end = min(latest_ms, quantize_cue(round(phase_map.covered_end_ms)).actual_ms)
+    elif end > latest_ms:
+        notes.append("it ends no later than the part it enters")
         end = latest_ms
     planned = (start, end)
     for why, ms in not_before:

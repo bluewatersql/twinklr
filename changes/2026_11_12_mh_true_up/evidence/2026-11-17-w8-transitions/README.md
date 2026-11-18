@@ -878,3 +878,84 @@ and `out_an_ev.txt` (the events sweep), `fz/` and `fuzz_lost.py`, `fuzz_summary.
     across instead.
 14. **A hit moved so no head loses it** (the review's case: on 5.3 on all four heads,
     where without the transition it is on 5.3 too).
+
+## Fix round 3 (third review of `fd85b8db`: plan repair, 2026-11-17)
+
+**Provenance.** The third review approved the render side and asked for these repair
+changes; its scripts (`w8rev3/tools/`) were rerun against this tree. Same worktree, same
+executor, uncommitted; no provider call, no network, no xLights, nothing under
+`~/xlights`, `data/` or `artifacts/`; `make validate` not run (the integrator's).
+
+### M-1: repair placed the song's last EXIT off the beat grid
+
+Repair sized the closing boundary from the song's last frame (`beat_grid.duration_ms`,
+past the covered beat grid); `transitions._at` then returned None and `window_for`
+silently fell back to the part's start, so a one-beat blackout looked like the whole last
+part ("it leaves 10420 ms …"). Now:
+
+- **One shared placement:** `transitions.part_frames` (a part's frames from the detected
+  downbeats, as the compile context places it) and `transitions.closing_boundary_ms` (the
+  last part's end, no later than `cue_limits`' end) are used by the render (its part
+  windows; its closing boundary, then the part's cues' own end where earlier) and by
+  repair (`rig_repair.played_window`, new: the window repair reads, by the render's own
+  functions).
+- **`window_for` never falls back silently:** where the detected beats do not reach the
+  window's length from its boundary it stops at the grid's first or last beat and records
+  why in `clamped`.
+- The review's repro (`repro_exit_room.py`, 120 BPM and 78.3 BPM with two pickup beats, a
+  colour on 8.3, EXIT blackout BEAT): repair now says nothing it should not (it said "it
+  leaves 1900 ms …" at 78.3); on `REALISTIC`, repair's closing window is 188160–188520 ms,
+  the render's. Test `test_repair_places_the_songs_last_exit_where_the_render_does`
+  (the review's case: repair's window, start, end and boundary, equal the render's).
+
+### M-2: the darkness caveat only where it can be true
+
+"A head that needs longer in the dark … plays no transition" is now said only for `snap`
+and the lit modes, and only where the time left is below the most darkness the offer
+bounds (`rig_repair._darkness_bound_ms`: the slowest head's full pan or tilt travel plus
+the slowest wheel change, which includes going dark and the state's settle; where the
+offer lacks a term it is said, unbounded). Never for `blackout` or `fade_via_black`. The
+review's `repair_vs_render.py` (1,080 cases): warned 376 (818 at `fd85b8db`), heads
+skipping 54, **every one of them warned** (54 of 54), warned on a dark mode 0; and still
+0 disagreements on whether the window yields and whether it plays. The bound is the
+offer's, not the head's exact need (its axis latency and settle are not in the offer);
+in this sweep it covers every skip. The agreement test now asserts both directions
+(warned ⊇ skipped; never warned for `blackout` or `fade_via_black`).
+
+### LOW
+
+- **Hits still lost after the last pass** are traced (`hits_lost_to_transitions`: the
+  boundary, the head, why) and warned (a diagnostic and a log warning), never kept
+  silent. Test `test_hits_a_transition_still_loses_after_the_last_pass_are_traced_and_warned`
+  (a sweep into `mirror_wings` with a hit on 4.1 and two gobo changes, which needs a
+  second pass: with `TRANSITION_PASSES` patched to 1 the loss is traced and warned on all
+  four heads; with the default, nothing is lost).
+- The 12 random-plan tests are named and described as smoke tests
+  (`test_smoke_random_plans_with_events_inside_transition_windows`).
+
+### No frame changed; no revision bump
+
+The byte matrix (`w8fix3/matrix_fix.py`, the round-2 harness, 567 configurations × 23
+renders) against `fd85b8db`'s run: **13,041 of 13,041 renders identical** in frames,
+`.xsq` and normalised trace (`w8fix3/compare_frames.txt`). `RENDERER_REVISION` stays 12;
+pins and the golden fingerprint unchanged. The planner prompts did not change, so **the
+planner cache key is unchanged**. Repair's recorded reasons change for plans with
+transitions (their wording and when the caveat appears).
+
+### Verification (this tree, fresh, after the last code edit)
+
+| Command | Result |
+|---|---|
+| `uv run pytest -q --no-cov` | 7224 passed, 30 skipped (2 new cases; the agreement cases gained the caveat assertions) |
+| `uv run pytest tests/regression/test_mh_pins.py tests/golden -q --no-cov` | 62 passed, 1 skipped |
+| `uv run pytest tests/regression/test_mh_intent_parity.py -q --no-cov` | 26 passed; `--runxfail`: 26 passed |
+| `uv run ruff check .` | All checks passed |
+| `uv run ruff format --check .` | 1308 files already formatted |
+| `uv run mypy .` | No issues in 655 source files |
+
+Run on `fd85b8db`'s code with this test file: the two new cases fail there (the closing
+window and the lost-hit trace do not exist) and 8 agreement cases (the caveat on a
+`blackout` or `fade_via_black`). Scratch:
+`/private/tmp/claude-501/-Users-ondeck-work-github-twinklr/9cfb5b66-fff4-47db-adcb-766b50dc61e9/scratchpad/w8fix3/`
+(`matrix_fix.py`, `matrix_fix.jsonl`, `compare_frames.txt`, `rvr_final.txt`,
+`minpass*.py`, `realexit.py`, `base_fd85/`).

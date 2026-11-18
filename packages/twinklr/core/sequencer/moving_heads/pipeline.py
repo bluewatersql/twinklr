@@ -102,7 +102,6 @@ from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     coalesce_frames,
     encode_fixture_frames,
     frame_times,
-    quantize_cue,
     quantized_cues,
 )
 from twinklr.core.sequencer.moving_heads.export.xsq_adapter import (
@@ -142,6 +141,8 @@ from twinklr.core.sequencer.moving_heads.transitions import (
     HeadContext,
     HeadTransition,
     Window,
+    closing_boundary_ms,
+    part_frames,
     play_head,
     window_for,
 )
@@ -2819,6 +2820,28 @@ class RenderingPipeline:
             for (boundary_ms, fixture_id), why in lost.items():
                 skip.setdefault(boundary_ms, {})[fixture_id] = why
         render_log.replay(logger, said)
+        if lost:
+            # Hits the last pass still loses to a transition: said, never kept silent.
+            assert self.render_record is not None
+            remaining = [
+                {"boundary_ms": boundary_ms, "fixture_id": fixture_id, "reason": why}
+                for (boundary_ms, fixture_id), why in sorted(lost.items())
+            ]
+            message = (
+                f"moving heads: after {TRANSITION_PASSES} render passes, {len(remaining)} "
+                "head(s) still lose a hit to a transition (the trace's hits_lost_to_transitions "
+                "lists them)"
+            )
+            self.render_record["hits_lost_to_transitions"] = remaining
+            self.render_record["diagnostics"].append(
+                MHDiagnostic(
+                    code="unsupported_attribute",
+                    severity="warning",
+                    message=message,
+                    action="unchanged",
+                ).model_dump(mode="json")
+            )
+            render_log.warn(logger, "%s", message)
         if self.output_path:
             assert self.render_record is not None
             xsq = build_sequence(
@@ -3007,10 +3030,7 @@ class RenderingPipeline:
             events = timed.setdefault(
                 base_id, section_events(plan_sections[base_id], self.beat_grid)
             )
-            window = (
-                quantize_cue(context.start_ms).actual_ms,
-                quantize_cue(context.end_ms).actual_ms,
-            )
+            window = part_frames(self.beat_grid, section.start_bar, section.end_bar)
             # A colour or gobo an earlier part's event left the heads holding: this part
             # holds it from its start, as a section colour.
             for fixture_id, states in carried_states(
@@ -3475,7 +3495,10 @@ class RenderingPipeline:
             # inside the section's last part.
             part_id, (part_start, part_end), identity = last_part[last_section.section_id]
             ends = [c.t1_ms for c in cues if (c.section_id, c.segment_id) == identity]
-            end = min(part_end, max(ends, default=part_end))
+            end = min(
+                closing_boundary_ms(phase_map, duration_ms, part_end),
+                max(ends, default=part_end),
+            )
             bars = self.beat_grid.bar_boundaries
             closing = window_for(
                 last_section.exit,
