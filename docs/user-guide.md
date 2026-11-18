@@ -509,6 +509,20 @@ A section's `transitions` play at its boundaries (`sequencer/moving_heads/transi
 
 The trace's `section_looks[].transitions` lists each transition with its window, split point, any clamp, the `EXIT` it replaced, and per head what it played (`plays`, `dark_ms`, `dark_outlasts_window_to_ms` where its darkness runs past the window, `wheels_turn`, a head's own `window_ms`, `fallback`, `not_played`, `strategies_played_otherwise`, `curve_played` for the modes that shape by the curve: a curve that neither rises nor falls over its cycle, such as a wave or a hold, plays as `linear`, and one that falls is turned over); `eval-report` prints it. A transition counts as played on a head only where the head's frames differ from the same plan rendered without transitions: every differing frame, over the whole song, is laid at the transition playing on that head nearest it, and one with none is traced `plays: nothing: <why>`; a per-section warning counts the heads a transition played nothing or did not play on. That second render costs a render (a plan without transitions renders once); its warnings are held, never logged twice.
 
+#### How a section's motif and variation reach the lights
+
+A section's `motif_id` and `variation` choose the variant each of its parts plays (`sequencer/moving_heads/arrangement.py`, used by both the render and repair). Every family template declares a three-by-three grid of variants: reach `narrow`, base, `wide` by rate `slow`, base, `fast` (preset ids `narrow`, `slow`, `wide`, `fast`, `narrow+slow`, `narrow+fast`, `wide+slow`, `wide+fast`). The pre-planning check admits each variant on its own dry compile, and does not offer one that plays the same frames as its base in a section after its own base (it is excluded as "plays the same as base here"; `finite_snap_hold`'s `fast` is one). The planner is shown, per template, the variants it does not play on this rig and song.
+
+**Motif.** Sections sharing a `motif_id` form a chain in plan order: the first introduces it; each later one relates to the previous carrier, its source. Where the macro plan's motif thread lists the section, its evolution is the relation (a thread that only introduces restates later carriers); otherwise a carrier with a `variation` varies and one without restates. Code writes the relation and source to the plan (`motif_relation`, `motif_source_id`; they are not in the planner's schema). A carrier with a source plays its source's variant, stepped by its `variation`; `RESOLVE` without a variation steps slower, else narrower, else restates. Each part steps from the source's part at the same index (from its last part when the source has fewer). A motif on a different template than its source carries only its reach and rate. A motif's colour and gobo are never changed by code.
+
+**Variation without a motif source.** A part steps from the variant the previous section on its template plays, else from its own preset (a named, admitted preset, else its template's effective variant). An introduced motif without a variation plays its own preset. A section with neither a motif nor a variation plays as before.
+
+**One step.** `NARROW` and `WIDEN` move one step on reach, `SLOWER` and `FASTER` one on rate. A step off the grid (wider than `wide`) or to a variant the check did not admit plays the source's variant, and the trace and repair say why.
+
+**Repair** (`rig_repair._arrangement_repairs`, before the section's other repairs) records each step that cannot play, a named `preset_id` the resolution replaces, a named preset the template does not declare or the check did not admit (the part plays its effective variant), a motif on another template than its source's, and a colour or gobo that differs from the source's.
+
+The trace's `section_looks[].arrangement` says, for each section with a motif or a variation, the motif (`id`, `relation`, `source`) and the variant resolved (`asked`, `relative_to`, `from`, `plays`, the `named` preset, and the `reason` where the step cannot play).
+
 Under `twinklr show` the moving heads' macro focal role in a section adjusts its intensity at render: `LEAD` plays one step up the intensity ladder (`as_authored`, `SLOW`, `SMOOTH` and `FAST` as `DRAMATIC`; `DRAMATIC` as `INTENSE`; on a template at full level that is the dip-and-return, more movement in the light, not more light), `SUPPORT` plays the planner's choice, `REST` at most the template's level (`DRAMATIC` and `INTENSE` as authored). The heads render as one rig, so a role applies only where every moving-head target holds it; a section that names none for them plays the planner's choice, and one that names different roles, or a role for some targets and none for others, plays the planner's choice with a warning. The planner's prompt under `show` lists each section's role and says so. A role that changes a section's intensity is render identity: the trace and the plan checkpoint record it as `focal_roles`, and `eval-report` re-renders with it (and names `focal roles` when they differ). `twinklr run` has no focal role.
 
 `moving_heads.initial_states` is never defaulted: a fixture without an entry has an unknown initial state and the run is refused before planning, because nothing establishes where a head is when the sequence starts (a previous sequence leaves it wherever it last aimed). The refusal lists every fixture without an entry and prints, as one object ready to paste into `moving_heads.initial_states`, the entry each profile's default bytes give: each axis at the value they encode, each discrete channel in its `default_state`, `settled`, and `dark` exactly when that dimmer level or shutter state extinguishes it. Pasting it asserts that each head really rests there, settled and dark as stated, when the sequence starts.
@@ -1000,10 +1014,12 @@ colour and gobo on the heads whose wheel states are tagged
 dimmer, which under `twinklr show` the heads' macro focal role adjusts
 ([how](#how-a-sections-intensity-reaches-the-lights)), and its timed events and the
 lyric moment cues they land on ([how](#how-a-sections-events-reach-the-lights)), and its
-entry and exit transitions ([how](#how-a-sections-transitions-reach-the-lights)). It does
-not yet render the rest of the planner's song intent (motif variation, density,
-modifiers), which no renderer has rendered; the trace's diagnostics name, per section,
-the intent fields it set that are not rendered. Rendering them is planned work
+entry and exit transitions ([how](#how-a-sections-transitions-reach-the-lights)), and the
+variant its motif and variation resolve each part to
+([how](#how-a-sections-motif-and-variation-reach-the-lights)). It does not yet render
+the rest of the planner's song intent (density, modifiers), which no renderer has
+rendered; the trace's diagnostics name, per section, the intent fields it set that are
+not rendered. Rendering them is planned work
 ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 
 _Source: `packages/twinklr/core/pipeline/definitions/moving_heads.py` and `common.py`_

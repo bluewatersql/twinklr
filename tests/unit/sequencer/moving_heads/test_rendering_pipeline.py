@@ -151,7 +151,9 @@ def test_intent_no_renderer_rendered_yet_is_not_called_a_regression() -> None:
     (diagnostic,) = _unrendered(pipeline)
     assert "intensity" not in diagnostic["message"]
     assert "known regression" not in diagnostic["message"]
-    assert "motif, density: not rendered by any renderer yet" in diagnostic["message"]
+    # The motif renders (W10b); density does not yet.
+    assert "density: not rendered by any renderer yet" in diagnostic["message"]
+    assert "motif" not in diagnostic["message"]
     assert "plan/song-intent-rendering.md" in diagnostic["message"]
 
 

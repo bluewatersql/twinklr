@@ -161,10 +161,19 @@ the same section are valid.
 
 **`motif_id`** and **`variation`**: carry a macro motif (from the Macro Strategy motifs)
 through the song and shape the arc across repeated sections. `motif_id` names the motif a
-section carries. `variation` says how a section treats it relative to where it appeared
-before: `NONE` (the same), `NARROW` (tighter), `WIDEN` (broader), `SLOWER`, `FASTER`. A
-second chorus widens or quickens the first, a last chorus goes furthest, a bridge narrows
-or slows.
+section carries; sections naming the same motif are the same idea. Deterministic code plays
+it: the first section carrying a motif introduces it as planned; each later one plays the
+variant of each template its previous carrier played (a part steps from the source's part
+at the same position), one step further where you set `variation`: `NARROW` (tighter
+reach), `WIDEN` (broader reach), `SLOWER` (half the rate), `FASTER` (double the rate);
+`NONE` restates it. Without a motif, `variation` steps from the previous section on the
+same template. A step only plays where the rig admits that variant (What This Rig Can
+Show names the variants a template does not play); otherwise the section restates, and
+repair says so. Keep a motif on the
+same template where you can: on another template only its reach and rate carry it. Code
+never changes a section's colour or gobo to match its motif; choose them yourself. `preset_id`
+is replaced where a motif's source or a variation step decides the variant. A second chorus widens or
+quickens the first, a last chorus goes furthest, a bridge narrows or slows.
 
 **`density`**: how busy the movement is, shaping the arc with intensity:
 - `REST`: the heads mostly hold (a breakdown, a held note)

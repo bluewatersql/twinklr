@@ -53,8 +53,8 @@ updated: 2026-11-17
   per song section, 1-3 parts (template + preset over bars) and the section's **song
   intent** (intensity, colour, gobo, timed events tied to lyric moment cues, motif
   variation, density, entry/exit transitions; an intensity, colour or gobo of
-  `as_authored` keeps the template's own look and needs a reason). The parts, colour,
-  gobo and intensity render; the rest is a known regression being fixed.
+  `as_authored` keeps the template's own look and needs a reason). Everything but
+  density (and part modifiers) renders; density is a known regression being fixed.
 - **Plan repair** — deterministic normalisation that drops or adjusts one planned item
   the song cannot hold (an unknown cue is dropped; an event outside its section is moved
   into it) instead of refusing the plan, keeping as much of it as the song allows; recorded in the plan's `repairs`, the trace's `plan_repairs` and the

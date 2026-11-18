@@ -1,0 +1,134 @@
+---
+type: evidence
+status: complete
+area: engineering
+change: 2026_11_12_mh_true_up
+created: 2026-11-18
+updated: 2026-11-18
+---
+
+# W10b/W10c — motif and variation rendered; W10a review fixes
+
+**Provenance.** Implemented by an executor agent on 2026-11-18 in the worktree
+`twinklr-mh-true-up` from `d1125419`, uncommitted; the integrator commits. Plan:
+[w10-arrangement.md](../../plan/w10-arrangement.md) §1 and §3 (the "as built" notes there
+record where the build departs from it). No provider call, no network, no xLights, nothing
+under `~/xlights`, `data/` or `artifacts/`; `make validate` not run (the integrator's).
+Every value is a proposal; nothing here has been viewed (PENDING-OWNER, below).
+
+## W10b/W10c — what was built
+
+- **One resolver** (`sequencer/moving_heads/arrangement.py`), called by the render
+  (`RenderingPipeline._arranged`, over the gate's admission) and by plan repair
+  (`rig_repair._arrangement`, over the offer), so repair and render agree by
+  construction. Rules: [user guide](../../../../docs/user-guide.md#how-a-sections-motif-and-variation-reach-the-lights).
+- **Motif (W10b).** Equal `motif_id`s chain in plan order; the relation comes from the
+  macro thread where it lists the section (a repeated INTRODUCE restates), else VARY where
+  a variation is set, else RESTATE. `normalize_plan` writes the code-owned
+  `PlanSection.motif_relation` and `motif_source_id` (hidden from the planner schema with
+  `SkipJsonSchema`, left out of the plan dump when null, so every existing plan's
+  fingerprint input is unchanged) and records a section no thread lists and a repeated
+  introduction. A plan without them (saved, injected) derives them in plan order at render.
+- **Variation (W10c).** One step on one axis of the reach/rate grid, from the motif
+  source's part at the same index, else (with a step to take) the previous section on the
+  family, else the part's own preset, else the effective variant. A step off the grid, to
+  a variant not admitted, or to a ladder variant that plays as the base here plays the
+  source variant, traced with the reason and recorded by repair. RESOLVE without a
+  variation steps slower, else narrower, else restates.
+- **Repair** (`_arrangement_repairs`, first, before the section repairs that read the
+  resolved variant's phases): steps that cannot play, a named preset the resolution
+  replaces, a named preset not declared or not admitted (review M2), a motif on another
+  template than its source's (only its reach and rate carry), a colour or gobo that differs
+  from the source's (never changed by code).
+- **Trace.** `section_looks[].arrangement` per section with a motif or variation:
+  `{"motif": {id, relation, source?}, "variation": {asked, relative_to, from, plays,
+  named?, reason?}}`. `_unrendered_intent_message` now names density and modifiers only.
+- **Prompts.** Planner `developer.j2` says what renders; planner `user.j2` adds two lines
+  (the variation rule with the variants a template does *not* play on this rig and song,
+  and a variation variant's first dark moment where it differs); judge `developer.j2` and
+  `user.j2` item 4 say what a restatement and a one-step variation are.
+- **RENDERER_REVISION 13.**
+
+**Parity rows: not added (pushback).** The parity baseline holds only the old renderer's
+facts, and the old renderer never rendered motif or variation, so there is no parity row
+to add. In their place: the pins (`tests/regression/test_mh_pins.py`) were re-recorded
+fingerprint-only with every frame unchanged, and the new tests below pin the new behaviour.
+
+## W10a review fixes (listed apart)
+
+- **H1 — dark entries and dark windows per variant.** `RigOffer.dark_entries` is again the
+  ladder's (base, `narrow`, `slow`) claim, exactly 1eca8998's; each pair involving a
+  variation variant has its own claim in `RigOffer.variant_dark_entries`
+  (`successor → predecessor → "pv>sv"`), read through `RigOffer.dark_entry_heads(...)`
+  with the variants the plan plays. The prompt's dark windows are the ladder's; a
+  variation variant whose first dark moment differs gets one added line.
+- **M1 — a variant that plays as its base.** The gate compiles each variant as a section
+  after a bar of its own base, entered as the render enters a section, two cycles of the
+  longer of the two long, and compares the encoded frames with the base's (on all 72
+  reviewer rig × grid cases the result equals a whole-song comparison). A variation variant that matches is not offered
+  (`preset_exclusions`: "plays the same as base here"; never a refusal, even for a
+  template that is not excludable); a ladder variant that matches stays admitted as before
+  (the ladder is unchanged) and is listed in `TemplateOffer.plays_as_base`, which no
+  variation steps to. On the tagged rig at 78, 120 and 170 BPM the only such variant is
+  `finite_snap_hold`'s `fast`; on 220°/s heads at 240 BPM, also its `slow` (ladder).
+- **M2 — a named preset the gate did not admit** is recorded and fed back ("…: the part
+  plays its effective variant"), as is one the template does not declare.
+  `stage.py:581` does not conflict with the no-refusal rule: it refuses only a
+  regeneration whose *injected base plan* names a template or preset this run's gate did
+  not admit (the kept sections would not render as injected), never planner output. One
+  consequence for the integrator: it checks named presets, not resolved variants, so a
+  kept motif carrier can resolve differently when its source section is the one being
+  regenerated (traced; not refused).
+- **M3 — entry dips per variant.** `TemplateAdmission.entry_dips` is the ladder's, entered
+  from the ladder alone (1eca8998's numbers); `variant_entry_dips[t][variant]` gives every
+  passing variant's dip entered from any passing variant, variation variants included
+  (what a plan playing one enters through).
+- **LOW — `_lit_move_record` left as is.** A truthful narrower rule needs each template's
+  peak lit speed as well as the pose envelope the offer publishes; with the envelope alone
+  any narrower rule would under-warn on some pair. Unchanged from d1125419.
+
+## Verification
+
+| Check | Result |
+|---|---|
+| New tests `tests/unit/sequencer/moving_heads/test_arrangement_render.py` | 56 (resolver rules, multi-part, off-grid / not admitted / plays-as-base, default identity, byte change per family × variation over all seven families, repair = render on two plans × 2 tempos × 2 head speeds, M1, M2, H1/M3 ladder equality, per-pair dark entries, motif-thread records) |
+| Full suite, ruff, format, mypy | see the hand-back (fresh output) |
+| Reviewer `prompt_compare` (3 rigs × 4 grids) vs 1eca8998 | 0 changed fields other than the two new keys |
+| Planner user prompt, owner-like rig, short-grid song | 10,471 → 11,270 chars (+799, two added lines, no existing line changed) |
+| Reviewer `repro_dark_entries` | identical to 1eca8998's output |
+| Reviewer `repro_unadmitted` | each case now recorded by repair; frames unchanged |
+| Reviewer `gate_compare` (72 rig × grid) vs 1eca8998 | admitted, effective, ladder presets and exclusions, entry dips, dark entries identical; differences only in the new variants and the offer's new fields |
+| Reviewer `underwarn` (3 rigs) vs d1125419 | identical |
+| Repair sweep, 20,736 plans with no motif/variation (3 rigs × 4 grids × 6×6 families × colour × 4 transitions × 3 presets × event) | vs 1eca8998: sections identical; records differ only by d1125419's LOW-4 lit-move records and the new M2 records (96, `masked_wheel_flick` `narrow` not admitted); vs d1125419 the H1 dark-entry records return to 1eca8998's |
+| Byte matrix (567 configs, 13,041 renders) vs d1125419 | frames, segments, `.xsq`, `.xmap`, `.xtiming` identical; normalised trace and render record identical; raw trace and record differ by the revision and fingerprint; gate data differs by the H1/M3 numbers (back to 1eca8998's) and M1 |
+| Gate wall time vs d1125419 (`gate_time.py`, six rigs, one machine, back to back) | 1.10–1.40× (owner-like 62 bars: 16.6 → 18.1 s) |
+
+## The owner song's saved plan
+
+`11_need_a_favor` (`final.json`, read in place, not copied) carries `spiral` on verse_2,
+chorus_1 (WIDEN), break (FASTER) and chorus_2 (WIDEN, two parts); no section names a
+preset. It exercises motif and variation as saved: no fresh paid plan is needed for these.
+Its saved admission predates W10a, so the render must re-run the gate (with it, every
+step would be refused as not admitted). Expected with a gate that admits the steps:
+verse_2 base, chorus_1 `wide`, break `wide+fast`, chorus_2 both parts `wide+fast` (WIDEN
+off the grid, traced). It never shows a RESTATE, a RESOLVE, a same-template motif or a
+named preset replaced.
+
+## M1 design note (not built): carrying rate on the snap family
+
+`finite_snap_hold` lifts once in a beat and holds; entered after any section the lift is
+inside the dark entry window, so its rate is invisible and the gate rightly drops `fast`.
+Options for the owner: (a) rate as re-snap period, a LOOP of snaps to a small pose bank
+every bar (base), two bars (`slow`), half a bar (`fast`), which makes rate the visible
+thing but changes the family from one move to a pattern; (b) rate on the hold, the dimmer
+settling or pulsing at the variant's period after the lift; (c) leave snap rate-less and
+offer reach only. (a) is the most legible; it is a catalog change with a gate re-run.
+
+## PENDING-OWNER
+
+1. Look: does a WIDEN / FASTER restatement read as "the same idea, bigger / quicker"
+   across templates (chorus_1 → break → chorus_2 on the owner song)?
+2. Look: is "only reach and rate carry a motif across templates" enough to read as a motif?
+3. Look: the off-grid case (WIDEN from `wide+fast` plays `wide+fast`): acceptable, or step
+   the other axis?
+4. The snap family's rate (design note above).

@@ -34,7 +34,7 @@ from itertools import pairwise
 import math
 from typing import TYPE_CHECKING, Any, Literal, Protocol, get_args
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.config.fixtures.capabilities import FixtureCapabilities, StrobeSpeed
 from twinklr.core.config.fixtures.state_tags import (
@@ -551,6 +551,9 @@ class TemplateOffer(BaseModel):
     variant_excluded: dict[str, dict[str, dict[str, tuple[str, ...]]]] = {}
     """Per variation variant off the ladder (`pipeline.VARIATION_PRESETS`), the states it
     cannot hold beyond `excluded`, per fixture and wheel (left out when none)."""
+    plays_as_base: tuple[str, ...] = Field(default=(), exclude_if=lambda value: not value)
+    """Ladder variants (`narrow`, `slow`) that play the same frames as the base here: still
+    played where a section names one, never a variation's step (left out when none)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -600,6 +603,10 @@ class RigOffer(BaseModel):
     always enter it dark after that template (the gate's check, on every pair of their
     admitted variants, from each bar of the predecessor's cycle): a wheel change there
     rides the entry and needs no dip (empty without a gate)."""
+    variant_dark_entries: dict[str, dict[str, dict[str, tuple[str, ...]]]] = {}
+    """The same per pair of variants where either is a variation variant, keyed
+    `"<predecessor variant>><successor variant>"` (`base` for no preset): the heads that
+    always enter for that pair (`dark_entry_heads` reads the right one)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -641,6 +648,29 @@ class RigOffer(BaseModel):
             update={"heads": tuple(h.without(excluded.get(h.fixture_id, {})) for h in self.heads)}
         )
 
+    def dark_entry_heads(
+        self,
+        successor: str,
+        predecessor: str,
+        successor_variant: str = "base",
+        predecessor_variant: str = "base",
+    ) -> tuple[str, ...]:
+        """The heads that always enter `successor` dark after `predecessor`, for the
+        variants each plays: the ladder's claim (over every pair of ladder variants) unless
+        either plays a variation variant, which has its own."""
+        from twinklr.core.sequencer.moving_heads.arrangement import VARIATION_PRESETS
+
+        if (
+            successor_variant not in VARIATION_PRESETS
+            and predecessor_variant not in VARIATION_PRESETS
+        ):
+            return self.dark_entries.get(successor, {}).get(predecessor, ())
+        return (
+            self.variant_dark_entries.get(successor, {})
+            .get(predecessor, {})
+            .get(f"{predecessor_variant}>{successor_variant}", ())
+        )
+
     def color(self, color: str) -> ColorOffer:
         """`color_offer` on this rig."""
         return color_offer(self.heads, color)
@@ -668,6 +698,7 @@ def rig_offer(
     beat_grid: BeatGrid,
     templates: Mapping[str, TemplateOffer] | None = None,
     dark_entries: Mapping[str, Mapping[str, Sequence[str]]] | None = None,
+    variant_dark_entries: Mapping[str, Mapping[str, Mapping[str, Sequence[str]]]] | None = None,
 ) -> RigOffer:
     """The rig's offer for one song (`RigOffer`); `templates` and `dark_entries` from the
     gate."""
@@ -756,6 +787,13 @@ def rig_offer(
         dark_entries={
             t: {before: tuple(heads) for before, heads in after.items()}
             for t, after in (dark_entries or {}).items()
+        },
+        variant_dark_entries={
+            t: {
+                before: {pair: tuple(heads) for pair, heads in pairs.items()}
+                for before, pairs in after.items()
+            }
+            for t, after in (variant_dark_entries or {}).items()
         },
     )
 
@@ -919,6 +957,9 @@ def _shown(offer: ColorOffer) -> str:
     return "; ".join(f"{state} on {', '.join(heads)}" for state, heads in by_state.items())
 
 
+_GRID_ORDER = ("wide", "fast", "narrow+slow", "narrow+fast", "wide+slow", "wide+fast")
+
+
 def offer_for_prompt(
     offer: RigOffer,
     palettes: Mapping[str, SectionPalette],
@@ -992,18 +1033,54 @@ def offer_for_prompt(
             grouped[state.available].append(name + heads)
         return grouped
 
+    from twinklr.core.sequencer.moving_heads.arrangement import VARIATION_PRESETS
+
     windows = []
+    variant_windows = []
     if offer.wheel_change_ms is not None and offer.beat_ms:
         needed = offer.wheel_change_ms / offer.beat_ms
+
+        def first(phases: DarkPhases) -> float | None:
+            return min(
+                (
+                    start
+                    for fixture_id in phases.heads
+                    if (start := phases.first_window(fixture_id, needed)) is not None
+                ),
+                default=None,
+            )
+
         for template_id, template in offer.templates.items():
-            starts = [
-                start
-                for phases in template.variants.values()
-                for fixture_id in phases.heads
-                if (start := phases.first_window(fixture_id, needed)) is not None
+            # The ladder's variants (what plays unless a section varies it), then each
+            # variation variant whose first window opens elsewhere.
+            ladder = [
+                at
+                for name, ladder_phases in template.variants.items()
+                if name not in VARIATION_PRESETS and (at := first(ladder_phases)) is not None
             ]
-            if starts:
-                windows.append(f"{template_id} (from beat {round_beats(min(starts))} of its cycle)")
+            if ladder:
+                windows.append(f"{template_id} (from beat {round_beats(min(ladder))} of its cycle)")
+            for name, variant_phases in template.variants.items():
+                at = first(variant_phases)
+                if (
+                    name in VARIATION_PRESETS
+                    and at is not None
+                    and (not ladder or at != min(ladder))
+                ):
+                    variant_windows.append(f"{template_id} {name} from beat {round_beats(at)}")
+    grid = ("base", "narrow", "slow", *sorted(VARIATION_PRESETS, key=_GRID_ORDER.index))
+    variations = [
+        {
+            "template_id": template_id,
+            "missing": [
+                name
+                for name in grid
+                if name not in template.variants or name in template.plays_as_base
+            ],
+        }
+        for template_id, template in offer.templates.items()
+        if any(name in VARIATION_PRESETS for name in template.variants)
+    ]
     exclusions = []
     for template_id, template in offer.templates.items():
         states = sorted(
@@ -1019,6 +1096,8 @@ def offer_for_prompt(
                 {"template_id": template_id, **wheel_event_beats(phases, offer.beat_ms)}
             )
     return {
+        "variant_windows": variant_windows,
+        "variations": variations,
         "colors": colors,
         "color_wheel": any(head.color_wheel for head in offer.heads),
         "colors_tagged": offer.offers_colors(),

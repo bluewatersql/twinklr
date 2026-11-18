@@ -176,6 +176,7 @@ def _recorded_render(render: dict[str, Any]) -> RecordedRender:
             preset_exclusions=tuple(admission["preset_exclusions"]),
             entry_dips=dict(admission["entry_dips"]),
             offer=RigOffer.model_validate(admission["offer"]),
+            variant_entry_dips=dict(admission.get("variant_entry_dips", {})),
         ),
     )
 

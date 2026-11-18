@@ -32,6 +32,12 @@ from twinklr.core.sequencer.models.transition import (
     TransitionEdge,
     TransitionLength,
 )
+from twinklr.core.sequencer.moving_heads.arrangement import (
+    BASE,
+    SectionArrangement,
+    options_from_variants,
+    resolve_arrangement,
+)
 from twinklr.core.sequencer.moving_heads.events import (
     HIT_LATE_FRAMES,
     HIT_MIN_LIT_FRAMES,
@@ -88,24 +94,182 @@ def _canonical(template_id: str) -> str:
         return template_id
 
 
+def _arrangement(plan: ChoreographyPlan, offer: RigOffer) -> dict[str, SectionArrangement]:
+    """The render's motif relations and resolved variants (`arrangement`), over the
+    gate's admitted variants (`RigOffer.templates`)."""
+    from twinklr.core.sequencer.moving_heads.templates import get_template
+
+    def declared(template_id: str) -> list[str]:
+        try:
+            return [preset.preset_id for preset in get_template(template_id).presets]
+        except Exception:  # an unknown template is the validator's to report
+            return []
+
+    return resolve_arrangement(
+        plan,
+        options_from_variants(
+            {t: list(template.variants) for t, template in offer.templates.items()},
+            declared,
+            {t: template.plays_as_base for t, template in offer.templates.items()},
+        ),
+        canonical=_canonical,
+    )
+
+
+def _entry_heads(
+    offer: RigOffer,
+    played: Mapping[tuple[str, int], str] | None,
+    before: PlanSection,
+    after: PlanSection,
+) -> tuple[str, ...]:
+    """The heads that always enter `after`'s first part dark after `before`'s last, for
+    the variants they play (`RigOffer.dark_entry_heads`; a part no motif or variation
+    resolves reads the ladder's claim)."""
+    return offer.dark_entry_heads(
+        _canonical(after.parts[0].template_id),
+        _canonical(before.parts[-1].template_id),
+        (played or {}).get((after.section_id, 0), BASE),
+        (played or {}).get((before.section_id, len(before.parts) - 1), BASE),
+    )
+
+
+def _arrangement_repairs(
+    plan: ChoreographyPlan, offer: RigOffer, arranged: Mapping[str, SectionArrangement]
+) -> list[PlanRepair]:
+    """What the render plays differently from what a section's motif, variation or preset
+    asks, recorded for the planner: a variation step that cannot play (off the grid, or
+    not admitted here: the part plays its source's variant); a named preset the
+    resolution replaces, or one the gate did not admit or the template does not declare;
+    a motif carried onto another template than its source's (only its reach and rate
+    carry it); a colour or gobo that differs from the motif's source (never overwritten)."""
+    from twinklr.core.sequencer.moving_heads.templates import get_template
+
+    repairs: list[PlanRepair] = []
+    sections = {section.section_id: section for section in plan.sections}
+
+    def note(section_id: str, item: str, reason: str) -> None:
+        repairs.append(
+            PlanRepair(
+                section_id=section_id, item=item, action=RepairAction.RECORDED, reason=reason
+            )
+        )
+
+    for section in plan.sections:
+        arrangement = arranged.get(section.section_id)
+        for index, part in enumerate(section.parts):
+            template_id = _canonical(part.template_id)
+            variant = None if arrangement is None else arrangement.parts[index]
+            label = f"part {index + 1} ({template_id})"
+            if variant is not None:
+                if variant.reason:
+                    note(
+                        section.section_id,
+                        f"{label} variation {variant.asked}",
+                        f"from {variant.source} ({variant.relative_to}): {variant.reason}; it "
+                        f"plays {variant.plays}",
+                    )
+                if part.preset_id and part.preset_id != variant.preset_id:
+                    note(
+                        section.section_id,
+                        f"{label} preset {part.preset_id}",
+                        f"the section's motif and variation resolve this part to "
+                        f"{variant.plays} ({variant.relative_to}), which plays instead",
+                    )
+                continue
+            if not part.preset_id:
+                continue
+            template = offer.templates.get(template_id)
+            try:
+                declared = {p.preset_id for p in get_template(part.template_id).presets}
+            except Exception:  # an unknown template is the validator's to report
+                continue
+            if part.preset_id not in declared:
+                why = f"{template_id} declares no preset {part.preset_id!r}"
+            elif template is not None and part.preset_id not in template.variants:
+                why = (
+                    f"the pre-planning check did not admit {template_id}'s "
+                    f"{part.preset_id!r} on this rig and song"
+                )
+            else:
+                continue
+            effective = next(iter(template.variants), BASE) if template is not None else BASE
+            note(
+                section.section_id,
+                f"{label} preset {part.preset_id}",
+                f"{why}: the part plays its effective variant ({effective})",
+            )
+        if arrangement is None or arrangement.source_id is None:
+            continue
+        source = sections.get(arrangement.source_id)
+        if source is None:
+            continue
+        motif = f"motif {arrangement.motif_id}"
+        for index, part in enumerate(section.parts):
+            source_part = source.parts[min(index, len(source.parts) - 1)]
+            if _canonical(source_part.template_id) != _canonical(part.template_id):
+                variant = arrangement.parts[index]
+                note(
+                    section.section_id,
+                    motif,
+                    f"part {index + 1} plays {_canonical(part.template_id)}, its source "
+                    f"{arrangement.source_id!r} {_canonical(source_part.template_id)}: only "
+                    f"its reach and rate ({variant.plays if variant else BASE}) carry the motif",
+                )
+        for field_name in ("color", "gobo"):
+            mine, theirs = getattr(section, field_name), getattr(source, field_name)
+            if mine != theirs:
+                note(
+                    section.section_id,
+                    motif,
+                    f"its {field_name} ({_spelled(mine)}) differs from its source "
+                    f"{arrangement.source_id!r}'s ({_spelled(theirs)}); a motif's {field_name} "
+                    "is never changed by code",
+                )
+    return repairs
+
+
+def _spelled(value: object) -> str:
+    return "as_authored" if value is None else str(getattr(value, "value", value))
+
+
 def section_offer(offer: RigOffer, section: PlanSection) -> RigOffer:
     """The offer for a section's first part: without the states its template cannot hold
     (`RigOffer.for_templates`). A boundary is entered through the first part."""
     return offer.for_templates({_canonical(section.parts[0].template_id)})
 
 
-def _parts(offer: RigOffer, section: PlanSection) -> list[tuple[str, int, int, RigOffer]]:
-    """Each part of the section: its canonical template, its bars and its offer."""
-    out = []
-    for part, start, end in section.part_bars():
+_Part = tuple[str, int, int, RigOffer, "str | None"]
+"""A section's part as repair reads it: its canonical template, its bars, its offer (for
+the variant it plays) and, where its motif or variation resolves it, that variant."""
+
+
+def _parts(
+    offer: RigOffer,
+    section: PlanSection,
+    played: Mapping[tuple[str, int], str] | None = None,
+) -> list[_Part]:
+    """Each part of the section: its canonical template, its bars, its offer and, where
+    its motif or variation resolves it (`played`, by section and part index), the variant
+    it plays."""
+    out: list[_Part] = []
+    for index, (part, start, end) in enumerate(section.part_bars()):
         template_id = _canonical(part.template_id)
-        out.append((template_id, start, end, offer.for_templates({template_id})))
+        variant = (played or {}).get((section.section_id, index))
+        out.append(
+            (
+                template_id,
+                start,
+                end,
+                offer.for_templates({template_id}, None if variant in (None, BASE) else variant),
+                variant,
+            )
+        )
     return out
 
 
 def _judge(
     offer: RigOffer,
-    parts: Sequence[tuple[str, int, int, RigOffer]],
+    parts: Sequence[_Part],
     asked: str,
     unavailable: Sequence[bool],
     missing: Sequence[Sequence[str]],
@@ -177,10 +341,20 @@ def repair_rig_intent(
     and the render trace records what plays. Each repair is appended to `plan.repairs`.
     """
     repairs = list(plan.repairs)
+    # Fixed order: the motif relations and the variant each part plays first, so every
+    # later repair reads the variant the render plays.
+    arranged = _arrangement(plan, offer)
+    played = {
+        (section_id, index): variant.plays
+        for section_id, arrangement in arranged.items()
+        for index, variant in enumerate(arrangement.parts)
+        if variant is not None
+    }
+    repairs += _arrangement_repairs(plan, offer, arranged)
     sections: list[PlanSection] = []
     for section in plan.sections:
         palette = palettes.get(section.section_id)
-        parts = _parts(offer, section)
+        parts = _parts(offer, section, played)
         update: dict[str, Any] = {}
 
         def note(
@@ -190,10 +364,8 @@ def repair_rig_intent(
                 PlanRepair(section_id=section_id, item=item, action=action, reason=reason)
             )
 
-        def colour_verdict(
-            hex_: str, among: Sequence[tuple[str, int, int, RigOffer]] = parts
-        ) -> tuple[str, str] | None:
-            shown = [rig.color(hex_) for *_, rig in among]
+        def colour_verdict(hex_: str, among: Sequence[_Part] = parts) -> tuple[str, str] | None:
+            shown = [rig.color(hex_) for _, _, _, rig, _ in among]
             return _judge(
                 offer,
                 among,
@@ -205,10 +377,8 @@ def repair_rig_intent(
                 unshown_color_reason(among[0][3]),
             )
 
-        def gobo_verdict(
-            pattern: str, among: Sequence[tuple[str, int, int, RigOffer]] = parts
-        ) -> tuple[str, str] | None:
-            shown = [rig.gobo(pattern) for *_, rig in among]
+        def gobo_verdict(pattern: str, among: Sequence[_Part] = parts) -> tuple[str, str] | None:
+            shown = [rig.gobo(pattern) for _, _, _, rig, _ in among]
             return _judge(
                 offer,
                 among,
@@ -313,8 +483,10 @@ def repair_rig_intent(
             note(item, RepairAction.RECORDED, reason)
         sections.append(section.model_copy(update=update) if update else section)
     if beat_grid is not None:
-        repairs += _boundary_repairs(sections, offer, palettes, beat_grid)
-        sections, transition_repairs = _transition_repairs(sections, offer, palettes, beat_grid)
+        repairs += _boundary_repairs(sections, offer, palettes, beat_grid, played)
+        sections, transition_repairs = _transition_repairs(
+            sections, offer, palettes, beat_grid, played
+        )
         repairs += transition_repairs
     if len(repairs) == len(plan.repairs):
         return plan
@@ -324,7 +496,7 @@ def repair_rig_intent(
 def _event_records(
     section: PlanSection,
     events: Sequence[PlanEvent],
-    parts: Sequence[tuple[str, int, int, RigOffer]],
+    parts: Sequence[_Part],
     offer: RigOffer,
     beat_grid: BeatGrid | None,
     palette: SectionPalette | None = None,
@@ -499,17 +671,21 @@ SHUTTER_KINDS = frozenset(
 )
 
 
-def _part_at(
-    parts: Sequence[tuple[str, int, int, RigOffer]], bar: int
-) -> tuple[str, int, int, RigOffer] | None:
+def _part_at(parts: Sequence[_Part], bar: int) -> _Part | None:
     return next((p for p in parts if p[1] <= bar <= p[2]), None)
 
 
-def _phases(offer: RigOffer, template_id: str) -> DarkPhases | None:
+def _phases(offer: RigOffer, template_id: str, variant: str | None = None) -> DarkPhases | None:
+    """A template's published dark phases: for the variant a part's motif or variation
+    resolves it to (`variant`), else its base's (else its first admitted variant's)."""
     template = offer.templates.get(template_id)
     if template is None or not template.variants:
         return None
-    phases = template.variants.get("base") or next(iter(template.variants.values()))
+    phases = (
+        (template.variants.get(variant) if variant is not None else None)
+        or template.variants.get("base")
+        or next(iter(template.variants.values()))
+    )
     return phases if phases.cycle_beats > 0 else None
 
 
@@ -535,7 +711,7 @@ def _head_wheel_turn(
     fixture_id: str,
     change: int | None,
     index: int,
-    part: tuple[str, int, int, RigOffer],
+    part: _Part,
     offer: RigOffer,
     beat_grid: BeatGrid,
     closed_from: Sequence[tuple[float, float]],
@@ -565,7 +741,7 @@ def _head_wheel_turn(
         # boundary (the section's boundaries record says how).
         return 0.0, None, None
     before = at - beats[index - 1] if index > 0 else (offer.beat_ms or 0.0)
-    phases = _phases(offer, part[0])
+    phases = _phases(offer, part[0], part[4])
     windows: list[tuple[float, float]] = []
     position = 0.0
     if phases is not None and start_index is not None:
@@ -606,7 +782,7 @@ def _head_wheel_turn(
 def _wheel_plays(
     event: PlanEvent,
     index: int,
-    parts: Sequence[tuple[str, int, int, RigOffer]],
+    parts: Sequence[_Part],
     offer: RigOffer,
     palette: SectionPalette | None,
     beat_grid: BeatGrid,
@@ -753,7 +929,7 @@ def _beat_length(beats: Sequence[float], index: int) -> float:
 
 def _dark_heads_on(
     index: int,
-    parts: Sequence[tuple[str, int, int, RigOffer]],
+    parts: Sequence[_Part],
     offer: RigOffer,
     beat_grid: BeatGrid,
     beat_ms: float | None,
@@ -767,7 +943,7 @@ def _dark_heads_on(
     played."""
     position_ = beat_grid.bar_and_beat(index)
     part = None if position_ is None else _part_at(parts, position_[0])
-    phases = None if part is None else _phases(offer, part[0])
+    phases = None if part is None else _phases(offer, part[0], part[4])
     start_index = None if part is None else beat_grid.beat_index(part[1], 1)
     if part is None or phases is None or start_index is None:
         return None
@@ -789,7 +965,7 @@ def _dark_heads_on(
 def _hit_move(
     event: PlanEvent,
     index: int,
-    parts: Sequence[tuple[str, int, int, RigOffer]],
+    parts: Sequence[_Part],
     offer: RigOffer,
     beat_grid: BeatGrid,
     wheel_leads: Sequence[tuple[float, float]],
@@ -866,6 +1042,7 @@ def _boundary_repairs(
     offer: RigOffer,
     palettes: Mapping[str, SectionPalette],
     beat_grid: BeatGrid,
+    variants: Mapping[tuple[str, int], str] | None = None,
 ) -> list[PlanRepair]:
     """The colour changes between consecutive sections that set colours which the render
     may not play from the boundary (see `repair_rig_intent`), one record per section;
@@ -885,9 +1062,7 @@ def _boundary_repairs(
         new = played = _head_colors(after, offer, palettes.get(after.section_id))
         successor = _canonical(after.parts[0].template_id)
         # Heads that always enter dark after the previous template turn in the entry.
-        dark = offer.dark_entries.get(successor, {}).get(
-            _canonical(before.parts[-1].template_id), ()
-        )
+        dark = _entry_heads(offer, variants, before, after)
         heads = sorted(f for f in new if f in old and old[f] != new[f] and f not in dark)
         if not heads or after.start_bar - 1 >= len(bars):
             continue
@@ -903,7 +1078,7 @@ def _boundary_repairs(
         template = offer.templates.get(successor)
         variant = None
         if template is not None:
-            preset = after.parts[0].preset_id
+            preset = (variants or {}).get((after.section_id, 0)) or after.parts[0].preset_id
             variant = template.variants.get(preset or "base") or next(
                 iter(template.variants.values()), None
             )
@@ -981,6 +1156,7 @@ def _transition_repairs(
     offer: RigOffer,
     palettes: Mapping[str, SectionPalette],
     beat_grid: BeatGrid,
+    played: Mapping[tuple[str, int], str] | None = None,
 ) -> tuple[list[PlanSection], list[PlanRepair]]:
     """Each boundary's transition as the render plays it (`transitions`), for the planner:
 
@@ -1108,7 +1284,7 @@ def _transition_repairs(
             outgoing, incoming = (
                 (other, section) if kept.edge is TransitionEdge.ENTRY else (section, other)
             )
-            for said in _plays_nothing(kept, outgoing, incoming, offer):
+            for said in _plays_nothing(kept, outgoing, incoming, offer, played):
                 note(RepairAction.RECORDED, said)
             for said in _yields_to_events(kept, outgoing, incoming, beat_grid, offer):
                 note(RepairAction.RECORDED, said)
@@ -1148,6 +1324,7 @@ def _plays_nothing(
     outgoing: PlanSection | None,
     incoming: PlanSection | None,
     offer: RigOffer,
+    played: Mapping[tuple[str, int], str] | None = None,
 ) -> list[str]:
     """Where a `snap` is the plain cut, the frames the render plays without it: the song's
     first ENTRY (the heads rest dark before it and are moved into place in the dark before
@@ -1163,7 +1340,7 @@ def _plays_nothing(
     if outgoing is None or incoming is None:
         return []
     after, before = incoming.parts[0].template_id, outgoing.parts[-1].template_id
-    dark = offer.dark_entries.get(_canonical(after), {}).get(_canonical(before), ())
+    dark = _entry_heads(offer, played, outgoing, incoming)
     if not dark:
         return []
     return [

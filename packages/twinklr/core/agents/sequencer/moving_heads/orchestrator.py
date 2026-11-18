@@ -40,6 +40,7 @@ from twinklr.core.agents.shared.judge.controller import (
 )
 from twinklr.core.agents.shared.judge.feedback import FeedbackManager
 from twinklr.core.agents.spec import AgentSpec
+from twinklr.core.sequencer.moving_heads.arrangement import with_motif_relations
 
 logger = logging.getLogger(__name__)
 
@@ -178,9 +179,19 @@ def build_judge_variables(
 def normalize_plan(plan: ChoreographyPlan, context: MovingHeadPlanningContext) -> ChoreographyPlan:
     """What runs on every planner response before validation: canonical section ids, the
     lyric cues bound to their beats and single items the song cannot hold repaired
-    (`bind_lyric_moment_cues`), then the colours and gobos the rig cannot show repaired
-    (`repair_rig_intent`, when the run has the gate's offer)."""
+    (`bind_lyric_moment_cues`), each motif section's relation and source written from the
+    macro motif threads (`arrangement.with_motif_relations`), then what the rig cannot
+    show repaired (`repair_rig_intent`, when the run has the gate's offer)."""
     plan = bind_lyric_moment_cues(plan, context.lyric_context, context.beat_grid, context.sections)
+    threads = (
+        None
+        if context.macro_plan is None
+        else {
+            thread.motif_id: (list(thread.section_ids), thread.evolution.value)
+            for thread in context.macro_plan.motif_continuity
+        }
+    )
+    plan = with_motif_relations(plan, threads)
     if context.rig_offer is None:
         return plan
     return repair_rig_intent(plan, context.rig_offer, context.palettes, context.beat_grid)

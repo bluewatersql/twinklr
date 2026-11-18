@@ -56,6 +56,14 @@ from twinklr.core.sequencer.models.moving_heads.topology import rig_topology
 from twinklr.core.sequencer.models.template import RepeatMode
 from twinklr.core.sequencer.models.transition import TransitionEdge
 from twinklr.core.sequencer.moving_heads import render_log
+from twinklr.core.sequencer.moving_heads.arrangement import (
+    BASE,
+    VARIATION_PRESETS,
+    PartVariant,
+    SectionArrangement,
+    options_from_variants,
+    resolve_arrangement,
+)
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.preposition import (
     FALLBACK_METADATA_KEY,
@@ -1205,15 +1213,6 @@ def _swap_wheels(
     return cue.model_copy(update={"channels": channels})
 
 
-VARIATION_PRESETS = frozenset(
-    {"wide", "fast", "narrow+slow", "narrow+fast", "wide+slow", "wide+fast"}
-)
-"""The catalog's variation variants beyond `narrow` and `slow` (song-intent W10a): reach
-`narrow|wide` by rate `slow|fast` and their combinations. Each is dry-compiled and offered
-when it passes, but none is ever a template's effective variant: they ask for more reach
-or rate, or would admit a template its ladder (base, `narrow`, `slow`) refuses."""
-
-
 @dataclass(frozen=True)
 class TemplateAdmission:
     """What the pre-planning gate offers the planner (`admit_templates`).
@@ -1245,6 +1244,13 @@ class TemplateAdmission:
     preset_exclusions: tuple[dict[str, str | None], ...]
     entry_dips: dict[str, dict[str, Any]]
     offer: RigOffer
+    variant_entry_dips: dict[str, dict[str, dict[str, Any]]] = field(default_factory=dict)
+    """Per admitted template and each variant it plays (`base` for its base), that
+    variant's own worst-case entry dip entered from any variant that plays, variation
+    variants (`VARIATION_PRESETS`) included: what a plan playing a variation variant
+    enters through. `entry_dips` is the ladder's, entered from the ladder alone: what a
+    plan playing no variation variant enters through. Empty where no variation variant
+    plays."""
 
     def record(self) -> dict[str, Any]:
         """The admission as JSON values, for the plan checkpoint."""
@@ -1499,6 +1505,59 @@ def admit_templates(
         default=None,
     )
     heads = rig_offer(fixture_group, beat_grid).heads
+    # A variant that plays the same frames as its family's base in a section here (placed
+    # after the song's first bar, entered as the render enters a section) would show
+    # nothing: a variation variant is not offered; a ladder variant (`narrow`, `slow`)
+    # stays admitted as before, for a section that names it, and no variation steps to it.
+    entered: dict[tuple[str, str | None, int], list[EncodedFixtureFrame] | None] = {}
+    plays_as_base: dict[str, list[str]] = {}
+    unseen: set[tuple[str, str | None]] = set()  # left out, but never a refusal
+
+    def entered_frames(
+        template_id: str, preset_id: str | None, length: int
+    ) -> list[EncodedFixtureFrame] | None:
+        if (template_id, preset_id, length) not in entered:
+            entered[template_id, preset_id, length] = _entered_frames(
+                template_id,
+                preset_id,
+                fixtures=fixtures,
+                fixture_group=fixture_group,
+                topology=topology,
+                beat_grid=beat_grid,
+                bars=min(bars, 1 + length),
+                phase_map=phase_map,
+                profiles=profiles,
+                initial_states=initial_states,
+                failure_mode=failure_mode,
+                start_limit_ms=start_limit,
+                end_limit_ms=end_limit,
+                duration_ms=duration_ms,
+            )
+        return entered[template_id, preset_id, length]
+
+    for template_id, preset_id in list(whole_compiles):
+        if (
+            preset_id is None
+            or (template_id, preset_id) in failures
+            or (template_id, None) in failures
+            or (template_id, None) not in whole_compiles
+        ):
+            continue
+        # Two cycles of the longer of the two after the entry bar: a whole-song section
+        # repeats them (a patch applies to every cycle alike), at a fraction of the cost.
+        length = 1 + 2 * math.ceil(
+            max(whole_compiles[template_id, preset_id][3], whole_compiles[template_id, None][3])
+        )
+        variant = entered_frames(template_id, preset_id, length)
+        if variant is None or variant != entered_frames(template_id, None, length):
+            continue
+        if preset_id in VARIATION_PRESETS:
+            failures.setdefault((template_id, preset_id), []).append(
+                f"template {template_id!r}, preset {preset_id!r}: plays the same as base here"
+            )
+            unseen.add((template_id, preset_id))
+        else:
+            plays_as_base.setdefault(template_id, []).append(preset_id)
     excluded = {
         template_id: _overlay_exclusions(
             get_template(template_id),
@@ -1566,7 +1625,13 @@ def admit_templates(
         }
         for template_id in template_ids
     }
-    rungs = {c: per_fixture for c, per_fixture in reach.items() if c not in failures}
+    # The ladder's dips (what a plan that names no variation variant enters through), then
+    # each variation variant's own, from the envelope of every passing rung.
+    rungs = {
+        c: per_fixture
+        for c, per_fixture in reach.items()
+        if c not in failures and c[1] not in VARIATION_PRESETS
+    }
     while True:
         dips, unbounded = _entry_dips(rungs, profiles, initial_states, shortest_beat_ms, offered)
         if not unbounded:
@@ -1587,6 +1652,28 @@ def admit_templates(
         for combination, reason in (certain or unbounded).items():
             failures.setdefault(combination, []).append(reason)
             del rungs[combination]
+    rung_dips: dict[tuple[str, str | None], dict[str, Any]] = {}
+    variation_rungs = {
+        c: per_fixture
+        for c, per_fixture in reach.items()
+        if c not in failures and c[1] in VARIATION_PRESETS
+    }
+    if variation_rungs:
+        _, unbounded = _entry_dips(
+            {**rungs, **variation_rungs},
+            profiles,
+            initial_states,
+            shortest_beat_ms,
+            offered,
+            rung_dips,
+        )
+        for combination, reason in unbounded.items():
+            if combination in variation_rungs:
+                failures.setdefault(combination, []).append(reason)
+    variant_dips: dict[str, dict[str, dict[str, Any]]] = {}
+    for (template_id, preset_id), rung_dip in rung_dips.items():
+        if (template_id, preset_id) not in failures:
+            variant_dips.setdefault(template_id, {})[preset_id or BASE] = rung_dip
     # Each template's rungs, base first, then its presets in declared order; its ladder
     # leaves out the variation variants, which never decide admission or the effective
     # variant.
@@ -1604,7 +1691,12 @@ def admit_templates(
             for reason in failures.get((template_id, preset_id), ())
         ]
 
-    refused = [reason for t in template_ids if t not in excludable for reason in reasons(t)]
+    refused = [
+        reason
+        for t in template_ids
+        if t not in excludable
+        for reason in reasons(t, rungs=[p for p in (None, *presets_of[t]) if (t, p) not in unseen])
+    ]
     if refused:
         raise UnsupportedRenderModeError(
             "the moving-head renderer would offer the planner templates this rig "
@@ -1641,27 +1733,30 @@ def admit_templates(
                 },
                 excluded=excluded.get(t, {}),
                 variant_excluded=variant_excluded.get(t, {}),
+                plays_as_base=tuple(p for p in plays_as_base.get(t, ()) if p in passing[t]),
             )
             for t in admitted
         },
-        # Only song intent changes a wheel at a boundary, so only a rig that offers a
-        # wheel state needs to know where it always enters dark.
-        {}
-        if not any(head.colors or head.gobos for head in heads)
-        else _dark_entries(
-            {t: passing[t] for t in admitted},
-            template_cycles={c: whole_compiles[c][3] for c in whole_compiles},
-            beat_grid=beat_grid,
-            bars=bars,
-            fixtures=fixtures,
-            fixture_group=fixture_group,
-            topology=topology,
-            profiles=profiles,
-            initial_states=initial_states,
-            phase_map=phase_map,
-            failure_mode=failure_mode,
-            start_limit_ms=start_limit,
-            end_limit_ms=end_limit,
+        *(
+            # Only song intent changes a wheel at a boundary, so only a rig that offers a
+            # wheel state needs to know where it always enters dark.
+            ({}, {})
+            if not any(head.colors or head.gobos for head in heads)
+            else _dark_entries(
+                {t: passing[t] for t in admitted},
+                template_cycles={c: whole_compiles[c][3] for c in whole_compiles},
+                beat_grid=beat_grid,
+                bars=bars,
+                fixtures=fixtures,
+                fixture_group=fixture_group,
+                topology=topology,
+                profiles=profiles,
+                initial_states=initial_states,
+                phase_map=phase_map,
+                failure_mode=failure_mode,
+                start_limit_ms=start_limit,
+                end_limit_ms=end_limit,
+            )
         ),
     )
     admitted_presets = {t: tuple(p for p in passing[t] if p is not None) for t in admitted}
@@ -1705,7 +1800,106 @@ def admit_templates(
         preset_exclusions=preset_exclusions,
         entry_dips=dips,
         offer=offer,
+        variant_entry_dips={t: v for t, v in variant_dips.items() if t in admitted},
     )
+
+
+def _entered_frames(
+    template_id: str,
+    preset_id: str | None,
+    *,
+    fixtures: Any,
+    fixture_group: FixtureGroup,
+    topology: Any,
+    beat_grid: BeatGrid,
+    bars: int,
+    phase_map: MusicalPhaseMap,
+    profiles: Mapping[str, FixtureCapabilities],
+    initial_states: Mapping[str, InitialFixtureState],
+    failure_mode: FailureMode,
+    start_limit_ms: int,
+    end_limit_ms: int,
+    duration_ms: int,
+) -> list[EncodedFixtureFrame] | None:
+    """A template variant as a section from bar 2 to bar `bars` plays it after a
+    one-bar section of the same template's base (the commonest place a variation plays:
+    after its own family): compiled, entered as the render enters a section
+    (`_enter_section`, from the heads as that bar leaves them) and encoded over the
+    section;
+    None where it does not compile or the song has a single bar."""
+    from twinklr.core.sequencer.moving_heads.compile.step import CompileError
+    from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
+        UnsupportedRigShapeError,
+    )
+
+    if bars < 2:
+        return None
+    document = get_template(template_id)
+
+    def compiled(
+        preset_id: str | None, start_bar: int, duration_bars: int
+    ) -> tuple[list[FixtureSegment], TemplateCompileContext] | None:
+        preset = next((p for p in document.presets if p.preset_id == preset_id), None)
+        context = TemplateCompileContext(
+            section_id=f"render_preflight_{start_bar}",
+            template_id=document.template.template_id,
+            preset_id=preset_id,
+            fixtures=fixtures,
+            beat_grid=beat_grid,
+            start_bar=start_bar,
+            duration_bars=duration_bars,
+            presets=fixture_group.presets,
+            topology=topology,
+            fixture_group_id=fixture_group.group_id,
+        )
+        try:
+            return list(
+                compile_template(
+                    document.template,
+                    context,
+                    preset,
+                    phase_map=phase_map,
+                    start_limit_ms=start_limit_ms,
+                    end_limit_ms=end_limit_ms,
+                ).segments
+            ), context
+        except (CompileError, PhysicalChannelError, UnsupportedRigShapeError, ValueError):
+            return None
+
+    before = compiled(None, 1, 1)
+    section = compiled(preset_id, 2, bars - 1)
+    if before is None or section is None:
+        return None
+    kept: dict[str, list[HeadFollow]] = defaultdict(list)
+    for fixture_id in {cue.fixture_id for cue in before[0]}:
+        kept[fixture_id] = follow_cues(
+            sorted((c for c in before[0] if c.fixture_id == fixture_id), key=lambda c: c.t0_ms),
+            profiles[fixture_id],
+            frame_ms=EFFECT_GRID_MS,
+        )
+    cues, _, _ = _enter_section(
+        section[0],
+        kept,
+        profiles,
+        initial_states,
+        section_start_ms=section[1].start_ms,
+        phase_map=phase_map,
+        failure_mode=failure_mode,
+    )
+    # The section's frames, up to its last cue's end (the frames after it hold).
+    end_ms = min(duration_ms, max(cue.t1_ms for cue in cues)) if cues else duration_ms
+    times = tuple(t for t in frame_times(end_ms) if t >= section[1].start_ms)
+    by_fixture: dict[str, list[FixtureSegment]] = defaultdict(list)
+    for cue in cues:
+        by_fixture[cue.fixture_id].append(cue)
+    frames: list[EncodedFixtureFrame] = []
+    for fixture_id in sorted(by_fixture):
+        frames.extend(
+            encode_fixture_frames(
+                by_fixture[fixture_id], profiles[fixture_id], frame_times_ms=times
+            )
+        )
+    return frames
 
 
 def _overlay_exclusions(
@@ -1845,12 +2039,16 @@ def _dark_entries(
     failure_mode: FailureMode,
     start_limit_ms: int,
     end_limit_ms: int,
-) -> dict[str, dict[str, tuple[str, ...]]]:
+) -> tuple[dict[str, dict[str, tuple[str, ...]]], dict[str, dict[str, dict[str, tuple[str, ...]]]]]:
     """Per admitted template and admitted predecessor template, the heads that always
     enter it through a dark window after that one (`_enters_lit` false): for every pair
-    of their admitted variants, the predecessor placed from bar 1 and the successor from each bar after
-    it, up to the predecessor's longest cycle (each phase of its cycle the boundary can
-    fall on, at this song's opening tempo). A wheel change there rides the entry."""
+    of their admitted ladder variants (base, `narrow`, `slow`), the predecessor placed
+    from bar 1 and the successor from each bar after it, up to the predecessor's longest
+    cycle (each phase of its cycle the boundary can fall on, at this song's opening
+    tempo). A wheel change there rides the entry. Second, the same per pair of variants
+    where either is a variation variant (`VARIATION_PRESETS`), keyed
+    `"<predecessor variant>><successor variant>"` (`BASE` for no preset): what holds for
+    the variants a plan actually plays."""
     from twinklr.core.sequencer.moving_heads.compile.step import CompileError
     from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
         UnsupportedRigShapeError,
@@ -1889,7 +2087,14 @@ def _dark_entries(
             by_fixture[cue.fixture_id].append(cue)
         return by_fixture
 
-    longest = max((math.ceil(cycle) for cycle in template_cycles.values()), default=1)
+    longest = max(
+        (
+            math.ceil(cycle)
+            for (_, preset_id), cycle in template_cycles.items()
+            if preset_id not in VARIATION_PRESETS
+        ),
+        default=1,
+    )
     starts = range(2, min(bars, 1 + max(longest, 1)) + 1)
     pairs = {(t, p) for t, presets in variants.items() for p in presets}
     entries: dict[tuple[str, str | None], dict[int, dict[str, list[FixtureSegment]] | None]] = {}
@@ -1911,38 +2116,51 @@ def _dark_entries(
             }
         )
 
-    def dark_heads(predecessor: str, successor: str) -> set[str]:
+    def pair_heads(predecessor: str, pp: str | None, successor: str, sp: str | None) -> set[str]:
+        """The heads that always enter `successor` (variant `sp`) dark after
+        `predecessor` (variant `pp`); none where a compile fails."""
+        before_by_bar = follows[predecessor, pp]
+        if before_by_bar is None or not starts:
+            return set()
         heads = set(profiles)
-        for pp in variants[predecessor]:
-            before_by_bar = follows[predecessor, pp]
-            if before_by_bar is None:
+        for b in starts:
+            own_by_fixture = entries[successor, sp][b]
+            if own_by_fixture is None:
                 return set()
-            for sp in variants[successor]:
-                for b in starts:
-                    own_by_fixture = entries[successor, sp][b]
-                    if own_by_fixture is None:
-                        return set()
-                    heads -= {
-                        f
-                        for f, own in own_by_fixture.items()
-                        if f in profiles
-                        and _enters_lit(
-                            own,
-                            before_by_bar[b].get(f, []),
-                            profiles[f],
-                            initial_states.get(f),
-                            failure_mode,
-                        )
-                    }
-        return heads if starts else set()
+            heads -= {
+                f
+                for f, own in own_by_fixture.items()
+                if f in profiles
+                and _enters_lit(
+                    own,
+                    before_by_bar[b].get(f, []),
+                    profiles[f],
+                    initial_states.get(f),
+                    failure_mode,
+                )
+            }
+        return heads
 
     dark: dict[str, dict[str, tuple[str, ...]]] = {}
+    by_pair: dict[str, dict[str, dict[str, tuple[str, ...]]]] = {}
     for successor in variants:
         for predecessor in variants:
-            heads = dark_heads(predecessor, successor)
-            if heads:
+            # The ladder's claim holds for every pair of its variants; a pair with a
+            # variation variant is published on its own.
+            heads = set(profiles)
+            for pp in variants[predecessor]:
+                for sp in variants[successor]:
+                    found = pair_heads(predecessor, pp, successor, sp)
+                    if pp in VARIATION_PRESETS or sp in VARIATION_PRESETS:
+                        if found:
+                            by_pair.setdefault(successor, {}).setdefault(predecessor, {})[
+                                f"{pp or BASE}>{sp or BASE}"
+                            ] = tuple(sorted(found))
+                    else:
+                        heads &= found
+            if heads and starts:
                 dark.setdefault(successor, {})[predecessor] = tuple(sorted(heads))
-    return dark
+    return dark, by_pair
 
 
 def _dark_phases(
@@ -2027,6 +2245,7 @@ def _entry_dips(
     initial_states: Mapping[str, InitialFixtureState],
     shortest_beat_ms: float | None,
     offered: Mapping[str, Mapping[str, Mapping[ChannelName, Collection[str]]]],
+    rung_dips: dict[tuple[str, str | None], dict[str, Any]] | None = None,
 ) -> tuple[dict[str, dict[str, Any]], dict[tuple[str, str | None], str]]:
     """Each template's worst-case section-entry dip, over its rungs in `reach` (keyed by
     template and preset id, None for the base), and each rung without a bound on some
@@ -2040,7 +2259,7 @@ def _entry_dips(
     per template and fixture), so the states offered for any template join the states
     held, and those offered for a rung's template its entry states. A wheel is offered
     only when every one of its states has a known settle, so they never leave a rung
-    without a bound.
+    without a bound. With `rung_dips`, each bounded rung's own dip is written there.
     """
     envelope: dict[str, dict[ChannelName, tuple[float, float]]] = {}
     held: dict[str, dict[ChannelName, set[str]]] = defaultdict(lambda: defaultdict(set))
@@ -2071,6 +2290,7 @@ def _entry_dips(
                 held[fixture_id][channel] |= set(offered_states)
 
     worst: dict[str, tuple[int, str]] = {}
+    per_rung: dict[tuple[str, str | None], tuple[int, str]] = {}
     unbounded: dict[tuple[str, str | None], str] = {}
     for (template_id, preset_id), per_fixture in reach.items():
         found: tuple[int, str] | None = None
@@ -2103,16 +2323,21 @@ def _entry_dips(
             if found is None or bound > found[0]:
                 found = (bound, fixture_id)
         else:
+            if found is not None:
+                per_rung[template_id, preset_id] = found
             if found is not None and (template_id not in worst or found[0] > worst[template_id][0]):
                 worst[template_id] = found
-    dips = {
-        template_id: {
+
+    def dip(bound: int, fixture_id: str) -> dict[str, Any]:
+        return {
             "fixture_id": fixture_id,
             "bound_ms": bound,
             "beats": None if shortest_beat_ms is None else math.ceil(bound / shortest_beat_ms),
         }
-        for template_id, (bound, fixture_id) in worst.items()
-    }
+
+    dips = {template_id: dip(*found) for template_id, found in worst.items()}
+    if rung_dips is not None:
+        rung_dips.update({rung: dip(*found) for rung, found in per_rung.items()})
     return dips, unbounded
 
 
@@ -2430,17 +2655,22 @@ def _section_preset(
     template_doc: TemplateDoc,
     diagnostics: list[MHDiagnostic],
     admission: TemplateAdmission | None,
+    arranged: PartVariant | None = None,
 ) -> TemplatePreset | None:
-    """The preset a flattened section (one part, `flatten_section`) renders: the one its
-    part names, when the template declares it and the pre-planning gate (`admission`,
-    when it ran) did not leave it out; otherwise the template's effective variant (the
-    base without a gate result), with a warning when the part named a preset.
+    """The preset a flattened section (one part, `flatten_section`) renders: where its
+    motif or variation resolves it (`arranged`, `arrangement.resolve_arrangement`), the
+    resolved variant (the trace says why); otherwise the one its part names, when the
+    template declares it and the pre-planning gate (`admission`, when it ran) did not
+    leave it out; otherwise the template's effective variant (the base without a gate
+    result), with a warning when the part named a preset.
 
     An undeclared id is not turned into an energy preset: intensity plays on the dimmer
     (`intensity.shape_section`), never through a preset.
     """
     template_id = template_doc.template.template_id
     declared = {preset.preset_id: preset for preset in template_doc.presets}
+    if arranged is not None:
+        return None if arranged.preset_id is None else declared[arranged.preset_id]
     fallback = None if admission is None else admission.effective_preset.get(template_id)
     (part,) = section.parts
     if not part.preset_id:
@@ -2483,13 +2713,11 @@ def _unrendered_intent_message(section: PlanSection) -> str | None:
     """What of the section's song intent the renderer does not render yet (no renderer
     has); None for a section that sets none of it. Its colour and gobo
     (`song_intent.resolve_section_look`), its intensity (`intensity.shape_section`), its
-    events and their lyric cues (`events`) and its transitions (`transitions`) render, so
-    they are never listed."""
+    events and their lyric cues (`events`), its transitions (`transitions`) and its motif
+    and variation (`arrangement`) render, so they are never listed."""
     names = [
         name
         for name, is_set in (
-            ("motif", section.motif_id is not None),
-            ("variation", section.variation.value != "NONE"),
             ("density", section.density.value != "BALANCED"),
             ("modifiers", any(part.modifiers for part in section.parts)),
         )
@@ -2712,6 +2940,9 @@ class RenderingPipeline:
         self.hit_frames: dict[tuple[str, int], dict[str, int]] = {}
         """Set by `render()`: per plan section and hit (its index in the section's
         events), the frame the hit plays on, per head that plays it."""
+        self._arrangement_cache: (
+            tuple[ChoreographyPlan, dict[str, tuple[SectionArrangement, int]]] | None
+        ) = None
         self.transition_free: RenderingPipeline | None = None
         """Set by a `render()` whose plan has transitions: the same plan rendered without
         them, which the played rule and the hits a transition may not lose are read
@@ -2731,7 +2962,14 @@ class RenderingPipeline:
         substitutions: list[tuple[str, str | None]] = []
         for section in self.iterate_plan_sections(self.choreography_plan):
             (part,) = section.parts
-            preset = _section_preset(section, get_template(part.template_id), [], self.admission)
+            arrangement, index = self._arranged().get(section.section_id, (None, 0))
+            preset = _section_preset(
+                section,
+                get_template(part.template_id),
+                [],
+                self.admission,
+                None if arrangement is None else arrangement.parts[index],
+            )
             rendered = None if preset is None else preset.preset_id
             if rendered != (part.preset_id or None):
                 substitutions.append((section.section_id, rendered))
@@ -3052,7 +3290,14 @@ class RenderingPipeline:
                 template_doc = get_template(part.template_id)
             except Exception as e:
                 raise ValueError(f"Template not found: {part.template_id}") from e
-            preset = _section_preset(section, template_doc, diagnostics, self.admission)
+            arrangement, part_index = self._arranged().get(section.section_id, (None, 0))
+            preset = _section_preset(
+                section,
+                template_doc,
+                diagnostics,
+                self.admission,
+                None if arrangement is None else arrangement.parts[part_index],
+            )
             context = TemplateCompileContext(
                 section_id=section.section_id,
                 template_id=template_doc.template.template_id,
@@ -3459,6 +3704,9 @@ class RenderingPipeline:
                     **played_box[0].final.get(fixture_id, {}),
                 }
             record = _played_record(look.record(), outcomes)
+            if arrangement is not None:
+                # The section's motif relation and the variant this part plays.
+                record["arrangement"] = arrangement.record(part_index)
             if boundaries:
                 for boundary in boundaries:
                     if boundary["fixture_id"] in entered_by and "dark_dip" in boundary:
@@ -4019,6 +4267,40 @@ class RenderingPipeline:
                     f"this head (it plays at {at} ms without the transition)"
                 )
         return lost
+
+    def _arranged(self) -> dict[str, tuple[SectionArrangement, int]]:
+        """Per flattened section (`flatten_section`) of a plan section with a motif or a
+        variation, its plan section's arrangement and the part's index
+        (`arrangement.resolve_arrangement`, over the gate's admitted variants when it ran)."""
+        plan = self.choreography_plan
+        cached = self._arrangement_cache
+        if cached is not None and cached[0] is plan:
+            return cached[1]
+        variants = (
+            {}
+            if self.admission is None
+            else {t: list(offer.variants) for t, offer in self.admission.offer.templates.items()}
+        )
+        arranged = resolve_arrangement(
+            plan,
+            options_from_variants(
+                variants,
+                lambda t: [preset.preset_id for preset in get_template(t).presets],
+                {}
+                if self.admission is None
+                else {
+                    t: offer.plays_as_base for t, offer in self.admission.offer.templates.items()
+                },
+            ),
+            canonical=lambda t: get_template(t).template.template_id,
+        )
+        out: dict[str, tuple[SectionArrangement, int]] = {}
+        for section in plan.sections:
+            if section.section_id in arranged:
+                for index, flat in enumerate(flatten_section(section)):
+                    out[flat.section_id] = (arranged[section.section_id], index)
+        self._arrangement_cache = (plan, out)
+        return out
 
     def _transitions_played(
         self, section_looks: Sequence[dict[str, Any]], free: RenderingPipeline

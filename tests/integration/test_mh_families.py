@@ -343,7 +343,9 @@ def test_in_other_meters_every_family_is_offered_with_both_variants(
     periods. In 2/4, 3/4 and 6/8 a cycle that would end mid-period, or before the flick's
     overlay ends, grows to whole bars that hold it (`whole_period_cycle`), so no family
     jumps at its cycle boundary: every family and variant is admitted, each playing its
-    base when a section names no preset, and each entry dip is reported."""
+    base when a section names no preset, and each entry dip is reported; only the snap's
+    `fast`, which plays as its base after its own base (its lift is inside the dark entry
+    window), is left out, and the gate says so."""
     rig, job = (
         (zoom_rig(HEADS), zoom_job(HEADS)) if zoom else (family_rig(HEADS), family_job(HEADS))
     )
@@ -352,8 +354,19 @@ def test_in_other_meters_every_family_is_offered_with_both_variants(
         admission = _gate(template_ids, _meter_grid(beats_per_bar, 500.0, 10), rig, job)
 
     assert admission.admitted == template_ids
-    assert admission.exclusions == () and admission.preset_exclusions == ()
-    assert admission.admitted_presets == dict.fromkeys(template_ids, _ALL)
+    assert admission.exclusions == ()
+    assert [
+        (e["template_id"], e["preset_id"], e["reason"]) for e in admission.preset_exclusions
+    ] == [
+        (
+            "finite_snap_hold",
+            "fast",
+            "template 'finite_snap_hold', preset 'fast': plays the same as base here",
+        )
+    ]
+    assert admission.admitted_presets == {
+        t: tuple(p for p in _ALL if (t, p) != ("finite_snap_hold", "fast")) for t in template_ids
+    }
     assert admission.effective_preset == dict.fromkeys(template_ids)
     assert admission.entry_dips.keys() == set(template_ids)
 

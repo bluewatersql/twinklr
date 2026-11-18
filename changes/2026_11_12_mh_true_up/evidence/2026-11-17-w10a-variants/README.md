@@ -30,7 +30,9 @@ value is a proposal; the variants' look has not been viewed (PENDING-OWNER).
   phases when it passes (`TemplateOffer.variants`), recorded in `preset_exclusions` and
   logged when it fails.
 - **Offer-wide data, honest per variant.** Entry dips and `dark_entries` are measured over
-  every admitted variant. The overlay exclusions stay over the ladder; a variation
+  every admitted variant. (Superseded by the W10a review fixes H1/M3, 2026-11-18: the
+  ladder's are 1eca8998's again and the variation variants' are published apart;
+  [record](../2026-11-18-w10bc-motif-variation/README.md).) The overlay exclusions stay over the ladder; a variation
   variant's own beyond them is recorded for it (`TemplateOffer.variant_excluded`), and
   `RigOffer.for_templates(ids, variant)` reads it, as the render's colour resolution now
   does for the preset a section plays. None of the synthetic rigs tried produces such an

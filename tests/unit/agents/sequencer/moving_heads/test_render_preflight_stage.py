@@ -451,7 +451,13 @@ async def test_render_stage_records_the_gates_exclusions_in_the_trace(tmp_path: 
     [exclusion] = trace["render"]["admission_exclusions"]
     assert exclusion["template_id"] == "masked_wheel_flick"
     assert _NO_FLICK in exclusion["reason"]
-    assert "admission_preset_exclusions" not in trace["render"]  # none: left out
+    # The one variant left out: the snap's `fast` plays as its base here.
+    [preset_exclusion] = trace["render"]["admission_preset_exclusions"]
+    assert (preset_exclusion["template_id"], preset_exclusion["preset_id"]) == (
+        "finite_snap_hold",
+        "fast",
+    )
+    assert "plays the same as base here" in preset_exclusion["reason"]
 
 
 @pytest.mark.asyncio

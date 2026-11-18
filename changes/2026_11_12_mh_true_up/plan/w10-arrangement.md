@@ -134,6 +134,25 @@ restating section's colour or gobo differs from the source's, repair feeds it ba
 
 **Order.** W10b (motif) lands before W10c (variation resolution), since the source is derived first.
 
+**As built (W10b/W10c, 2026-11-18; evidence
+[2026-11-18-w10bc-motif-variation](../evidence/2026-11-18-w10bc-motif-variation/README.md)).**
+Departures from §1 and §3, each recorded here:
+- *Where.* Repair does not write the resolved variant into `preset_id`. One resolver
+  (`arrangement.resolve_arrangement`) runs in the render and in repair, so they agree by
+  construction, and a saved or injected plan renders its motif and variation without a
+  re-repair. Repair records a named preset the resolution replaces.
+- *No step to take.* An introduced motif, or a section without a motif source, with no
+  variation plays its own preset (not the previous section's variant).
+- *Plays as base.* A ladder variant (`narrow`, `slow`) whose frames equal the base's here
+  stays admitted for a section naming it, but no variation steps to it
+  (`TemplateOffer.plays_as_base`); a variation variant that does is not offered (W10a
+  review M1).
+- *Per-variant data* (W10a review H1, M3): the ladder's entry dips and dark entries are
+  1eca8998's; variation variants' are published apart (`variant_entry_dips`,
+  `variant_dark_entries`), replacing §1's "measured over every admitted variant".
+- *Parity rows* are not added: the parity baseline holds only old-renderer facts and the
+  old renderer never rendered motif or variation; pins and tests stand in.
+
 ## 4. Modifiers (W10e, redesigned against the code; critic M7)
 
 The key stays a free string (integrator decision 6). `direction` via `transform.reverse` is refused
