@@ -59,7 +59,6 @@ from twinklr.core.sequencer.moving_heads import render_log
 from twinklr.core.sequencer.moving_heads.arrangement import (
     BASE,
     VARIATION_PRESETS,
-    GiveWay,
     PartVariant,
     SectionArrangement,
     options_from_variants,
@@ -468,13 +467,45 @@ def _cue_level(cue: FixtureSegment, profile: FixtureCapabilities, time_ms: int) 
 
 
 TRANSITION_PASSES = 3
-
-ARRANGEMENT_PASSES = 4
-"""How many times a plan whose variations worsen its events renders again
-(`RenderingPipeline._settle_arrangement`): each pass moves every section to blame to its
-next candidate (a FASTER step has two; any other step one before its source)."""
 """How many times a render with transitions plays at most: a pass that loses a hit to a
 transition on a head plays again with no transition on that head there."""
+
+
+@dataclass(frozen=True)
+class ArrangementUnit:
+    """One choice the render may make as planned or give up for the song: a section's
+    variation step today; density and modifiers plug in the same way.
+
+    The render builds the arrangement up from the reference (every unit at "reference"),
+    unit by unit in `order` (plan order), trying `candidates` in turn; a candidate is
+    accepted when the whole song, rendered with the units accepted so far and it, plays
+    no event worse than the reference (`worse`). A unit with no accepted candidate stays at
+    "reference" and gives way, traced with the first worse event; once all are decided,
+    each unit that gave way is tried again with the later acceptances in place.
+
+    To add a unit kind: write a function `units(pipeline) -> list[ArrangementUnit]` and
+    `register_arrangement_units(units)`; in the render code the kind controls, read
+    `pipeline.unit_choice(key)` ("planned" when the render is not choosing, else
+    "reference" or one of the unit's candidates) and `pipeline.unit_gave_way(key)` (the
+    event it gave way to, or None) for its trace."""
+
+    key: str
+    """Unique in the render, e.g. `variation:chorus_2`."""
+    order: tuple[int, int]
+    """Its place among units: (the plan section's index, the kind's own order)."""
+    candidates: tuple[str, ...]
+    """Tried in order after the reference; each a name the kind's render code reads."""
+
+
+ArrangementUnits = Callable[["RenderingPipeline"], list[ArrangementUnit]]
+
+_UNIT_KINDS: list[ArrangementUnits] = []
+
+
+def register_arrangement_units(kind: ArrangementUnits) -> None:
+    """Add a unit kind the render builds its arrangement up from (`ArrangementUnit`)."""
+    if kind not in _UNIT_KINDS:
+        _UNIT_KINDS.append(kind)
 
 
 def _plays(outcome: Mapping[str, Any] | None) -> bool:
@@ -1946,55 +1977,227 @@ def admit_templates(
     )
 
 
-def _event_outcomes(record: Mapping[str, Any]) -> dict[tuple[Any, ...], dict[str, Any]]:
-    """Each planned event's trace entry by (plan section, action, bar, beat, its count
-    among equals): what `_worse_events` compares."""
-    out: dict[tuple[Any, ...], dict[str, Any]] = {}
-    for look in record.get("section_looks", []):
-        base = look["section_id"].split("|")[0]
-        for entry in look.get("events", []):
-            key = (base, entry.get("action"), entry.get("bar"), entry.get("beat"))
-            n = sum(1 for k in out if k[:4] == key)
-            out[(*key, n)] = entry
+def _variation_units(pipeline: RenderingPipeline) -> list[ArrangementUnit]:
+    """A unit per plan section whose variation takes a step (a `variation`, or a RESOLVE
+    its macro thread gives): candidates the step alone, then a FASTER step's narrower
+    reach. Whatever re-resolves from it (its motif's carriers, the next section on its
+    family) follows it into each trial."""
+    from twinklr.core.sequencer.moving_heads.arrangement import motif_relations
+
+    relations = motif_relations(pipeline.choreography_plan, keep_resolve=True)
+    out = []
+    for index, section in enumerate(pipeline.choreography_plan.sections):
+        asked = section.variation.value
+        if asked == "NONE" and relations.get(section.section_id, (None,))[0] != "RESOLVE":
+            continue
+        out.append(
+            ArrangementUnit(
+                key=f"variation:{section.section_id}",
+                order=(index, 0),
+                candidates=("step", "fallback") if asked == "FASTER" else ("step",),
+            )
+        )
     return out
 
 
-def _worse_events(
-    before: Mapping[tuple[Any, ...], Mapping[str, Any]],
-    after: Mapping[tuple[Any, ...], Mapping[str, Any]],
-) -> list[tuple[str, str]]:
-    """Each event `after` plays worse than `before` (the reference), as (its plan
-    section, the event and how): lost on a head that played it; a hit farther from its
-    lyric cue (or its planned frame); a colour or gobo change shown later or more briefly
-    (a frame of grid tolerance)."""
-    worse: list[tuple[str, str]] = []
-    for key, entry in before.items():
-        later = after.get(key)
-        if later is None:
+register_arrangement_units(_variation_units)
+
+WITHOUT_SPREAD = "without_spread"
+"""A modifier unit's candidate: every modifier the part plays but its spread."""
+
+
+def _modifier_units(pipeline: RenderingPipeline) -> list[ArrangementUnit]:
+    """A unit per placed part whose modifiers play as planned (`modifiers`): candidates all
+    of them, then, where a spread plays with others, all but the spread (the one modifier
+    that moves a template's darkness); its reference plays none."""
+    order = {s.section_id: i for i, s in enumerate(pipeline.choreography_plan.sections)}
+    out = []
+    for section_id, play in pipeline._modifier_plays().items():
+        if not play.applied:
             continue
+        keys = {key for key, _ in play.applied}
+        out.append(
+            ArrangementUnit(
+                key=f"modifier:{section_id}",
+                order=(order[section_id.split("|")[0]], 2),
+                candidates=("planned", WITHOUT_SPREAD)
+                if "spread" in keys and len(keys) > 1
+                else ("planned",),
+            )
+        )
+    return out
+
+
+register_arrangement_units(_modifier_units)
+
+
+def _modifier_warnings(section_id: str, play: ModifierPlay) -> list[MHDiagnostic]:
+    """One warning per modifier of a placed part that does not play."""
+    return [
+        MHDiagnostic(
+            code="unsupported_attribute",
+            severity="warning",
+            message=f"section {section_id!r}: its modifier {name} does not play ({why})",
+            section_id=section_id,
+            action="unchanged",
+        )
+        for name, why in play.not_applied
+    ]
+
+
+def worse(reference: RenderingPipeline, trial: RenderingPipeline) -> list[str]:
+    """Every way `trial` plays the song worse than `reference` (two renders of one plan),
+    in words, first found first; empty where it plays nothing worse. Judged per event and
+    head, with a frame of tolerance:
+
+    - an event, a transition or a head in the reference's trace missing from the trial's;
+    - an event lost on a head that plays it in the reference;
+    - a hit farther from its lyric cue (else its planned frame), or with a lower peak level
+      over its first four frames;
+    - a colour or gobo change shown later, or for less time (lit, holding its state);
+    - a `closed` with more lit frames, a strobe or `pulse` with fewer, over the 25 frames
+      from its frame (whether or not it plays: a replaced one still asked for that);
+    - a transition that plays on a head in the reference and not in the trial.
+
+    Public: the render's arrangement units are judged by it (`ArrangementUnit`)."""
+    assert reference.render_record is not None and trial.render_record is not None
+    said: list[str] = []
+    frames: dict[int, dict[str, _Frames]] = {}
+
+    def of(pipeline: RenderingPipeline, fixture_id: str) -> _Frames:
+        by_head = frames.setdefault(id(pipeline), {})
+        if fixture_id not in by_head:
+            profile = next(
+                f.config.physical_profile
+                for f in pipeline.fixture_group.expand_fixtures()
+                if f.fixture_id == fixture_id
+            )
+            assert profile is not None
+            by_head[fixture_id] = _Frames(
+                [s for s in pipeline._segments if s.fixture_id == fixture_id], profile
+            )
+        return by_head[fixture_id]
+
+    def events(pipeline: RenderingPipeline) -> dict[tuple[Any, ...], dict[str, Any]]:
+        out: dict[tuple[Any, ...], dict[str, Any]] = {}
+        for look in (pipeline.render_record or {}).get("section_looks", []):
+            base = look["section_id"].split("|")[0]
+            for entry in look.get("events", []):
+                key = (base, entry.get("action"), entry.get("bar"), entry.get("beat"))
+                n = sum(1 for k in out if k[:4] == key)
+                out[(*key, n)] = entry
+        return out
+
+    def transitions(pipeline: RenderingPipeline) -> dict[tuple[Any, ...], dict[str, Any]]:
+        out: dict[tuple[Any, ...], dict[str, Any]] = {}
+        for look in (pipeline.render_record or {}).get("section_looks", []):
+            for entry in look.get("transitions", []):
+                out[(entry.get("edge"), entry.get("boundary_ms"))] = entry
+        return out
+
+    then, now = events(reference), events(trial)
+    for key, entry in then.items():
         section_id, action, bar, beat, _ = key
+        what = f"its {action} at bar {bar} beat {beat} in section {section_id!r}"
+        later = now.get(key)
+        if later is None:
+            said.append(f"{what} (missing)")
+            continue
         ref = entry.get("cue_ms") if entry.get("cue_ms") is not None else entry.get("frame_ms")
-        said: dict[str, list[str]] = {}
         for fixture_id, outcome in entry.get("heads", {}).items():
-            then = later.get("heads", {}).get(fixture_id, {})
-            if "not_played" in outcome or "unchanged" in outcome:
+            current = later.get("heads", {}).get(fixture_id)
+            if current is None:
+                said.append(f"{what} (missing on {fixture_id})")
                 continue
-            if "not_played" in then:
-                said.setdefault("lost", []).append(fixture_id)
-            elif action == "hit" and ref is not None:
-                was, now = outcome.get("played_ms"), then.get("played_ms")
-                if was is not None and now is not None and abs(now - ref) > abs(was - ref) + 20:
-                    said.setdefault("played farther from its beat", []).append(fixture_id)
+            shutter = action in ("closed", "pulse") or str(action).startswith("strobe_")
+            if not shutter and ("not_played" in outcome or "unchanged" in outcome):
+                continue
+            if not shutter and "not_played" in current:
+                said.append(f"{what} (lost on {fixture_id})")
+                continue
+            if action == "hit":
+                was, at = outcome.get("played_ms"), current.get("played_ms")
+                if was is None or at is None:
+                    continue
+                if ref is not None and abs(at - ref) > abs(was - ref) + FRAME:
+                    said.append(f"{what} (played farther from its beat on {fixture_id})")
+                elif of(trial, fixture_id).peak(at) < of(reference, fixture_id).peak(was) - _PEAK:
+                    said.append(f"{what} (a weaker flash on {fixture_id})")
             elif action in WHEEL_ACTIONS:
-                was_at, now_at = outcome.get("reveal_ms"), then.get("reveal_ms")
-                if was_at is not None and now_at is not None and now_at > was_at + 20:
-                    said.setdefault("shown later", []).append(fixture_id)
-                elif (outcome.get("shown_for_ms") or 0) > (then.get("shown_for_ms") or 0) + 20:
-                    said.setdefault("shown more briefly", []).append(fixture_id)
-        if said:
-            how = "; ".join(f"{what} on {', '.join(heads)}" for what, heads in said.items())
-            worse.append((section_id, f"its {action} at bar {bar} beat {beat} ({how})"))
-    return worse
+                state = outcome.get("state")
+                was = outcome.get("reveal_ms") or outcome.get("shown_ms")
+                at = current.get("reveal_ms") or current.get("shown_ms")
+                if was is None:
+                    continue
+                if at is None:
+                    said.append(f"{what} (lost on {fixture_id})")
+                    continue
+                channel = WHEEL_ACTIONS[action]
+                run_was = of(reference, fixture_id).run(was, channel, state)
+                run_now = of(trial, fixture_id).run(at, channel, state)
+                if at > was + FRAME:
+                    said.append(f"{what} (shown later on {fixture_id})")
+                elif run_now + FRAME < run_was:
+                    said.append(f"{what} (shown more briefly on {fixture_id})")
+            elif shutter:
+                start = entry.get("frame_ms") or 0
+                lit_was = of(reference, fixture_id).lit_over(start, 25)
+                lit_now = of(trial, fixture_id).lit_over(start, 25)
+                if action == "closed" and lit_now > lit_was + 1:
+                    said.append(f"{what} (lit inside on {fixture_id})")
+                elif action != "closed" and lit_now < lit_was - 1:
+                    said.append(f"{what} (fewer lit frames on {fixture_id})")
+    current_transitions = transitions(trial)
+    for key, entry in transitions(reference).items():
+        later = current_transitions.get(key)
+        what = f"its {key[0]} transition at {key[1]} ms"
+        if later is None:
+            said.append(f"{what} (missing)")
+            continue
+        for fixture_id, outcome in entry.get("heads", {}).items():
+            current = later.get("heads", {}).get(fixture_id, {})
+            if _transition_plays(outcome) and not _transition_plays(current):
+                said.append(f"{what} (no longer plays on {fixture_id})")
+    return said
+
+
+FRAME = EFFECT_GRID_MS
+
+_PEAK = 20 / 255
+"""A hit's peak may sit this far (a share of the dimmer's top) under the reference's."""
+
+
+def _transition_plays(outcome: Mapping[str, Any]) -> bool:
+    return "not_played" not in outcome and not str(outcome.get("plays", "")).startswith("nothing")
+
+
+class _Frames:
+    """One head's planned segments read frame by frame (`events._HeadFrames`): lit, level
+    and wheel states, for `worse`."""
+
+    def __init__(self, own: Sequence[FixtureSegment], profile: FixtureCapabilities) -> None:
+        from twinklr.core.sequencer.moving_heads.events import _HeadFrames
+
+        self.frames = _HeadFrames(sorted(own, key=lambda c: c.t0_ms), profile)
+
+    def peak(self, t: int) -> float:
+        return max((self.frames.levels.get(t + k * FRAME, 0.0) for k in range(4)), default=0.0)
+
+    def run(self, t: int, channel: ChannelName, state: str | None) -> int:
+        """How long from `t` the head stays lit holding `state` on `channel`."""
+        from twinklr.core.sequencer.moving_heads.events import _state
+
+        start = t
+        while self.frames.lit.get(t, False) and (
+            state is None
+            or _state(self.frames.own[self.frames.cue_at[t]], channel, self.frames.profile, t)
+            == state
+        ):
+            t += FRAME
+        return t - start
+
+    def lit_over(self, t: int, count: int) -> int:
+        return sum(1 for k in range(count) if self.frames.lit.get(t + k * FRAME, False))
 
 
 TWIN_POSE_DEG = 3.0
@@ -3373,18 +3576,17 @@ class RenderingPipeline:
         self._arrangement_cache: (
             tuple[ChoreographyPlan, dict[str, tuple[SectionArrangement, int]]] | None
         ) = None
-        self._give_way: dict[str, GiveWay] = {}
-        """Per plan section, the variants its variation gave way to its events with
-        (`_settle_arrangement`)."""
-        self._modifiers_give_way: dict[str, str] = {}
-        """Per placed part (its flattened section id), the song event its modifiers gave
-        way to, in words: none of them plays there (`_part_modifiers`). The hook by which
-        the song-outranks settling switches a part's modifiers off where they make an
-        event worse than the same plan without them (W10e); nothing sets it yet."""
-        self._steps = True
-        """False for the render the song's events are judged against: every part plays
-        its source variant."""
+        self._choices: dict[str, str] | None = None
+        """Per arrangement unit (`ArrangementUnit.key`), the candidate this render plays;
+        None where every unit plays as planned (no unit, or a render not choosing)."""
+        self._gave_way: dict[str, str] = {}
+        """Per unit that gave way to the song, the first event it would have made worse."""
         self._settled = False
+        """Set once the arrangement is chosen (and on every trial render)."""
+        self._segments: list[FixtureSegment] = []
+        self._time_markers: list[TimeMarker] = []
+        self.arrangement_renders = 0
+        """How many whole-song renders choosing the arrangement took (0 without units)."""
         self.transition_free: RenderingPipeline | None = None
         """Set by a `render()` whose plan has transitions: the same plan rendered without
         them, which the played rule and the hits a transition may not lose are read
@@ -3403,7 +3605,11 @@ class RenderingPipeline:
         plays (`_part_modifiers`), and its dark spans as snapped, when there are any.
         """
         substitutions: list[tuple[str, str | None]] = []
-        played: list[tuple[str, list[str]]] = []
+        played = [
+            (section_id, [spelled(modifier) for modifier in play.applied])
+            for section_id, play in self._modifier_plays().items()
+            if play.applied
+        ]
         for section in self.iterate_plan_sections(self.choreography_plan):
             (part,) = section.parts
             arrangement, index = self._arranged().get(section.section_id, (None, 0))
@@ -3414,9 +3620,6 @@ class RenderingPipeline:
                 self.admission,
                 None if arrangement is None else arrangement.parts[index],
             )
-            applied = self._part_modifiers(section, get_template(part.template_id), preset).applied
-            if applied:
-                played.append((section.section_id, [spelled(modifier) for modifier in applied]))
             rendered = None if preset is None else preset.preset_id
             offered = (
                 None
@@ -3452,17 +3655,54 @@ class RenderingPipeline:
         self, section: PlanSection, template_doc: TemplateDoc, preset: TemplatePreset | None
     ) -> ModifierPlay:
         """What a placed part's modifiers play (`modifiers.resolve_modifiers`) on the
-        variant it plays (`preset`), over the gate's offer for its template, unless they
-        gave way to the song (`_modifiers_give_way`)."""
+        variant it plays (`preset`), over the gate's offer for its template, as its
+        arrangement unit (`_modifier_units`) plays: all of them as planned, all but the
+        spread, or none (the reference, or given way to the song)."""
         (part,) = section.parts
         template_id = template_doc.template.template_id
+        key = f"modifier:{section.section_id}"
+        choice = self.unit_choice(key)
+        withdrawn: dict[str, str] = {}
+        if choice != "planned":
+            event = self.unit_gave_way(key)
+            why = (
+                f"the modifier gave way to {event}"
+                if event is not None
+                else "the modifier gave way to the song: with it an event plays worse than "
+                "without it, and the part keeps its other modifiers"
+                if choice == WITHOUT_SPREAD
+                else "held back while the render chooses its arrangement"
+            )
+            withdrawn = (
+                {"spread": why} if choice == WITHOUT_SPREAD else dict.fromkeys(MODIFIERS, why)
+            )
         return resolve_modifiers(
             part.modifiers,
             template_doc.template,
             None if self.admission is None else self.admission.offer.templates.get(template_id),
             BASE if preset is None else preset.preset_id,
-            gave_way=self._modifiers_give_way.get(section.section_id),
+            withdrawn=withdrawn,
         )
+
+    def _modifier_plays(self) -> dict[str, ModifierPlay]:
+        """Per placed part (flattened section id) whose part asks for modifiers, what they
+        play in this render (`_part_modifiers`, on the variant `_section_preset` gives it)."""
+        out = {}
+        for section in self.iterate_plan_sections(self.choreography_plan):
+            (part,) = section.parts
+            if not part.modifiers:
+                continue
+            document = get_template(part.template_id)
+            arrangement, index = self._arranged().get(section.section_id, (None, 0))
+            preset = _section_preset(
+                section,
+                document,
+                [],
+                self.admission,
+                None if arrangement is None else arrangement.parts[index],
+            )
+            out[section.section_id] = self._part_modifiers(section, document, preset)
+        return out
 
     def rendered_palettes(self) -> dict[str, SectionPalette]:
         """The macro palette each plan section whose colour, or a colour event's, is a
@@ -3576,7 +3816,23 @@ class RenderingPipeline:
             CompileError, PhysicalChannelError, OutputError,
                 ValueError: For a step, value, model or output the renderer refuses.
         """
-        self._settle_arrangement()
+        if not self._settled:
+            self._reuse: RenderingPipeline | None = None
+            self._choose_arrangement()
+            if self._reuse is not None:
+                # The last accepted trial is this render: its frames and trace are reused.
+                reused = self._reuse
+                kept = {
+                    "output_path": self.output_path,
+                    "arrangement_renders": self.arrangement_renders,
+                    "_gave_way": self._gave_way,
+                    "_choices": self._choices,
+                }
+                self.__dict__.update(reused.__dict__)
+                self.__dict__.update(kept)
+                self._arrangement_cache = None
+                self._retrace_arrangement()
+                return self._deliver(self._segments, self._time_markers)
         plan = self.choreography_plan
         self.transition_free = None
         if any(section.transitions for section in plan.sections):
@@ -3587,6 +3843,7 @@ class RenderingPipeline:
                 }
             )
             free.output_path = None
+            free._settled = True  # judged on the outer render, never on its own
             with render_log.held():
                 free.render()
             self.transition_free = free
@@ -3621,6 +3878,13 @@ class RenderingPipeline:
                 ).model_dump(mode="json")
             )
             render_log.warn(logger, "%s", message)
+        self._segments, self._time_markers = segments, time_markers
+        return self._deliver(segments, time_markers)
+
+    def _deliver(
+        self, segments: list[FixtureSegment], time_markers: list[TimeMarker]
+    ) -> list[FixtureSegment]:
+        """Write the delivery where the render has an output path; the planned segments."""
         if self.output_path:
             assert self.render_record is not None
             xsq = build_sequence(
@@ -4205,19 +4469,7 @@ class RenderingPipeline:
             if modifiers.asked:
                 # What the part's modifiers play, and why any does not.
                 record.setdefault("arrangement", {})["modifiers"] = modifiers.record()
-                diagnostics.extend(
-                    MHDiagnostic(
-                        code="unsupported_attribute",
-                        severity="warning",
-                        message=(
-                            f"section {section.section_id!r}: its modifier {name} does not "
-                            f"play ({why})"
-                        ),
-                        section_id=section.section_id,
-                        action="unchanged",
-                    )
-                    for name, why in modifiers.not_applied
-                )
+                diagnostics.extend(_modifier_warnings(section.section_id, modifiers))
             offered = (
                 None
                 if self.admission is None or preset is None
@@ -4821,79 +5073,185 @@ class RenderingPipeline:
                 {t: offer.plays_as_base for t, offer in templates.items()},
             ),
             canonical=lambda t: get_template(t).template.template_id,
-            give_way=self._give_way,
-            steps=self._steps,
+            modes=None
+            if self._choices is None
+            else {
+                key.partition(":")[2]: choice
+                for key, choice in self._choices.items()
+                if key.startswith("variation:")
+            },
+            gave_way={
+                key.partition(":")[2]: event
+                for key, event in self._gave_way.items()
+                if key.startswith("variation:")
+            },
         )
 
-    def _settle_arrangement(self) -> None:
-        """**The song outranks the arrangement.** A variation never makes an event worse
-        than it is with every part playing its source variant (no step taken): no event of
-        the plan is lost on a head, played farther from its lyric cue or planned beat,
-        shown later or more briefly (`_worse_events`). The plan renders with every step
-        off (the reference) and as resolved; each worse event is laid at its own section
-        where that one varies, else at the section before it where that one varies (an
-        entry's darkness reaches across the boundary), and that section takes its next
-        candidate (a FASTER step's narrower reach, else its source variant: the variation
-        gives way, traced with the event). It renders again until no event is worse, at
-        most `ARRANGEMENT_PASSES` times. A plan with no variation step renders once, as
-        before."""
-        if not self._steps or self._settled:
+    def unit_choice(self, key: str) -> str:
+        """The candidate arrangement unit `key` plays in this render (`ArrangementUnit`):
+        "planned" where the render is not choosing, else "reference" or a candidate."""
+        if self._choices is None:
+            return "planned"
+        return self._choices.get(key, "reference")
+
+    def unit_gave_way(self, key: str) -> str | None:
+        """The event unit `key` gave way to, in words, or None."""
+        return self._gave_way.get(key)
+
+    def _choose_arrangement(self) -> None:
+        """**The song outranks the arrangement.** Every arrangement unit (`ArrangementUnit`,
+        `register_arrangement_units`: a section's variation step, and the units density
+        and modifiers register) is built up greedily from the reference, the song with
+        every unit at "reference" (every part on its source variant): unit by unit in plan
+        order, each candidate in turn renders the whole song with the units accepted so
+        far plus it, and the first under which no event anywhere is worse than in the
+        reference (`worse`) is accepted; a unit with none stays at "reference" and gives
+        way, traced with the first worse event; once every unit is decided, each unit that
+        gave way is tried again with the later acceptances in place, until none changes
+        (each acceptance shrinks the set, so this ends). The final render is the last
+        accepted trial, reused (`_reuse`). So the render is never worse than the reference,
+        and no unit gives way that its candidates would play at no cost with every other
+        unit as finally chosen; where two units cannot both play, the earlier in plan
+        order keeps its choice (the tie-break). A candidate that resolves to the same
+        arrangement as the accepted one (a step the rig cannot play) needs no render; an
+        arrangement already rendered is not rendered again. Cost: 1 reference render plus
+        1 per distinct candidate tried (each with its transition-free pass where the plan
+        has transitions), and one per candidate retried for a unit that gave way; none for a
+        plan without units."""
+        self._settled = True
+        units = sorted((unit for kind in _UNIT_KINDS for unit in kind(self)), key=lambda u: u.order)
+        if not units:
             return
-        stepped = {
-            section_id
-            for section_id, (arrangement, _) in self._arranged().items()
-            if any(part is not None and part.plays != part.source for part in arrangement.parts)
-        }
-        if not stepped or not any(s.events for s in self.choreography_plan.sections):
-            return
-        reference = copy.copy(self)
-        reference._steps = False
-        reference._arrangement_cache = None
-        reference.output_path = None
-        with render_log.held():
-            reference.render()
-        assert reference.render_record is not None
-        before = _event_outcomes(reference.render_record)
-        give_way: dict[str, GiveWay] = {}
-        order = [s.section_id for s in self.choreography_plan.sections]
-        for _ in range(ARRANGEMENT_PASSES):
-            trial = copy.copy(self)
-            trial._give_way = dict(give_way)
-            trial._settled = True
-            trial._arrangement_cache = None
-            trial.output_path = None
-            with render_log.held():
-                trial.render()
-            assert trial.render_record is not None
-            varied: dict[str, frozenset[str]] = {}
-            for arrangement, _ in trial._arranged().values():
-                played = frozenset(
-                    part.plays
-                    for part in arrangement.parts
-                    if part is not None and part.plays != part.source
-                )
-                if played:
-                    varied[arrangement.section_id] = played
-            blamed: dict[str, str] = {}
-            for section_id, because in _worse_events(before, _event_outcomes(trial.render_record)):
-                owner = section_id if section_id in varied else None
-                if owner is None and section_id in order:
-                    at = order.index(section_id)
-                    previous = order[at - 1] if at else None
-                    owner = previous if previous in varied else None
-                if owner is not None and owner not in blamed:
-                    blamed[owner] = because
-            if not blamed:
-                break
-            for owner, because in blamed.items():
-                previous_way = give_way.get(owner)
-                give_way[owner] = GiveWay(
-                    rejected=(previous_way.rejected if previous_way else frozenset())
-                    | varied[owner],
-                    because=because,
-                )
-        self._give_way = give_way
+        rendered: dict[tuple[Any, ...], RenderingPipeline] = {}
+
+        def trial(choices: dict[str, str], gave_way: dict[str, str]) -> RenderingPipeline:
+            candidate = copy.copy(self)
+            candidate._choices = dict(choices)
+            candidate._gave_way = dict(gave_way)
+            candidate._arrangement_cache = None
+            candidate.output_path = None
+            signature = candidate._signature()
+            if signature not in rendered:
+                with render_log.held():
+                    candidate.render()
+                self.arrangement_renders += 1
+                rendered[signature] = candidate
+            return rendered[signature]
+
+        accepted = {unit.key: "reference" for unit in units}
+        gave_way: dict[str, str] = {}
+        reference = trial(accepted, gave_way)
+        last = reference
+        for unit in units:
+            first_worse: str | None = None
+            for candidate in unit.candidates:
+                choices = {**accepted, unit.key: candidate}
+                probe = copy.copy(self)
+                probe._choices = choices
+                probe._arrangement_cache = None
+                if probe._signature() == last._signature():
+                    # Plays the same as the accepted arrangement (a step the rig cannot
+                    # play): kept, with its own trace, and no render.
+                    accepted = choices
+                    break
+                tried = trial(choices, gave_way)
+                found = worse(reference, tried)
+                if not found:
+                    accepted, last = choices, tried
+                    break
+                if first_worse is None:
+                    first_worse = found[0]
+            else:
+                if first_worse is not None:
+                    gave_way[unit.key] = first_worse
+        # A unit that gave way is tried again with every later acceptance in place (a
+        # later unit can make it harmless); each acceptance shrinks the set, so this ends.
+        changed = True
+        while changed and gave_way:
+            changed = False
+            for unit in units:
+                if unit.key not in gave_way:
+                    continue
+                for candidate in unit.candidates:
+                    choices = {**accepted, unit.key: candidate}
+                    tried = trial(choices, {k: v for k, v in gave_way.items() if k != unit.key})
+                    if not worse(reference, tried):
+                        accepted, last = choices, tried
+                        del gave_way[unit.key]
+                        changed = True
+                        break
+        self._choices = accepted
+        self._gave_way = gave_way
         self._arrangement_cache = None
+        if self._signature() == last._signature():
+            self._reuse = last
+        else:
+            self._reuse = None
+
+    def _retrace_arrangement(self) -> None:
+        """A reused trial's arrangement trace and warnings, rewritten for the arrangement
+        chosen (units decided after it gave way, traced)."""
+        assert self.render_record is not None
+        arranged = self._arranged()
+        warnings = []
+        for look in self.render_record.get("section_looks", []):
+            found = arranged.get(look["section_id"])
+            if found is None or "arrangement" not in look:
+                continue
+            arrangement, index = found
+            look["arrangement"] = arrangement.record(index)
+            variant = arrangement.parts[index]
+            if variant is not None and variant.reason:
+                warnings.append(
+                    MHDiagnostic(
+                        code="unsupported_attribute",
+                        severity="warning",
+                        message=(
+                            f"section {look['section_id']!r}: its variation {variant.asked} "
+                            f"does not play ({variant.reason})"
+                        ),
+                        section_id=look["section_id"],
+                        action="unchanged",
+                    ).model_dump(mode="json")
+                )
+        # Each part's modifiers as its unit was finally decided.
+        plays = self._modifier_plays()
+        for look in self.render_record.get("section_looks", []):
+            play = plays.get(look["section_id"])
+            if play is not None:
+                look.setdefault("arrangement", {})["modifiers"] = play.record()
+                warnings += [
+                    warning.model_dump(mode="json")
+                    for warning in _modifier_warnings(look["section_id"], play)
+                ]
+        self.render_record["diagnostics"] = [
+            d
+            for d in self.render_record["diagnostics"]
+            if not (
+                ("its variation" in d.get("message", "") or "its modifier" in d.get("message", ""))
+                and "does not play" in d["message"]
+            )
+        ] + warnings
+
+    def _signature(self) -> tuple[Any, ...]:
+        """What decides this render's frames among arrangement trials: each section's
+        resolved variants and every unit choice that is not a variation's."""
+        arranged = self._arranged()
+        return (
+            tuple(
+                sorted(
+                    (section_id, tuple(p.plays if p else None for p in a.parts))
+                    for section_id, (a, _) in arranged.items()
+                )
+            ),
+            tuple(
+                sorted(
+                    (key, choice)
+                    for key, choice in (self._choices or {}).items()
+                    if not key.startswith("variation:")
+                )
+            ),
+        )
 
     def arrangement_changes(self, base: ChoreographyPlan, replanned: str) -> str | None:
         """Under `twinklr regenerate`, the warning naming each kept section whose parts now

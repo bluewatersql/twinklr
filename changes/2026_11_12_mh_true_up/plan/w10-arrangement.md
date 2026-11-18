@@ -160,9 +160,10 @@ Departures from §1 and §3, each recorded here:
   alike; FASTER falls back to a narrower reach.
 - *The song outranks the arrangement* (integrator decision after the owner render at
   bcefff0f, revision 17): a variation may never make a lyric-bound or planned event worse
-  than its source variant; the render renders the plan with steps off and as resolved and
-  gives way where an event worsens (`_settle_arrangement`); repair predicts it for the
-  planner. FASTER falls back one reach step at most; near-twin variants (3 degrees) are
+  than its source variant; revision 18 builds the arrangement up greedily from the
+  reference (every step off), unit by unit in plan order, accepting the first candidate
+  under which no event is worse (`pipeline.worse`, `ArrangementUnit`); repair predicts
+  where a variation may give way. FASTER falls back one reach step at most; near-twin variants (3 degrees) are
   not offered.
 - *Code-owned relation* (W10b/c review M1): plan time derives and overwrites
   `motif_relation`/`motif_source_id`; the render derives them again, keeping only a
@@ -214,9 +215,13 @@ Departures from the proposal above, each recorded here:
 - *No render-time give-way for an unproven variant.* What plays on another variant is
   decided from the offer, so render and repair resolve it with one function
   (`resolve_modifiers`) and never disagree.
-- *The song outranks modifiers: not yet.* One per-part switch
-  (`RenderingPipeline._modifiers_give_way`) waits for the settling being rebuilt in the
-  main tree; until it is plugged in, a modifier that worsens an event plays.
+- *The song outranks modifiers* (after f9894cc8's arrangement loop): a part's modifiers
+  are one unit (`pipeline._modifier_units`, key `modifier:<part id>`, order after its
+  section's variation and density), candidates all of them, then all but the spread
+  where a spread plays with others (the one modifier that moves darkness); its reference
+  plays none. Repair says they may give way, and hedges a boundary record where either
+  side plays modifiers (the dark entries it reads are measured without them).
+  Revision 20.
 
 ## 5. Cross-cutting
 

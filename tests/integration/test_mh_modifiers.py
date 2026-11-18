@@ -481,6 +481,8 @@ def assert_repair_says_what_plays(repaired: ChoreographyPlan, pipeline: Renderin
         (part_id.split("|")[0], entry["modifier"], f"{entry['reason']}; the part plays without it")
         for part_id, part in traced(pipeline).items()
         for entry in part.get("not_applied", [])
+        # Giving way is the render's to decide; repair says only that it may.
+        if not entry["reason"].startswith("the modifier gave way")
     }
     assert said == played
 
@@ -544,12 +546,14 @@ def test_repair_says_what_the_render_plays(
 
 
 @pytest.mark.parametrize("name", RIGS)
-def test_repair_reads_the_darkness_a_spread_plays(name: str) -> None:
+def test_a_spread_that_darkens_a_hit_gives_way_and_repair_says_it_may(name: str) -> None:
     """The cascades are lit only on a stretch of each head's own phase: under `unison`
     every head is dark on the same beats (the gate publishes them,
     `TemplateOffer.modifier_phases`). A hit on a beat every head is dark on under
-    `unison`, where some heads are lit without it: repair says it moves with the spread
-    and plays on the lit heads without it, and the render does each."""
+    `unison`, where some heads are lit without it: repair reads that darkness and says the
+    modifiers may give way; the render's arrangement unit gives way (the song outranks
+    the arrangement), tracing the event, and the hit plays as without the spread. With
+    `aim` beside it, only the spread gives way."""
     fg = rig(name)
     beat_grid = grid(120)
     admission = gate(fg, beat_grid)
@@ -573,8 +577,8 @@ def test_repair_reads_the_darkness_a_spread_plays(name: str) -> None:
             overall_strategy="",
         )
 
-    def said(repaired: ChoreographyPlan) -> list[str]:
-        return [r.reason for r in repaired.repairs if r.item.endswith(": hit")]
+    def said(repaired: ChoreographyPlan, suffix: str = ": hit") -> list[str]:
+        return [r.reason for r in repaired.repairs if r.item.endswith(suffix)]
 
     found = None
     for bar, beat in ((bar, beat) for bar in (5, 6) for beat in range(1, 5)):
@@ -589,27 +593,53 @@ def test_repair_reads_the_darkness_a_spread_plays(name: str) -> None:
             break
     assert found is not None
 
-    def heads(*modifiers: tuple[str, str]) -> dict[str, Any]:
+    def rendered(*modifiers: tuple[str, str]) -> tuple[ChoreographyPlan, RenderingPipeline]:
         repaired = repair_rig_intent(plan(*found, *modifiers), admission.offer, {}, beat_grid)
-        pipeline = render(repaired.sections, fg, beat_grid, admission)
+        return repaired, render(repaired.sections, fg, beat_grid, admission)
+
+    def hit(pipeline: RenderingPipeline) -> dict[str, Any]:
         assert pipeline.render_record is not None
         (look,) = [x for x in pipeline.render_record["section_looks"] if x["section_id"] == "b"]
         (entry,) = look["events"]
         outcomes: dict[str, Any] = entry["heads"]
         return outcomes
 
-    played = heads(("spread", "unison"))
-    assert played and all("moved" in o for o in played.values() if "played_ms" in o)
-    assert any("played_ms" in o for o in played.values())
+    repaired, unified = rendered(("spread", "unison"))
+    (may,) = said(repaired, "modifiers")
+    assert may.startswith("the modifiers may make the song's events worse than without them")
+    assert "they may give way" in may
+    _, plain = rendered()
+    trace = traced(unified)["b"]
+    assert trace["applied"] == []
+    (why,) = trace["not_applied"]
+    assert why["reason"].startswith("the modifier gave way to ")
+    assert hit(unified) == hit(plain)
+    assert unified.frames == plain.frames
+    assert any(
+        "its modifier spread=unison does not play" in d["message"] for d in diagnostics(unified)
+    )
     (reason,) = said(repair_rig_intent(plan(*found), admission.offer, {}, beat_grid))
-    dark = sorted(h for h, outcome in heads().items() if "not_played" in outcome)
+    dark = sorted(h for h, outcome in hit(plain).items() if "not_played" in outcome)
     assert reason == (
         f"template 'fly_out_cascade' is dark on this beat on {', '.join(dark)} (between its "
         "cues): only the other heads play it"
     )
+    _, aimed = rendered(("spread", "unison"), ("aim", "high"))
+    trace = traced(aimed)["b"]
+    assert trace["applied"] == ["aim=high"]
+    (why,) = trace["not_applied"]
+    assert why["modifier"] == "spread=unison"
+    assert why["reason"].startswith("the modifier gave way to the song")
+    assert hit(aimed) == hit(plain)
 
 
-# --- identity, the give-way hook and what is said -------------------------------------------
+def diagnostics(pipeline: RenderingPipeline) -> list[dict[str, Any]]:
+    assert pipeline.render_record is not None
+    found: list[dict[str, Any]] = pipeline.render_record["diagnostics"]
+    return found
+
+
+# --- identity, the arrangement unit and what is said -------------------------------------------
 
 
 @pytest.mark.parametrize("name", RIGS)
@@ -649,18 +679,22 @@ def test_what_plays_is_render_identity(name: str) -> None:
     assert offered.fingerprint() != refused.fingerprint()
 
 
-@pytest.mark.parametrize("name", RIGS)
-def test_a_parts_modifiers_give_way_through_one_hook(name: str) -> None:
-    """The song-outranks settling switches a part's modifiers off by its flattened section
-    id (`RenderingPipeline._modifiers_give_way`): none plays, the trace says to what, and
-    the frames are the plan's without them."""
-    fg = rig(name)
+def test_a_parts_modifiers_are_one_arrangement_unit() -> None:
+    """One unit per placed part whose modifiers play, after its section's variation and
+    density; a spread playing with others may go alone first."""
+    from twinklr.core.sequencer.moving_heads.pipeline import WITHOUT_SPREAD, _modifier_units
+
+    fg = rig("720dps")
     beat_grid = grid(120)
     admission = gate(fg, beat_grid)
-    asked = [("spread", "unison"), ("aim", "high")]
     pipeline = RenderingPipeline(
         choreography_plan=ChoreographyPlan(
-            sections=[section("a", (1, 8), "mirror_wings", *asked)], overall_strategy=""
+            sections=[
+                section("a", (1, 4), "mirror_wings", ("spread", "unison"), ("aim", "high")),
+                section("b", (5, 6), "target_orbit", ("aim", "low")),
+                section("c", (7, 8), "target_orbit", ("spread", "unison")),
+            ],
+            overall_strategy="",
         ),
         beat_grid=beat_grid,
         fixture_group=fg,
@@ -668,16 +702,11 @@ def test_a_parts_modifiers_give_way_through_one_hook(name: str) -> None:
         media_file="silence.wav",
         admission=admission,
     )
-    pipeline._modifiers_give_way["a"] = "its hit at bar 3 beat 1"
-    pipeline.render()
-    without = render([section("a", (1, 8), "mirror_wings")], fg, beat_grid, admission)
 
-    assert pipeline.frames == without.frames
-    trace = traced(pipeline)["a"]
-    assert trace["applied"] == []
-    assert [e["reason"].split(";")[0] for e in trace["not_applied"]] == [
-        "the part's modifiers gave way to its hit at bar 3 beat 1"
-    ] * 2
+    assert [(u.key, u.order, u.candidates) for u in _modifier_units(pipeline)] == [
+        ("modifier:a", (0, 2), ("planned", WITHOUT_SPREAD)),
+        ("modifier:b", (1, 2), ("planned",)),
+    ]
 
 
 def test_the_planner_and_the_report_are_told_what_plays() -> None:

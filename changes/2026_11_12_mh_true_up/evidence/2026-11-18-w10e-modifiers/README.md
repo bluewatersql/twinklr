@@ -67,12 +67,13 @@ below).
   does not; the evaluation report's template line lists the modifiers that played
   (`TemplateSelection.modifiers`, previously the plan's entries). `RENDERED_INTENT_FIELDS`
   includes `modifiers`; `_unrendered_intent_message` lists only density.
-- **Identity.** `RENDERER_REVISION` 18 (history note in `identity.py`). The modifiers each
-  section plays are hashed (`render_fingerprint(modifiers=...)`, only when any play: the
-  offer decides what plays and is not otherwise identity). A plan without modifiers
-  renders the same frames: every pin's frames and `.xsq` hash is unchanged; the 137
-  fingerprints in `tests/regression/test_mh_pins.py` and the combined-show golden's were
-  re-recorded for the revision alone.
+- **Identity.** `RENDERER_REVISION` 20 after the merge of `f9894cc8` (its 18 kept in the
+  history note; 19 is density's). The modifiers each section plays are hashed
+  (`render_fingerprint(modifiers=...)`, only when any play: the offer and the arrangement
+  decide what plays and are not otherwise identity). A plan without modifiers renders the
+  same frames: every pin's frames and `.xsq` hash is unchanged; the 137 fingerprints in
+  `tests/regression/test_mh_pins.py` and the combined-show golden's were re-recorded for
+  the revision alone (`9be42ccf` for 18, the merge for 20).
 - **Prompts.** Planner `developer.j2` says what modifiers are and what each looks like;
   `user.j2` lists, per template, the values that play here (`offer_for_prompt`'s
   `modifiers`); the judge's `developer.j2` and `user.j2` mention them. Characters before
@@ -81,18 +82,57 @@ below).
   9606, judge user 6397 → 6417. The offer and prompt packs are in the planner cache key,
   so every song plans again once (paid).
 
-## The song outranks the arrangement: integration point
+## The song outranks the arrangement (after merging `f9894cc8`)
 
-Not built here, by the brief: another agent is replacing `_settle_arrangement`. A part's
-modifiers switch off through one hook, `RenderingPipeline._modifiers_give_way`
-(`{flattened section id: "the event, in words"}`), read by `_part_modifiers`, which both
-the render and `fingerprint` call; the trace then says "the part's modifiers gave way to
-…" and the frames are the plan's without them
-(`test_a_parts_modifiers_give_way_through_one_hook`). Until the new settling sets it, a
-modifier that makes an event worse than the same plan without it still plays, and
-repair does not predict such a give-way. The settling's reference render should switch
-every part's modifiers off (all ids in the hook) and accept a part's modifiers as one
-unit.
+A part's modifiers are one unit of the arrangement loop (`pipeline._modifier_units`,
+registered with `register_arrangement_units`): key `modifier:<flattened part id>`, order
+`(plan section index, 2)` (after the section's variation, 0, and density, 1), one unit
+per placed part whose modifiers play as planned. Its reference plays none of them; its
+candidates are `planned` (all), then, where a spread plays with other modifiers,
+`without_spread` (all but the spread: the one modifier that moves a template's darkness,
+so the likeliest to cost an event; aim and direction move poses only). `_part_modifiers`
+reads `pipeline.unit_choice(key)`; the trace says "the modifier gave way to <event>"
+from `pipeline.unit_gave_way(key)` (for `without_spread`, whose dropped spread has no
+recorded event, "the modifier gave way to the song: with it an event plays worse than
+without it, and the part keeps its other modifiers"). `_retrace_arrangement` rewrites
+each part's modifier trace and warnings for the final choices, since a reused trial's
+trace predates later decisions. Repair (`rig_repair._modifier_give_way`) compares a
+section's event predictions with and without its parts' modifiers and says they "may
+give way". Its colour-change records at a boundary where either section plays modifiers
+end "its parts play modifiers, which this prediction does not count: the render decides
+on its own frames", because the dark entries and phases it reads are measured without
+them (the cheap half of closing the earlier known limit; the published dips themselves
+are unchanged). The known loop bug (an equal-signature candidate breaking) did not
+show in these tests: a modifier unit's candidates always differ in signature from the
+accepted arrangement, since its choice is part of the signature.
+
+**Acceptance (strict, independent).** The reviewers' `strict_worse.py`, adapted with
+modifiers as the variable (scratch `strict_worse_mod.py`): 100 random plans per rig of
+up to six sections over 24 bars, each section with 1-3 events (hits, cue-bound hits,
+colour, gobo, strobe, pulse, closed/open), colour, intensity and transitions at random,
+no motif or variation, and 1-3 offered modifiers per part; each rendered with and
+without its modifiers, every event and transition per head compared from the trace and
+the frames (a hit lost, farther from its cue or dimmer; a colour or gobo change lost,
+later or briefer; lit frames inside a closed span, fewer in a strobe or pulse; a
+transition that stops playing), and rendered twice for determinism:
+
+| Rig | Plans | Worse | Errors | Parts: all play / spread gave way, rest play / none | Render mean (max), arrangement renders mean (max) |
+|---|---|---|---|---|---|
+| family rig 720°/s, 120 BPM | 100 | 0 | 0 | 470 / 54 / 76 of 600 (87% play some) | 7.5 s (14.3), 8.3 (11) |
+| allowed_rig 150°/s, 79.5 BPM, 2 pickup beats | 100 | 0 | 0 | 460 / 40 / 100 of 600 (83% play some) | 10.3 s (22.7), 8.5 (13) |
+
+Every section of these plans has events, so these are the survival rates next to
+events.
+
+**Realistic song** (`realistic_plan` on `owner_like_rig`, 62 bars at 78.3 BPM, the
+reviewers' `timing2.py` with modifiers added: each part every key's last offered value):
+
+| Plan | Wall time | Render passes | Arrangement renders | Modifiers |
+|---|---|---|---|---|
+| transitions + events | 3.6 s | 2 | 0 | — |
+| + variation | 27.3 s | 14 | 7 | — |
+| + variation + modifiers | 69.9 s | 34 | 17 | 7 parts; 3 spreads gave way (chorus_1, break, chorus_2 A), the rest play |
+| transitions + events + modifiers | 45.2 s | 22 | 11 | the same |
 
 ## Per-family offer
 
@@ -143,13 +183,15 @@ effective variant and, for the cascades' spreads, a three-cycle compile per vari
 
 ## Verification
 
-Run in the worktree after the last edit, 2026-11-18 (the worktree's `.venv` synced
-offline with `--extra dev --extra anthropic --all-packages` first; it had no pytest):
+Run in the worktree after the last edit of the merge with `f9894cc8`, 2026-11-18 (the
+worktree's `.venv` synced offline with `--extra dev --extra anthropic --all-packages`
+first; it had no pytest):
 
-- `uv run pytest -q --no-cov -p no:cacheprovider`: 7487 passed, 30 skipped (full suite).
+- `uv run pytest -q --no-cov -p no:cacheprovider`: 7491 passed, 30 skipped (full suite;
+  only this count was written into this record afterwards, and no test reads it).
 - `uv run ruff check .`: all checks passed. `uv run ruff format --check .`: 1316 files
   already formatted. `uv run mypy packages`: no issues in 654 source files.
-- New: `tests/integration/test_mh_modifiers.py`, 68 tests: per family what it takes and
+- New: `tests/integration/test_mh_modifiers.py`, 67 tests: per family what it takes and
   why not; what each modifier changes; the gate's offer on four rigs and tempos (3/4
   included), without a topology, and on two heads (spreads play alike, not offered); per
   family and offered value a byte change against the plan without it, on the 720°/s rig
@@ -158,11 +200,14 @@ offline with `--extra dev --extra anthropic --all-packages` first; it had no pyt
   carrier; aim excluded on the snap's `wide` on heads allowed to 80°; a two-part section;
   repair = render on two plans x three meters/tempos x two rigs (unknown key and value,
   duplicates, not offered, case-blind spelling); repair reading a spread's darkness and
-  the render agreeing on a hit; failed modifiers change no frame; what plays is
-  identity; the give-way hook; the prompt line and the report lines. Each render test
+  repair saying a spread may give way where it darkens a hit, and the render's unit
+  giving way (frames as without it), or only the spread where aim plays beside it;
+  failed modifiers change no frame; what plays is identity; the units a plan registers;
+  the prompt line and the report lines. Each render test
   runs on both rigs.
 - Changed: `tests/regression/test_mh_pins.py` (137 fingerprints) and
-  `tests/golden/fixtures/combined_show_drop.json` (1) re-recorded for revision 18, each
+  `tests/golden/fixtures/combined_show_drop.json` (1) re-recorded for revision 18, then
+  20 at the merge (`repin.sh`'s mapping: 175 fingerprints mapped), each
   frame, `.xsq` and trace hash unchanged; `tests/unit/sequencer/moving_heads/compile/test_paths.py`
   counts the gate's placement compiles with the modifier offer stubbed (its own bar-1
   compiles are not placements).
@@ -171,14 +216,16 @@ offline with `--extra dev --extra anthropic --all-packages` first; it had no pyt
 
 - **Entry dips and dark-entry claims ignore modifiers.** `entry_dips`,
   `variant_entry_dips` and `RigOffer.dark_entries` are measured over the unmodified
-  variants. The render sizes every entry from the poses it plays, so nothing plays wrong,
-  but an aimed part enters from up to 10 degrees outside the logged dip's envelope, and
-  repair's boundary predictions (`dark_entry_heads`) read the unmodified claim.
+  variants. The render sizes every entry from the poses it plays and the arrangement loop
+  judges every event on the frames, so nothing plays worse; repair hedges its boundary
+  records where modifiers play, but its predictions still read the unmodified claims.
 - **Placements of a modified variant are not planned again** (argued above, and covered
   by render tests on three rigs at 79.5, 120 and 170 BPM in 4/4 and 140 BPM in 3/4,
   every frame inside range, speed and wheel darkness); a `--template-dir` template whose
   dark gaps depend on where a head is at a cut could still refuse a render under
   `on_unplayable: error`.
+- **Cost.** Each modifier unit is one more whole-song render per candidate (see the
+  realistic song above).
 
 ## PENDING-OWNER
 
@@ -190,6 +237,6 @@ offline with `--extra dev --extra anthropic --all-packages` first; it had no pyt
    mirror kept): the intended look?
 4. `direction: reverse` on the snap drops from its lifted aim and holds low, and on the
    flick and zoom wave sways the other way first: do they read as "reversed"?
-5. Whether modifiers fall under "the song outranks the arrangement" as variations do
-   (the brief says yes; the hook is ready, the settling is not plugged in).
+5. The order in which a part's modifiers give way (all, then all but the spread, then
+   none), and whether the render time the units add is acceptable (realistic song above).
 6. The cost: a paid re-plan of every song once (prompt and offer changed).

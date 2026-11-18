@@ -125,7 +125,7 @@ def _arrangement(
             {t: template.plays_as_base for t, template in offer.templates.items()},
         ),
         canonical=_canonical,
-        steps=steps,
+        modes=None if steps else {},
     )
 
 
@@ -162,15 +162,14 @@ def _give_way(
     beat_grid: BeatGrid | None,
 ) -> list[PlanRepair]:
     """Each section whose variation would make one of the plan's events worse than its
-    source variant does (`RenderingPipeline._settle_arrangement`, which decides on its own
-    frames): predicted from the published dark phases (`_event_records` under each) and,
+    source variant does (a prediction: `RenderingPipeline._choose_arrangement` decides on
+    its own frames): predicted from the published dark phases (`_event_records` under each) and,
     for a hit in the next section's first bar, the heads that always enter it dark after
     each variant (`RigOffer.dark_entry_heads`). Recorded for the planner: move the
     variation, or the event."""
     if beat_grid is None:
         return []
     source = _played(plan, offer, _arrangement(plan, offer, steps=False))
-    plays, source_plays = _modifier_plays(plan, offer, played), _modifier_plays(plan, offer, source)
     out: list[PlanRepair] = []
     sections = list(plan.sections)
     for at, section in enumerate(sections):
@@ -183,7 +182,7 @@ def _give_way(
         now = _event_records(
             section,
             section.events,
-            _parts(offer, section, played, plays),
+            _parts(offer, section, played),
             offer,
             beat_grid,
             palette,
@@ -192,7 +191,7 @@ def _give_way(
             _event_records(
                 section,
                 section.events,
-                _parts(offer, section, source, source_plays),
+                _parts(offer, section, source),
                 offer,
                 beat_grid,
                 palette,
@@ -239,10 +238,10 @@ def _give_way(
                     section_id=section.section_id,
                     item=f"variation {section.variation.value}",
                     action=RepairAction.RECORDED,
-                    reason="the variation would make the song's events worse than its "
-                    f"source variant does ({'; '.join(worse)}): it gives way to them and "
-                    "plays the source variant (the render decides on its own frames); move "
-                    "the variation or the event",
+                    reason="the variation may make the song's events worse than its source "
+                    f"variant does ({'; '.join(worse)}): the variation may give way and play "
+                    "the source variant (the render decides on its own frames); move the "
+                    "variation or the event",
                 )
             )
     return out
@@ -468,6 +467,62 @@ def _modifier_plays(
     return out
 
 
+def _modifier_give_way(
+    plan: ChoreographyPlan,
+    offer: RigOffer,
+    played: Mapping[tuple[str, int], str],
+    plays: Mapping[tuple[str, int], ModifierPlay],
+    palettes: Mapping[str, SectionPalette],
+    beat_grid: BeatGrid | None,
+) -> list[PlanRepair]:
+    """Each section whose parts' modifiers would make one of its events worse than
+    without them, as the published dark phases predict (`_event_records` with and
+    without them): recorded for the planner that they may give way
+    (`RenderingPipeline._choose_arrangement` decides on its own frames, the spread first
+    where it plays with others)."""
+    if beat_grid is None:
+        return []
+    out: list[PlanRepair] = []
+    for section in plan.sections:
+        own = {k for k, play in plays.items() if k[0] == section.section_id and play.applied}
+        if not own or not section.events:
+            continue
+        palette = palettes.get(section.section_id)
+        without = {k: v for k, v in plays.items() if k not in own}
+        now = _event_records(
+            section,
+            section.events,
+            _parts(offer, section, played, plays),
+            offer,
+            beat_grid,
+            palette,
+        )
+        then = set(
+            _event_records(
+                section,
+                section.events,
+                _parts(offer, section, played, without),
+                offer,
+                beat_grid,
+                palette,
+            )
+        )
+        worse = [reason for item, reason in now if (item, reason) not in then]
+        if worse:
+            out.append(
+                PlanRepair(
+                    section_id=section.section_id,
+                    item="modifiers",
+                    action=RepairAction.RECORDED,
+                    reason="the modifiers may make the song's events worse than without them "
+                    f"({'; '.join(worse)}): they may give way, the spread first where it "
+                    "plays with others (the render decides on its own frames); move the "
+                    "modifier or the event",
+                )
+            )
+    return out
+
+
 def _modifier_repairs(
     plan: ChoreographyPlan, plays: Mapping[tuple[str, int], ModifierPlay]
 ) -> list[PlanRepair]:
@@ -579,6 +634,7 @@ def repair_rig_intent(
     # Then the parts' modifiers on the variants they play, which events read.
     plays = _modifier_plays(plan, offer, played)
     repairs += _modifier_repairs(plan, plays)
+    repairs += _modifier_give_way(plan, offer, played, plays, palettes, beat_grid)
     sections: list[PlanSection] = []
     for section in plan.sections:
         palette = palettes.get(section.section_id)
@@ -711,7 +767,14 @@ def repair_rig_intent(
             note(item, RepairAction.RECORDED, reason)
         sections.append(section.model_copy(update=update) if update else section)
     if beat_grid is not None:
-        repairs += _boundary_repairs(sections, offer, palettes, beat_grid, played)
+        repairs += _boundary_repairs(
+            sections,
+            offer,
+            palettes,
+            beat_grid,
+            played,
+            {section_id for (section_id, _), play in plays.items() if play.applied},
+        )
         sections, transition_repairs = _transition_repairs(
             sections, offer, palettes, beat_grid, played
         )
@@ -1104,15 +1167,11 @@ def _wheel_plays(
             if late is not None and late <= bound and lit >= least
         )
 
-    frame_of = quantize_cue(round(beats[index])).actual_ms
-    bar_ms = _bar_length(beat_grid, index)
-
     def search(
         score: Callable[[int, Any], int], keep: Collection[str] = ()
     ) -> tuple[int, int, Any, str] | None:
-        """The beat within the move bounds (later first, within one bar in frames) the
-        most heads `score`, among those where every head in `keep` still shows it in
-        time (`events._play_wheel_events`)."""
+        """The beat within the move bounds (later first) the most heads `score`, among
+        those where every head in `keep` still shows it (`events._play_wheel_events`)."""
         first_bar, last_bar = part[1], part[2]
         reach = WHEEL_MOVE_BARS * beat_grid.beats_per_bar
         for side, offsets in (
@@ -1127,13 +1186,9 @@ def _wheel_plays(
                     continue
                 if not since < i < until or beats[i] >= end_ms:
                     continue
-                frame = quantize_cue(round(beats[i])).actual_ms
-                if abs(frame - frame_of) > WHEEL_MOVE_BARS * bar_ms:
-                    continue
                 trial = outcomes(i)
-                bound = WHEEL_LATE_BEATS * _beat_length(beats, i) + EFFECT_GRID_MS
                 lates = [trial[f][0] for f in keep if f in trial]
-                if any(late is None or late > bound for late in lates):
+                if any(late is None for late in lates):
                     continue
                 if count := score(i, trial):
                     candidates.append((count, -abs(offset), i, trial))
@@ -1148,19 +1203,22 @@ def _wheel_plays(
     reasons: list[str] = []
     brief = False
     if not well(index, found):
-        own_bound = WHEEL_LATE_BEATS * _beat_length(beats, index) + EFFECT_GRID_MS
-        kept = [f for f, (late, _, _, _) in found.items() if late is not None and late <= own_bound]
+        # As `events._play_wheel_events`: the rule as it was is the outcome to improve on;
+        # a beat shown well is preferred only where every head it shows the change on
+        # still shows it; else that outcome plays, brief.
+        baseline = (shown, index, found, None) if shown else search(in_time)
+        kept = [
+            f
+            for f, (late, _, _, _) in (found if baseline is None else baseline[2]).items()
+            if late is not None
+        ]
         better = search(well, keep=kept)
         if better is not None:
             _, chosen, found, direction = better
             shown = in_time(chosen, found)
-        else:
-            brief = bool(shown)
-            if not shown:
-                fallback = search(in_time)
-                if fallback is not None:
-                    shown, chosen, found, direction = fallback
-                    brief = True
+        elif baseline is not None:
+            shown, chosen, found, direction = baseline
+            brief = True
     if direction is not None or not shown:
         if direction is None:
             whys = sorted({why for _, why, _, _ in first.values() if why is not None})
@@ -1224,15 +1282,6 @@ def _frames_late(at: float, reveal: float) -> float:
     """How late a reveal at `reveal` is after the beat at `at`, each on the frame nearest
     it (as the render places both)."""
     return quantize_cue(round(reveal)).actual_ms - quantize_cue(round(at)).actual_ms
-
-
-def _bar_length(beat_grid: BeatGrid, index: int) -> float:
-    """The length of the bar the beat at `index` lies in (`events._bar_ms`)."""
-    position = beat_grid.bar_and_beat(index)
-    bars = beat_grid.bar_boundaries
-    if position is not None and position[0] < len(bars):
-        return float(bars[position[0]] - bars[position[0] - 1])
-    return beat_grid.beats_per_bar * _beat_length(beat_grid.beat_boundaries, index)
 
 
 def _beat_length(beats: Sequence[float], index: int) -> float:
@@ -1304,14 +1353,8 @@ def _hit_move(
         dark = _dark_heads_on(i, parts, offer, beat_grid, _beat_length(beats, i))
         return len(everyone) if dark is None else len(everyone - set(dark[1]))
 
-    frame_of = quantize_cue(round(beats[index])).actual_ms
-    bar_ms = _bar_length(beat_grid, index)
     offsets = [
-        o
-        for o in (*range(1, reach + 1), *range(-1, -reach - 1, -1))
-        if 0 <= index + o < len(beats)
-        and abs(quantize_cue(round(beats[index + o])).actual_ms - frame_of)
-        <= HIT_MOVE_BARS * bar_ms
+        o for o in (*range(1, reach + 1), *range(-1, -reach - 1, -1)) if 0 <= index + o < len(beats)
     ]
     found = [(index + o, n) for o in offsets if (n := lit(index + o))]
     if not found:
@@ -1373,10 +1416,14 @@ def _boundary_repairs(
     palettes: Mapping[str, SectionPalette],
     beat_grid: BeatGrid,
     variants: Mapping[tuple[str, int], str] | None = None,
+    modified: Collection[str] = (),
 ) -> list[PlanRepair]:
     """The colour changes between consecutive sections that set colours which the render
     may not play from the boundary (see `repair_rig_intent`), one record per section;
-    each head judged on its own wheel change time."""
+    each head judged on its own wheel change time. Where a section on either side of the
+    boundary plays modifiers (`modified`), which move where its heads are and when they
+    are dark, the published dark entries and phases read are those without them, so the
+    record says it may not hold."""
     repairs: list[PlanRepair] = []
     beats = beat_grid.beat_boundaries
     bars = beat_grid.bar_boundaries
@@ -1428,6 +1475,12 @@ def _boundary_repairs(
             f"({'/'.join(str(ms) for ms in sorted(set(slow.values())))} ms dark) does not fit "
             f"half the beat before the section ({beat / 2:.0f} ms)"
         )
+        hedge = (
+            "; its parts play modifiers, which this prediction does not count: the render "
+            "decides on its own frames"
+            if {before.section_id, after.section_id} & set(modified)
+            else ""
+        )
         if never:
             repairs.append(
                 PlanRepair(
@@ -1437,7 +1490,7 @@ def _boundary_repairs(
                     reason=f"{why}, and its template has no dark moment long enough to turn "
                     f"the wheel: where {', '.join(never)} play straight into the section they "
                     "keep the previous section's colour; change colour where the heads enter "
-                    "dark, or choose a template with a dark phase",
+                    "dark, or choose a template with a dark phase" + hedge,
                 )
             )
         elif late:
@@ -1449,7 +1502,7 @@ def _boundary_repairs(
                     action=RepairAction.RECORDED,
                     reason=f"{why}: where {', '.join(late)} play straight into the section the "
                     f"change waits for the template's first dark moment long enough, beat "
-                    f"{round_beats(first)} of its cycle, past half the section",
+                    f"{round_beats(first)} of its cycle, past half the section" + hedge,
                 )
             )
     return repairs

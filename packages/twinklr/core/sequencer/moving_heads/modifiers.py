@@ -39,12 +39,16 @@ plays every modifier offered for its template that fits the variant it plays, in
 fixed order of `MODIFIERS` whatever order the plan lists them in; each other entry is not
 applied, with why and the template's valid set: a key the renderer does not know, a value
 its key does not take, a second entry for a key (the first plays), a value not offered for
-the template here, a value that does not fit the variant played, or the part's modifiers
-giving way to the song (`gave_way`: the render's per-part switch,
-`RenderingPipeline._modifiers_give_way`, where the song-outranks settling is to turn a
-part's modifiers off; nothing sets it yet). Without a gate result for a template, every
-value `candidates` applies plays, as a template the gate did not judge plays every preset
-it declares. Every value here is a first proposal for the owner's W10 view.
+the template here, a value that does not fit the variant played, or one the render
+withdrew because it gave way to the song (`withdrawn`). **The song outranks the
+arrangement:** a part's modifiers are one arrangement unit
+(`pipeline._modifier_units`): the render plays them only where no event of the song is
+worse than without them (`pipeline.worse`), first all of them, then, where a spread plays
+with others, all but the spread (a spread is the one modifier that moves a template's
+darkness), else none, traced with the event they gave way to. Without a gate result for
+a template, every value `candidates` applies plays, as a template the gate did not judge
+plays every preset it declares. Every value here is a first proposal for the owner's W10
+view.
 """
 
 from __future__ import annotations
@@ -334,12 +338,12 @@ def resolve_modifiers(
     offered: TemplateOffer | None,
     variant: str,
     *,
-    gave_way: str | None = None,
+    withdrawn: Mapping[str, str] | None = None,
 ) -> ModifierPlay:
     """What a part's `asked` modifiers play on `template` (canonical, its base) playing
     `variant` (`base` for no preset), over the gate's `offered` template (None where no
-    gate judged it); with `gave_way`, the song event the part's modifiers gave way to, so
-    none plays (module docstring)."""
+    gate judged it); `withdrawn`, per key, why the render does not play it here (it gave
+    way to the song: `pipeline.RenderingPipeline._part_modifiers`) (module docstring)."""
     valid = offered_set(offered, template)
     excluded = {} if offered is None else offered.modifier_exclusions.get(variant, {})
     refused = {} if offered is None else offered.modifier_refusals
@@ -363,9 +367,9 @@ def resolve_modifiers(
         elif spelled((key, value)) in excluded:
             seen[key] = value
             why = f"it does not fit {variant}: {excluded[spelled((key, value))]}"
-        elif gave_way is not None:
+        elif key in (withdrawn or {}):
             seen[key] = value
-            why = f"the part's modifiers gave way to {gave_way}"
+            why = (withdrawn or {})[key]
         else:
             seen[key] = value
             applied.append((key, value))
