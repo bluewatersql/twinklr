@@ -120,15 +120,16 @@ to the owner.
 
 **As built (W10d, 2026-11-18; evidence
 [2026-11-18-w10d-density](../evidence/2026-11-18-w10d-density/README.md)).** `density.py`,
-renderer revision 18; BALANCED renders the same frames. Departures from §2, each recorded
+renderer revision 19; BALANCED renders the same frames. Departures from §2, each recorded
 here:
-- *SPARSE yields to the song by construction.* Every head plays as BALANCED over each
-  planner event's seen span (`events.yield_spans` with hits) widened by a beat each side,
-  and over each colour or gobo change's whole lit run as BALANCED shows it (a shorter
-  protection made a colour "shown more briefly", which the song-outranks rule counts as
-  worse). SPARSE runs after the part's events, so repair does not overlay SPARSE darkness
-  on the published phases for its event predictions (§2's "repair overlays"): they are
-  BALANCED's, and the agreement tests prove the render's events equal BALANCED's.
+- *SPARSE yields to the song.* SPARSE runs after the part's events, so its darkness
+  changes no event's own decisions; every head plays as BALANCED over what `pipeline.worse`
+  judges an event by (`density.sparse_protected`: a strobe's or `pulse`'s first 25 frames,
+  half a beat each side of a hit, a colour or gobo change's lit run as BALANCED shows it).
+  The lit run cannot be narrowed: `worse` counts any shorter run as "shown more briefly",
+  so a narrower protection would only turn a partial SPARSE into a whole-section
+  give-way. Repair does not overlay SPARSE darkness for its event predictions (§2's
+  "repair overlays"): the events are BALANCED's or the section gives way.
 - *SPARSE's lit rule and fallback.* "Every head lit at least once" is judged on the
   frames (three running, as a hit's lit run), per part; the alternation restarts in each
   part on that part's variant's cycle. Fallback order: every cycle, every half cycle, then
@@ -144,9 +145,11 @@ here:
   cues included, so an accent whose beat falls inside a transition's window is dropped
   (traced) rather than moved past it; an accent is also dropped where its beat or frames
   fall inside a planner event's seen span widened by a beat (one rule with SPARSE).
-- *The give-way hook* is `RenderingPipeline.density_give_way` (`density.DensityGiveWay`:
-  play BALANCED, or drop named accents); the give-way loop being built for the arrangement
-  sets it (integration pending).
+- *Give-way* (after f9894cc8): each SPARSE or BUSY section is an arrangement unit
+  (`pipeline._density_units`, key `density:<section>`, after its variation, candidate
+  "planned", reference BALANCED), traced "density gave way to <event>". BUSY gives way
+  whole: `worse` names events, not the accents near them, and the accents already keep
+  clear of events and transitions. REST is not a unit. Revision 19.
 - *Offer and contract.* `RigOffer.sparse_halves` (left out of dumps when None) and a
   per-template cycle note in the prompt; the `density` field's description and the
   planner and judge prompts now say what renders (re-keys the planner cache).
@@ -195,9 +198,10 @@ Departures from §1 and §3, each recorded here:
   alike; FASTER falls back to a narrower reach.
 - *The song outranks the arrangement* (integrator decision after the owner render at
   bcefff0f, revision 17): a variation may never make a lyric-bound or planned event worse
-  than its source variant; the render renders the plan with steps off and as resolved and
-  gives way where an event worsens (`_settle_arrangement`); repair predicts it for the
-  planner. FASTER falls back one reach step at most; near-twin variants (3 degrees) are
+  than its source variant; revision 18 builds the arrangement up greedily from the
+  reference (every step off), unit by unit in plan order, accepting the first candidate
+  under which no event is worse (`pipeline.worse`, `ArrangementUnit`); repair predicts
+  where a variation may give way. FASTER falls back one reach step at most; near-twin variants (3 degrees) are
   not offered.
 - *Code-owned relation* (W10b/c review M1): plan time derives and overwrites
   `motif_relation`/`motif_source_id`; the render derives them again, keeping only a

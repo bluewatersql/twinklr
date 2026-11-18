@@ -35,12 +35,10 @@ from tests.unit.sequencer.moving_heads.test_events_render import (
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.agents.sequencer.moving_heads.rig_repair import repair_rig_intent
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
-from twinklr.core.sequencer.moving_heads.density import DensityGiveWay
 from twinklr.core.sequencer.moving_heads.events import HIT_LATE_FRAMES, HIT_MIN_LIT_FRAMES
 from twinklr.core.sequencer.moving_heads.pipeline import (
     RenderingPipeline,
-    _event_outcomes,
-    _worse_events,
+    worse,
 )
 from twinklr.core.sequencer.moving_heads.song_intent import rig_offer
 
@@ -174,10 +172,7 @@ def test_busy_gives_way_to_the_planners_events_and_transitions(kind: str) -> Non
         assert "color at bar 5 beat 1's seen span" in reasons[(head, 5)]
         assert "hit at bar 7 beat 2's seen span" in reasons[(head, 7)]
     assert busy.render_record is not None and plain.render_record is not None
-    assert (
-        _worse_events(_event_outcomes(plain.render_record), _event_outcomes(busy.render_record))
-        == []
-    )
+    assert worse(plain, busy) == []
     assert windows(busy) == windows(plain)
     (_, (start, end)) = windows(busy)[0]
     for head in HEADS:
@@ -230,30 +225,3 @@ def test_busy_over_a_quarter_of_the_song_is_fed_back_lowest_energy_first() -> No
     assert [r.section_id for r in said] == ["verse", "bridge"]
     assert all("more than 25%" in r.reason for r in said)
     assert repaired.sections == sections
-
-
-def test_busy_drops_only_the_accents_the_give_way_hook_names() -> None:
-    def render(give_way: dict[str, DensityGiveWay]) -> RenderingPipeline:
-        pipeline = RenderingPipeline(
-            choreography_plan=ChoreographyPlan(
-                sections=[m.plan_section("s1", 1, 8, "mirror_wings", density="BUSY")],
-                overall_strategy="",
-            ),
-            beat_grid=grid(120),
-            fixture_group=rig(),
-            job_config=m.family_job(HEADS),
-            media_file="silence.wav",
-        )
-        pipeline.density_give_way = give_way
-        pipeline.render()
-        return pipeline
-
-    placed = density_of(render({}))["placed"]
-    at = placed["MH2"][3]
-    why = "density gave way to its colour at bar 4 beat 1"
-    entry = density_of(render({"s1": DensityGiveWay(accents={("MH2", at): why})}))
-    assert entry["placed"]["MH2"] == [t for t in placed["MH2"] if t != at]
-    assert entry["placed"]["MH1"] == placed["MH1"]
-    assert [(d["fixture_id"], d["at_ms"], d["reason"]) for d in entry["dropped"]] == [
-        ("MH2", at, why)
-    ]

@@ -31,7 +31,7 @@ same rate one reach step narrower where it does (never two: that would read as N
 noted ("faster here needs a narrower reach"). **The song outranks the arrangement:** a
 section whose step would make one of the plan's events worse than with every part on its
 source variant takes its next candidate, and at the last gives way to the event and plays
-its source (`GiveWay`, `RenderingPipeline._settle_arrangement`). So every carrier varies the introduced look
+its source (`MODES`, `RenderingPipeline`'s arrangement units). So every carrier varies the introduced look
 by one step: a restating section plays the
 introducer's variant, and a RESOLVE with no variation set steps from it SLOWER, else
 NARROW, else restates. The step carries the source's reach and rate *class* across
@@ -261,14 +261,13 @@ def with_motif_relations(
     return plan.model_copy(update={"sections": sections, "repairs": repairs})
 
 
-@dataclass(frozen=True)
-class GiveWay:
-    """A section whose variation gave way to its events (`RenderingPipeline.render`): the
-    variants it may not play (each worsened an event against its source variant) and the
-    event it gave way to, in words."""
-
-    rejected: frozenset[str]
-    because: str
+MODES = ("planned", "step", "fallback", "reference")
+"""How a section's variation is resolved (`resolve_arrangement`'s `modes`): `planned`, the
+step with its fallbacks (a FASTER step one reach step narrower where the step is not
+offered); `step`, the step alone; `fallback`, the FASTER step's narrower reach alone;
+`reference`, no step: every part plays what it would with the section's variation NONE
+(its motif's introduced look, else its own preset), what the song's events are judged
+against (`RenderingPipeline`'s arrangement units)."""
 
 
 def resolve_arrangement(
@@ -276,15 +275,15 @@ def resolve_arrangement(
     options: Callable[[str], VariantOptions],
     canonical: Callable[[str], str] = lambda template_id: template_id,
     *,
-    give_way: Mapping[str, GiveWay] | None = None,
-    steps: bool = True,
+    modes: Mapping[str, str] | None = None,
+    gave_way: Mapping[str, str] | None = None,
 ) -> dict[str, SectionArrangement]:
     """Per plan section with a motif or a variation, its relation and each part's resolved
     variant (module docstring); `options` gives a template's (canonical id) effective and
-    admitted variants, `canonical` a template id's canonical form. `give_way`, per section,
-    the variants it may not play (the next candidate plays: a FASTER step's narrower
-    reach, else the source variant); without `steps` every part plays its source (the
-    song's events are judged against that)."""
+    admitted variants, `canonical` a template id's canonical form. `modes`, per section,
+    how its variation resolves (`MODES`; a section `modes` leaves out plays `reference`;
+    without `modes` every section is `planned`); `gave_way`, per section in `reference`
+    mode because its variation gave way to an event, that event in words (traced)."""
     relations = motif_relations(plan, keep_resolve=True)
     played: dict[tuple[str, int], tuple[str, str]] = {}
     """Per (section, part index), the template and the variant it plays."""
@@ -312,8 +311,8 @@ def resolve_arrangement(
                 relation,
                 source_id,
                 played,
-                (give_way or {}).get(section.section_id),
-                steps,
+                "planned" if modes is None else modes.get(section.section_id, "reference"),
+                (gave_way or {}).get(section.section_id),
             )
             played[section.section_id, index] = (template_id, variant.plays)
             parts.append(variant)
@@ -338,8 +337,8 @@ def _resolve_part(
     relation: str | None,
     source_id: str | None,
     played: Mapping[tuple[str, int], tuple[str, str]],
-    give_way: GiveWay | None = None,
-    stepping: bool = True,
+    mode: str = "planned",
+    gave_way: str | None = None,
 ) -> PartVariant:
     asked = section.variation.value
     source_parts = [k for k in played if k[0] == source_id]
@@ -357,7 +356,7 @@ def _resolve_part(
             for (section_id, _), (template, variant) in played.items()
             if template == template_id and section_id != section.section_id
         ]
-        if previous and asked != "NONE" and section.motif_id is None:
+        if previous and asked != "NONE" and section.motif_id is None and mode != "reference":
             source = previous[-1]
             earlier = next(
                 section_id
@@ -369,13 +368,12 @@ def _resolve_part(
             source = own
             relative_to = "its own preset" if named and own == named else "its effective variant"
     steps: list[str] = []
-    if not stepping:
+    if mode == "reference":
         steps = []
     elif asked != "NONE":
         steps = [asked]
     elif relation == "RESOLVE":
         steps = ["SLOWER", "NARROW"]
-    rejected = frozenset() if give_way is None else give_way.rejected
 
     def fallback(why: str) -> PartVariant:
         if source in choice.admitted:
@@ -402,7 +400,11 @@ def _resolve_part(
         )
 
     if not steps:
-        return fallback("")
+        return fallback(
+            ""
+            if gave_way is None
+            else f"the variation gave way to {gave_way}: it plays the source variant"
+        )
     position = grid_position(source)
     if position is None:
         return fallback(f"{asked}: the source variant {source!r} is not on the reach/rate grid")
@@ -421,6 +423,10 @@ def _resolve_part(
         candidates = [target]
         if step == "FASTER" and place[0] > 0:
             candidates.append(grid_variant(place[0] - 1, place[1]))
+        if mode == "step":
+            candidates = candidates[:1]
+        elif mode == "fallback":
+            candidates = candidates[1:]
         note = None
         chosen = None
         for candidate in candidates:
@@ -430,9 +436,6 @@ def _resolve_part(
                     if candidate in choice.plays_as_base
                     else f"{candidate!r} of {template_id} is not admitted on this rig and song"
                 )
-            elif candidate in rejected:
-                assert give_way is not None
-                why = f"{candidate!r} gave way to {give_way.because}"
             else:
                 chosen = candidate
                 break
@@ -453,11 +456,6 @@ def _resolve_part(
             plays=target,
             named=named,
             note=note,
-        )
-    if give_way is not None and any("gave way to" in reason for reason in reasons):
-        return fallback(
-            f"the variation gave way to {give_way.because} ({'; '.join(reasons)}): it plays "
-            "the source variant"
         )
     return fallback("; ".join(reasons) + ": it plays the source variant")
 

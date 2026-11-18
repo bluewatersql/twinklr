@@ -39,7 +39,6 @@ from twinklr.core.sequencer.moving_heads.compile.preset import apply_preset
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import whole_period_cycle
 from twinklr.core.sequencer.moving_heads.density import (
     REST_INDEX,
-    DensityGiveWay,
     play_sparse,
     rest_record,
     with_rest,
@@ -56,9 +55,8 @@ from twinklr.core.sequencer.moving_heads.pipeline import (
     _dark_over_spans,
     _dark_windows,
     _dip_span,
-    _event_outcomes,
-    _worse_events,
     admit_templates,
+    worse,
 )
 from twinklr.core.sequencer.moving_heads.song_intent import rig_offer
 from twinklr.core.sequencer.moving_heads.templates import get_template
@@ -617,10 +615,7 @@ def test_sparse_never_makes_a_planner_event_worse(kind: str, template_id: str) -
     sparse = play([m.plan_section("s1", 1, 8, template_id, events=EVENTS, density="SPARSE")], kind)
     plain = play([m.plan_section("s1", 1, 8, template_id, events=EVENTS)], kind)
     assert sparse.render_record is not None and plain.render_record is not None
-    assert (
-        _worse_events(_event_outcomes(plain.render_record), _event_outcomes(sparse.render_record))
-        == []
-    )
+    assert worse(plain, sparse) == []
     assert density_of(sparse)["plays"].startswith("half the heads dark")
     assert_physical(sparse, plain)
 
@@ -673,12 +668,24 @@ def test_transitions_into_and_out_of_sparse_keep_their_windows(kind: str, mode: 
     assert_physical(sparse)
 
 
-@pytest.mark.parametrize("level", ["REST", "SPARSE", "BUSY"])
-def test_a_section_whose_density_gives_way_plays_balanced_and_says_why(level: str) -> None:
-    """The give-way hook (`RenderingPipeline.density_give_way`): a section set to give way
-    renders BALANCED's frames, traced with why."""
+@pytest.mark.parametrize("level", ["SPARSE", "BUSY"])
+def test_a_density_that_makes_the_song_worse_gives_way_to_balanced(
+    level: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """SPARSE and BUSY are arrangement units: where `worse` finds an event worse with the
+    density as planned, the section plays BALANCED's frames, traced with the event."""
+    from twinklr.core.sequencer.moving_heads import pipeline as module
 
-    def render(density: str, give_way: dict[str, DensityGiveWay]) -> RenderingPipeline:
+    judged = module.worse
+
+    def worse(reference: RenderingPipeline, trial: RenderingPipeline) -> list[str]:
+        if trial.unit_choice("density:s1") == "planned":
+            return ["its hit at bar 2 beat 1 in section 's1' (lost on MH1)"]
+        return judged(reference, trial)
+
+    monkeypatch.setattr(module, "worse", worse)
+
+    def render(density: str) -> RenderingPipeline:
         pipeline = RenderingPipeline(
             choreography_plan=ChoreographyPlan(
                 sections=[m.plan_section("s1", 1, 8, "mirror_wings", density=density)],
@@ -689,11 +696,33 @@ def test_a_section_whose_density_gives_way_plays_balanced_and_says_why(level: st
             job_config=m.family_job(HEADS),
             media_file="silence.wav",
         )
-        pipeline.density_give_way = give_way
         pipeline.render()
         return pipeline
 
-    why = "density gave way to its hit at bar 2 beat 1"
-    gave_way = render(level, {"s1": DensityGiveWay(balanced=why)})
-    assert gave_way.frames == render("BALANCED", {}).frames
-    assert density_of(gave_way) == {"level": level, "gave_way": why}
+    gave_way, plain = render(level), render("BALANCED")
+    assert gave_way.frames == plain.frames
+    assert density_of(gave_way) == {
+        "level": level,
+        "gave_way": "density gave way to its hit at bar 2 beat 1 in section 's1' (lost on MH1)",
+    }
+    assert gave_way.arrangement_renders == 2  # the reference, and the density tried
+
+
+def test_rest_is_not_an_arrangement_unit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """REST is dark by definition: it never gives way and takes no trial render."""
+    from twinklr.core.sequencer.moving_heads import pipeline as module
+
+    monkeypatch.setattr(module, "worse", lambda reference, trial: ["anything"])
+    pipeline = RenderingPipeline(
+        choreography_plan=ChoreographyPlan(
+            sections=[m.plan_section("s1", 1, 8, "mirror_wings", density="REST")],
+            overall_strategy="",
+        ),
+        beat_grid=grid(120),
+        fixture_group=rig(),
+        job_config=m.family_job(HEADS),
+        media_file="silence.wav",
+    )
+    pipeline.render()
+    assert pipeline.arrangement_renders == 0
+    assert density_of(pipeline)["plays"] == "dark"

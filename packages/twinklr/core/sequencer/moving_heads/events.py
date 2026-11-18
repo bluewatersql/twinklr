@@ -43,7 +43,7 @@ not.
   darkness is the dimmer's inside a cue (a template's dimmer dark phase, a closed event)
   with no wheel moving; a head dark between its template's cues does not play it; where
   every head is dark on the beat (a show's rest, a repositioning, a wheel change) it
-  moves within `HIT_MOVE_BARS` (counted in frames): a hit bound to a lyric cue to the beat
+  moves within `HIT_MOVE_BARS` (in beats on the grid): a hit bound to a lyric cue to the beat
   after its own where a head shows it and that beat is at or after the lyric (a hit
   never lands before its lyric when the next beat serves), else the beat nearest the
   lyric (the later of equals); another to the beat the most heads show,
@@ -67,10 +67,9 @@ not.
   stays lit showing it for `SHOWN_FOR_BEATS` of the beat; where no head does on its own
   beat (the template darkens the heads soon after the reveal), it moves, within the same
   bounds, to the beat where the most heads show it well, among the beats where every
-  head that shows it in time on its own beat still does (a move never loses one); where
-  no beat within reach does, it plays as above and each head is traced `brief` ("shown
-  for N ms"), which repair feeds back. A move stays within `WHEEL_MOVE_BARS` bar(s) of
-  the event's frame, counted in frames. Inside a template overlay the event takes over the overlay's state from
+  head that shows it on its own beat still does (a move may only improve on the unmoved
+  outcome); where no beat within reach does, it plays as above and each head is traced
+  `brief` ("shown for N ms"), which repair feeds back. Inside a template overlay the event takes over the overlay's state from
   the beat.
 
 Every bar and beat is counted from the bar's downbeat (`BeatGrid.beat_index`), as the
@@ -572,18 +571,6 @@ def _beat_ms(beat_grid: BeatGrid, time_ms: float) -> float:
     beats = beat_grid.beat_boundaries
     index = min(max(bisect.bisect_right(beats, time_ms), 1), len(beats) - 1)
     return beats[index] - beats[index - 1]
-
-
-def _bar_ms(beat_grid: BeatGrid, event: TimedEvent) -> float:
-    """The length of the event's bar (on the grid's bars, else its beats)."""
-    position = beat_grid.bar_and_beat(event.beat_index)
-    bars = beat_grid.bar_boundaries
-    if position is not None and position[0] < len(bars):
-        start = bars[position[0] - 1]
-        end = bars[position[0]] if position[0] < len(bars) else None
-        if end is not None:
-            return float(end - start)
-    return beat_grid.beats_per_bar * _beat_ms(beat_grid, event.frame_ms)
 
 
 def _shortest_beat(beat_grid: BeatGrid, start_ms: int, end_ms: int) -> float:
@@ -1335,9 +1322,9 @@ def _play_wheel_events(
             trial: Callable[[TimedEvent], dict[str, Any]] = trial,
             keep: Collection[str] = (),
         ) -> tuple[int, TimedEvent, dict[str, Any], str] | None:
-            """The beat within the move bounds (later first, within one bar in frames)
+            """The beat within the move bounds (later first, in beats on the grid)
             the most heads `score`, among those where every head in `keep` still shows the
-            change in time."""
+            change."""
             for side, offsets in (
                 ("later", range(1, reach + 1)),
                 ("earlier", range(-1, -reach - 1, -1)),
@@ -1350,11 +1337,9 @@ def _play_wheel_events(
                     frame = quantize_cue(round(beats[i])).actual_ms
                     if not (since < frame < until and start <= frame < end):
                         continue
-                    if abs(frame - event.frame_ms) > WHEEL_MOVE_BARS * _bar_ms(beat_grid, event):
-                        continue
                     moved = replace(event, beat_index=i, beat_ms=beats[i], frame_ms=frame)
                     found = trial(moved)
-                    if any(not _shown_in_time(found[f][1], moved, beat_grid) for f in keep):
+                    if any(not found[f][2] or found[f][1].get("reveal_ms") is None for f in keep):
                         continue
                     if count := score(found, moved):
                         candidates.append((count, -abs(offset), moved, found))
@@ -1367,25 +1352,28 @@ def _play_wheel_events(
         chosen, direction, shown = event, None, in_time(outcomes, event)
         brief = False
         if not well(outcomes, event):
-            # Shown only briefly on its beat, or not in time: a beat within reach where some
-            # head shows it well is preferred; else the old rule, traced brief.
-            # A move never loses a head that shows the change on its own beat.
+            # The rule as it was (its own beat where some head shows it in time, else the
+            # beat within reach the most heads do) is the outcome to improve on: a beat where
+            # some head shows it well is preferred only where every head that outcome shows
+            # it on still does (a move may only improve on the unmoved outcome); else that
+            # outcome plays, traced brief.
+            baseline: tuple[int, TimedEvent, dict[str, Any], str | None] | None = (
+                (shown, event, outcomes, None) if shown else search(in_time)
+            )
             kept = [
                 f
-                for f, (_, record, _) in outcomes.items()
-                if _shown_in_time(record, event, beat_grid)
+                for f, (_, record, turned) in (
+                    outcomes if baseline is None else baseline[2]
+                ).items()
+                if turned and record.get("reveal_ms") is not None
             ]
             better = search(well, keep=kept)
             if better is not None:
                 _, chosen, outcomes, direction = better
                 shown = in_time(outcomes, chosen)
-            else:
-                brief = bool(shown)
-                if not shown:
-                    fallback = search(in_time)
-                    if fallback is not None:
-                        shown, chosen, outcomes, direction = fallback
-                        brief = True
+            elif baseline is not None:
+                shown, chosen, outcomes, direction = baseline
+                brief = True
         position = beat_grid.bar_and_beat(chosen.beat_index)
         # Moving it changes no frame where every head turns the same as on its own beat
         # (dark on both, shown from the same next reveal): then "moved" only names where
@@ -1600,28 +1588,22 @@ def apply_hits(
         def serves(found: Mapping[str, Any], need: frozenset[str] = need) -> bool:
             return bool(found) and need <= found.keys()
 
-        def within_bar(index: int, event: TimedEvent = event) -> bool:
-            """Whether the beat at `index` lands within `HIT_MOVE_BARS` bar(s) of the
-            event's frame, counted in frames (a beat count alone can round past it)."""
-            frame = quantize_cue(round(beats[index])).actual_ms
-            return abs(frame - event.frame_ms) <= HIT_MOVE_BARS * _bar_ms(beat_grid, event)
-
         def moved(
             serves: Callable[[Mapping[str, Any]], bool],
             event: TimedEvent = event,
             home: int = home,
             able_on: Callable[[int], dict[str, tuple[int, str, int]]] = able_on,
         ) -> tuple[int, dict[str, tuple[int, str, int]], str] | None:
-            """The beat the hit moves to among those that `serves` (within one bar, in
-            frames): a cue-bound hit's beat after its own where that is at or after its
-            lyric, else its nearest the lyric (the later of equals); another's the most
-            heads show, a later one first."""
+            """The beat the hit moves to among those that `serves` (within `HIT_MOVE_BARS`
+            in beats on the grid): a cue-bound hit's beat after its own where that is at or
+            after its lyric, else its nearest the lyric (the later of equals); another's the
+            most heads show, a later one first."""
             if event.cue_ms is not None:
                 cue_ms = event.cue_ms
                 nearby = [
                     offset
                     for offset in (*range(1, reach + 1), *range(-1, -reach - 1, -1))
-                    if 0 <= home + offset < len(beats) and within_bar(home + offset)
+                    if 0 <= home + offset < len(beats)
                 ]
                 # At or after the lyric, no later than the beat after its own.
                 after = [
@@ -1650,9 +1632,7 @@ def apply_hits(
                 candidates = [
                     (len(found), -abs(offset), home + offset, found)
                     for offset in offsets
-                    if 0 <= home + offset < len(beats)
-                    and within_bar(home + offset)
-                    and serves(found := able_on(home + offset))
+                    if 0 <= home + offset < len(beats) and serves(found := able_on(home + offset))
                 ]
                 if candidates:
                     _, _, at, found = max(candidates, key=lambda c: (c[0], c[1]))
@@ -1673,7 +1653,10 @@ def apply_hits(
                     "a head that plays it without the transitions is dark on its beat with "
                     "them; it moves where every such head shows it"
                 )
-            if found is not None:
+            # A move may only improve on the unmoved outcome: never lose a head that
+            # shows it on its own beat, unless it moves for the heads a transition would
+            # otherwise lose it on (`required`), which the rule protects first.
+            if found is not None and (need or able.keys() <= found[1].keys()):
                 chosen, able, direction = found
         beat = beats[chosen]
         position = beat_grid.bar_and_beat(chosen)

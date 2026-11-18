@@ -1,8 +1,9 @@
-"""The song outranks the arrangement (`RenderingPipeline._settle_arrangement`): a section's
-variation never makes one of the plan's events worse than the same plan with every part on
-its source variant (no event lost on a head, a hit farther from its lyric or beat, a colour
-shown later or more briefly), and where it would, it takes its next candidate or gives
-way, traced; repair predicts it for the planner. Every rig here narrows its allowed ranges
+"""The song outranks the arrangement (`RenderingPipeline._choose_arrangement`, `worse`):
+the arrangement is built up from the reference (every variation step off), and a section's
+variation plays only where no event anywhere is worse than in the reference (no event lost
+on a head, a hit farther from its lyric or beat, a colour shown later or more briefly, ...);
+else it takes its next candidate or gives way, traced; repair predicts where it may.
+Every rig here narrows its allowed ranges
 (`allowed_rig`) and most move at 150 degree/s."""
 
 from __future__ import annotations
@@ -21,10 +22,9 @@ from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.sequencer.moving_heads.pipeline import (
     RenderingPipeline,
     TemplateAdmission,
-    _event_outcomes,
-    _worse_events,
     admit_templates,
 )
+from twinklr.core.sequencer.moving_heads.pipeline import worse as worse_than
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 FAMILIES = (
@@ -94,11 +94,8 @@ def played(
     return pipeline, list(repaired.repairs)
 
 
-def worse(varied: RenderingPipeline, plain: RenderingPipeline) -> list[tuple[str, str]]:
-    assert varied.render_record is not None and plain.render_record is not None
-    return _worse_events(
-        _event_outcomes(plain.render_record), _event_outcomes(varied.render_record)
-    )
+def worse(varied: RenderingPipeline, plain: RenderingPipeline) -> list[str]:
+    return worse_than(plain, varied)
 
 
 def owner_shaped(variation: str, beat_grid: BeatGrid) -> list[Any]:
@@ -146,7 +143,8 @@ def test_the_owner_shaped_break_never_costs_an_event(variation: str) -> None:
     step = looks["break"]["arrangement"]["variation"]
     gave_way = "gave way" in (step.get("reason") or "")
     # Repair predicts it for the planner (from the published dark phases).
-    assert gave_way == any(r.section_id == "break" and "gives way" in r.reason for r in said)
+    # Repair predicts where a variation may give way; the render decides.
+    assert all(r.reason.startswith("the variation may") for r in said if "events worse" in r.reason)
     if gave_way:
         assert step["plays"] == step["from"]
         assert any(
@@ -240,3 +238,124 @@ def test_a_colour_change_shown_until_an_exit_is_counted_to_the_exit() -> None:
         if head.get("shown_ms") is None:
             continue
         assert head["shown_ms"] + head["shown_for_ms"] <= exit_["window_ms"][0] + 20
+
+
+def test_a_harmless_variation_after_one_that_gives_way_still_plays() -> None:
+    """The arrangement is built up from the reference in plan order: the break's FASTER
+    costs its own lyric hits and the chorus's downbeat hit, so it gives way; the chorus's
+    WIDEN, judged with the break at its source variant, costs nothing and plays (it was
+    once blamed for the break's loss and given up for nothing)."""
+    beat_grid = m.pickup_grid(60_000 / 79.5, 12, pickup=2)
+    fg = slow(owner_like_rig())
+    admission = gate(fg, beat_grid)
+    sections = owner_shaped("FASTER", beat_grid)
+    chorus = sections[2].model_copy(
+        update={"motif_id": "m", "variation": type(sections[2].variation)("WIDEN")}
+    )
+    sections = [sections[0], sections[1], chorus]
+    pipeline, _ = played(sections, fg, beat_grid, admission)
+    plain, _ = played(
+        [s.model_copy(update={"variation": type(s.variation)("NONE")}) for s in sections],
+        fg,
+        beat_grid,
+        admission,
+    )
+
+    assert worse(pipeline, plain) == []
+    assert pipeline.render_record is not None
+    looks = {look["section_id"]: look for look in pipeline.render_record["section_looks"]}
+    brk = looks["break"]["arrangement"]["variation"]
+    chorus_step = looks["chorus"]["arrangement"]["variation"]
+    if "gave way" in (brk.get("reason") or ""):
+        assert brk["plays"] == brk["from"]
+    assert chorus_step["plays"] == "wide" and not chorus_step.get("reason")
+    # One reference render plus one per distinct candidate tried: the break's two, the
+    # chorus's one, and the break's two again once the chorus is accepted.
+    assert 1 < pipeline.arrangement_renders <= 1 + 2 + 1 + 2
+
+
+def test_worse_is_empty_for_a_render_against_itself() -> None:
+    beat_grid = m.pickup_grid(60_000 / 120, 12, pickup=0)
+    fg = m.allowed_rig(rig())
+    admission = gate(fg, beat_grid)
+    pipeline, _ = played(owner_shaped("NONE", beat_grid), fg, beat_grid, admission)
+
+    assert worse(pipeline, pipeline) == []
+
+
+@pytest.mark.parametrize("ending", ["exit_blackout", "entry_repositioning"])
+def test_shown_time_matches_the_encoded_frames(ending: str) -> None:
+    """`shown_for_ms` equals what the encoded frames show: lit, holding the state, from
+    the reveal; before an EXIT blackout and before the next section's entry repositioning
+    (a colour change on the section's last beat)."""
+    from tests.unit.sequencer.moving_heads.test_events_render import Frames
+
+    beat_grid = m.pickup_grid(500.0, 8, pickup=0)
+    fg = m.allowed_rig(rig())
+    admission = gate(fg, beat_grid)
+    blackout = {
+        "edge": "EXIT",
+        "mode": "blackout",
+        "length": "BAR",
+        "curve": "linear",
+        "split": "HALF",
+        "channels": [],
+    }
+    first = m.plan_section(
+        "s",
+        1,
+        4,
+        "mirror_wings",
+        color="red",
+        events=[event(4, 3, "color", color="blue")],
+        transitions=[blackout] if ending == "exit_blackout" else [],
+    )
+    sections = (
+        [first]
+        if ending == "exit_blackout"
+        else [first, m.plan_section("t", 5, 8, "fly_out_cascade")]
+    )
+    pipeline, _ = played(sections, fg, beat_grid, admission)
+    assert pipeline.render_record is not None
+    looks = {look["section_id"]: look for look in pipeline.render_record["section_looks"]}
+    (entry,) = looks["s"]["events"]
+    frames = Frames(pipeline)
+    checked = 0
+    for head, outcome in entry["heads"].items():
+        if outcome.get("shown_ms") is None:
+            continue
+        dark, colours = frames.dark(head), frames.state(head, "color")
+        i = outcome["shown_ms"] // 20
+        j = i
+        while j < len(dark) and not dark[j] and colours[j] == outcome["state"]:
+            j += 1
+        assert outcome["shown_for_ms"] == (j - i) * 20, (head, outcome)
+        checked += 1
+    assert checked
+
+
+def test_a_registered_unit_kind_is_built_up_from_the_reference(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The unit interface (`ArrangementUnit`, `register_arrangement_units`): a kind's units
+    are tried, after the reference, with the render reading `unit_choice`; a candidate
+    that plays no event worse is kept. Here a kind whose choice changes nothing."""
+    from twinklr.core.sequencer.moving_heads import pipeline as module
+
+    def kind(pipeline: RenderingPipeline) -> list[module.ArrangementUnit]:
+        return [module.ArrangementUnit(key="probe:s", order=(0, 9), candidates=("on",))]
+
+    monkeypatch.setattr(module, "_UNIT_KINDS", [*module._UNIT_KINDS, kind])
+    beat_grid = m.pickup_grid(500.0, 8, pickup=0)
+    fg = m.allowed_rig(rig())
+    admission = gate(fg, beat_grid)
+    pipeline, _ = played(
+        [m.plan_section("s", 1, 8, "mirror_wings", events=[event(2, 1, "hit")])],
+        fg,
+        beat_grid,
+        admission,
+    )
+
+    assert pipeline.unit_choice("probe:s") == "on"
+    assert pipeline.unit_gave_way("probe:s") is None
+    assert pipeline.arrangement_renders == 2  # the reference and the one candidate

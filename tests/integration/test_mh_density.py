@@ -32,9 +32,8 @@ from twinklr.core.config.models import JobConfig
 from twinklr.core.sequencer.moving_heads.pipeline import (
     RenderingPipeline,
     TemplateAdmission,
-    _event_outcomes,
-    _worse_events,
     admit_templates,
+    worse,
 )
 
 LEVELS = ("REST", "SPARSE", "BUSY")
@@ -195,10 +194,7 @@ def test_repair_and_render_agree_that_sparse_and_busy_leave_events_as_balanced(
     dense, dense_plan = play(sections(level), kind)
     plain, plain_plan = play(sections("BALANCED"), kind)
     assert dense.render_record is not None and plain.render_record is not None
-    assert (
-        _worse_events(_event_outcomes(plain.render_record), _event_outcomes(dense.render_record))
-        == []
-    )
+    assert worse(plain, dense) == []
 
     def events_said(plan: ChoreographyPlan) -> list[tuple[str, str]]:
         return [(r.item, r.reason) for r in plan.repairs if r.item.startswith("event at")]
@@ -293,8 +289,5 @@ def test_density_with_motif_variation_events_and_each_intensity(
     assert looks["verse"]["arrangement"]["variation"]["asked"] == "NARROW"
     assert "density" not in looks.get("outro", {}).get("arrangement", {})
     assert dense.render_record is not None and plain.render_record is not None
-    assert (
-        _worse_events(_event_outcomes(plain.render_record), _event_outcomes(dense.render_record))
-        == []
-    )
+    assert worse(plain, dense) == []
     assert_physical(dense, plain)

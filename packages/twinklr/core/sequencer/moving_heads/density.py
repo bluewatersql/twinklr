@@ -25,10 +25,9 @@ value below is a first proposal for the owner's W10 view, not a measured or acce
   each tried while some head lit as BALANCED would never be lit for `HIT_MIN_LIT_FRAMES`
   running, or nothing would go dark: units of a whole cycle, then of half a cycle, then
   the part plays BALANCED (traced; repair records it). Every head plays as BALANCED over
-  each planner event's seen span (`events.yield_spans` with hits, and `seen_until`) widened
-  by `EVENT_MARGIN_BEATS` each side, and over each colour or gobo change's whole lit run
-  as BALANCED shows it (`shown_spans`), so SPARSE's darkness never touches what an event
-  shows. A head that cannot be commanded dark, or whose shutter cannot take the
+  what `pipeline.worse` judges an event by (`sparse_protected`: a strobe's or `pulse`'s
+  first frames, half a beat each side of a hit, a colour or gobo change's lit run as
+  BALANCED shows it); the arrangement's units catch anything else. A head that cannot be commanded dark, or whose shutter cannot take the
   alternation in time, stays lit (traced).
 - **BALANCED** is the template's own light (identity).
 - **BUSY**: an accent each bar on each head's first lit beat of the bar (`play_busy`): the
@@ -41,16 +40,17 @@ value below is a first proposal for the owner's W10 view, not a measured or acce
   span widened by `EVENT_MARGIN_BEATS` each side, is dropped; one that would not differ visibly from the
   section's level is not played; each is traced with why.
 
-**The song outranks the arrangement.** `DensityGiveWay` is the hook a render accepts per
-plan section (`RenderingPipeline.density_give_way`): the section plays BALANCED, or drops
-named BUSY accents, each traced with why.
+**The song outranks the arrangement.** SPARSE and BUSY sections are arrangement units
+(`pipeline._density_units`): the render plays one as asked only where no event anywhere in
+the song plays worse than with it at BALANCED (`pipeline.worse`); else it plays BALANCED,
+traced "density gave way to <event>". REST is not a unit.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 import contextlib
-from dataclasses import dataclass, field, replace
+from dataclasses import replace
 from fractions import Fraction
 import math
 from typing import TYPE_CHECKING, Any
@@ -98,6 +98,10 @@ EVENT_MARGIN_BEATS = 1
 span widened by this many beats each side (a hit's pre-dip and decay, a colour change's
 dark lead and its `SHOWN_FOR_BEATS`); BUSY drops an accent inside a hit's span so widened."""
 
+JUDGED_SHUTTER_FRAMES = 25
+"""How many frames from a strobe's, `pulse`'s or `closed`'s frame `pipeline.worse` counts
+its lit frames over (SPARSE leaves a strobe or `pulse` BALANCED there)."""
+
 SPARSE_UNITS: tuple[tuple[str, int], ...] = (("cycle", 1), ("half cycle", 2))
 """SPARSE's units in fallback order: the played variant's cycle divided by each."""
 
@@ -105,24 +109,6 @@ BUSY_SONG_SHARE = 0.25
 """Proposed (W10d). Repair feeds back BUSY sections that together cover more than this
 share of the song (lowest energy first): an accent every bar loses its weight. Never a
 refusal."""
-
-
-@dataclass(frozen=True)
-class DensityGiveWay:
-    """How one plan section's density gives way to the song (the render's
-    `density_give_way`, set by the give-way loop that compares the render with the same
-    plan at BALANCED)."""
-
-    balanced: str | None = None
-    """Why the section plays BALANCED instead (SPARSE gave way to an event); None where
-    it plays as planned."""
-    accents: Mapping[tuple[str, int], str] = field(default_factory=dict)
-    """BUSY accents dropped, by (head, frame), each with why."""
-
-
-def played_level(asked: str, give_way: DensityGiveWay | None) -> str:
-    """The density a section plays: as asked, else BALANCED where it gave way."""
-    return BALANCED if give_way is not None and give_way.balanced is not None else asked
 
 
 # --- REST --------------------------------------------------------------------------------
@@ -256,22 +242,56 @@ def event_spans(
     return out
 
 
-def shown_spans(records: Mapping[int, Mapping[str, Any]] | None) -> list[tuple[str, int, int]]:
-    """Each colour or gobo change's lit run showing it on each head, as the part's events
-    played it (from its dark lead, or its reveal, to `shown_ms` plus `shown_for_ms`):
-    SPARSE keeps every head as BALANCED over it, so no change is shown later or more
-    briefly than at BALANCED."""
-    out = []
+def sparse_protected(
+    events: SectionEvents,
+    window: tuple[int, int],
+    records: Mapping[int, Mapping[str, Any]] | None,
+    hit_frames: Mapping[int, Sequence[int]],
+    beat_grid: BeatGrid,
+) -> list[tuple[str, int, int]]:
+    """What SPARSE leaves every head BALANCED over in a part (`window`): what
+    `pipeline.worse` judges an event by, so SPARSE gives way only where it truly costs
+    one. SPARSE runs after the part's events, so its darkness changes no event's own
+    decisions, only what is seen of them:
+
+    - a strobe or `pulse` over its first `JUDGED_SHUTTER_FRAMES` frames (a `closed` and an
+      `open` need nothing: SPARSE only darkens);
+    - a hit over half a beat each side of the frames it plays on (`hit_frames`, else its
+      beat's): its lit start, its dimmer lead and its peak;
+    - a colour or gobo change over each head's lit run showing it as the events played
+      it (`records`: from its reveal for `shown_for_ms`), so it is shown no later and no
+      more briefly than at BALANCED.
+
+    The arrangement's units catch the rest (a hit BALANCED moved, a transition SPARSE's
+    darkness stops playing)."""
+    lo, hi = window
+    out: list[tuple[str, int, int]] = []
+
+    def label(event: TimedEvent) -> str:
+        return f"{event.action} at bar {event.bar} beat {event.beat}"
+
+    for event, start, end in events.shutter_spans():
+        if event.action != "closed" and start < hi and end > lo:
+            out.append((label(event), start, min(end, start + JUDGED_SHUTTER_FRAMES * FRAME)))
+    for event in events.hits():
+        frames = list(hit_frames.get(event.index, ())) or [event.frame_ms]
+        half = _beat_ms(beat_grid, event.frame_ms) / 2
+        out.append(
+            (
+                label(event),
+                math.floor((min(frames) - half) / FRAME) * FRAME,
+                math.ceil((max(frames) + half) / FRAME) * FRAME,
+            )
+        )
     for entry in (records or {}).values():
         if entry.get("action") not in ("color", "gobo"):
             continue
-        label = f"{entry['action']} at bar {entry['bar']} beat {entry['beat']}"
+        said = f"{entry['action']} at bar {entry['bar']} beat {entry['beat']}"
         for outcome in entry.get("heads", {}).values():
             shown, length = outcome.get("shown_ms"), outcome.get("shown_for_ms")
             if shown is None or length is None:
                 continue
-            start = outcome.get("dark_dip", {}).get("from_ms", outcome.get("reveal_ms", shown))
-            out.append((label, min(start, shown), shown + length))
+            out.append((said, min(outcome.get("reveal_ms") or shown, shown), shown + length))
     return out
 
 
@@ -432,13 +452,11 @@ def play_busy(
     phase_map: MusicalPhaseMap,
     beat_grid: BeatGrid,
     blocked: Mapping[str, Sequence[tuple[str, int, int]]],
-    give_way: Mapping[tuple[str, int], str],
 ) -> tuple[list[FixtureSegment], dict[str, Any]]:
     """A part's cues (all heads, inside `window`, as they play after intensity and hits)
     with BUSY's accents played on `bars` (the module docstring), and its trace entry.
     `blocked`, per head, the spans an accent may not touch, each with what it is (a
-    transition's window, a planner event's seen span); `give_way` the accents the
-    give-way loop drops (`DensityGiveWay.accents`)."""
+    transition's window, a planner event's seen span)."""
     start, end = window
     shape = HITS[emphasis]
     beats = beat_grid.beat_boundaries
@@ -474,10 +492,6 @@ def play_busy(
                 "beat": None if position is None else position[1],
                 "at_ms": at,
             }
-            why = give_way.get((fixture_id, at))
-            if why is not None:
-                dropped.append({**label, "reason": why})
-                continue
             decay = _decay_frames(phase_map, beats[index], shape, t)
             played, outcome = _play_hit(
                 frames, axis, shape, phase_map, beats[index], at, "lit", decay, start

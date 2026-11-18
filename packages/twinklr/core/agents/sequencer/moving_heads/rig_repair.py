@@ -125,7 +125,7 @@ def _arrangement(
             {t: template.plays_as_base for t, template in offer.templates.items()},
         ),
         canonical=_canonical,
-        steps=steps,
+        modes=None if steps else {},
     )
 
 
@@ -162,8 +162,8 @@ def _give_way(
     beat_grid: BeatGrid | None,
 ) -> list[PlanRepair]:
     """Each section whose variation would make one of the plan's events worse than its
-    source variant does (`RenderingPipeline._settle_arrangement`, which decides on its own
-    frames): predicted from the published dark phases (`_event_records` under each) and,
+    source variant does (a prediction: `RenderingPipeline._choose_arrangement` decides on
+    its own frames): predicted from the published dark phases (`_event_records` under each) and,
     for a hit in the next section's first bar, the heads that always enter it dark after
     each variant (`RigOffer.dark_entry_heads`). Recorded for the planner: move the
     variation, or the event."""
@@ -228,10 +228,10 @@ def _give_way(
                     section_id=section.section_id,
                     item=f"variation {section.variation.value}",
                     action=RepairAction.RECORDED,
-                    reason="the variation would make the song's events worse than its "
-                    f"source variant does ({'; '.join(worse)}): it gives way to them and "
-                    "plays the source variant (the render decides on its own frames); move "
-                    "the variation or the event",
+                    reason="the variation may make the song's events worse than its source "
+                    f"variant does ({'; '.join(worse)}): the variation may give way and play "
+                    "the source variant (the render decides on its own frames); move the "
+                    "variation or the event",
                 )
             )
     return out
@@ -1030,15 +1030,11 @@ def _wheel_plays(
             if late is not None and late <= bound and lit >= least
         )
 
-    frame_of = quantize_cue(round(beats[index])).actual_ms
-    bar_ms = _bar_length(beat_grid, index)
-
     def search(
         score: Callable[[int, Any], int], keep: Collection[str] = ()
     ) -> tuple[int, int, Any, str] | None:
-        """The beat within the move bounds (later first, within one bar in frames) the
-        most heads `score`, among those where every head in `keep` still shows it in
-        time (`events._play_wheel_events`)."""
+        """The beat within the move bounds (later first) the most heads `score`, among
+        those where every head in `keep` still shows it (`events._play_wheel_events`)."""
         first_bar, last_bar = part[1], part[2]
         reach = WHEEL_MOVE_BARS * beat_grid.beats_per_bar
         for side, offsets in (
@@ -1053,13 +1049,9 @@ def _wheel_plays(
                     continue
                 if not since < i < until or beats[i] >= end_ms:
                     continue
-                frame = quantize_cue(round(beats[i])).actual_ms
-                if abs(frame - frame_of) > WHEEL_MOVE_BARS * bar_ms:
-                    continue
                 trial = outcomes(i)
-                bound = WHEEL_LATE_BEATS * _beat_length(beats, i) + EFFECT_GRID_MS
                 lates = [trial[f][0] for f in keep if f in trial]
-                if any(late is None or late > bound for late in lates):
+                if any(late is None for late in lates):
                     continue
                 if count := score(i, trial):
                     candidates.append((count, -abs(offset), i, trial))
@@ -1074,19 +1066,22 @@ def _wheel_plays(
     reasons: list[str] = []
     brief = False
     if not well(index, found):
-        own_bound = WHEEL_LATE_BEATS * _beat_length(beats, index) + EFFECT_GRID_MS
-        kept = [f for f, (late, _, _, _) in found.items() if late is not None and late <= own_bound]
+        # As `events._play_wheel_events`: the rule as it was is the outcome to improve on;
+        # a beat shown well is preferred only where every head it shows the change on
+        # still shows it; else that outcome plays, brief.
+        baseline = (shown, index, found, None) if shown else search(in_time)
+        kept = [
+            f
+            for f, (late, _, _, _) in (found if baseline is None else baseline[2]).items()
+            if late is not None
+        ]
         better = search(well, keep=kept)
         if better is not None:
             _, chosen, found, direction = better
             shown = in_time(chosen, found)
-        else:
-            brief = bool(shown)
-            if not shown:
-                fallback = search(in_time)
-                if fallback is not None:
-                    shown, chosen, found, direction = fallback
-                    brief = True
+        elif baseline is not None:
+            shown, chosen, found, direction = baseline
+            brief = True
     if direction is not None or not shown:
         if direction is None:
             whys = sorted({why for _, why, _, _ in first.values() if why is not None})
@@ -1150,15 +1145,6 @@ def _frames_late(at: float, reveal: float) -> float:
     """How late a reveal at `reveal` is after the beat at `at`, each on the frame nearest
     it (as the render places both)."""
     return quantize_cue(round(reveal)).actual_ms - quantize_cue(round(at)).actual_ms
-
-
-def _bar_length(beat_grid: BeatGrid, index: int) -> float:
-    """The length of the bar the beat at `index` lies in (`events._bar_ms`)."""
-    position = beat_grid.bar_and_beat(index)
-    bars = beat_grid.bar_boundaries
-    if position is not None and position[0] < len(bars):
-        return float(bars[position[0]] - bars[position[0] - 1])
-    return beat_grid.beats_per_bar * _beat_length(beat_grid.beat_boundaries, index)
 
 
 def _beat_length(beats: Sequence[float], index: int) -> float:
@@ -1230,14 +1216,8 @@ def _hit_move(
         dark = _dark_heads_on(i, parts, offer, beat_grid, _beat_length(beats, i))
         return len(everyone) if dark is None else len(everyone - set(dark[1]))
 
-    frame_of = quantize_cue(round(beats[index])).actual_ms
-    bar_ms = _bar_length(beat_grid, index)
     offsets = [
-        o
-        for o in (*range(1, reach + 1), *range(-1, -reach - 1, -1))
-        if 0 <= index + o < len(beats)
-        and abs(quantize_cue(round(beats[index + o])).actual_ms - frame_of)
-        <= HIT_MOVE_BARS * bar_ms
+        o for o in (*range(1, reach + 1), *range(-1, -reach - 1, -1)) if 0 <= index + o < len(beats)
     ]
     found = [(index + o, n) for o in offsets if (n := lit(index + o))]
     if not found:

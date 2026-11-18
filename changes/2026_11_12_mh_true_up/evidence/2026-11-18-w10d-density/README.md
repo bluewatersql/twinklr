@@ -44,18 +44,28 @@ One module, `sequencer/moving_heads/density.py`, with thin call sites. Rules in 
   `density.play_sparse` runs after the part's events (inside `compile_section`, so every
   recompile and the boundary, deferral and transition passes see the darkness), on the
   cycle of the variant the part plays (`whole_period_cycle` over the resolved, fitted
-  preset), ONCE templates lit for their first cycle; protected spans (`event_spans`,
-  `shown_spans`); fallback every cycle → every half cycle → BALANCED, traced.
+  preset), ONCE templates lit for their first cycle; every head as BALANCED over what
+  `pipeline.worse` judges an event by (`sparse_protected`, narrowed after the merge of
+  f9894cc8: a strobe's or `pulse`'s first 25 frames, half a beat each side of a hit, a
+  colour or gobo change's lit run); fallback every cycle → every half cycle → BALANCED,
+  traced.
 - **BUSY (an accent each bar).** `density.play_busy`, after the hits: per head and bar,
   the first beat lit three frames running (`events._lit_start` on the head's frames as
   played, a transition's own cues included), played with `events._play_hit` (MED, HIGH
   under DRAMATIC/INTENSE); dropped where its beat or frames fall inside a transition's
   window on that head or a planner event's widened seen span; not played where not
   visible; each traced.
-- **Give-way hook (integration point).** `RenderingPipeline.density_give_way:
-  dict[str, DensityGiveWay]` (`balanced`: why the section plays BALANCED; `accents`: the
-  (head, frame) accents dropped, each with why). Nothing sets it yet; the arrangement's
-  give-way loop is to set it (`pipeline.py`, the attribute's docstring says so).
+- **Arrangement units (after merging f9894cc8).** `pipeline._density_units`, registered
+  with `register_arrangement_units`: one unit per SPARSE or BUSY section, key
+  `density:<section>`, order `(section index, 1)` (after its variation), candidate
+  "planned"; at "reference" the section plays BALANCED. The render reads
+  `unit_choice`/`unit_gave_way`; a section that gives way is traced "density gave way to
+  <event>" (kept when a trial render is reused, `_retrace_arrangement`). BUSY gives way
+  whole: `worse` names events, not accents, and the accents already keep clear of every
+  event and transition, so a per-accent candidate would cost renders for nothing it can
+  name. REST is not a unit. The interim `density_give_way` hook and
+  `density.DensityGiveWay` are removed. `worse`'s 25-frame shutter window is
+  `density.JUDGED_SHUTTER_FRAMES`, so SPARSE protects what it judges.
 - **Trace.** `section_looks[].arrangement.density` per part (REST: `dark_ms`, `ended_by`,
   `lit`; SPARSE: `cycle_bars`, `alternates`, `units`, `fallback`, `lit_share`,
   `lit`; BUSY: `emphasis`, `placed`, `dropped`, `not_visible`, `no_lit_beat`,
@@ -76,7 +86,10 @@ One module, `sequencer/moving_heads/density.py`, with thin call sites. Rules in 
   (movement through template and variation, light through `density`); judge
   `developer.j2` and `user.j2` say what each level renders. `PlanSection.density`'s
   description and `Density`'s docstring now say the same (re-keys the planner cache).
-- **Identity.** `RENDERER_REVISION` 18, with a history note. Pins: all 137 failing pins
+- **Identity.** `RENDERER_REVISION` 18 at 16d1b0f6; 19 after merging f9894cc8 (which
+  also took 18), with both history notes. At each step only fingerprints were
+  re-recorded (every pin and the golden checked against both parents: every frame and
+  `.xsq` hash equal). Pins: all 137 failing pins
   failed on the fingerprint alone and were re-recorded; every frame and `.xsq` hash is
   unchanged (`tests/regression/test_mh_pins.py`, 138 passed after). The combined-show
   golden's moving-head fingerprint was re-recorded; its effects and trace hashes are
@@ -116,18 +129,18 @@ New tests (all on the fast rig and on `allowed_rig` at 150 degree/s):
   SPARSE halves alternating on the variant's cycle (mirror partners equal, lit half as
   BALANCED, every head lit), on `slow`'s cycle, half-cycle fallback, the ONCE move lit,
   one mirror pair plays BALANCED (and repair), never worse for events, a head that cannot
-  go dark stays lit, transitions in all six modes keep their windows; the give-way hook.
+  go dark stays lit, transitions in all six modes keep their windows; a SPARSE or BUSY
+  section `worse` faults gives way to BALANCED's frames (traced); REST is no unit.
 - `tests/unit/sequencer/moving_heads/test_density_busy_render.py` (BUSY, 37): accents on
   each head's first lit beat of every bar (checked against the BALANCED frames), only the
   dimmer changing; MED/HIGH by intensity for all six levels; not-visible accents traced
   one by one (a slow dimmer); dropped inside an event's seen span and a transition window,
   events as BALANCED, windows unchanged; transitions in all six modes keep their windows;
-  two parts accent every bar; the 25 % budget fed back lowest energy first; the hook drops
-  only the named accents.
+  two parts accent every bar; the 25 % budget fed back lowest energy first.
 - `tests/integration/test_mh_density.py` (156): all seven families × REST/SPARSE/BUSY
   differ from BALANCED; SPARSE lights every head on every admitted variant; repair =
   render for SPARSE's unit over 1-4 bar parts; SPARSE and BUSY leave every event as
-  BALANCED (`_worse_events` empty) and repair's event records unchanged; the first ENTRY
+  BALANCED (`pipeline.worse` empty) and repair's event records unchanged; the first ENTRY
   snap plays nothing under each level (render and repair); two parts each on their own
   variant's cycle; every density with motif, variation, events and each intensity level.
 
@@ -145,13 +158,42 @@ run (the integrator's). One run before the last edit failed the prompt guard
 values on one prompt line); the planner's rig density line became three sub-bullets and
 the judge line names the looks, not the values.
 
+## After merging f9894cc8: density in the arrangement's loop
+
+**Strict check** (`scratchpad/w10d/strict_density.py`, adapted from the arrangement
+review's `strict_worse.py` with density as the variable; an independent outcome reader on
+the frames, not `worse`): 200 random plans of up to six sections of 2-6 bars, 1-3 events
+each (hits, lyric-bound hits, colour, gobo, strobe, pulse, closed/open), transitions on
+about a third, density SPARSE/BUSY/BALANCED, no motif or variation (so density is the only
+unit), each compared with the same plan at BALANCED:
+
+| Setup | Plans | Worse | Errors | Deterministic | SPARSE played / gave way / BALANCED fallback | BUSY played |
+|---|---|---|---|---|---|---|
+| plain rig, 120 BPM | 100 | 0 | 0 | 100 | 196 / 5 / 20 of 221 | 232 of 232 |
+| allowed_rig at 150 degree/s, 79.5 BPM, 2 pickup beats | 100 | 0 | 0 | 100 | 211 / 3 / 7 of 221 | 232 of 232 |
+
+SPARSE gave way to: a hit lost on a head (4), a transition that stopped playing on a head
+(3), a hit played farther from its beat (1). The BALANCED fallbacks are parts too short
+for either unit (repair predicts them). Mean whole-song renders per plan 5.6 (the
+reference and one per SPARSE or BUSY section); final render 5.6 s against 0.9 s at
+BALANCED on the plain rig, 8.8 s against 1.4 s on the slow one (four sweeps in parallel
+on a shared machine).
+
+**REALISTIC** (the owner's test song's shape, 62 bars at 78.3 BPM, owner-like rig, its
+seven transitions, its events, a motif with NARROW and FASTER carriers, and SPARSE, SPARSE,
+BUSY, REST, BUSY on five sections): 7 arrangement renders (the reference, 2 variation
+units, 4 density units), 38.5 s wall; the same plan at BALANCED 3 renders, 14.0 s (a
+shared machine). Every density unit and both variations played; REST dark.
+
+After the merge and the wiring, last edit first: `uv run pytest -q --no-cov -p no:cacheprovider`
+7678 passed, 30 skipped, 0 failed (25 min 20 s, a shared machine); `uv run ruff check .`
+passed; `uv run ruff format --check .` 1318 files formatted; `uv run mypy packages` no
+issues in 654 files (the worktree's environment now has every dev extra).
+
 ## Not built, or not as asked
 
-- **Song-outranks loop.** Not built here by instruction: the hook is in place; SPARSE
-  and BUSY avoid every event by construction where they can see it. Not covered by
-  construction: a hit the BALANCED render moved off its beat (SPARSE protects its planned
-  beat and its transition-free frame); a transition whose played status SPARSE's darkness
-  changes. The loop is to catch those.
+- **Per-accent give-way for BUSY** is not built: the unit interface takes whole
+  candidates, and `worse` reports events, not accents (see Arrangement units).
 - **REST on a rig with heads that cannot go dark** cannot be rendered end to end: the
   transaction pass refuses any render on such a rig when it parks the head after its
   last cue (`compile/preposition.py` `_dark_commands`, raised as "cannot park"). Tested
@@ -173,7 +215,7 @@ the judge line names the looks, not the values.
 4. **Is a hit every bar too much over a chorus?** BUSY puts a MED (HIGH under DRAMATIC or
    INTENSE) hit on each head's first lit beat of every bar.
 5. **REST as full darkness**, the whole section, events aside.
-6. **SPARSE gives way around a colour change** for the change's whole lit run: on a
-   template lit throughout (mirror_wings), SPARSE stops after a colour change until the
-   template next goes dark. Keeping it shorter would show the colour "more briefly",
-   which the song-outranks rule counts as worse.
+6. **SPARSE pauses after a colour change** for the change's lit run: on a template lit
+   throughout (mirror_wings), SPARSE stops after a colour change until the template next
+   goes dark. Narrower is not possible without giving way: `worse` counts any shorter
+   lit run as "shown more briefly", so the whole section would play BALANCED instead.
