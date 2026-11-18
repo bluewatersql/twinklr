@@ -9,7 +9,7 @@ the planner on its next revision, never a refusal. The resolution is the rendere
 from __future__ import annotations
 
 import bisect
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from fractions import Fraction
 from itertools import pairwise
 import math
@@ -42,6 +42,7 @@ from twinklr.core.sequencer.moving_heads.events import (
     HIT_LATE_FRAMES,
     HIT_MIN_LIT_FRAMES,
     HIT_MOVE_BARS,
+    SHOWN_FOR_BEATS,
     section_events,
     strobe_beats,
     yield_spans,
@@ -174,10 +175,11 @@ def _arrangement_repairs(
                 note(
                     section.section_id,
                     f"{label} variant {plays}",
-                    Fit.from_record(fit).describe(plays)
-                    + ", weaker than the catalog's: the rig's speed allows no more",
+                    Fit.from_record(fit).describe(plays),
                 )
             if variant is not None:
+                if variant.note:
+                    note(section.section_id, f"{label} variation {variant.asked}", variant.note)
                 if variant.reason:
                     note(
                         section.section_id,
@@ -367,6 +369,18 @@ def repair_rig_intent(
         for index, variant in enumerate(arrangement.parts)
         if variant is not None
     }
+    # A part no motif or variation resolves plays its named preset where the gate admits
+    # it (as the render's `_section_preset`): its dark phases are that variant's.
+    for section in plan.sections:
+        for index, part in enumerate(section.parts):
+            template = offer.templates.get(_canonical(part.template_id))
+            if (
+                (section.section_id, index) not in played
+                and part.preset_id
+                and template is not None
+                and part.preset_id in template.variants
+            ):
+                played[section.section_id, index] = part.preset_id
     repairs += _arrangement_repairs(plan, offer, arranged)
     sections: list[PlanSection] = []
     for section in plan.sections:
@@ -733,14 +747,16 @@ def _head_wheel_turn(
     beat_grid: BeatGrid,
     closed_from: Sequence[tuple[float, float]],
     end_ms: float,
-) -> tuple[float | None, str | None, tuple[float, float] | None]:
+) -> tuple[float | None, str | None, tuple[float, float] | None, float]:
     """When a head shows a colour or gobo change on the beat at `index`, as the render
     turns it (`events._turn`): `(late_ms, why_not, dark_lead)`. `late_ms` 0 on the beat
     (after a dip `dip_fits` allows, with the darkness already there counted, `dark_lead` its
     span), the time to its next reveal where it is dark on the beat (a `closed`, the
     template's dark phase), the time to the end of a later dark window that turns it within
     `WHEEL_LATE_BEATS`; None, with why, where it does not show it before the section's end
-    or cannot turn it."""
+    or cannot turn it. Fourth, how many beats the head stays lit after it shows it (to its
+    template's next dark moment; unbounded where nothing published darkens it), which
+    `events.SHOWN_FOR_BEATS` judges."""
     beats = beat_grid.beat_boundaries
     at = beats[index]
     for start, end in closed_from:
@@ -748,15 +764,16 @@ def _head_wheel_turn(
             # The wheel turns in the `closed`'s darkness, which a hit there then cannot light
             # (its wheels change in that dark run); the head shows it from the `open`.
             if end >= end_ms:
-                return None, "the head is dark from a `closed` to the section's end", None
-            return _frames_late(at, end), None, (start, end)
+                return None, "the head is dark from a `closed` to the section's end", None, 0.0
+            return _frames_late(at, end), None, (start, end), math.inf
     if change is None:
-        return None, "a term of its wheel change (a settle, or the close latency) is unknown", None
+        return (
+            None,
+            "a term of its wheel change (a settle, or the close latency) is unknown",
+            None,
+            0.0,
+        )
     start_index = beat_grid.beat_index(part[1], 1)
-    if index == start_index:
-        # On the part's first beat it turns as the part's colour or gobo does, at its
-        # boundary (the section's boundaries record says how).
-        return 0.0, None, None
     before = at - beats[index - 1] if index > 0 else (offer.beat_ms or 0.0)
     phases = _phases(offer, part[0], part[4])
     windows: list[tuple[float, float]] = []
@@ -765,34 +782,52 @@ def _head_wheel_turn(
         windows = _cycle_windows(phases, fixture_id)
         position = (index - start_index) % phases.cycle_beats
     frame = EFFECT_GRID_MS / max(before, 1.0)
+
+    def lit_for(shown: float) -> float:
+        """Beats from `shown` (a position in the cycle) to the next dark moment."""
+        return min(
+            (start - shown for start, _ in windows if start > shown + frame), default=math.inf
+        )
+
+    if index == start_index:
+        # On the part's first beat it turns as the part's colour or gobo does, at its
+        # boundary (the section's boundaries record says how).
+        return 0.0, None, None, lit_for(position)
+
     for start, end in windows:
         # Dark where a window opens within the frames a reveal must stay lit (the render
         # does not count a frame or two of the new state as shown).
         if start - HIT_MIN_LIT_FRAMES * frame <= position < end - frame:
             reveal = _beat_time(beats, index, end - position)
             if reveal >= end_ms:
-                return None, "the head is not lit again before the section's end", None
-            return _frames_late(at, reveal), None, None
+                return None, "the head is not lit again before the section's end", None, 0.0
+            return _frames_late(at, reveal), None, None, lit_for(end)
     lead = change / before
     covered = sum(
         max(0.0, min(end, position) - max(start, position - lead)) for start, end in windows
     )
     added = change - covered * before
     if dip_fits(added, before):
-        return 0.0, None, (at - change, at)
+        return 0.0, None, (at - change, at), lit_for(position)
     for start, end in sorted(windows):
         if (
             position < start <= position + WHEEL_LATE_BEATS
             and end - start >= lead
             and end - position <= WHEEL_LATE_BEATS + frame
         ):
-            return _frames_late(at, _beat_time(beats, index, end - position)), None, None
+            return (
+                _frames_late(at, _beat_time(beats, index, end - position)),
+                None,
+                None,
+                lit_for(end),
+            )
     return (
         None,
         f"its {change} ms wheel change (adding {added:.0f} ms of darkness) does not fit half "
         f"the beat before it ({before / 2:.0f} ms), and no dark moment of its template turns "
         f"it within {WHEEL_LATE_BEATS:g} beat",
         None,
+        0.0,
     )
 
 
@@ -838,7 +873,9 @@ def _wheel_plays(
         return None
     changes = {h.fixture_id: h.changes.get(wheel, {}) for h in offer.heads}
 
-    def outcomes(i: int) -> dict[str, tuple[float | None, str | None, tuple[float, float] | None]]:
+    def outcomes(
+        i: int,
+    ) -> dict[str, tuple[float | None, str | None, tuple[float, float] | None, float]]:
         position = beat_grid.bar_and_beat(i)
         here = None if position is None else _part_at(parts, position[0])
         return {
@@ -855,15 +892,23 @@ def _wheel_plays(
             for f, state in turning.items()
         }
 
-    def in_time(i: int, found: Mapping[str, tuple[float | None, str | None, Any]]) -> int:
+    def in_time(i: int, found: Mapping[str, tuple[float | None, str | None, Any, float]]) -> int:
         bound = WHEEL_LATE_BEATS * _beat_length(beats, i) + EFFECT_GRID_MS
-        return sum(1 for late, _, _ in found.values() if late is not None and late <= bound)
+        return sum(1 for late, _, _, _ in found.values() if late is not None and late <= bound)
 
-    first = found = outcomes(index)
-    chosen, direction = index, None
-    shown = in_time(index, found)
-    reasons: list[str] = []
-    if not shown:
+    def well(i: int, found: Mapping[str, tuple[float | None, str | None, Any, float]]) -> int:
+        length = _beat_length(beats, i)
+        bound = WHEEL_LATE_BEATS * length + EFFECT_GRID_MS
+        # A frame of grid tolerance, as the render counts its frames.
+        least = SHOWN_FOR_BEATS - 2 * EFFECT_GRID_MS / length
+        return sum(
+            1
+            for late, _, _, lit in found.values()
+            if late is not None and late <= bound and lit >= least
+        )
+
+    def search(score: Callable[[int, Any], int]) -> tuple[int, int, Any, str] | None:
+        """The beat within the move bounds (later first) the most heads `score`."""
         first_bar, last_bar = part[1], part[2]
         reach = WHEEL_MOVE_BARS * beat_grid.beats_per_bar
         for side, offsets in (
@@ -879,14 +924,33 @@ def _wheel_plays(
                 if not since < i < until or beats[i] >= end_ms:
                     continue
                 trial = outcomes(i)
-                if count := in_time(i, trial):
+                if count := score(i, trial):
                     candidates.append((count, -abs(offset), i, trial))
             if candidates:
-                shown, _, chosen, found = max(candidates, key=lambda c: (c[0], c[1]))
-                direction = side
-                break
+                count, _, i, trial = max(candidates, key=lambda c: (c[0], c[1]))
+                return count, i, trial, side
+        return None
+
+    first = found = outcomes(index)
+    chosen, direction = index, None
+    shown = in_time(index, found)
+    reasons: list[str] = []
+    brief = False
+    if not well(index, found):
+        better = search(well)
+        if better is not None:
+            _, chosen, found, direction = better
+            shown = in_time(chosen, found)
+        else:
+            brief = bool(shown)
+            if not shown:
+                fallback = search(in_time)
+                if fallback is not None:
+                    shown, chosen, found, direction = fallback
+                    brief = True
+    if direction is not None or not shown:
         if direction is None:
-            whys = sorted({why for _, why, _ in first.values() if why is not None})
+            whys = sorted({why for _, why, _, _ in first.values() if why is not None})
             return (
                 [
                     f"no head shows it lit within {WHEEL_LATE_BEATS:g} beat of its beat, nor of "
@@ -895,7 +959,7 @@ def _wheel_plays(
                     "it on a beat where the heads are lit (the `open` that ends a `closed` is "
                     "one: the wheel turns in its darkness)"
                     + "".join(
-                        f"; on its beat on {', '.join(sorted(f for f, (_, w, _) in first.items() if w == why))}: {why}"
+                        f"; on its beat on {', '.join(sorted(f for f, (_, w, _, _) in first.items() if w == why))}: {why}"
                         for why in whys
                     )
                 ],
@@ -904,14 +968,25 @@ def _wheel_plays(
             )
         bar, beat = beat_grid.bar_and_beat(chosen) or (0, 0)
         reasons.append(
-            f"no head shows it lit within {WHEEL_LATE_BEATS:g} beat of its beat (the heads are "
-            f"dark there, or the wheel change does not fit): it moves {direction} to bar {bar} "
-            f"beat {beat} ({beats[chosen] - beats[index]:+.0f} ms), where {shown} head(s) show "
-            "it in time"
+            (
+                f"no head shows it lit within {WHEEL_LATE_BEATS:g} beat of its beat (the heads "
+                "are dark there, or the wheel change does not fit)"
+                if not in_time(index, first)
+                else f"on its beat no head stays lit showing it for {SHOWN_FOR_BEATS:g} beat "
+                "(its template darkens the heads soon after)"
+            )
+            + f": it moves {direction} to bar {bar} beat {beat} "
+            f"({beats[chosen] - beats[index]:+.0f} ms), where {shown} head(s) show it in time"
+        )
+    if brief:
+        reasons.append(
+            f"it is shown for less than {SHOWN_FOR_BEATS:g} beat on every head (its template "
+            "darkens them soon after the reveal) on every beat within reach; put it where the "
+            "heads stay lit"
         )
     late = {
         f: round(ms)
-        for f, (ms, _, _) in found.items()
+        for f, (ms, _, _, _) in found.items()
         if ms is not None and ms > 2 * EFFECT_GRID_MS
     }
     if late:
@@ -921,15 +996,15 @@ def _wheel_plays(
             + ": dark on the beat (from the head's next reveal), or turned in a later dark "
             "moment"
         )
-    for why in sorted({why for _, why, _ in found.values() if why is not None}):
-        heads = sorted(f for f, (_, w, _) in found.items() if w == why)
+    for why in sorted({why for _, why, _, _ in found.values() if why is not None}):
+        heads = sorted(f for f, (_, w, _, _) in found.items() if w == why)
         reasons.append(f"on {', '.join(heads)} it does not play: {why}")
-    leads = [lead for _, _, lead in found.values() if lead is not None]
+    leads = [lead for _, _, lead, _ in found.values() if lead is not None]
     if chosen != index:
         leads = [
             (a + beats[chosen] - beats[index], b + beats[chosen] - beats[index]) for a, b in leads
         ]
-    return reasons, leads, {f: turning[f] for f, (ms, _, _) in found.items() if ms is not None}
+    return reasons, leads, {f: turning[f] for f, (ms, _, _, _) in found.items() if ms is not None}
 
 
 def _frames_late(at: float, reveal: float) -> float:

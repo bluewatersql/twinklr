@@ -117,10 +117,10 @@ from twinklr.core.sequencer.moving_heads.export.xsq_adapter import (
     run_requests,
 )
 from twinklr.core.sequencer.moving_heads.fitting import (
-    MIN_RATE,
     MIN_REACH,
     Fit,
     fits_for,
+    fittable,
     fitted_preset,
 )
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
@@ -1396,15 +1396,19 @@ def admit_templates(
                 if rung not in VARIATION_PRESETS
             )
             attempts: list[Fit | None] = [None]
-            if preset is not None and preset.preset_id in VARIATION_PRESETS and ladder_passes:
-                attempts += fits_for(document, preset)
+            eligible = (
+                preset is not None and preset.preset_id in VARIATION_PRESETS and ladder_passes
+            )
             catalog_failure: list[str] | None = None
-            for fit in attempts:
+            stopped: tuple[Fit, list[str]] | None = None
+            attempt = 0
+            while attempt < len(attempts):
+                fit = attempts[attempt]
+                attempt += 1
                 if fit is not None:
+                    failed = failures.pop(combination)
                     if catalog_failure is None:
-                        catalog_failure = failures.pop(combination)
-                    else:
-                        failures.pop(combination)
+                        catalog_failure = failed
                     reach.pop(combination, None)
                     whole_compiles.pop(combination, None)
                 tried = (
@@ -1542,13 +1546,28 @@ def admit_templates(
                     if fit is not None:
                         fitted[combination] = fit
                     break
+                if fit is None:
+                    # Only a physical limit is fitted, and only at a reduced reach.
+                    if eligible and fittable(failures[combination]):
+                        assert preset is not None
+                        attempts += fits_for(
+                            document, preset, because=_limit(failures[combination][0])
+                        )
+                elif not fittable(failures[combination]):
+                    stopped = (fit, failures[combination])
+                    break
             if catalog_failure is not None and combination in failures:
                 assert preset is not None
                 failures[combination] = [
                     *catalog_failure,
-                    f"template {template_id!r}, preset {preset.preset_id!r}: no fitted "
-                    f"strength passes either (down to x{MIN_REACH:g} of the base's reach and "
-                    f"{MIN_RATE:g} of its period)",
+                    f"template {template_id!r}, preset {preset.preset_id!r}: "
+                    + (
+                        f"no reduced reach passes either (down to x{MIN_REACH:g} of the "
+                        "base's, or to the narrow reach at half the period)"
+                        if stopped is None
+                        else f"at a reduced reach ({stopped[0].describe(preset.preset_id)}) "
+                        f"it fails otherwise, so it is not fitted: {'; '.join(stopped[1])}"
+                    ),
                 ]
     # A rung without an entry bound fails, and leaves the envelope the other rungs' dips
     # and bounds are measured from. Rungs that lose their bound together may do so only
@@ -1613,6 +1632,39 @@ def admit_templates(
             unseen.add((template_id, preset_id))
         else:
             plays_as_base.setdefault(template_id, []).append(preset_id)
+    # No two offered variation variants play the same: one that plays as an earlier variant
+    # here (a fitted `fast` at the narrow reach, a snap whose rate does not show) is that
+    # variant, and is not offered again.
+    for template_id in template_ids:
+        ordered = [
+            p
+            for p in presets_of[template_id]
+            if (template_id, p) in whole_compiles and (template_id, p) not in failures
+        ]
+        if not any(p in VARIATION_PRESETS for p in ordered):
+            continue
+        length = 1 + 2 * math.ceil(max(whole_compiles[template_id, p][3] for p in ordered))
+        for later, preset_id in enumerate(ordered):
+            if preset_id not in VARIATION_PRESETS:
+                continue
+            frames = entered_frames(template_id, preset_id, length)
+            twin = next(
+                (
+                    earlier
+                    for earlier in ordered[:later]
+                    if (template_id, earlier) not in failures
+                    and earlier not in plays_as_base.get(template_id, ())
+                    and frames is not None
+                    and frames == entered_frames(template_id, earlier, length)
+                ),
+                None,
+            )
+            if twin is not None:
+                failures.setdefault((template_id, preset_id), []).append(
+                    f"template {template_id!r}, preset {preset_id!r}: plays the same as "
+                    f"{twin!r} here"
+                )
+                unseen.add((template_id, preset_id))
     excluded = {
         template_id: _overlay_exclusions(
             get_template(template_id),
@@ -1863,6 +1915,11 @@ def admit_templates(
         offer=offer,
         variant_entry_dips={t: v for t, v in variant_dips.items() if t in admitted},
     )
+
+
+def _limit(reason: str) -> str:
+    """A gate failure's reason without its template and preset prefix: what broke."""
+    return reason.rsplit("': ", 1)[-1]
 
 
 def _entered_frames(

@@ -565,7 +565,7 @@ class TemplateOffer(BaseModel):
     """Per variation variant off the ladder (`pipeline.VARIATION_PRESETS`), the states it
     cannot hold beyond `excluded`, per fixture and wheel (left out when none)."""
     plays_as_base: tuple[str, ...] = Field(default=(), exclude_if=lambda value: not value)
-    fitted: dict[str, dict[str, float]] = Field(
+    fitted: dict[str, dict[str, Any]] = Field(
         default_factory=dict, exclude_if=lambda value: not value
     )
     """Per variation variant that plays only at a strength fitted to this rig
@@ -1114,9 +1114,10 @@ def offer_for_prompt(
     ]
     fitted = [
         f"`{template_id}` {name} at "
-        + " and ".join(
-            ([f"x{fit['reach']:g} of the base's reach"] if "reach" in fit else [])
-            + ([f"a {fit['period_beats']:g}-beat movement"] if "period_beats" in fit else [])
+        + (
+            f"x{fit['reach']:g} of the base's reach"
+            if fit.get("toward") == "wide"
+            else f"half the period and x{fit['reach']:g} of the base's reach"
         )
         for template_id, template in offer.templates.items()
         for name, fit in template.fitted.items()

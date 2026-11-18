@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 BACKEND_ID = "xlights_dmx"
 """The backend the renderer writes: xLights DMX effects in an `.xsq`."""
 
-RENDERER_REVISION = "15"
+RENDERER_REVISION = "16"
 """Bumped by hand in the commit that intentionally changes the renderer's output; the
 render identity also carries the frame encoder's own version. 3: a section's colour and
 gobo are rendered (song-intent rendering W4), so a plan that sets them renders
@@ -77,7 +77,12 @@ carrier steps from the section that introduced it, not the carrier before, so a 
 with two varied carriers renders differently from 13; every other plan renders the same
 frames. 15 (variant fitting): a variation variant the rig cannot play at the catalog's
 strength plays at the strongest reduced strength that passes (`fitting`); a rig where the
-catalog strength passes renders the same frames."""
+catalog strength passes renders the same frames. 16 (fitting review): a fitted variant
+keeps the catalog period and reduces only its reach (a fitted `fast` toward `narrow`'s
+extents), so its reveals stay on the catalog variant's beats; a variant that plays like an
+earlier one is not offered; a colour or gobo change shown only briefly moves to a beat
+where it is shown well. A rig where the catalog strength passes, and a plan whose colour
+and gobo changes are shown well, renders the same frames."""
 
 
 def render_fingerprint(

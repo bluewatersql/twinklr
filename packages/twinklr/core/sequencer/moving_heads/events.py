@@ -61,8 +61,13 @@ not.
   some head shows it within `WHEEL_LATE_BEATS`; a head never lit again before the
   section's end does not play it; where no head would, it moves, on every head, to the
   beat within `WHEEL_MOVE_BARS` where the most heads do, a later one first, else does not
-  play (`_play_wheel_events`). Inside a template overlay the event takes over the
-  overlay's state from the beat.
+  play (`_play_wheel_events`). A change is shown well where a head that shows it in time
+  stays lit showing it for `SHOWN_FOR_BEATS` of the beat; where no head does on its own
+  beat (the template darkens the heads soon after the reveal), it moves, within the same
+  bounds, to the beat where the most heads show it well; where no beat within reach
+  does, it plays as above and each head is traced `brief` ("shown for N ms"), which repair
+  feeds back. Inside a template overlay the event takes over the overlay's state from
+  the beat.
 
 Every bar and beat is counted from the bar's downbeat (`BeatGrid.beat_index`), as the
 planner, the cue binder and the plan repair count it.
@@ -173,6 +178,12 @@ UNBOUND_EMPHASIS = "MED"
 HIT_PRE_DIP_BEATS = 0.25
 """Proposed (W6). How long before the beat the pre-dip eases down (at least two frames);
 it never reaches dark and never leaves the section or the lit run."""
+
+SHOWN_FOR_BEATS = 0.5
+"""Proposed (W10 fit review). A colour or gobo change is shown well where a head that shows
+it in time stays lit showing it for this share of the beat; a change shown only briefly
+(the template's own darkness following the reveal) moves, within its move bounds, to a beat
+where some head shows it well, else plays where it is shown and is traced `brief`."""
 
 HIT_MOVE_BARS = 1
 """How far (in bars, either way, inside the section) a hit on a beat the head cannot show
@@ -994,6 +1005,12 @@ def _note_reveal(
         (t for t in lit if all(shows.get(t + k * FRAME, False) for k in range(HIT_MIN_LIT_FRAMES))),
         None,
     )
+    if record["shown_ms"] is not None:
+        # How long the head stays lit showing it from there (`SHOWN_FOR_BEATS`).
+        t = record["shown_ms"]
+        while shows.get(t, False):
+            t += FRAME
+        record["shown_for_ms"] = t - record["shown_ms"]
     if not lit:
         record["reveal_ms"] = None
         record["late"] = {"reason": "the head never shows it lit before the section's end"}
@@ -1165,6 +1182,14 @@ def apply_section_events(
     return _in_order(cues, by_head), played
 
 
+def _shown_well(record: Mapping[str, Any], event: TimedEvent, beat_grid: BeatGrid) -> bool:
+    """Whether a head shown the change in time stays lit showing it for
+    `SHOWN_FOR_BEATS` of the event's beat."""
+    return _shown_in_time(record, event, beat_grid) and record.get(
+        "shown_for_ms", 0
+    ) + FRAME >= SHOWN_FOR_BEATS * _beat_ms(beat_grid, event.frame_ms)
+
+
 def _shown_in_time(record: Mapping[str, Any], event: TimedEvent, beat_grid: BeatGrid) -> bool:
     """Whether a head's outcome for a wheel event shows the change lit for
     `HIT_MIN_LIT_FRAMES` frames running within `WHEEL_LATE_BEATS` of the event's frame (a
@@ -1270,9 +1295,22 @@ def _play_wheel_events(
                 1 for _, record, _ in outcomes.values() if _shown_in_time(record, at, beat_grid)
             )
 
-        first = outcomes = trial(event)
-        chosen, direction, shown = event, None, in_time(outcomes, event)
-        if not shown:
+        def well(
+            outcomes: Mapping[str, tuple[list[FixtureSegment], dict[str, Any], bool]],
+            at: TimedEvent,
+        ) -> int:
+            return sum(
+                1 for _, record, _ in outcomes.values() if _shown_well(record, at, beat_grid)
+            )
+
+        def search(
+            score: Callable[..., int],
+            event: TimedEvent = event,
+            since: int = since,
+            until: int = until,
+            trial: Callable[[TimedEvent], dict[str, Any]] = trial,
+        ) -> tuple[int, TimedEvent, dict[str, Any], str] | None:
+            """The beat within the move bounds (later first) the most heads `score`."""
             for side, offsets in (
                 ("later", range(1, reach + 1)),
                 ("earlier", range(-1, -reach - 1, -1)),
@@ -1287,12 +1325,30 @@ def _play_wheel_events(
                         continue
                     moved = replace(event, beat_index=i, beat_ms=beats[i], frame_ms=frame)
                     found = trial(moved)
-                    if count := in_time(found, moved):
+                    if count := score(found, moved):
                         candidates.append((count, -abs(offset), moved, found))
                 if candidates:
-                    shown, _, chosen, outcomes = max(candidates, key=lambda c: (c[0], c[1]))
-                    direction = side
-                    break
+                    count, _, moved, found = max(candidates, key=lambda c: (c[0], c[1]))
+                    return count, moved, found, side
+            return None
+
+        first = outcomes = trial(event)
+        chosen, direction, shown = event, None, in_time(outcomes, event)
+        brief = False
+        if not well(outcomes, event):
+            # Shown only briefly on its beat, or not in time: a beat within reach where some
+            # head shows it well is preferred; else the old rule, traced brief.
+            better = search(well)
+            if better is not None:
+                _, chosen, outcomes, direction = better
+                shown = in_time(outcomes, chosen)
+            else:
+                brief = bool(shown)
+                if not shown:
+                    fallback = search(in_time)
+                    if fallback is not None:
+                        shown, chosen, outcomes, direction = fallback
+                        brief = True
         position = beat_grid.bar_and_beat(chosen.beat_index)
         # Moving it changes no frame where every head turns the same as on its own beat
         # (dark on both, shown from the same next reveal): then "moved" only names where
@@ -1329,6 +1385,11 @@ def _play_wheel_events(
                     },
                     False,
                 )
+            if brief and turned and record.get("shown_for_ms") is not None:
+                record["brief"] = (
+                    f"shown for {record['shown_for_ms']} ms, under {SHOWN_FOR_BEATS:g} beat: "
+                    "its template darkens the head soon after, on every beat within reach"
+                )
             if direction is not None and shown:
                 record["moved"] = {
                     "from_ms": event.frame_ms,
@@ -1337,8 +1398,13 @@ def _play_wheel_events(
                     "beat": None if position is None else position[1],
                     "offset_ms": chosen.frame_ms - event.frame_ms,
                     "heads_in_time": shown,
-                    "reason": f"no head shows it within {WHEEL_LATE_BEATS:g} beat of its own "
-                    "beat (dark there, or the wheel change does not fit)",
+                    "reason": (
+                        f"no head shows it within {WHEEL_LATE_BEATS:g} beat of its own "
+                        "beat (dark there, or the wheel change does not fit)"
+                        if not in_time(first, event)
+                        else f"on its own beat no head stays lit showing it for "
+                        f"{SHOWN_FOR_BEATS:g} beat"
+                    ),
                 }
                 if unchanged:
                     record["moved"]["changes_nothing"] = (

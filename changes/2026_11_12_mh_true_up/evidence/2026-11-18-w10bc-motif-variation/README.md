@@ -89,6 +89,93 @@ fingerprint-only with every frame unchanged, and the new tests below pin the new
   a first appearance has nothing before it); stated in the module, both planner prompts
   and the user guide.
 
+## Variant fitting revised (after 5825ff0a: owner render and review)
+
+**Why.** On the owner's rig the 3-beat `fast` (the old rate ladder) slid the break's
+reveals off the beat (12 of 13 windows half a beat off; hits moved, a colour shown for
+9 frames). Integrator decision: a fit never changes the period.
+
+**Built.** `fitting.py` reduces only the reach: `wide` and the wide part of `wide+slow` /
+`wide+fast` x1.4, x1.3, x1.25, x1.2 of the base's extent; `fast` keeps the halved period
+and steps its extents a quarter, a half and three quarters of the way to the family's own
+`narrow` extents (its floor; at `narrow`'s it would be `narrow+fast`, so it is then not
+offered). Whole-beat periods are gone. Only a speed or allowed-range failure is fitted;
+a mask or dark-repositioning failure, at the catalog or at a reduced reach, fails with
+its own reason. Never fitted: `narrow+fast`, the snap's fast variants (its rate does not
+show; a fitted `wide+fast` would be a weaker `wide`), zoom (no variant patches it). The
+fit carries what the catalog strength broke (`because`) into the offer, the trace and
+repair (review M2: "outside the operable range" where the range forced it; the old
+"the rig's speed allows no more" is gone). **No two offered variants play alike:** the
+gate compares each variation variant's entered frames with every earlier variant's and
+leaves out a twin ("plays the same as 'narrow' here"); on every rig the snap's
+`narrow+fast` and `wide+fast` now go (as its `fast` did). **FASTER** whose variant is not
+offered plays the same rate at the next narrower reach that is (`wide+fast` → `fast` →
+`narrow+fast`), noted "faster here needs a narrower reach" in the trace and repair (chosen
+over "cannot play": it is the honest nearest faster look).
+
+**Seen rule (review).** A colour or gobo change passed when a head showed it lit for 3
+frames running within a beat; nothing measured how long it stayed lit, so the template's
+own darkness could follow after 9 frames. Now (`events.SHOWN_FOR_BEATS` = 0.5): a change
+no head shows for half a beat on its own beat moves, within the existing move bounds, to
+the beat where the most heads do; where none does it plays as before and every head is
+traced `brief` ("shown for N ms"); repair predicts both from the published dark phases
+and feeds them back. **Hits:** not changed. A hit's moment is its flash, whose
+`visible_frames` frames are already required lit and visibly different; a decay cut by the
+template's darkness still reads as a hit, so the colour rule's preference is not needed.
+**Found and fixed on the way:** repair read the base's dark phases for a part that names
+an admitted preset (no motif or variation), so on a `fast` cascade its colour-event moves
+disagreed with the render in 12 of 48 probe cases (also at 5825ff0a); it now reads the
+named variant's (48 of 48 agree, 80 of 80 across five families).
+
+**Admission on `allowed_rig` at 150 degree/s** (synthetic):
+
+**79.5 BPM** (gate 4.62 s at 2c961b58 -> 5.13 s)
+
+| Template | Fitted | Not offered (why) |
+|---|---|---|
+| finite_snap_hold | - | `fast` (plays as base), `narrow+fast` (plays as 'narrow'), `wide+fast` (over the speed (not fitted)) |
+| fly_in_cascade | `fast` half period at x0.75 | `wide+fast` (over the speed at every reduced reach) |
+| fly_out_cascade | `fast` half period at x0.75 | `wide+fast` (over the speed at every reduced reach) |
+| masked_wheel_flick | - | - |
+| mirror_wings | - | `wide+fast` (over the speed at every reduced reach) |
+| target_orbit | `wide+fast` x1.4 | - |
+
+**120 BPM** (gate 2.13 s at 2c961b58 -> 2.32 s)
+
+| Template | Fitted | Not offered (why) |
+|---|---|---|
+| finite_snap_hold | - | `fast` (over the speed (not fitted)), `narrow+fast` (plays as 'narrow'), `wide+fast` (over the speed (not fitted)) |
+| fly_in_cascade | - | `wide` (over the speed at every reduced reach), `fast` (over the speed at every reduced reach), `narrow+fast` (over the speed (not fitted)), `wide+fast` (over the speed at every reduced reach) |
+| fly_out_cascade | - | `wide` (over the speed at every reduced reach), `fast` (over the speed at every reduced reach), `narrow+fast` (over the speed (not fitted)), `wide+fast` (over the speed at every reduced reach) |
+| masked_wheel_flick | - | `wide+fast` (over the speed at every reduced reach) |
+| mirror_wings | `wide` x1.3; `fast` half period at x0.679 | `wide+fast` (over the speed at every reduced reach) |
+| target_orbit | `fast` half period at x0.9 | `wide+fast` (over the speed at every reduced reach) |
+
+**170 BPM** (gate 1.31 s at 2c961b58 -> 1.57 s)
+
+| Template | Fitted | Not offered (why) |
+|---|---|---|
+| finite_snap_hold | - | `wide` (over the speed at every reduced reach), `fast` (over the speed (not fitted)), `narrow+fast` (plays as 'narrow'), `wide+fast` (over the speed (not fitted)) |
+| fly_in_cascade | `wide+slow` x1.4 | `wide` (over the speed at every reduced reach), `fast` (over the speed at every reduced reach), `narrow+fast` (over the speed (not fitted)), `wide+fast` (over the speed at every reduced reach) |
+| fly_out_cascade | `wide+slow` x1.4 | `wide` (over the speed at every reduced reach), `fast` (over the speed at every reduced reach), `narrow+fast` (over the speed (not fitted)), `wide+fast` (over the speed at every reduced reach) |
+| masked_wheel_flick | `fast` half period at x0.75 | `wide` (dark repositioning (not fitted)), `wide+fast` (over the speed at every reduced reach) |
+| mirror_wings | - | `wide` (over the speed at every reduced reach), `fast` (over the speed at every reduced reach), `narrow+fast` (over the speed (not fitted)), `wide+fast` (over the speed at every reduced reach) |
+| target_orbit | `wide` x1.3 | `fast` (over the speed at every reduced reach), `wide+fast` (over the speed at every reduced reach) |
+
+On `family_rig` (nothing fitted) gate time is unchanged (5.40/3.21/3.10 s ->
+5.42/3.34/3.21 s at 79.5/120/170 BPM).
+
+**Tests** (`tests/integration/test_mh_variant_fitting.py`, all on narrowed rigs):
+reach-only ladders and floors per variant; a fitted patch keeps the catalog period;
+on 150 degree/s heads at 79.5 BPM in 4/4 and 3/4 the cascades' fitted `fast` reveals on
+exactly the frames the catalog `fast` does on fast heads, never a frame over the speed;
+fit, cause and strength in offer, trace and repair; a range-forced fit says so; a
+repositioning failure is not fitted; no two offered variants alike; FASTER to a narrower
+reach; fitted strength is identity; a hair's breadth either side of 140.48 degree/s;
+`zoom_wave` on a zoom rig narrowed to 10..38 (admitted; its `wide` fitted at 60 degree/s).
+`tests/unit/sequencer/moving_heads/test_seen_rule.py`: moved for brevity, traced brief,
+kept on a well-shown beat, each with repair agreeing.
+
 ## Variant fitting (after 2c961b58)
 
 **Why.** On the owner's 150 degree/s heads at 79.5 BPM the gate refused most variation

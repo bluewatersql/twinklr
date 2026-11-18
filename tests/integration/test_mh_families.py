@@ -346,8 +346,9 @@ def test_in_other_meters_every_family_is_offered_with_both_variants(
     overlay ends, grows to whole bars that hold it (`whole_period_cycle`), so no family
     jumps at its cycle boundary: every family and variant is admitted, each playing its
     base when a section names no preset, and each entry dip is reported; only the snap's
-    `fast`, which plays as its base after its own base (its lift is inside the dark entry
-    window), is left out, and the gate says so."""
+    fast variants, which play as its base, `narrow` and `wide` after its own base (its lift
+    is inside the dark entry window, so its rate does not show), are left out, and the gate
+    says so."""
     rig, job = (
         (zoom_rig(HEADS), zoom_job(HEADS)) if zoom else (family_rig(HEADS), family_job(HEADS))
     )
@@ -357,17 +358,12 @@ def test_in_other_meters_every_family_is_offered_with_both_variants(
 
     assert admission.admitted == template_ids
     assert admission.exclusions == ()
-    assert [
-        (e["template_id"], e["preset_id"], e["reason"]) for e in admission.preset_exclusions
-    ] == [
-        (
-            "finite_snap_hold",
-            "fast",
-            "template 'finite_snap_hold', preset 'fast': plays the same as base here",
-        )
-    ]
+    snap = {"fast", "narrow+fast", "wide+fast"}  # its rate does not show
+    assert {(e["template_id"], e["preset_id"]) for e in admission.preset_exclusions} == {
+        ("finite_snap_hold", p) for p in snap
+    }
     assert admission.admitted_presets == {
-        t: tuple(p for p in _ALL if (t, p) != ("finite_snap_hold", "fast")) for t in template_ids
+        t: tuple(p for p in _ALL if t != "finite_snap_hold" or p not in snap) for t in template_ids
     }
     assert admission.effective_preset == dict.fromkeys(template_ids)
     assert admission.entry_dips.keys() == set(template_ids)
@@ -1099,8 +1095,8 @@ def test_variation_variants_never_decide_admission_or_the_effective_variant() ->
     """On 300-degree heads at 170 BPM the cascades' `fast` and `wide` fail while
     `narrow+fast` passes: the families are admitted and play their effective variant by
     the ladder (base, `narrow`, `slow`) exactly as before the variation variants existed;
-    the variation variants that pass are offered, `fast` and `wide` only fitted to the rig
-    (`fitting`), those that fail are recorded."""
+    the variation variants that pass are offered, `wide` only fitted to the rig
+    (`fitting`), and `fast`, which no reduced reach at its halved period fits, is recorded."""
     with family_catalog():
         admission = _gate(
             FAMILY_IDS, bars_grid(*([60_000 / 170] * 16)), _slow_heads(300.0), family_job(HEADS)
@@ -1108,14 +1104,14 @@ def test_variation_variants_never_decide_admission_or_the_effective_variant() ->
 
     assert set(admission.effective_preset.values()) <= {None, "narrow", "slow"}
     cascade = admission.offer.templates["fly_in_cascade"]
-    assert {"fast", "wide"} <= cascade.fitted.keys()
-    assert "narrow+fast" in cascade.variants
+    assert cascade.fitted.keys() == {"wide"}
+    assert "narrow+fast" in cascade.variants and "fast" not in cascade.variants
     refused = {
         (e["template_id"], e["preset_id"])
         for e in admission.preset_exclusions
         if e["preset_id"] in VARIATION_PRESETS
     }
-    assert ("fly_in_cascade", "fast") not in refused and ("fly_in_cascade", "wide") not in refused
+    assert ("fly_in_cascade", "fast") in refused and ("fly_in_cascade", "wide") not in refused
 
 
 def test_a_variation_variant_moves_wider_or_faster_than_the_base() -> None:

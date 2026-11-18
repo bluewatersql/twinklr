@@ -26,7 +26,10 @@ reach; SLOWER, FASTER on rate) from a source variant:
   a part on the same family, as it plays; otherwise its own preset, else the effective
   variant.
 
-So every carrier varies the introduced look by one step: a restating section plays the
+A FASTER step whose variant the rig does not play at the source's reach plays the
+same rate at the next narrower reach that it does (`wide+fast` → `fast` → `narrow+fast`),
+noted ("faster here needs a narrower reach"). So every carrier varies the introduced look
+by one step: a restating section plays the
 introducer's variant, and a RESOLVE with no variation set steps from it SLOWER, else
 NARROW, else restates. The step carries the source's reach and rate *class* across
 templates by name. A step off the grid, a variant not admitted for the part's template on
@@ -120,6 +123,9 @@ class PartVariant:
     reason: str | None = None
     """Why the part plays its source variant instead of the step, or plays its template's
     effective variant instead of its source's."""
+    note: str | None = None
+    """How a step that plays was reached otherwise than asked (a FASTER step that needs a
+    narrower reach on this rig)."""
 
     @property
     def preset_id(self) -> str | None:
@@ -138,6 +144,8 @@ class PartVariant:
             record["named"] = self.named
         if self.reason:
             record["reason"] = self.reason
+        if self.note:
+            record["note"] = self.note
         return record
 
 
@@ -384,14 +392,28 @@ def _resolve_part(
             reasons.append(f"{step}: {source!r} is already the {_EDGES[step]} variant")
             continue
         target = grid_variant(place[0], place[1])
-        if target in choice.plays_as_base:
-            reasons.append(f"{step}: {target!r} of {template_id} plays the same as base here")
-            continue
-        if target not in choice.admitted:
-            reasons.append(
-                f"{step}: {target!r} of {template_id} is not admitted on this rig and song"
+        note = None
+        if target in choice.plays_as_base or target not in choice.admitted:
+            why = (
+                f"{target!r} of {template_id} plays the same as base here"
+                if target in choice.plays_as_base
+                else f"{target!r} of {template_id} is not admitted on this rig and song"
             )
-            continue
+            # Faster at a narrower reach: the rig's speed is a speed of reach per period.
+            narrower = next(
+                (
+                    candidate
+                    for reach in (range(place[0] - 1, -1, -1) if step == "FASTER" else ())
+                    if (candidate := grid_variant(reach, place[1])) in choice.admitted
+                    and candidate not in choice.plays_as_base
+                ),
+                None,
+            )
+            if narrower is None:
+                reasons.append(f"{step}: {why}")
+                continue
+            note = f"{step}: {why}; faster here needs a narrower reach: it plays {narrower!r}"
+            target = narrower
         return PartVariant(
             section_id=section.section_id,
             part_index=index,
@@ -401,6 +423,7 @@ def _resolve_part(
             source=source,
             plays=target,
             named=named,
+            note=note,
         )
     return fallback("; ".join(reasons) + ": it plays the source variant")
 

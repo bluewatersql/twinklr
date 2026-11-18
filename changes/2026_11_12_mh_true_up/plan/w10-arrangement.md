@@ -152,9 +152,12 @@ Departures from §1 and §3, each recorded here:
   its family when it has a step, else its own preset.
 - *Variant fitting* (integrator decision, 2026-11-18, after the owner-rig render at
   2c961b58): the catalog's x1.5 and /2 are targets; a variation variant that fails the
-  gate is fitted to the rig (`fitting.py`: reach x1.4 → x1.2, rate on whole beats up to
-  3/4 of the base period, reach first in a combination), offered at the strongest passing
-  strength, in render identity. Revision 15.
+  gate is fitted to the rig (`fitting.py`), offered at the strongest passing strength,
+  in render identity. Revision 15. Revised after the owner render and review (revision
+  16): a fit never changes the period (a 3-beat `fast` slid its reveals off the beat);
+  only the reach is reduced (wide x1.4 → x1.2; fast toward `narrow`'s extents at the
+  halved period); only speed and range failures are fitted; no two offered variants play
+  alike; FASTER falls back to a narrower reach.
 - *Code-owned relation* (W10b/c review M1): plan time derives and overwrites
   `motif_relation`/`motif_source_id`; the render derives them again, keeping only a
   plan-time RESOLVE (only a macro thread gives one; the render has no macro plan).

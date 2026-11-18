@@ -1327,14 +1327,15 @@ def _offsets(profile: FixtureCapabilities, channel: ChannelName) -> list[int]:
     return [] if wheel is None else [wheel.offset]
 
 
-def allowed_rig(group: FixtureGroup) -> FixtureGroup:
+def allowed_rig(group: FixtureGroup, *, zoom: tuple[float, float] = (10.0, 34.0)) -> FixtureGroup:
     """`group` with every head's pan, tilt and zoom allowed range narrower than its
     physical one, asymmetrically (SYNTHETIC numbers of the shape a real rig's limits take:
     pan and tilt stopped short of each end by different amounts, zoom short of its widest
-    beam, where the profile's default and the zoom job's initial state still lie). The compiler, the gate and every offer fact must work within the allowed
+    beam, where the profile's default and the zoom job's initial state still lie; `zoom`
+    10..34 refuses `zoom_wave`, 10..38 admits it). The compiler, the gate and every offer fact must work within the allowed
     (operable) range; a rig with allowed equal to physical hides any that do not."""
     payload = group.model_dump(mode="json")
-    limits = {"pan": (-160.0, 125.0), "tilt": (-20.0, 105.0), "zoom": (10.0, 34.0)}
+    limits = {"pan": (-160.0, 125.0), "tilt": (-20.0, 105.0), "zoom": zoom}
     for fixture in payload["fixtures"]:
         axes = fixture["config"]["physical_profile"]["axes"]
         for name, (low, high) in limits.items():
