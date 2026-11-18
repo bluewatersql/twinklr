@@ -35,6 +35,7 @@ from twinklr.core.sequencer.models.transition import (
 )
 from twinklr.core.sequencer.moving_heads.arrangement import (
     BASE,
+    VARIATION_PRESETS,
     SectionArrangement,
     options_from_variants,
     resolve_arrangement,
@@ -56,6 +57,11 @@ from twinklr.core.sequencer.moving_heads.events import (
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import quantize_cue
 from twinklr.core.sequencer.moving_heads.fitting import Fit
 from twinklr.core.sequencer.moving_heads.intensity import SHAPED_LEVELS
+from twinklr.core.sequencer.moving_heads.modifiers import (
+    ModifierPlay,
+    resolve_modifiers,
+    spelled,
+)
 from twinklr.core.sequencer.moving_heads.song_intent import (
     STROBE_FLASHES_PER_BEAT,
     WHEEL_LATE_BEATS,
@@ -180,11 +186,21 @@ def _give_way(
             continue
         palette = palettes.get(section.section_id)
         now = _event_records(
-            section, section.events, _parts(offer, section, played), offer, beat_grid, palette
+            section,
+            section.events,
+            _parts(offer, section, played),
+            offer,
+            beat_grid,
+            palette,
         )
         then = set(
             _event_records(
-                section, section.events, _parts(offer, section, source), offer, beat_grid, palette
+                section,
+                section.events,
+                _parts(offer, section, source),
+                offer,
+                beat_grid,
+                palette,
             )
         )
         # An event whose outcome on the varied variant is one it does not have on the
@@ -384,24 +400,158 @@ def _parts(
     offer: RigOffer,
     section: PlanSection,
     played: Mapping[tuple[str, int], str] | None = None,
+    modifiers: Mapping[tuple[str, int], ModifierPlay] | None = None,
 ) -> list[_Part]:
     """Each part of the section: its canonical template, its bars, its offer and, where
     its motif or variation resolves it (`played`, by section and part index), the variant
-    it plays."""
+    it plays. A part whose modifiers (`modifiers`, by section and part index) play a
+    spread that moves its darkness reads the variant's dark phases with it
+    (`TemplateOffer.modifier_phases`)."""
     out: list[_Part] = []
     for index, (part, start, end) in enumerate(section.part_bars()):
         template_id = _canonical(part.template_id)
         variant = (played or {}).get((section.section_id, index))
-        out.append(
-            (
-                template_id,
-                start,
-                end,
-                offer.for_templates({template_id}, None if variant in (None, BASE) else variant),
-                variant,
+        rig = offer.for_templates({template_id}, None if variant in (None, BASE) else variant)
+        play = (modifiers or {}).get((section.section_id, index))
+        template = offer.templates.get(template_id)
+        if play is not None and template is not None and template.variants:
+            moved = template.modifier_phases.get(variant or _effective(template), {})
+            spread = next((spelled(m) for m in play.applied if spelled(m) in moved), None)
+            if spread is not None:
+                # The phases `_phases` reads for this part, with the spread.
+                key = next(
+                    k
+                    for k in (variant, "base", next(iter(template.variants)))
+                    if k in template.variants
+                )
+                rig = rig.model_copy(
+                    update={
+                        "templates": {
+                            **rig.templates,
+                            template_id: template.model_copy(
+                                update={"variants": {**template.variants, key: moved[spread]}}
+                            ),
+                        }
+                    }
+                )
+        out.append((template_id, start, end, rig, variant))
+    return out
+
+
+def _effective(template: TemplateOffer | None) -> str:
+    """A template's effective variant on this rig and song: its first admitted variant that
+    is not a variation variant (`base` without a gate)."""
+    if template is None:
+        return BASE
+    return next((v for v in template.variants if v not in VARIATION_PRESETS), BASE)
+
+
+def _modifier_plays(
+    plan: ChoreographyPlan, offer: RigOffer, played: Mapping[tuple[str, int], str]
+) -> dict[tuple[str, int], ModifierPlay]:
+    """Per (section, part index) with modifiers, what they play (`resolve_modifiers`, as
+    the render resolves them) on the variant the part plays: the resolved or named one
+    (`played`), else its template's effective variant."""
+    from twinklr.core.sequencer.moving_heads.templates import get_template
+
+    out: dict[tuple[str, int], ModifierPlay] = {}
+    for section in plan.sections:
+        for index, part in enumerate(section.parts):
+            if not part.modifiers:
+                continue
+            try:
+                document = get_template(part.template_id)
+            except Exception:  # an unknown template is the validator's to report
+                continue
+            template = offer.templates.get(document.template.template_id)
+            out[section.section_id, index] = resolve_modifiers(
+                part.modifiers,
+                document.template,
+                template,
+                played.get((section.section_id, index)) or _effective(template),
+            )
+    return out
+
+
+def _modifier_give_way(
+    plan: ChoreographyPlan,
+    offer: RigOffer,
+    played: Mapping[tuple[str, int], str],
+    plays: Mapping[tuple[str, int], ModifierPlay],
+    palettes: Mapping[str, SectionPalette],
+    beat_grid: BeatGrid | None,
+) -> list[PlanRepair]:
+    """Each section whose parts' modifiers would make one of its events worse than
+    without them, as the published dark phases predict (`_event_records` with and
+    without them): recorded for the planner that they may give way
+    (`RenderingPipeline._choose_arrangement` decides on its own frames, the spread first
+    where it plays with others)."""
+    if beat_grid is None:
+        return []
+    out: list[PlanRepair] = []
+    for section in plan.sections:
+        own = {k for k, play in plays.items() if k[0] == section.section_id and play.applied}
+        if not own or not section.events:
+            continue
+        palette = palettes.get(section.section_id)
+        without = {k: v for k, v in plays.items() if k not in own}
+        now = _event_records(
+            section,
+            section.events,
+            _parts(offer, section, played, plays),
+            offer,
+            beat_grid,
+            palette,
+        )
+        then = set(
+            _event_records(
+                section,
+                section.events,
+                _parts(offer, section, played, without),
+                offer,
+                beat_grid,
+                palette,
             )
         )
+        worse = [reason for item, reason in now if (item, reason) not in then]
+        if worse:
+            out.append(
+                PlanRepair(
+                    section_id=section.section_id,
+                    item="modifiers",
+                    action=RepairAction.RECORDED,
+                    reason="the modifiers may make the song's events worse than without them "
+                    f"({'; '.join(worse)}): they may give way, the spread first where it "
+                    "plays with others (the render decides on its own frames); move the "
+                    "modifier or the event",
+                )
+            )
     return out
+
+
+def _modifier_repairs(
+    plan: ChoreographyPlan, plays: Mapping[tuple[str, int], ModifierPlay]
+) -> list[PlanRepair]:
+    """Each modifier a part asks for that does not play (`resolve_modifiers`: a key or
+    value the renderer does not know, a second entry for a key, one not offered for the
+    template here or that does not fit the variant the part plays), with why and the
+    template's valid set, recorded for the planner: the part plays without it."""
+    repairs: list[PlanRepair] = []
+    for section in plan.sections:
+        for index, part in enumerate(section.parts):
+            play = plays.get((section.section_id, index))
+            if play is None:
+                continue
+            repairs += [
+                PlanRepair(
+                    section_id=section.section_id,
+                    item=f"part {index + 1} ({_canonical(part.template_id)}) modifier {name}",
+                    action=RepairAction.RECORDED,
+                    reason=f"{why}; the part plays without it",
+                )
+                for name, why in play.not_applied
+            ]
+    return repairs
 
 
 def _judge(
@@ -463,6 +613,9 @@ def repair_rig_intent(
       (`_event_records`): a strobe or pulse slowed at this tempo, a hit on a beat its
       template is dark on (it plays on the lit heads, or moves), a wheel change too soon
       after the previous one.
+    - A part's modifier that does not play (`_modifier_repairs`) is kept and recorded with
+      why and the template's valid set; event predictions read the dark phases its
+      modifiers play.
     - With `beat_grid`, transitions (`_transition_repairs`): one longer than its two
       parts hold is shortened (adjusted); a per-channel strategy for a channel no head
       has is dropped (adjusted); the rest is recorded as it plays (an EXIT the next
@@ -484,12 +637,16 @@ def repair_rig_intent(
     played = _played(plan, offer, arranged)
     repairs += _arrangement_repairs(plan, offer, arranged)
     repairs += _give_way(plan, offer, arranged, played, palettes, beat_grid)
+    # Then the parts' modifiers on the variants they play, which events read.
+    plays = _modifier_plays(plan, offer, played)
+    repairs += _modifier_repairs(plan, plays)
+    repairs += _modifier_give_way(plan, offer, played, plays, palettes, beat_grid)
     # Then density, on the variant each part plays, before the events it darkens.
-    repairs += _density_repairs(plan, offer, played, beat_grid)
+    repairs += _density_repairs(plan, offer, played, beat_grid, plays)
     sections: list[PlanSection] = []
     for section in plan.sections:
         palette = palettes.get(section.section_id)
-        parts = _parts(offer, section, played)
+        parts = _parts(offer, section, played, plays)
         update: dict[str, Any] = {}
 
         def note(
@@ -626,7 +783,14 @@ def repair_rig_intent(
             note(item, RepairAction.RECORDED, reason)
         sections.append(section.model_copy(update=update) if update else section)
     if beat_grid is not None:
-        repairs += _boundary_repairs(sections, offer, palettes, beat_grid, played)
+        repairs += _boundary_repairs(
+            sections,
+            offer,
+            palettes,
+            beat_grid,
+            played,
+            plays,
+        )
         sections, transition_repairs = _transition_repairs(
             sections, offer, palettes, beat_grid, played
         )
@@ -898,7 +1062,7 @@ def _head_wheel_turn(
         )
     start_index = beat_grid.beat_index(part[1], 1)
     before = at - beats[index - 1] if index > 0 else (offer.beat_ms or 0.0)
-    phases = _phases(offer, part[0], part[4])
+    phases = _phases(part[3], part[0], part[4])
     windows: list[tuple[float, float]] = []
     position = 0.0
     if phases is not None and start_index is not None:
@@ -1169,7 +1333,7 @@ def _dark_heads_on(
     played."""
     position_ = beat_grid.bar_and_beat(index)
     part = None if position_ is None else _part_at(parts, position_[0])
-    phases = None if part is None else _phases(offer, part[0], part[4])
+    phases = None if part is None else _phases(part[3], part[0], part[4])
     start_index = None if part is None else beat_grid.beat_index(part[1], 1)
     if part is None or phases is None or start_index is None:
         return None
@@ -1279,10 +1443,16 @@ def _boundary_repairs(
     palettes: Mapping[str, SectionPalette],
     beat_grid: BeatGrid,
     variants: Mapping[tuple[str, int], str] | None = None,
+    plays: Mapping[tuple[str, int], ModifierPlay] | None = None,
 ) -> list[PlanRepair]:
     """The colour changes between consecutive sections that set colours which the render
     may not play from the boundary (see `repair_rig_intent`), one record per section;
-    each head judged on its own wheel change time."""
+    each head judged on its own wheel change time, on the dark phases the new section's first
+    part plays (with its modifiers, `_parts`). Where a part on either side of the boundary
+    plays modifiers (`plays`), which move where its heads are as they enter, the published
+    dark entries read are measured without them, so the record says what may happen, not
+    what will."""
+    modified = {section_id for (section_id, _), play in (plays or {}).items() if play.applied}
     repairs: list[PlanRepair] = []
     beats = beat_grid.beat_boundaries
     bars = beat_grid.bar_boundaries
@@ -1311,7 +1481,7 @@ def _boundary_repairs(
         }
         if not slow:
             continue
-        template = offer.templates.get(successor)
+        template = _parts(offer, after, variants, plays)[0][3].templates.get(successor)
         variant = None
         if template is not None:
             preset = (variants or {}).get((after.section_id, 0)) or after.parts[0].preset_id
@@ -1334,6 +1504,13 @@ def _boundary_repairs(
             f"({'/'.join(str(ms) for ms in sorted(set(slow.values())))} ms dark) does not fit "
             f"half the beat before the section ({beat / 2:.0f} ms)"
         )
+        uncertain = bool({before.section_id, after.section_id} & modified)
+        hedge = (
+            "; its parts play modifiers, whose entries this prediction does not count: the "
+            "render decides on its own frames"
+            if uncertain
+            else ""
+        )
         if never:
             repairs.append(
                 PlanRepair(
@@ -1342,8 +1519,9 @@ def _boundary_repairs(
                     action=RepairAction.RECORDED,
                     reason=f"{why}, and its template has no dark moment long enough to turn "
                     f"the wheel: where {', '.join(never)} play straight into the section they "
-                    "keep the previous section's colour; change colour where the heads enter "
-                    "dark, or choose a template with a dark phase",
+                    + ("may keep" if uncertain else "keep")
+                    + " the previous section's colour; change colour where the heads enter "
+                    "dark, or choose a template with a dark phase" + hedge,
                 )
             )
         elif late:
@@ -1354,8 +1532,9 @@ def _boundary_repairs(
                     item=f"colour change from section '{before.section_id}'",
                     action=RepairAction.RECORDED,
                     reason=f"{why}: where {', '.join(late)} play straight into the section the "
-                    f"change waits for the template's first dark moment long enough, beat "
-                    f"{round_beats(first)} of its cycle, past half the section",
+                    f"change {'may wait' if uncertain else 'waits'} for the template's first "
+                    "dark moment long enough, beat "
+                    f"{round_beats(first)} of its cycle, past half the section" + hedge,
                 )
             )
     return repairs
@@ -1771,6 +1950,7 @@ def _density_repairs(
     offer: RigOffer,
     played: Mapping[tuple[str, int], str],
     beat_grid: BeatGrid | None,
+    modifiers: Mapping[tuple[str, int], ModifierPlay],
 ) -> list[PlanRepair]:
     """What each section's density plays other than asked (`density`), for the planner;
     never a refusal, the render decides and traces:
@@ -1847,10 +2027,10 @@ def _density_repairs(
             if beat_grid is None or not offer.beat_ms:
                 continue
             frame = EFFECT_GRID_MS / offer.beat_ms
-            for index, (template_id, start, end, _, variant) in enumerate(
-                _parts(offer, section, played)
+            for index, (template_id, start, end, rig, variant) in enumerate(
+                _parts(offer, section, played, modifiers)
             ):
-                phases = _phases(offer, template_id, variant)
+                phases = _phases(rig, template_id, variant)
                 if phases is None:
                     continue
                 try:

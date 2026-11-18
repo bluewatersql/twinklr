@@ -156,7 +156,7 @@ See [product/overview.md](product/overview.md).
     showed it, never worse than the unmoved outcome), else is traced `brief`. The song
     outranks the arrangement: the arrangement is built up greedily from the reference
     (every variation step off); a variation that makes any event worse gives way
-    (render-decided, repair-predicted). Renderer revision 20.
+    (render-decided, repair-predicted).
     ([user guide](../docs/user-guide.md#how-a-sections-motif-and-variation-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-w10bc-motif-variation/README.md))
   - **Density** (W10d, 2026-11-18, not yet seen by the owner). Density plays on the light:
@@ -170,10 +170,19 @@ See [product/overview.md](product/overview.md).
     mean light (as built) or movement is put to the owner. Renderer revision 21.
     ([user guide](../docs/user-guide.md#how-a-sections-density-reaches-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-w10d-density/README.md))
-  - **Not rendered on this branch: modifiers.** Accepted and ignored (a per-section trace
-    diagnostic says so). Built on its own side branch (`feat/mh-true-up-p3-modifiers`) as
-    arrangement units judged by `pipeline.worse`, not merged yet
-    ([handoff](../changes/2026_11_12_mh_true_up/plan/handoff.md#side-branches)).
+  - **Modifiers** (W10e, 2026-11-18, not yet seen by the owner). A part's free
+    key/value `modifiers` play a closed set computed on the variant it plays: `spread`
+    (`unison`, `wave`, `wide_wave`, `reversed`), `direction: reverse` (the path backwards
+    in time), `aim: low|high` (start tilt 10 degrees). The gate offers per template the
+    values that compile on its effective variant and play unlike it, and excludes any
+    value whose range or dark repositioning is infeasible on the played variant; the planner sees the
+    offer. Anything else does not play, traced and repaired (`recorded`) with the same
+    reason. The song outranks them: a part's modifiers are one arrangement unit, played
+    only where no event is worse than without them (else all but the spread, else
+    none; render-decided, repair says they may give way). Gate time x1.11-1.26 on the
+    test rigs. Renderer revision 22.
+    ([user guide](../docs/user-guide.md#how-a-parts-modifiers-reach-the-lights),
+    [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-w10e-modifiers/README.md))
 
   `twinklr run`, `show`, `eval-report`, `inject` and `regenerate` all use it;
   `regenerate` re-renders the whole song. Gate time on eight heads and a four-minute

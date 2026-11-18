@@ -50,7 +50,7 @@
     }
   },
   "moving_heads": {
-    "render_fingerprint": "352a5e8c9df879161cf8caa6c70f2a22993f1bdcbbab54755a2208d1488300b9",
+    "render_fingerprint": "5a063541db8a6209b983a1a74b1aa96ed21664f43cb125dc44c16b772de041cc",
     "effect_count": 195,
     "effects_sha256": "6b5d28aae5cd625b44ad95131f8631e409e1762af77d5fcdf8d7ebfb4bda811b",
     "trace_sha256": "0dfeb0a4e8c0cfe7d14d7c6bbbff8292ce5ad572840edd47a51d57f47b7ebc5d"

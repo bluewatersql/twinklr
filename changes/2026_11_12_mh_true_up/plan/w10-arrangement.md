@@ -124,7 +124,7 @@ renderer revision 20; BALANCED renders the same frames. Departures from §2, eac
 here:
 - *SPARSE yields to the song.* SPARSE runs after the part's events, so its darkness
   changes no event's own decisions; every head plays as BALANCED over what `pipeline.worse`
-  judges an event by (`density.sparse_protected`: a strobe's or `pulse`'s first 25 frames,
+  judges an event by (`density.sparse_protected`: the full span of a strobe or `pulse`,
   half a beat each side of a hit, a colour or gobo change's lit run as BALANCED shows it).
   The lit run cannot be narrowed: `worse` counts any shorter run as "shown more briefly",
   so a narrower protection would only turn a partial SPARSE into a whole-section
@@ -237,6 +237,39 @@ only where the step's shape takes a transform). The offer publishes per family o
 values that change frames there, proven by a test per family and key that the bytes change; unknown
 or not-offered keys are recorded and fed back. Gate admission per offered value.
 
+**As built (W10e, 2026-11-18; evidence
+[2026-11-18-w10e-modifiers](../evidence/2026-11-18-w10e-modifiers/README.md)).** The
+critique held at the code (`models/template.py:192-196` transform only on relative
+shapes, `:214-218` no reverse of a periodic sweep, `:669-684` `StepPatch` has no
+distribution, `compile/patch.py:34-35` lists replaced). Built: a computed layer (`sequencer/moving_heads/modifiers.py`) on
+the variant a part plays, its preset applied, fitted or not; the key stays free.
+Departures from the proposal above, each recorded here:
+- *The set.* `spread: unison | wave | wide_wave | reversed` (wave only where the heads
+  move together; the other three only where they move in a wave), `direction: reverse`
+  as a time reversal on every path that has one (transform on circle and figure-eight,
+  negated extent on a sway and its zoom, start and end swapped on a finite move; never a
+  periodic sweep), `aim: low | high` (start tilt ±10, proposed). No separate `order`:
+  `reversed` is the wave's order; `forward` is never a value (it would be identity).
+- *Gate.* Each value on the effective variant only: compiled at bar 1 over the song,
+  then compared with the unmodified compile's first bar and two cycles by the twin rule
+  (`_cues_alike`, the cue-level form of `_alike`), not entered after the base; its
+  placements are not planned again (a phase shift, time reversal or tilt translation
+  keeps every head's speed and every dark gap's time and travel). Other variants: an
+  `aim` is excluded where the variant's compiled tilt would leave a head's range (no
+  compile); a spread that moves darkness publishes each variant's dark phases from a
+  three-cycle compile. Gate time x1.11-1.26, x1.14 on 96-bar eight-head songs (the
+  brief's limit x1.3).
+- *No render-time give-way for an unproven variant.* What plays on another variant is
+  decided from the offer, so render and repair resolve it with one function
+  (`resolve_modifiers`) and never disagree.
+- *The song outranks modifiers* (after f9894cc8's arrangement loop): a part's modifiers
+  are one unit (`pipeline._modifier_units`, key `modifier:<part id>`, order after its
+  section's variation and density), candidates all of them, then all but the spread
+  where a spread plays with others (the one modifier that moves darkness); its reference
+  plays none. Repair says they may give way, and hedges a boundary record where either
+  side plays modifiers (the dark entries it reads are measured without them).
+  Revision 20.
+
 ## 5. Cross-cutting
 
 - **Revision.** `RENDERER_REVISION` bumps in each task that changes output for an existing input.
@@ -265,7 +298,7 @@ All open owner questions are collected in one list:
 [owner decisions pending](owner-decisions-pending.md).
 
 1. The meaning of density as rendered (dark / half the heads alternating per cycle / the template /
-   an accent a bar), against the prompts' "movement" wording.
+   an accent a bar), now reflected in the planner prompts.
 2. Looks: `wide`/`fast` extents and rate; SPARSE's alternation; BUSY's accent per bar; SPARSE on
    `finite_snap_hold`; snap SLOWER/FASTER.
 3. Cost: gate wall time with nine variants (W10a measures it); a restricted grid if it is too slow.

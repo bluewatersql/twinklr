@@ -138,9 +138,7 @@ def test_rendered_intent_is_not_reported_unrendered_and_identity_plays_as_author
     assert _unrendered(pipeline) == []
 
 
-def test_intent_no_renderer_rendered_yet_is_not_called_a_regression() -> None:
-    """Fields the renderer before the cutover never rendered are named apart from the
-    regressed ones."""
+def test_density_and_modifiers_are_both_recorded_as_rendered() -> None:
     plan = sections_plan(("mirror_wings", 1, 4))
     section = plan.sections[0].model_copy(
         update={
@@ -162,14 +160,11 @@ def test_intent_no_renderer_rendered_yet_is_not_called_a_regression() -> None:
     )
     pipeline.render()
 
-    (diagnostic,) = _unrendered(pipeline)
-    assert "intensity" not in diagnostic["message"]
-    assert "known regression" not in diagnostic["message"]
-    # The motif (W10b) and density (W10d) render; modifiers do not yet.
-    assert "modifiers: not rendered by any renderer yet" in diagnostic["message"]
-    assert "density" not in diagnostic["message"]
-    assert "motif" not in diagnostic["message"]
-    assert "plan/song-intent-rendering.md" in diagnostic["message"]
+    assert _unrendered(pipeline) == []
+    assert pipeline.render_record is not None
+    (look,) = pipeline.render_record["section_looks"]
+    assert look["arrangement"]["density"]["level"] == "BUSY"
+    assert "modifiers" in look["arrangement"]
 
 
 def test_plan_repairs_reach_the_render_record_only_when_there_are_any() -> None:

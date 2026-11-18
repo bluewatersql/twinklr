@@ -92,9 +92,9 @@ Video prefix: `density_*`. There is no modifiers video yet: the owner's saved pl
 
 | # | Question | Today | See | If answered the other way |
 |---|---|---|---|---|
-| D1 | **Density means light or movement?** | Light: REST is dark; SPARSE has half the heads alternating per cycle; BUSY adds an accent each bar. The planner prompts say "movement" | [W10 plan](w10-arrangement.md#7-pending-owner), item 1; density branch: <integrator fills at merge> | Density changes the movement, and the prompts stay as they are |
-| D2 | Looks: SPARSE's alternation, BUSY's accent per bar, SPARSE on `finite_snap_hold` | <integrator fills at merge> | W10 plan, item 2 | Per look |
-| D3 | Modifiers: their closed set and what each renders | <integrator fills at merge> | modifiers branch | Per modifier |
+| D1 | **Density means light or movement?** | Light: REST is dark; SPARSE has half the heads alternating per cycle; BUSY adds an accent each bar. The planner describes the light | [W10 plan](w10-arrangement.md#7-pending-owner), item 1; [density evidence](../evidence/2026-11-18-w10d-density/README.md) | Density changes movement and the planner describes that behavior |
+| D2 | Looks: SPARSE's alternation, BUSY's accent per bar, SPARSE on `finite_snap_hold` | SPARSE swaps pairs on a hard cut. BUSY adds a hit-shaped accent. | W10 plan, item 2 | Per look |
+| D3 | Modifiers: their closed set and what each renders | Spread, direction and aim adjust the played template where admitted. | [modifier evidence](../evidence/2026-11-18-w10e-modifiers/README.md) | Per modifier |
 
 ## Song, grid and test songs
 

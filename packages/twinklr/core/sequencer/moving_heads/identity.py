@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 BACKEND_ID = "xlights_dmx"
 """The backend the renderer writes: xLights DMX effects in an `.xsq`."""
 
-RENDERER_REVISION = "21"
+RENDERER_REVISION = "22"
 """Bumped by hand in the commit that intentionally changes the renderer's output; the
 render identity also carries the frame encoder's own version. 3: a section's colour and
 gobo are rendered (song-intent rendering W4), so a plan that sets them renders
@@ -100,7 +100,9 @@ dark (a synthetic `closed`), SPARSE half the heads dark in turn on the played va
 cycle, BUSY an accent each bar on each head's first lit beat, SPARSE and BUSY joining the
 arrangement's units (they give way where an event would be worse than at BALANCED); a
 `closed` on a head that cannot go dark plays nothing there (traced) instead of failing the
-render. A plan whose sections are all BALANCED renders revision 20's frames."""
+render. A plan whose sections are all BALANCED renders revision 20's frames. 22 (W10e): a part's modifiers play where the gate offers them and
+they fit the played variant. A modifier yields if it would worsen a song event or
+drop more of a cue in that part or the next."""
 
 
 def render_fingerprint(
@@ -119,6 +121,7 @@ def render_fingerprint(
     dark_spans: Sequence[tuple[int, int]] = (),
     palettes: Mapping[str, BaseModel] | None = None,
     focal_roles: Mapping[str, str] | None = None,
+    modifiers: Sequence[tuple[str, Sequence[str]]] = (),
 ) -> str:
     """Hash the functional inputs of a render.
 
@@ -147,6 +150,9 @@ def render_fingerprint(
         focal_roles: The moving heads' macro focal role by song section id (`twinklr
             show`), which adjusts each section's intensity; hashed only when there are
             any, so a render without them keeps its earlier identity.
+        modifiers: `(section name, ["key=value", ...])` for each section whose modifiers
+            play, those it plays (the gate's offer decides which do); hashed only when
+            there are any, so a render without one keeps its earlier identity.
 
     Returns:
         A 64-character lowercase SHA-256 hex digest.
@@ -177,6 +183,8 @@ def render_fingerprint(
         }
     if focal_roles:
         payload["focal_roles"] = dict(focal_roles)
+    if modifiers:
+        payload["modifiers"] = [[section, list(played)] for section, played in modifiers]
     if locks:
         payload["locks"] = sorted(
             (_canonical_lock(lock.model_dump(mode="json")) for lock in locks),

@@ -880,6 +880,9 @@ def test_the_gate_compiles_each_distinct_once_placement_once(
         return real(template, context, *args, **kwargs)
 
     monkeypatch.setattr(pipeline_module, "compile_template", recording)
+    # The modifier offer compiles its own values at bar 1 (`_admit_modifiers`); only the
+    # placements are counted here.
+    monkeypatch.setattr(pipeline_module, "_admit_modifiers", lambda *_, **__: {})
     document = loop_template_doc(
         "p23_once_steady", [path_step("f", "sweep", mode="finite")], mode="ONCE"
     )

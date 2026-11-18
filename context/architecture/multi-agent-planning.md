@@ -40,8 +40,8 @@ its intensity on the dimmer (DRAMATIC and INTENSE a beat-locked pulse; under `tw
 show` the heads' macro focal role moves it a step), and its timed events (closed/open,
 strobes, pulse, hits, colour and gobo changes) with the lyric moment cues they land on
 (a hit scaled by the cue's emphasis), its entry and exit transitions, and the reach and
-rate variant its motif and variation resolve each part to. It does not yet render the
-rest of the plan's song intent (density, modifiers),
+rate variant its motif and variation resolve each part to, with its modifiers. It does
+not yet render the rest of the plan's song intent (density),
 which no renderer has rendered. The owner has ruled that
 all of it is rendered on the single path and that nothing leaves the planner contract
 without the owner's word ([song-intent rendering](../../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md),
