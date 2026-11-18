@@ -28,6 +28,7 @@ from tests.support.moving_heads import (
     FAMILY_IDS,
     TEMPLATE_DIR,
     TEMPLATE_ID,
+    allowed_rig,
     assert_honest_transactions,
     bars_grid,
     family_catalog,
@@ -39,6 +40,7 @@ from tests.support.moving_heads import (
     overlay,
     p1_job,
     p1_rig,
+    plan_section,
     registered_templates,
     sections_plan,
     sweep_step,
@@ -1184,3 +1186,107 @@ def test_a_variation_variant_moves_wider_or_faster_than_the_base() -> None:
             assert wide_swing > base_swing, template_id
             if template_id != "finite_snap_hold":  # one move, then a hold: no turns
                 assert fast_turns > base_turns, template_id
+
+
+@pytest.mark.parametrize("zoom", [False, True], ids=["family-rig", "zoom-rig"])
+def test_a_rig_whose_allowed_ranges_are_narrower_than_physical_runs_end_to_end(
+    zoom: bool,
+) -> None:
+    """Allowed (operable) ranges narrower than physical on pan, tilt and zoom, as real rigs
+    declare: the gate admits, its offer facts are bounded over the allowed range (the
+    darkness a transition's move may need was once measured over the physical range and
+    raised), and repair and a render with variants, a motif and transitions play inside
+    the allowed range."""
+    from twinklr.core.agents.sequencer.moving_heads.rig_repair import repair_rig_intent
+    from twinklr.core.sequencer.moving_heads.song_intent import offer_for_prompt
+
+    rig = allowed_rig(zoom_rig(HEADS) if zoom else family_rig(HEADS))
+    job = zoom_job(HEADS) if zoom else family_job(HEADS)
+    template_ids = CATALOG_IDS if zoom else FAMILY_IDS
+    grid = bars_grid(*([500.0] * 16))
+    with family_catalog():
+        admission = _gate(template_ids, grid, rig, job)
+        assert admission.admitted
+        assert admission.offer.dark_change_ms is not None
+        assert offer_for_prompt(admission.offer, {}, ["s1", "s2", "s3"])
+        first, second = admission.admitted[0], admission.admitted[-1]
+        sections = [
+            plan_section("s1", 1, 4, first, motif_id="m"),
+            plan_section(
+                "s2",
+                5,
+                8,
+                second,
+                motif_id="m",
+                variation="WIDEN",
+                transitions=[
+                    {
+                        "edge": "ENTRY",
+                        "mode": "crossfade",
+                        "length": "BAR",
+                        "curve": "linear",
+                        "split": "HALF",
+                        "channels": [],
+                    }
+                ],
+            ),
+            plan_section(
+                "s3",
+                9,
+                12,
+                first,
+                variation="FASTER",
+                transitions=[
+                    {
+                        "edge": "ENTRY",
+                        "mode": "snap",
+                        "length": "BEAT",
+                        "curve": "linear",
+                        "split": "QUARTER",
+                        "channels": [],
+                    }
+                ],
+            ),
+        ]
+        repaired = repair_rig_intent(
+            ChoreographyPlan(sections=sections, overall_strategy=""), admission.offer, {}, grid
+        )
+        pipeline = RenderingPipeline(
+            choreography_plan=repaired,
+            beat_grid=grid,
+            fixture_group=rig,
+            job_config=job,
+            media_file="silence.wav",
+            admission=admission,
+        )
+        pipeline.render()
+
+    profile = rig.expand_fixtures()[0].config.physical_profile
+    assert profile is not None
+    for name, axis in profile.axes.items():
+        if name == "dimmer":
+            continue
+        low, high = sorted(axis.dmx_word(v) for v in axis.operable_range)
+        for frame in pipeline.frames:
+            channels = dict(frame.channels)
+            word = channels[axis.coarse_offset]
+            if axis.fine_offset is not None:
+                word = word << 8 | channels[axis.fine_offset]
+            assert low <= word <= high, (frame.fixture_id, frame.time_ms, name, word)
+
+
+def test_an_offer_fact_that_cannot_be_computed_is_unknown_not_a_failure(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The darkness bound is an offer fact: where it cannot be computed it is unknown (repair
+    then warns on every transition window it would have bounded) and the gate goes on."""
+    from twinklr.core.sequencer.moving_heads import song_intent
+
+    def broken(*_: Any, **__: Any) -> int:
+        raise ValueError("an unforeseen profile")
+
+    with patch.object(song_intent, "worst_case_entry_ms", broken):
+        offer = song_intent.rig_offer(family_rig(HEADS), bars_grid(*([500.0] * 4)))
+
+    assert offer.dark_change_ms is None
+    assert "is unknown on" in caplog.text

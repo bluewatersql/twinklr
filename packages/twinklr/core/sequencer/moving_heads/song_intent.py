@@ -31,6 +31,7 @@ from __future__ import annotations
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from itertools import pairwise
+import logging
 import math
 from typing import TYPE_CHECKING, Any, Literal, Protocol, get_args
 
@@ -64,6 +65,8 @@ if TYPE_CHECKING:
     from twinklr.core.config.fixtures import FixtureGroup
     from twinklr.core.sequencer.planning import MacroPlan
     from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+
+logger = logging.getLogger(__name__)
 
 RENDERED_INTENT_FIELDS = frozenset(
     {
@@ -740,9 +743,11 @@ def rig_offer(
                 assert settle is not None  # offered states have one
                 changes.append(wheel_change_ms(profile, settle))
     dark_changes: list[int | None] = []
-    for profile in profiles.values():
+    for fixture_id, profile in profiles.items():
+        # Across each axis' operable range (its allowed range where the profile narrows
+        # the physical one): the poses a head can be commanded to.
         ranges = {
-            channel: (profile.axes[key].physical_min, profile.axes[key].physical_max)
+            channel: profile.axes[key].operable_range
             for channel, key in AXIS_KEYS.items()
             if channel in (ChannelName.PAN, ChannelName.TILT, ChannelName.ZOOM)
             and key in profile.axes
@@ -752,8 +757,8 @@ def rig_offer(
             for channel in (ChannelName.COLOR, ChannelName.GOBO)
             if DISCRETE_KEYS[channel] in profile.discrete
         }
-        dark_changes.append(
-            worst_case_entry_ms(
+        try:
+            bound = worst_case_entry_ms(
                 profile,
                 entry_pose={channel: (low, low) for channel, (low, _) in ranges.items()},
                 entry_wheels=every,
@@ -761,7 +766,17 @@ def rig_offer(
                 frame_ms=EFFECT_GRID_MS,
                 held_wheels=every,
             )
-        )
+        except ValueError as error:
+            # An offer fact never takes the gate down: the bound is unknown, and repair
+            # then warns on every transition it would have bounded.
+            logger.warning(
+                "moving heads: the darkness a head may need for a transition's move or "
+                "turn is unknown on %r (%s); repair warns on every transition window",
+                fixture_id,
+                error,
+            )
+            bound = None
+        dark_changes.append(bound)
     intervals = sorted(b - a for a, b in pairwise(beat_grid.beat_boundaries))
     travels: dict[str, list[int | None]] = {}
     for profile in profiles.values():

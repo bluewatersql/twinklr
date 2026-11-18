@@ -77,6 +77,7 @@ from twinklr.core.sequencer.display.xlights_mapping import (
     XLightsGroupMapping,
     XLightsMapping,
 )
+from twinklr.core.sequencer.moving_heads.arrangement import with_motif_relations
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import OutputError
 from twinklr.core.sequencer.moving_heads.export.xsq_adapter import check_models
 from twinklr.core.sequencer.moving_heads.song_intent import SectionPalette
@@ -208,9 +209,13 @@ def _load_live_plan(
     if record is None:
         return None
     try:
-        plan = load_plan(
-            record["plan"],
-            remedy=f"run `twinklr inject` to re-plan the whole song into {sequence_path}",
+        # Injected plans are normalised on load: code-owned motif relations are derived
+        # again (no macro thread here, so an injected RESOLVE is not honoured).
+        plan = with_motif_relations(
+            load_plan(
+                record["plan"],
+                remedy=f"run `twinklr inject` to re-plan the whole song into {sequence_path}",
+            )
         )
         palettes = TypeAdapter(dict[str, SectionPalette]).validate_python(record["palettes"])
         return plan, {key: str(record[key]) for key in LIVE_PLAN_IDENTITY}, palettes

@@ -199,7 +199,16 @@ class MovingHeadRenderingStage:
             base_plan = context.get_state("regeneration_base_plan")
             replanned = context.get_state("regeneration_section_id")
             if isinstance(base_plan, _ChoreographyPlan) and isinstance(replanned, str):
-                changes = pipeline.arrangement_changes(base_plan, replanned)
+                try:
+                    changes = pipeline.arrangement_changes(base_plan, replanned)
+                except Exception:
+                    # A warning that cannot be computed never fails a finished render.
+                    logger.exception(
+                        "moving heads: could not tell which kept sections the re-plan of %r "
+                        "moves to another variant; the trace's arrangement says what each plays",
+                        replanned,
+                    )
+                    changes = None
                 if changes is not None:
                     logger.warning("moving heads: %s", changes)
                     context.set_state("arrangement_warning", changes)

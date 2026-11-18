@@ -116,7 +116,7 @@ See [product/overview.md](product/overview.md).
     it within a beat, else not played. The trace records every event
     per head (unplaceable ones too) and every lyric cue with its offset from the lyric;
     the offer says what each event plays at the song's tempo; repair records, with the
-    render's tests, what will play otherwise. Renderer revision 13.
+    render's tests, what will play otherwise. Renderer revision 14.
     ([user guide](../docs/user-guide.md#how-a-sections-events-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w6-w7-events/README.md))
   - **Transitions** (W8, 2026-11-17, not yet seen by the owner). Each boundary plays its
@@ -135,7 +135,7 @@ See [product/overview.md](product/overview.md).
     transition counts as played on a head only where its frames differ from the plan
     rendered without transitions (else traced `nothing`, warned). Repair shortens one
     longer than its parts and records what plays otherwise; the trace lists each per
-    head. Renderer revision 13.
+    head. Renderer revision 14.
     ([user guide](../docs/user-guide.md#how-a-sections-transitions-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w8-transitions/README.md))
   - **Motif and variation** (W10b/W10c, 2026-11-18, not yet seen by the owner). Each
@@ -149,7 +149,7 @@ See [product/overview.md](product/overview.md).
     look it steps from, traced and repaired (`recorded`); a motif's colour and gobo are
     never changed. The trace's `arrangement` and the evaluation report say per section the
     relation and the variant played; `regenerate` says which kept sections a re-plan
-    moves to another variant. Renderer revision 13.
+    moves to another variant. Renderer revision 14.
     ([user guide](../docs/user-guide.md#how-a-sections-motif-and-variation-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-w10bc-motif-variation/README.md))
   - **Not rendered yet: density and modifiers.** Accepted and ignored (a per-section

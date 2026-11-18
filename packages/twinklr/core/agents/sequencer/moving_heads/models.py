@@ -260,15 +260,15 @@ class PlanSection(BaseModel):
         Field(
             default=None,
             exclude_if=lambda value: value is None,
-            description="How the section relates to the motif's previous carrier, written at "
-            "plan time from the macro motif thread (code-owned, not planned; "
+            description="How the section relates to the section that introduced its motif, "
+            "derived at plan time from the macro motif thread (code-owned, not planned; "
             "`arrangement.motif_relations`)",
         )
     )
     motif_source_id: SkipJsonSchema[str | None] = Field(
         default=None,
         exclude_if=lambda value: value is None,
-        description="The section the motif was last carried by (code-owned, not planned)",
+        description="The section that introduced the motif (code-owned, not planned)",
     )
     transitions: list[PlanTransition] = Field(
         description="At most one ENTRY and one EXIT transition, chosen for the boundary",

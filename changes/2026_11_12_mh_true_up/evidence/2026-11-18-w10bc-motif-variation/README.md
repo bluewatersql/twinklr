@@ -89,6 +89,37 @@ fingerprint-only with every frame unchanged, and the new tests below pin the new
   a first appearance has nothing before it); stated in the module, both planner prompts
   and the user guide.
 
+## Owner-rig gate crash and confirmation-review LOW items (after e922bc52)
+
+- **Crash.** `rig_offer`'s transition-darkness bound (`dark_change_ms`, W10a LOW-2,
+  d1125419) measured each head across its *physical* pan, tilt and zoom range; a head whose
+  allowed range is narrower (as the owner's are) cannot be commanded there and
+  `dmx_word` raised, taking the pre-planning gate down. It now measures across the
+  operable range (`AxisCapability.operable_range`, what the compiler uses). No other code
+  added since 1eca8998 reads `physical_min`/`physical_max` (grep of the diff). The
+  pre-existing W8 `full_travel_ms` still divides the physical range by the travel speed
+  (an overstatement on such rigs, never a raise); left as is and reported.
+- **Offer facts never take the gate down.** Chosen: the bound degrades to unknown (None)
+  on a `ValueError`, logged once per head; repair already treats an unknown bound as
+  "warn on every transition window". Test:
+  `test_an_offer_fact_that_cannot_be_computed_is_unknown_not_a_failure`.
+- **Coverage.** `tests.support.moving_heads.allowed_rig` narrows pan (-160..125 of
+  -270..270), tilt (-20..105 of -135..135) and zoom (10..34 of 10..40); SYNTHETIC
+  numbers. `test_a_rig_whose_allowed_ranges_are_narrower_than_physical_runs_end_to_end`
+  (family and zoom rigs) runs the gate, the offer, repair and a render with a motif,
+  variations and transitions, and checks every frame's pan, tilt and zoom word lies in
+  the allowed range; it fails on e922bc52's code.
+- **L1** `RENDERER_REVISION` 14 (a motif plan with two varied carriers renders differently
+  at 5b708b26 and e922bc52); pins re-recorded fingerprint-only, every frame held.
+- **L2** an injected plan read for `regenerate` is normalised on load
+  (`with_motif_relations`, no macro thread): an injected RESOLVE or stale source is not
+  honoured.
+- **L3** no channel carries render-derived facts back to the planner: the render runs once
+  after planning ends, and the refinement prompt reads only plan repairs. Left as is.
+- **L4** `arrangement_changes` failing logs and the render stands.
+- **L5** `PlanSection.motif_relation`/`motif_source_id` descriptions name the introducing
+  section.
+
 ## W10a review fixes (listed apart)
 
 - **H1 — dark entries and dark windows per variant.** `RigOffer.dark_entries` is again the

@@ -1138,3 +1138,46 @@ def test_profile_tags_fall_back_to_printing_in_full_when_the_file_cannot_be_writ
     output = capsys.readouterr().out
     assert "could not be written" in output
     assert "MH1, MH2 (profile 'synthetic_spot'): 6 wheel or shutter states" in output
+
+
+def test_an_injected_plan_is_normalised_on_load(tmp_path: Path) -> None:
+    """The code-owned motif relations of an injected plan are derived again on load: an
+    injected RESOLVE (no macro thread is at hand here) and a stale source are not kept."""
+    from tests.support import moving_heads as m
+    from twinklr.cli.main import LIVE_PLAN_IDENTITY, _load_live_plan
+
+    plan = ChoreographyPlan(
+        sections=[
+            m.plan_section("a", 1, 2, "mirror_wings", motif_id="mo"),
+            m.plan_section(
+                "b",
+                3,
+                4,
+                "mirror_wings",
+                motif_id="mo",
+                motif_relation="RESOLVE",
+                motif_source_id="zzz",
+            ),
+        ],
+        overall_strategy="",
+    )
+    sequence = tmp_path / "song.xsq"
+    path = tmp_path / ".twinklr-live-plans.json"
+    path.write_text(
+        json.dumps(
+            {
+                str(sequence): {
+                    "plan": plan.model_dump(mode="json"),
+                    "palettes": {},
+                    **dict.fromkeys(LIVE_PLAN_IDENTITY, "x"),
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = _load_live_plan(path, sequence)
+
+    assert loaded is not None
+    b = loaded[0].sections[1]
+    assert (b.motif_relation, b.motif_source_id) == ("RESTATE", "a")
