@@ -112,6 +112,9 @@ the compiled pan and tilt; the other-meter test now expects every variant admitt
 
 ## Look questions (PENDING-OWNER)
 
+All open owner questions are collected in one list:
+[owner decisions pending](../../plan/owner-decisions-pending.md).
+
 1. `wide` (extents × 1.5) and `fast` (period halved): the right amounts?
 2. `finite_snap_hold`: its `fast` (0.5 beat) and `slow` (2 beats) barely differ from its
    1-beat base.

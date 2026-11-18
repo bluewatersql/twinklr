@@ -24,6 +24,7 @@ in `context/`; memories explain why, and what we learned.
 - [p3-t4-live-acceptance-superseded.md](decisions/p3-t4-live-acceptance-superseded.md) — owner decision 2026-11-12: P3-T4 live macro acceptance is closed by the 2026-08 OpenAI and 2026-11-12 Claude live runs; the sealed ledger stays untouched
 - [display-stays-lit.md](decisions/display-stays-lit.md) — owner direction 2026-11-12: every section keeps the display lit; brightness floor, beat grid extended to song end, and a foundation-coverage rule in the group planner
 - [mh-single-renderer.md](decisions/mh-single-renderer.md) — owner direction and look acceptance 2026-11-16: one moving-head renderer (profile-based, complete DMX frames); the old renderer, its templates and switches deleted; the accepted look, guarded by the output pins, is the reference; the cutover regressed the planner's song intent, which the owner directed be rendered (2026-11-17)
+- [mh-song-outranks-the-arrangement.md](decisions/mh-song-outranks-the-arrangement.md) — integrator decision 2026-11-18 (owner may reverse): no arrangement choice (variation, density, modifiers) may make a song event worse than the reference; built up greedily from the reference in plan order and judged by `pipeline.worse`
 - [mh-render-matches-pre-cleanup-look.md](decisions/mh-render-matches-pre-cleanup-look.md) — **superseded 2026-11-16** by `mh-single-renderer.md`; was: the pre-clean-up look of the deleted renderer is the reference (history)
 
 ## Learnings
@@ -33,6 +34,7 @@ in `context/`; memories explain why, and what we learned.
 - [live-provider-run-lessons.md](learnings/live-provider-run-lessons.md) — live provider lessons: reasoning models reject temperature, 300 s timeout, config schema drift, degenerate-segment aborts, Claude rejects planner schemas as too large to compile, Ollama Cloud ignores `response_format`, proxy TLS
 - [simplification-pass-2026-02.md](learnings/simplification-pass-2026-02.md) — stale auto-memory case study: a claimed simplification pass that never landed on `main`
 - [prove-parity-before-deleting.md](learnings/prove-parity-before-deleting.md) — before deleting a replaced implementation, compare old and new on the same inputs; unchanged bytes on the surviving path did not show that the moving-head cutover lost the planner's song intent (2026-11-17)
+- [mh-defects-hide-on-idealized-rigs.md](learnings/mh-defects-hide-on-idealized-rigs.md) — test moving-head mechanisms on rigs with narrowed allowed ranges and slow heads, render the owner's song after each feature, and judge rule changes by comparing events before and after (2026-11-18)
 - [model-dump-hashes-rekey-caches.md](learnings/model-dump-hashes-rekey-caches.md) — removing or renaming a hashed model field changes session ids, planner cache keys, live-plan digests and fingerprints: paid re-plans and `regenerate` refusals to tell the owner about
 
 ## Constraints

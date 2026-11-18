@@ -190,6 +190,74 @@ After the merge and the wiring, last edit first: `uv run pytest -q --no-cov -p n
 passed; `uv run ruff format --check .` 1318 files formatted; `uv run mypy packages` no
 issues in 654 files (the worktree's environment now has every dev extra).
 
+## After merging c2198e26: review and owner-rig fixes
+
+Merged main at c2198e26 (934b2635: a same-playing candidate is skipped; `worse` judges a
+strobe, `pulse` or `closed` over its whole traced span, counting flashes).
+`RENDERER_REVISION` 20; every pin's and the golden's frame and `.xsq` hashes equal both
+parents'.
+
+- **REST hits (review HIGH).** REST enters as BALANCED would: its boundary
+  (`_boundary_change`) and entry window (`_enter_section`'s `decide_on`) are decided on the
+  part compiled without REST, and a cue the window leaves dark is kept
+  (`apply_entry_window`'s `keep_dark`), so a hit inside REST finds BALANCED's cues. A head
+  is lit for it from REST's darkness wherever its wheels hold still and its shutter is open
+  around the hit (`_forced_frames`'s `local`), and a cue starting a frame or two after the
+  beat counts, as for a lit head. Every head of the rig now has an outcome per hit (one
+  without a cue in the part says so). The reviewer's REST plans (`density_strict.py`,
+  seeds 0-59 on the plain and the slow rig, 120 plans): hits lost against BALANCED 46 head
+  cases → **0** (seeds 6 and 39 of `rest_detail.py` included). Colour and gobo changes
+  REST keeps unseen (104 head cases there) are by design: each head's trace adds
+  `rest` ("the section's REST keeps the head dark here: …") and repair records each such
+  event (it does not play, or shows from its next reveal).
+- **SPARSE and transitions (owner-rig defect).** SPARSE keeps every head as BALANCED over
+  the reach of the planned transitions at the part's edges, taken from the plan as given
+  (`RenderingPipeline._planned`, `_transition_reach`), so the render without transitions
+  keeps off the same frames and the played rule compares like with like: a transition
+  plays on every head it plays on at BALANCED, and the trace is the frames'. Tested on
+  target_orbit with an ENTRY crossfade (`test_sparse_keeps_off_a_transition_that_plays_at_balanced`).
+- **SPARSE and a colour lit from the section before (review MEDIUM-1).** Where an earlier
+  part's colour or gobo change is still lit as the part starts, every head plays as
+  BALANCED until its first dark frame.
+- **SPARSE and the new `worse`.** Strobes and pulses are protected over their whole span
+  (`worse` counts their flashes there), replacing the 25-frame window.
+- **BUSY and transitions (review MEDIUM-2).** Accents are decided once, on the plan
+  without its transitions: in the render an accent plays only where that render placed it,
+  and is dropped inside a transition only on a head the transition plays on. Played status
+  under BUSY equals BALANCED's (`test_busy_never_changes_what_a_transition_plays`).
+- **Mirror pairing (review LOW).** SPARSE's darkness is one span list per half, so mirror
+  partners get the same spans. On masked_wheel_flick with a section colour the partners'
+  own masks differ (the `flick` preset gives alternate heads different states, so their
+  overlay masks fall differently), and so do their whole dark masks; with no colour they
+  match. Not SPARSE's doing.
+- **Lit share.** The trace says what it measures (`lit_share_of`: the part's frames as
+  compiled, before its entry window, transitions, intensity and hits), which is why the
+  owner-rig frames read lower.
+- **One trial for every unit.** Where a density unit is in the plan, the arrangement first
+  tries every unit on its first candidate at once (`ArrangementUnit.together`); where that
+  plays nothing worse one trial settles it, else the unit-by-unit build runs as before. A
+  plan without density builds unit by unit as on main: 80 random variation plans render
+  the same frames as c2198e26 (`varhash.py`, below).
+
+**Numbers after these fixes.**
+
+| Check | Result |
+|---|---|
+| `strict_density.py` (as above, 200 plans) plain rig | 0 worse, 0 errors, all deterministic; SPARSE played 177, gave way 0, BALANCED fallback 44 of 221; BUSY played 232 of 232; mean 2.0 arrangement renders a plan |
+| `strict_density.py` allowed_rig 150 degree/s, 79.5 BPM | 0 worse, 0 errors; SPARSE played 187, gave way 2 (a hit lost, a hit farther from its beat), fallback 32 of 221; BUSY 232 of 232; mean 2.1 renders |
+| reviewer's `density_strict.py` plans (seeds 0-59 × plain and slow) | REST: 0 hits lost (was 46 head cases); SPARSE and BUSY: 0 worse plans (SPARSE was 2) |
+| 80 random variation plans without density, frames against c2198e26 | 80 of 80 identical, 625 renders on both |
+| REALISTIC (as above) | 2 arrangement renders, 9.7 s wall (was 7 renders, 38.5 s); the same plan at BALANCED 3 renders, 11.8 s |
+
+SPARSE's BALANCED fallbacks rose (20 → 44 of 221 on the plain rig) because short parts are
+now covered by what they must keep (a planned transition's window at each edge, a
+strobe's or pulse's whole span, a colour's lit run): nothing is left to darken, traced
+"nothing would go dark". Its give-ways fell to 0 and 2.
+
+After the last edit (merge of c2198e26 and these fixes): full suite 7696 passed, 30
+skipped, 0 failed (20 min 31 s); `ruff check .` passed; `ruff format --check .` 1318
+files formatted; `mypy packages` no issues in 654 files.
+
 ## Not built, or not as asked
 
 - **Per-accent give-way for BUSY** is not built: the unit interface takes whole
@@ -219,3 +287,15 @@ issues in 654 files (the worktree's environment now has every dev extra).
    throughout (mirror_wings), SPARSE stops after a colour change until the template next
    goes dark. Narrower is not possible without giving way: `worse` counts any shorter
    lit run as "shown more briefly", so the whole section would play BALANCED instead.
+7. **SPARSE swaps are hard cuts** (owner-rig render): on one frame one pair goes from full
+   to dark as the other comes in at full. Keep the hard swap, or a short cross-dip?
+8. **BUSY accent shape and depth.** It is the planner's own hit (`events._play_hit`, as
+   `apply_hits` plays it) at MED (HIGH under DRAMATIC or INTENSE): with room before the beat
+   a pre-dip and a snap to full; at a cascade's window start (dark before the beat) a flash
+   and a duck, e.g. `255 255 255 255 90 87 84 81 91 101 … 195` on the owner's rig: four
+   frames at full, a duck to 35 % recovering over about half a beat, which is the HIGH
+   shape (contrast 0.60, four frames, decay 0.75 beat: those sections are DRAMATIC or
+   INTENSE; MED is 0.40, three frames, half a beat), in chorus_2 under INTENSE a dip to 26
+   then full. Is that shape and depth right for an accent every bar?
+9. **SPARSE's lit share** is traced on the part's compiled frames; say if the trace should
+   count the frames as delivered instead.

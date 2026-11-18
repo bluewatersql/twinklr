@@ -120,7 +120,7 @@ to the owner.
 
 **As built (W10d, 2026-11-18; evidence
 [2026-11-18-w10d-density](../evidence/2026-11-18-w10d-density/README.md)).** `density.py`,
-renderer revision 19; BALANCED renders the same frames. Departures from §2, each recorded
+renderer revision 20; BALANCED renders the same frames. Departures from §2, each recorded
 here:
 - *SPARSE yields to the song.* SPARSE runs after the part's events, so its darkness
   changes no event's own decisions; every head plays as BALANCED over what `pipeline.worse`
@@ -149,7 +149,16 @@ here:
   (`pipeline._density_units`, key `density:<section>`, after its variation, candidate
   "planned", reference BALANCED), traced "density gave way to <event>". BUSY gives way
   whole: `worse` names events, not the accents near them, and the accents already keep
-  clear of events and transitions. REST is not a unit. Revision 19.
+  clear of events and transitions. REST is not a unit. Revision 20.
+- *Review and owner-rig fixes (revision 20).* REST decides its boundary and entry on the
+  part without REST and keeps cues its entry leaves dark, so its hits play on every head
+  that plays them at BALANCED (lit from the dark where the head's wheels hold still
+  around them); SPARSE keeps off the planned transitions' reach at its part's edges (from
+  the plan as given, so the render without transitions agrees) and off a colour still lit
+  from an earlier part; BUSY's accents are decided once on the plan without transitions
+  and dropped only inside a transition that plays on the head. Where a density unit is in
+  the plan, every unit's first candidate is tried at once first
+  (`ArrangementUnit.together`).
 - *Offer and contract.* `RigOffer.sparse_halves` (left out of dumps when None) and a
   per-template cycle note in the prompt; the `density` field's description and the
   planner and judge prompts now say what renders (re-keys the planner cache).
@@ -251,6 +260,9 @@ or not-offered keys are recorded and fed back. Gate admission per offered value.
 | W10f | Remove the diagnostic; docs, context, pins | all | S |
 
 ## 7. PENDING-OWNER
+
+All open owner questions are collected in one list:
+[owner decisions pending](owner-decisions-pending.md).
 
 1. The meaning of density as rendered (dark / half the heads alternating per cycle / the template /
    an accent a bar), against the prompts' "movement" wording.

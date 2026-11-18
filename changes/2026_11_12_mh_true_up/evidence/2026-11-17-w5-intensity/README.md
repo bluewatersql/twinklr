@@ -258,6 +258,9 @@ prompt line and omissions, judge prompt line, advisory skip).
 
 ## What the owner should look for (W5 view; PENDING-OWNER)
 
+All open owner questions are collected in one list:
+[owner decisions pending](../../plan/owner-decisions-pending.md).
+
 Render a song with sections set to DRAMATIC and INTENSE over catalog families (full
 level), and, under `twinklr show`, sections where the heads LEAD and REST:
 

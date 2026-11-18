@@ -1485,23 +1485,61 @@ class _HeadFrames:
 
 
 def _forced_frames(
-    frames: _HeadFrames, t: int, length: int, dark_spans: Sequence[tuple[int, int]]
+    frames: _HeadFrames,
+    t: int,
+    length: int,
+    dark_spans: Sequence[tuple[int, int]],
+    *,
+    local: bool = False,
 ) -> int:
     """How many frames from `t` a hit may light where the head is dark: inside its cues,
     dark through the dimmer only (the shutter open), outside every show rest, with the
     wheels still from the dark run's start through the frames after, and the close
-    latency (plus a frame) left dark after them. 0 where it may not."""
+    latency (plus a frame) left dark after them. 0 where it may not. With `local` (a
+    section's REST, dark from its first beat to its end), the dark run is the stretch
+    around `t` where the wheels hold `t`'s states and the shutter is open, lit only after
+    the wheels have settled from a turn that starts it."""
     profile = frames.profile
     if not profile.visibility.dimmer_zero_extinguishes or "dimmer" not in profile.axes:
         return 0
     if any(a <= t < b for a, b in dark_spans) or t not in frames.cue_at:
         return 0
+    held = frames.wheels(t) if local else None
+
+    def stretch(u: int) -> bool:
+        """Whether frame `u` is in the dark run (`local`: holding `t`'s wheels, its
+        shutter open)."""
+        if u not in frames.cue_at or frames.lit[u]:
+            return False
+        return held is None or (
+            frames.wheels(u) == held and not _shutter_dark(frames.own[frames.cue_at[u]], profile, u)
+        )
+
+    if local and not stretch(t):
+        return 0
     run_start = t
-    while run_start - FRAME in frames.cue_at and not frames.lit[run_start - FRAME]:
+    while stretch(run_start - FRAME):
         run_start -= FRAME
     run_end = t
-    while run_end in frames.cue_at and not frames.lit[run_end]:
+    while stretch(run_end):
         run_end += FRAME
+    if (
+        held is not None
+        and run_start - FRAME in frames.cue_at
+        and not frames.lit[run_start - FRAME]
+        and frames.wheels(run_start - FRAME) != held
+    ):
+        # The stretch starts on a wheel turn in the dark: lit only once it has settled.
+        cue = frames.own[frames.cue_at[t]]
+        settles = [
+            profile.discrete[DISCRETE_KEYS[channel]]
+            .states[_state(cue, channel, profile, t)]
+            .settle_ms
+            for channel in (ChannelName.COLOR, ChannelName.GOBO)
+            if DISCRETE_KEYS[channel] in profile.discrete
+        ]
+        if None in settles or t - run_start < frames_ms(max((s or 0 for s in settles), default=0)):
+            return 0
     tail = frames_ms(profile.visibility.close_latency_ms or 0) + FRAME
     usable = min(length, (run_end - t - tail) // FRAME)
     if usable <= 0:
@@ -1526,6 +1564,7 @@ def apply_hits(
     dark_spans: Sequence[tuple[int, int]],
     flashing: Sequence[tuple[TimedEvent, int, int]] = (),
     required: Mapping[int, Collection[str]] | None = None,
+    rest: bool = False,
 ) -> tuple[list[FixtureSegment], dict[int, dict[str, Any]], dict[int, dict[str, list[str]]]]:
     """A part's cues as they will play (after every darkness and intensity) with its hits
     played (see the module docstring). A hit is one moment for the rig: it plays on its
@@ -1542,8 +1581,10 @@ def apply_hits(
     without transitions) makes a beat serve only where every one of those heads can show
     it, so a transition never loses a hit on a head: where its beat does not serve them,
     the hit moves, by the same rules, to the beat that does (else it plays as without
-    them). Returns the cues, the trace entry per hit, and per flashing event and head the
-    hits that light its dark frames."""
+    them). With `rest` (the part is in a section's REST), a head is lit for the hit from
+    REST's darkness wherever its wheels hold still around it (`_forced_frames`, local).
+    Every head of `profiles` has an outcome per hit. Returns the cues, the trace entry per
+    hit, and per flashing event and head the hits that light its dark frames."""
     start, end = window
     records: dict[int, dict[str, Any]] = {}
     notes: dict[int, dict[str, list[str]]] = {}
@@ -1578,8 +1619,15 @@ def apply_hits(
                 lit = _lit_start(head, t)
                 if lit is not None:
                     able[fixture_id] = (lit, "lit", decay)
-                elif forced := _forced_frames(head, t, decay, dark_spans):
+                elif forced := _forced_frames(head, t, decay, dark_spans, local=rest):
                     able[fixture_id] = (t, "lit_from_dark", forced)
+                elif rest:
+                    # In REST a cue may start up to `HIT_LATE_FRAMES` after the beat's
+                    # frame, as a lit one may (`_lit_start`).
+                    for late in range(t + FRAME, t + (HIT_LATE_FRAMES + 1) * FRAME, FRAME):
+                        if forced := _forced_frames(head, late, decay, dark_spans, local=True):
+                            able[fixture_id] = (late, "lit_from_dark", forced)
+                            break
             return able
 
         home = event.beat_index
@@ -1660,7 +1708,13 @@ def apply_hits(
                 chosen, able, direction = found
         beat = beats[chosen]
         position = beat_grid.bar_and_beat(chosen)
-        for fixture_id in by_head:
+        for fixture_id in sorted({*by_head, *profiles}):
+            if fixture_id not in by_head:
+                heads[fixture_id] = {
+                    "not_played": "the head has no cue in this part (its template leaves it "
+                    "out, or it is held dark through the section's entry)"
+                }
+                continue
             if fixture_id not in frames:
                 heads[fixture_id] = {"not_played": "the head has no dimmer axis"}
                 continue
@@ -2045,7 +2099,8 @@ def describe_events(entries: Sequence[Mapping[str, Any]]) -> list[str]:
 
 def _describe_outcome(outcome: Mapping[str, Any]) -> str:
     if "not_played" in outcome:
-        return f"not played ({outcome['not_played']})"
+        rest = f"; {outcome['rest']}" if "rest" in outcome else ""
+        return f"not played ({outcome['not_played']}){rest}"
     if "unchanged" in outcome:
         return f"already {outcome['state']}"
     if "plays" in outcome and "to_ms" not in outcome:

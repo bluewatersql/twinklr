@@ -14,7 +14,7 @@ import json
 import logging
 import math
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -54,7 +54,7 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
 from twinklr.core.sequencer.models.moving_heads.topology import rig_topology
 from twinklr.core.sequencer.models.template import RepeatMode
-from twinklr.core.sequencer.models.transition import TransitionEdge
+from twinklr.core.sequencer.models.transition import PlanTransition, TransitionEdge
 from twinklr.core.sequencer.moving_heads import render_log
 from twinklr.core.sequencer.moving_heads.arrangement import (
     BASE,
@@ -92,11 +92,11 @@ from twinklr.core.sequencer.moving_heads.delivery import (
 from twinklr.core.sequencer.moving_heads.density import (
     BALANCED,
     BUSY,
-    JUDGED_SHUTTER_FRAMES,
     REST,
     REST_INDEX,
     SPARSE,
     busy_emphasis,
+    carried_runs,
     event_spans,
     play_busy,
     play_sparse,
@@ -359,8 +359,14 @@ def _enter_section(
     failure_mode: FailureMode,
     locks: Sequence[RenderLock] = (),
     played: Collection[str] = (),
+    decide_on: Sequence[FixtureSegment] | None = None,
 ) -> tuple[list[FixtureSegment], list[dict[str, Any]], list[dict[str, Any]]]:
     """Keep a section's uncut entry where it plays as authored, else open it with a window.
+
+    With `decide_on` (a REST part: the same part compiled without REST's darkness), each
+    fixture's window is decided on those cues and cuts `cues` the same, a cue cut dark to
+    its end kept (`apply_entry_window`'s `keep_dark`), so REST enters as BALANCED does and
+    the planner's events inside it find the same cues.
 
     A fixture in `played` enters through its section's transition, which already
     checked that the transaction pass plays it (`transitions.play_head`): it keeps its
@@ -391,6 +397,11 @@ def _enter_section(
     by_fixture: dict[str, list[FixtureSegment]] = defaultdict(list)
     for cue in sorted(cues, key=lambda cue: cue.t0_ms):
         by_fixture[cue.fixture_id].append(cue)
+    if decide_on is not None:
+        decided: dict[str, list[FixtureSegment]] = defaultdict(list)
+        for cue in sorted(decide_on, key=lambda cue: cue.t0_ms):
+            decided[cue.fixture_id].append(cue)
+        by_fixture = defaultdict(list, {f: decided.get(f) or own for f, own in by_fixture.items()})
     bounds: dict[str, int | None] = {}
     windows: dict[str, int | None] = {}
     skipped: set[str] = set()
@@ -432,7 +443,9 @@ def _enter_section(
         for fixture_id, end in windows.items()
         if fixture_id not in skipped
     }
-    entered, dropped = apply_entry_window(cues, window_ends, profiles=profiles)
+    entered, dropped = apply_entry_window(
+        cues, window_ends, profiles=profiles, keep_dark=decide_on is not None
+    )
     first = {}
     for cue in sorted(entered, key=lambda cue: -cue.t0_ms):
         first[cue.fixture_id] = cue.t0_ms
@@ -500,6 +513,10 @@ class ArrangementUnit:
     """Its place among units: (the plan section's index, the kind's own order)."""
     candidates: tuple[str, ...]
     """Tried in order after the reference; each a name the kind's render code reads."""
+    together: bool = False
+    """Where any unit has it, every unit's first candidate is tried at once first
+    (`RenderingPipeline._choose_arrangement`): units costing a render each (density) that
+    usually cost nothing settle in one trial."""
 
 
 ArrangementUnits = Callable[["RenderingPipeline"], list[ArrangementUnit]]
@@ -2006,7 +2023,10 @@ def _density_units(pipeline: RenderingPipeline) -> list[ArrangementUnit]:
     transition (`density.play_busy`), and `worse` names events, not the accents near them."""
     return [
         ArrangementUnit(
-            key=f"density:{section.section_id}", order=(index, 1), candidates=("planned",)
+            key=f"density:{section.section_id}",
+            order=(index, 1),
+            candidates=("planned",),
+            together=True,
         )
         for index, section in enumerate(pipeline.choreography_plan.sections)
         if section.density.value in (SPARSE, BUSY)
@@ -2033,9 +2053,9 @@ def worse(reference: RenderingPipeline, trial: RenderingPipeline) -> list[str]:
     - a hit farther from its lyric cue (else its planned frame), or with a lower peak level
       over its first four frames;
     - a colour or gobo change shown later, or for less time (lit, holding its state);
-    - a `closed` with more lit frames, a strobe or `pulse` with fewer, over the
-      `density.JUDGED_SHUTTER_FRAMES` (25) frames from its frame (whether or not it plays:
-      a replaced one still asked for that);
+    - a `closed` with more lit frames, a strobe or `pulse` with fewer flashes (lit runs)
+      or fewer lit frames, over the whole span the reference traced on the head (whether
+      or not it plays: a replaced one still asked for that);
     - a transition that plays on a head in the reference and not in the trial.
 
     Public: the render's arrangement units are judged by it (`ArrangementUnit`)."""
@@ -2119,11 +2139,18 @@ def worse(reference: RenderingPipeline, trial: RenderingPipeline) -> list[str]:
                 elif run_now + FRAME < run_was:
                     said.append(f"{what} (shown more briefly on {fixture_id})")
             elif shutter:
-                start = entry.get("frame_ms") or 0
-                lit_was = of(reference, fixture_id).lit_over(start, JUDGED_SHUTTER_FRAMES)
-                lit_now = of(trial, fixture_id).lit_over(start, JUDGED_SHUTTER_FRAMES)
+                # The whole span the reference traced on this head (else 25 frames from
+                # its frame): a `closed` by its dark frames, a strobe or pulse by its
+                # flashes (lit runs: a strobe turned solid has more lit frames, not more
+                # flashes) and its lit frames.
+                start = outcome.get("from_ms", entry.get("frame_ms") or 0)
+                end = outcome.get("to_ms", start + 25 * FRAME)
+                lit_was, flashes_was = of(reference, fixture_id).lit_runs(start, end)
+                lit_now, flashes_now = of(trial, fixture_id).lit_runs(start, end)
                 if action == "closed" and lit_now > lit_was + 1:
                     said.append(f"{what} (lit inside on {fixture_id})")
+                elif action != "closed" and flashes_now < flashes_was:
+                    said.append(f"{what} (fewer flashes on {fixture_id})")
                 elif action != "closed" and lit_now < lit_was - 1:
                     said.append(f"{what} (fewer lit frames on {fixture_id})")
     current_transitions = transitions(trial)
@@ -2175,8 +2202,11 @@ class _Frames:
             t += FRAME
         return t - start
 
-    def lit_over(self, t: int, count: int) -> int:
-        return sum(1 for k in range(count) if self.frames.lit.get(t + k * FRAME, False))
+    def lit_runs(self, start: int, end: int) -> tuple[int, int]:
+        """Lit frames and lit runs (flashes) in `[start, end)`."""
+        lit = [self.frames.lit.get(t, False) for t in range(start, end, FRAME)]
+        runs = sum(1 for i, on in enumerate(lit) if on and (i == 0 or not lit[i - 1]))
+        return sum(lit), runs
 
 
 TWIN_POSE_DEG = 3.0
@@ -3341,6 +3371,9 @@ class RenderingPipeline:
         preflight_render_policy(job_config, fixture_group)
 
         self.choreography_plan = choreography_plan
+        self._planned = choreography_plan
+        """The plan as given: its transitions, which the render without them (and every
+        arrangement trial) still reads where density keeps clear of them."""
         self.fixture_group = fixture_group
         self.job_config = job_config
         self.beat_grid = beat_grid
@@ -3767,6 +3800,8 @@ class RenderingPipeline:
         """Per plan section, where the transition it was entered by ends."""
         transition_heads: list[HeadTransition] = []
         """What each transition played on each head, to light again after intensity."""
+        resting: set[str] = set()
+        """The parts with hits that play in their section's REST (`apply_hits`' `rest`)."""
         accenting: list[tuple[str, tuple[int, int], int, int, str, dict[str, Any]]] = []
         """Per BUSY part: its id, frames, bars, accent emphasis and density trace entry."""
         halves = sparse_halves(self.fixture_group)
@@ -3894,6 +3929,13 @@ class RenderingPipeline:
                     cycled.mode == RepeatMode.ONCE,
                 )
 
+            planned_windows: list[tuple[str, int, int]] = []
+            if density == SPARSE:
+                # SPARSE keeps off the planned transitions' windows at this part's edges,
+                # as the plan has them (the render without transitions too), so a
+                # transition plays on every head it plays on at BALANCED.
+                planned_windows = self._transition_reach(section, phase_map)
+
             def densify(
                 cues: list[FixtureSegment],
                 records: Mapping[int, Mapping[str, Any]] | None,
@@ -3903,6 +3945,7 @@ class RenderingPipeline:
                 window: tuple[int, int] = window,
                 base_id: str = base_id,
                 sparse_box: list[dict[str, Any] | None] = sparse_box,
+                planned_windows: list[tuple[str, int, int]] = planned_windows,
                 *,
                 probe: bool = False,
             ) -> list[FixtureSegment]:
@@ -3919,7 +3962,9 @@ class RenderingPipeline:
                     halves=halves,
                     protected=sparse_protected(
                         events, window, records, hit_frames_of(base_id), self.beat_grid
-                    ),
+                    )
+                    + planned_windows,
+                    carried=carried_runs(event_records.values(), window[0]),
                     profiles=profiles,
                     darken=lambda head_cues, dark: _dark_over_spans(
                         head_cues, dark, profiles, shortest_lit_ms=self._shortest_lit_ms
@@ -4072,10 +4117,17 @@ class RenderingPipeline:
             keep: dict[str, dict[ChannelName, str]] = {}
             retries: dict[str, tuple[_BoundaryChange, int]] = {}
             half_beat = _half_beat_before(self.beat_grid, context.start_ms)
+            # A REST part decides its boundary as it would at BALANCED (`density`): REST's
+            # darkness is no reason to play through a boundary a head enters dark.
+            deciding = (
+                compile_section(held, events=events, probe=True)
+                if density == REST
+                else section_cues
+            )
             for fixture_id in sorted({cue.fixture_id for cue in section_cues}):
                 change = _boundary_change(
                     sorted(
-                        (cue for cue in section_cues if cue.fixture_id == fixture_id),
+                        (cue for cue in deciding if cue.fixture_id == fixture_id),
                         key=lambda cue: cue.t0_ms,
                     ),
                     kept[fixture_id],
@@ -4380,8 +4432,24 @@ class RenderingPipeline:
                 for event_index, unplaced_entry in unplaced:
                     event_records[(base_id, event_index)] = unplaced_entry
                 record["events"] = entries + [entry for _, entry in unplaced]
+                rest_dark = record.get("arrangement", {}).get("density", {}).get("dark_ms")
+                if density == REST and rest_dark is not None:
+                    # A colour or gobo change REST keeps unseen says so on each head.
+                    for event_entry in entries:
+                        if event_entry.get("action") not in WHEEL_ACTIONS or not (
+                            rest_dark[0] <= event_entry.get("frame_ms", -1) < rest_dark[1]
+                        ):
+                            continue
+                        for outcome in event_entry.get("heads", {}).values():
+                            if "not_played" in outcome:
+                                outcome["rest"] = (
+                                    "the section's REST keeps the head dark here: only an "
+                                    "`open`, a strobe, a `pulse` or a hit lights it"
+                                )
                 if any(e.action == "hit" for e in part_events):
                     hitting.append((section.section_id, window, events, record))
+                    if density == REST:
+                        resting.add(section.section_id)
             if asked is not None or focal_role is not None or shape_for(level) is not None:
                 record["intensity"] = {
                     "asked": asked,
@@ -4428,6 +4496,10 @@ class RenderingPipeline:
                 failure_mode=policy.reposition_fallback,
                 locks=self.locks,
                 played=entered_by.keys(),
+                # A REST part enters as it would at BALANCED (`density`).
+                decide_on=compile_section(held, events=events, probe=True)
+                if density == REST
+                else None,
             )
             for fixture_id in sorted({cue.fixture_id for cue in entered}):
                 before = kept[fixture_id]
@@ -4636,6 +4708,7 @@ class RenderingPipeline:
                 required={
                     event.index: set(hits_free.get((base, event.index), {})) for event in hits
                 },
+                rest=section_id in resting,
             )
             for i, cue in zip(index, struck, strict=True):
                 cues[i] = cue
@@ -4667,8 +4740,11 @@ class RenderingPipeline:
                     what = f"the {transition['edge']} {transition['mode']} transition's window"
                     w0, w1 = transition["window_ms"]
                     for fixture_id, outcome in transition.get("heads", {}).items():
-                        a, b = _head_span(transition, outcome) if _plays(outcome) else (w0, w1)
-                        blocked[fixture_id].append((what, min(a, w0), max(b, w1)))
+                        # Only where it plays on the head: one that changes nothing there
+                        # keeps the head's accents.
+                        if _plays(outcome):
+                            a, b = _head_span(transition, outcome)
+                            blocked[fixture_id].append((what, min(a, w0), max(b, w1)))
             seen: list[tuple[str, int, int]] = []
             for sid, sid_events in timed.items():
                 seen += [
@@ -4710,6 +4786,20 @@ class RenderingPipeline:
                         and cue.t1_ms > window[0]
                     )
                 ]
+                # Decided once, without the transitions (`transition_free`), where it ran.
+                fixed = (
+                    None
+                    if free is None or free.render_record is None
+                    else {
+                        f: set(at)
+                        for look in free.render_record.get("section_looks", [])
+                        if look["section_id"] == section_id
+                        for f, at in look.get("arrangement", {})
+                        .get("density", {})
+                        .get("placed", {})
+                        .items()
+                    }
+                )
                 accented, played_entry = play_busy(
                     [cues[i] for i in index],
                     window=window,
@@ -4719,6 +4809,7 @@ class RenderingPipeline:
                     phase_map=phase_map,
                     beat_grid=self.beat_grid,
                     blocked={f: [*blocked.get(f, []), *seen] for f in profiles},
+                    only=fixed,
                 )
                 for i, cue in zip(index, accented, strict=True):
                     cues[i] = cue
@@ -5030,6 +5121,63 @@ class RenderingPipeline:
             },
         )
 
+    def _transition_reach(
+        self, part: PlanSection, phase_map: MusicalPhaseMap
+    ) -> list[tuple[str, int, int]]:
+        """The windows the planned transitions at a flattened part's edges are placed in
+        before any event clamps them (`transitions.window_for`), from the plan as given
+        (`_planned`): the section's entry, or the previous section's exit, where the part
+        starts its section; the next section's entry, or the section's exit, where it ends
+        it."""
+        sections = list(self._planned.sections)
+        base = part.section_id.split("|")[0]
+        at = next((i for i, s in enumerate(sections) if s.section_id == base), None)
+        if at is None:
+            return []
+        section = sections[at]
+        previous = sections[at - 1] if at else None
+        following = sections[at + 1] if at + 1 < len(sections) else None
+        edges: list[
+            tuple[PlanTransition | None, TransitionEdge, int, Literal["before", "after"] | None]
+        ] = []
+        if part.start_bar == section.start_bar:
+            edge = TransitionEdge.ENTRY if section.entry is not None else TransitionEdge.EXIT
+            entering = section.entry or (previous.exit if previous else None)
+            edges.append(
+                (entering, edge, section.start_bar - 1, "before" if previous is None else None)
+            )
+        if part.end_bar == section.end_bar:
+            edge = (
+                TransitionEdge.ENTRY
+                if following is not None and following.entry is not None
+                else TransitionEdge.EXIT
+            )
+            leaving = (following.entry if following else None) or section.exit
+            edges.append((leaving, edge, section.end_bar, "after" if following is None else None))
+        out = []
+        song_end = len(frame_times(int(self.beat_grid.duration_ms))) * EFFECT_GRID_MS
+        for transition, edge, bar, rest in edges:
+            if transition is None:
+                continue
+            window = window_for(
+                transition,
+                edge,
+                boundary_ms=self.beat_grid.get_bar_start_ms(bar),
+                phase_map=phase_map,
+                beats_per_bar=self.beat_grid.beats_per_bar,
+                earliest_ms=0,
+                latest_ms=song_end,
+                rest=rest,
+            )
+            out.append(
+                (
+                    f"the {edge.value.lower()} {transition.mode.value} transition's window",
+                    window.start_ms,
+                    window.end_ms,
+                )
+            )
+        return out
+
     def unit_choice(self, key: str) -> str:
         """The candidate arrangement unit `key` plays in this render (`ArrangementUnit`):
         "planned" where the render is not choosing, else "reference" or a candidate."""
@@ -5057,10 +5205,12 @@ class RenderingPipeline:
         unit as finally chosen; where two units cannot both play, the earlier in plan
         order keeps its choice (the tie-break). A candidate that resolves to the same
         arrangement as the accepted one (a step the rig cannot play) needs no render; an
-        arrangement already rendered is not rendered again. Cost: 1 reference render plus
-        1 per distinct candidate tried (each with its transition-free pass where the plan
-        has transitions), and one per candidate retried for a unit that gave way; none for a
-        plan without units."""
+        arrangement already rendered is not rendered again. Cost: 1 reference render, then
+        (where a unit asks, `ArrangementUnit.together`) 1 for every unit on its first
+        candidate at once, which settles the arrangement where it plays nothing worse; else
+        1 per distinct candidate
+        tried (each with its transition-free pass where the plan has transitions), and one
+        per candidate retried for a unit that gave way; none for a plan without units."""
         self._settled = True
         units = sorted((unit for kind in _UNIT_KINDS for unit in kind(self)), key=lambda u: u.order)
         if not units:
@@ -5085,18 +5235,40 @@ class RenderingPipeline:
         gave_way: dict[str, str] = {}
         reference = trial(accepted, gave_way)
         last = reference
+
+        def unchanged(choices: dict[str, str]) -> bool:
+            probe = copy.copy(self)
+            probe._choices = choices
+            probe._arrangement_cache = None
+            return probe._signature() == last._signature()
+
+        # Where a unit asks for it (`ArrangementUnit.together`), every unit on its first
+        # candidate at once first: where that plays nothing worse (most plans) one trial
+        # settles the arrangement, as the unit-by-unit build and its retries mostly would
+        # (each unit on its first candidate). Taken only where each first candidate
+        # changes the arrangement on its own, so no later candidate (a FASTER step's
+        # narrower reach) is passed over. A plan whose units do not ask builds unit by unit.
+        together = {unit.key: unit.candidates[0] for unit in units}
+        if (
+            len(units) > 1
+            and any(unit.together for unit in units)
+            and not any(unchanged({**accepted, unit.key: unit.candidates[0]}) for unit in units)
+        ):
+            tried = trial(together, gave_way)
+            if not worse(reference, tried):
+                accepted, last, units = together, tried, []
+
         for unit in units:
             first_worse: str | None = None
+            same: dict[str, str] | None = None
             for candidate in unit.candidates:
                 choices = {**accepted, unit.key: candidate}
-                probe = copy.copy(self)
-                probe._choices = choices
-                probe._arrangement_cache = None
-                if probe._signature() == last._signature():
+                if unchanged(choices):
                     # Plays the same as the accepted arrangement (a step the rig cannot
-                    # play): kept, with its own trace, and no render.
-                    accepted = choices
-                    break
+                    # play resolves to its source): no render, and the next candidate
+                    # (a FASTER step's narrower reach) is still tried.
+                    same = same or choices
+                    continue
                 tried = trial(choices, gave_way)
                 found = worse(reference, tried)
                 if not found:
@@ -5107,6 +5279,10 @@ class RenderingPipeline:
             else:
                 if first_worse is not None:
                     gave_way[unit.key] = first_worse
+                elif same is not None:
+                    # Nothing differs: the unit keeps the first such candidate and its
+                    # own trace (e.g. "not admitted: it plays the source variant").
+                    accepted = same
         # A unit that gave way is tried again with every later acceptance in place (a
         # later unit can make it harmless); each acceptance shrinks the set, so this ends.
         changed = True
@@ -5117,6 +5293,8 @@ class RenderingPipeline:
                     continue
                 for candidate in unit.candidates:
                     choices = {**accepted, unit.key: candidate}
+                    if unchanged(choices):
+                        continue
                     tried = trial(choices, {k: v for k, v in gave_way.items() if k != unit.key})
                     if not worse(reference, tried):
                         accepted, last = choices, tried

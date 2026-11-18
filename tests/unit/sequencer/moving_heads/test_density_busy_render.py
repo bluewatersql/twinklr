@@ -167,8 +167,9 @@ def test_busy_gives_way_to_the_planners_events_and_transitions(kind: str) -> Non
     entry = density_of(busy)
     reasons = {(d["fixture_id"], d["bar"]): d["reason"] for d in entry["dropped"]}
     for head in HEADS:
-        assert "the ENTRY crossfade transition's window" in reasons[(head, 3)]
-        assert "hit at bar 3 beat 1" in reasons[(head, 3)] or "transition" in reasons[(head, 3)]
+        # Bar 3's first lit beat lies in the crossfade (the render without it accents a
+        # later beat there): dropped either way, never moved past the window.
+        assert "transition" in reasons[(head, 3)]
         assert "color at bar 5 beat 1's seen span" in reasons[(head, 5)]
         assert "hit at bar 7 beat 2's seen span" in reasons[(head, 7)]
     assert busy.render_record is not None and plain.render_record is not None
@@ -225,3 +226,56 @@ def test_busy_over_a_quarter_of_the_song_is_fed_back_lowest_energy_first() -> No
     assert [r.section_id for r in said] == ["verse", "bridge"]
     assert all("more than 25%" in r.reason for r in said)
     assert repaired.sections == sections
+
+
+@pytest.mark.parametrize("mode", ["snap", "crossfade"])
+@pytest.mark.parametrize("kind", RIGS)
+def test_busy_never_changes_what_a_transition_plays(kind: str, mode: str) -> None:
+    """Accents are decided once, without the transitions, and dropped only inside a
+    transition that plays on the head: a transition that plays nothing on a head at
+    BALANCED plays nothing under BUSY (the played rule sees no accent difference)."""
+
+    def plan(density: str) -> list[Any]:
+        return [
+            m.plan_section("s1", 1, 4, "mirror_wings"),
+            m.plan_section(
+                "s2", 5, 8, "fly_in_cascade", density=density, transitions=[transition(mode)]
+            ),
+            m.plan_section("s3", 9, 12, "target_orbit"),
+        ]
+
+    busy = play(plan("BUSY"), kind, bars=12)
+    plain = play(plan("BALANCED"), kind, bars=12)
+
+    def statuses(pipeline: RenderingPipeline) -> list[dict[str, str]]:
+        assert pipeline.render_record is not None
+        return [
+            {h: o.get("plays", "not played").split(":")[0] for h, o in t["heads"].items()}
+            for look in pipeline.render_record["section_looks"]
+            for t in look.get("transitions", [])
+        ]
+
+    assert statuses(busy) == statuses(plain)
+    assert worse(plain, busy) == []
+
+
+def test_density_units_that_cost_nothing_settle_in_one_trial() -> None:
+    """Every unit on its first candidate at once: three BUSY sections that make nothing
+    worse take the reference and one trial, not one each."""
+    pipeline = RenderingPipeline(
+        choreography_plan=ChoreographyPlan(
+            sections=[
+                m.plan_section(f"s{i}", 2 * i - 1, 2 * i, "mirror_wings", density="BUSY")
+                for i in (1, 2, 3)
+            ],
+            overall_strategy="",
+        ),
+        beat_grid=grid(120),
+        fixture_group=rig(),
+        job_config=m.family_job(HEADS),
+        media_file="silence.wav",
+    )
+    pipeline.render()
+    assert pipeline.arrangement_renders == 2
+    for section_id in ("s1", "s2", "s3"):
+        assert density_of(pipeline, section_id)["placed"]

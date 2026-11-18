@@ -13,8 +13,13 @@ value below is a first proposal for the owner's W10 view, not a measured or acce
   or the section's end. Planner intent wins: a planner shutter event on the same frame
   replaces it (it sorts first, so its span is empty, as for any two shutter events on one
   beat); a hit lights a head from the dark (`lit_from_dark`); a colour or gobo change turns
-  in the dark and shows from the head's next reveal. A head that cannot be commanded dark
-  (`song_intent.can_darken`) plays its template's look, traced; repair records it.
+  in the dark and shows from the head's next reveal (unseen in a REST nothing lights: each
+  head's trace says so, `rest`). REST enters as BALANCED would: its boundary and entry
+  window are decided on the part compiled without REST (`pipeline._enter_section`'s
+  `decide_on`), a cue the window leaves dark kept, so a hit finds BALANCED's cues and plays
+  on every head that plays it at BALANCED, lit from the dark wherever the head's wheels
+  hold still around it (`events._forced_frames`, local). A head that cannot be commanded
+  dark (`song_intent.can_darken`) plays its template's look, traced; repair records it.
 - **SPARSE**: fewer heads lit at once. The heads split by their folded distribution slot
   (`sparse_halves`: the rig in canonical order folded `min(i, n-1-i)`, so mirror partners
   stay together; even slots one half, odd slots the other), and the halves take turns
@@ -26,19 +31,23 @@ value below is a first proposal for the owner's W10 view, not a measured or acce
   running, or nothing would go dark: units of a whole cycle, then of half a cycle, then
   the part plays BALANCED (traced; repair records it). Every head plays as BALANCED over
   what `pipeline.worse` judges an event by (`sparse_protected`: a strobe's or `pulse`'s
-  first frames, half a beat each side of a hit, a colour or gobo change's lit run as
-  BALANCED shows it); the arrangement's units catch anything else. A head that cannot be commanded dark, or whose shutter cannot take the
-  alternation in time, stays lit (traced).
+  span, half a beat each side of a hit, a colour or gobo change's lit run as BALANCED
+  shows it, one still lit from an earlier part included), and over the reach of the
+  planned transitions at the part's edges (`RenderingPipeline._transition_reach`, from the
+  plan as given, so the render without transitions keeps off them too); the arrangement's
+  units catch anything else. A head that cannot be commanded dark, or whose shutter cannot
+  take the alternation in time, stays lit (traced).
 - **BALANCED** is the template's own light (identity).
 - **BUSY**: an accent each bar on each head's first lit beat of the bar (`play_busy`): the
   first beat of the bar where the head is lit for `HIT_MIN_LIT_FRAMES` running, as
   `events.apply_hits` judges a lit head, played as a hit (`events._play_hit`), `HIGH`
   emphasis where the section's intensity is shaped (`DRAMATIC`, `INTENSE`), else the
   unbound emphasis; never a strobe. Accents are code's, not events: they never enter
-  `events.yield_spans`, so they never shorten a transition. An accent whose beat or
-  frames fall inside a transition's window on that head, or inside a planner event's seen
-  span widened by `EVENT_MARGIN_BEATS` each side, is dropped; one that would not differ visibly from the
-  section's level is not played; each is traced with why.
+  `events.yield_spans`, so they never shorten a transition. They are decided once, on the
+  plan without its transitions (`only`): an accent plays only where that render placed it
+  and is dropped where its beat or frames fall inside a transition that plays on that head,
+  or inside a planner event's seen span widened by `EVENT_MARGIN_BEATS` each side; one that
+  would not differ visibly from the section's level is not played; each is traced with why.
 
 **The song outranks the arrangement.** SPARSE and BUSY sections are arrangement units
 (`pipeline._density_units`): the render plays one as asked only where no event anywhere in
@@ -48,7 +57,7 @@ traced "density gave way to <event>". REST is not a unit.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 import contextlib
 from dataclasses import replace
 from fractions import Fraction
@@ -56,12 +65,14 @@ import math
 from typing import TYPE_CHECKING, Any
 
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
+from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.topology import rig_topology
 from twinklr.core.sequencer.moving_heads.events import (
     HIT_MIN_LIT_FRAMES,
     HITS,
     SHUTTER_ACTIONS,
     UNBOUND_EMPHASIS,
+    WHEEL_ACTIONS,
     SectionEvents,
     TimedEvent,
     _beat_ms,
@@ -73,6 +84,7 @@ from twinklr.core.sequencer.moving_heads.events import (
     _own,
     _play_hit,
     _shutter_holds,
+    _state,
 )
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import quantize_cue
 from twinklr.core.sequencer.moving_heads.song_intent import can_darken
@@ -97,10 +109,6 @@ EVENT_MARGIN_BEATS = 1
 """Proposed (W10d). SPARSE plays every head as BALANCED over each planner event's seen
 span widened by this many beats each side (a hit's pre-dip and decay, a colour change's
 dark lead and its `SHOWN_FOR_BEATS`); BUSY drops an accent inside a hit's span so widened."""
-
-JUDGED_SHUTTER_FRAMES = 25
-"""How many frames from a strobe's, `pulse`'s or `closed`'s frame `pipeline.worse` counts
-its lit frames over (SPARSE leaves a strobe or `pulse` BALANCED there)."""
 
 SPARSE_UNITS: tuple[tuple[str, int], ...] = (("cycle", 1), ("half cycle", 2))
 """SPARSE's units in fallback order: the played variant's cycle divided by each."""
@@ -254,8 +262,8 @@ def sparse_protected(
     one. SPARSE runs after the part's events, so its darkness changes no event's own
     decisions, only what is seen of them:
 
-    - a strobe or `pulse` over its first `JUDGED_SHUTTER_FRAMES` frames (a `closed` and an
-      `open` need nothing: SPARSE only darkens);
+    - a strobe or `pulse` over its whole span (`worse` counts its flashes and lit frames
+      there; a `closed` and an `open` need nothing: SPARSE only darkens);
     - a hit over half a beat each side of the frames it plays on (`hit_frames`, else its
       beat's): its lit start, its dimmer lead and its peak;
     - a colour or gobo change over each head's lit run showing it as the events played
@@ -272,7 +280,7 @@ def sparse_protected(
 
     for event, start, end in events.shutter_spans():
         if event.action != "closed" and start < hi and end > lo:
-            out.append((label(event), start, min(end, start + JUDGED_SHUTTER_FRAMES * FRAME)))
+            out.append((label(event), start, end))
     for event in events.hits():
         frames = list(hit_frames.get(event.index, ())) or [event.frame_ms]
         half = _beat_ms(beat_grid, event.frame_ms) / 2
@@ -292,6 +300,26 @@ def sparse_protected(
             if shown is None or length is None:
                 continue
             out.append((said, min(outcome.get("reveal_ms") or shown, shown), shown + length))
+    return out
+
+
+def carried_runs(
+    entries: Iterable[Mapping[str, Any]], start_ms: int
+) -> dict[str, set[tuple[ChannelName, str]]]:
+    """Per head, the wheel states earlier colour or gobo changes (their trace `entries`)
+    still show lit up to a part starting at `start_ms` (their lit run, `shown_ms` for
+    `shown_for_ms`, reaching its first frame): `play_sparse`'s `carried`."""
+    out: dict[str, set[tuple[ChannelName, str]]] = {}
+    for entry in entries:
+        channel = WHEEL_ACTIONS.get(entry.get("action", ""))
+        if channel is None:
+            continue
+        for fixture_id, outcome in entry.get("heads", {}).items():
+            shown, state = outcome.get("shown_ms"), outcome.get("state")
+            if shown is None or state is None or shown >= start_ms:
+                continue
+            if shown + (outcome.get("shown_for_ms") or 0) >= start_ms - FRAME:
+                out.setdefault(fixture_id, set()).add((channel, state))
     return out
 
 
@@ -356,13 +384,19 @@ def play_sparse(
     darken: Callable[[Sequence[FixtureSegment], Sequence[tuple[int, int]]], list[FixtureSegment]],
     snap: Callable[[Sequence[tuple[int, int]]], Sequence[tuple[int, int]]],
     shortest_dark_ms: int,
+    carried: Mapping[str, Collection[tuple[ChannelName, str]]] | None = None,
 ) -> tuple[list[FixtureSegment], dict[str, Any]]:
     """A part's cues (all heads, inside `window`) with SPARSE played (the module
     docstring), and its trace entry. `at_bars` places a bar offset from the part's first
     downbeat as the compiler does (`TemplateCompileContext.bar_offset_to_ms`); `protected`
-    the planner events' widened seen spans (`event_spans`); `darken` commands frames dark
-    on a cue's own path (`pipeline._dark_over_spans`); `snap` lays a head's dark spans on
-    the frame grid at the rig's shortest dark and lit (`pipeline._snap_dark_spans`)."""
+    what every head plays as BALANCED (`sparse_protected`, the planned transitions'
+    windows); `carried`, per head, the wheel states an earlier part's colour or gobo
+    change still shows lit as this part starts: every head plays as BALANCED while any
+    head is still lit showing them; `darken`
+    commands frames dark on a cue's own path (`pipeline._dark_over_spans`); `snap` lays a
+    head's dark spans on the frame grid at the rig's shortest dark and lit
+    (`pipeline._snap_dark_spans`). Lit shares are of the part's frames as compiled (before
+    its entry window, transitions, intensity and hits), `lit_share_of` says so."""
     record: dict[str, Any] = {"level": SPARSE, "cycle_bars": float(cycle_bars)}
     if halves is None:
         record["plays"] = "BALANCED"
@@ -374,6 +408,25 @@ def play_sparse(
     by_head = {f: _own(cues, f) for f in sorted({c.fixture_id for c in cues})}
     before = {f: _lit(own, profiles[f]) for f, own in by_head.items()}
     frames = max(1, (window[1] - window[0]) // FRAME)
+    if carried:
+        # The earlier change's lit run on each head that still shows it: lit, holding it.
+        ends = []
+        for fixture_id, states in carried.items():
+            if fixture_id not in by_head or not states:
+                continue
+            head = _HeadFrames(by_head[fixture_id], profiles[fixture_id])
+            t = window[0]
+            while head.lit.get(t, False) and all(
+                _state(head.own[head.cue_at[t]], channel, head.profile, t) == state
+                for channel, state in states
+            ):
+                t += FRAME
+            ends.append(t)
+        if max(ends, default=window[0]) > window[0]:
+            protected = [
+                *protected,
+                ("an earlier part's colour or gobo change", window[0], max(ends)),
+            ]
     cannot = sorted(f for f in by_head if not can_darken(profiles[f]))
     tried: list[str] = []
     for name, divisor in SPARSE_UNITS:
@@ -412,6 +465,10 @@ def play_sparse(
                 f: [round(len(before[f]) / frames, 3), round(len(after[f]) / frames, 3)]
                 for f in by_head
             }
+            record["lit_share_of"] = (
+                "the part's frames as compiled, before its entry window, transitions, "
+                "intensity and hits (BALANCED, then SPARSE)"
+            )
             if cannot:
                 record["lit"] = dict.fromkeys(
                     cannot, "it cannot be commanded dark: it stays lit as BALANCED"
@@ -425,7 +482,7 @@ def play_sparse(
                 f"{', '.join(never)} would never be lit for {HIT_MIN_LIT_FRAMES} frames running"
                 if never
                 else "nothing would go dark (one unit, a ONCE template's move, or the "
-                "planner's events keep every head lit)"
+                "planner's events and transitions keep every head lit)"
             )
         )
     record["plays"] = "BALANCED"
@@ -452,11 +509,15 @@ def play_busy(
     phase_map: MusicalPhaseMap,
     beat_grid: BeatGrid,
     blocked: Mapping[str, Sequence[tuple[str, int, int]]],
+    only: Mapping[str, Collection[int]] | None = None,
 ) -> tuple[list[FixtureSegment], dict[str, Any]]:
     """A part's cues (all heads, inside `window`, as they play after intensity and hits)
     with BUSY's accents played on `bars` (the module docstring), and its trace entry.
     `blocked`, per head, the spans an accent may not touch, each with what it is (a
-    transition's window, a planner event's seen span)."""
+    transition's window, a planner event's seen span); `only`, per head, the accents the
+    same plan places without its transitions (`RenderingPipeline.transition_free`): an
+    accent is decided there once, so a transition never changes which accents play but
+    by its own frames (one it moves is dropped, traced)."""
     start, end = window
     shape = HITS[emphasis]
     beats = beat_grid.beat_boundaries
@@ -511,6 +572,15 @@ def play_busy(
             )
             if inside is not None:
                 dropped.append({**label, "reason": f"it falls inside {inside}"})
+                continue
+            if only is not None and at not in only.get(fixture_id, ()):
+                dropped.append(
+                    {
+                        **label,
+                        "reason": "the same plan without its transitions plays no accent "
+                        "here (a transition changes this bar's light on the head)",
+                    }
+                )
                 continue
             own, frames = played, after
             placed.setdefault(fixture_id, []).append(at)

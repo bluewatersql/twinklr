@@ -952,6 +952,7 @@ def apply_entry_window(
     window_ends: Mapping[str, int],
     *,
     profiles: Mapping[str, FixtureCapabilities],
+    keep_dark: bool = False,
 ) -> tuple[list[FixtureSegment], list[dict[str, str | int]]]:
     """Hold each fixture's section opening dark until its entry window ends.
 
@@ -964,6 +965,8 @@ def apply_entry_window(
     partial state. A cue with no such point, or cut where it stays commanded dark to its
     end (it would show nothing, and its darkness would count only from the cut), is
     dropped and recorded, and the next one is tried; later cues are unchanged. Fixtures not in `window_ends` keep every cue.
+    With `keep_dark` (a section's REST, dark by design) a cue cut dark to its end is kept:
+    the planner's events may light it.
 
     Args:
         segments: A section's compiled cues on the frame grid, each fixture's in
@@ -991,7 +994,9 @@ def apply_entry_window(
             else _holdable_cut(segment, start, profiles[segment.fixture_id])
         )
         if cut is not None and (
-            cut == segment.t0_ms or not dark_throughout(segment, profiles[segment.fixture_id], cut)
+            cut == segment.t0_ms
+            or keep_dark
+            or not dark_throughout(segment, profiles[segment.fixture_id], cut)
         ):
             entered.add(segment.fixture_id)
             kept.append(

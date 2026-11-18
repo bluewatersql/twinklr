@@ -60,7 +60,8 @@ front, as for every profile error):
 Not tags, because the profile already owns the fact: which shutter state is open
 (`open_state`), closed (`closed_state`) and dark (`visibility.extinguishing_shutter_states`).
 
-Decisions (reversible; the owner may overrule any):
+Decisions (reversible; the owner may overrule any; collected with every other open owner
+question in [owner decisions pending](../../plan/owner-decisions-pending.md)):
 
 1. **Preset names are accepted in `hex`, one stored form.** A name resolves to
    `COLOR_PRESET_HEX` when the profile loads and the profile stores and dumps only the

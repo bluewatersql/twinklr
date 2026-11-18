@@ -115,7 +115,7 @@ See [product/overview.md](product/overview.md).
     it within a beat, else not played. The trace records every event
     per head (unplaceable ones too) and every lyric cue with its offset from the lyric;
     the offer says what each event plays at the song's tempo; repair records, with the
-    render's tests, what will play otherwise. Renderer revision 18.
+    render's tests, what will play otherwise. Renderer revision 19.
     ([user guide](../docs/user-guide.md#how-a-sections-events-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w6-w7-events/README.md))
   - **Transitions** (W8, 2026-11-17, not yet seen by the owner). Each boundary plays its
@@ -134,7 +134,7 @@ See [product/overview.md](product/overview.md).
     transition counts as played on a head only where its frames differ from the plan
     rendered without transitions (else traced `nothing`, warned). Repair shortens one
     longer than its parts and records what plays otherwise; the trace lists each per
-    head. Renderer revision 18.
+    head. Renderer revision 19.
     ([user guide](../docs/user-guide.md#how-a-sections-transitions-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w8-transitions/README.md))
   - **Motif and variation** (W10b/W10c, 2026-11-18, not yet seen by the owner). Each
@@ -156,25 +156,24 @@ See [product/overview.md](product/overview.md).
     showed it, never worse than the unmoved outcome), else is traced `brief`. The song
     outranks the arrangement: the arrangement is built up greedily from the reference
     (every variation step off); a variation that makes any event worse gives way
-    (render-decided, repair-predicted). Renderer revision 18.
+    (render-decided, repair-predicted). Renderer revision 19.
     ([user guide](../docs/user-guide.md#how-a-sections-motif-and-variation-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-w10bc-motif-variation/README.md))
   - **Density** (W10d, 2026-11-18, not yet seen by the owner). Density plays on the light:
     REST is dark (a synthetic `closed` the planner's events still play through), SPARSE
     darkens half the heads (mirror partners together) in turn on the played variant's
     cycle, BUSY adds an accent each bar on each head's first lit beat; BALANCED is
-    unchanged. SPARSE keeps every head as BALANCED around each event and BUSY drops its
-    accents there; each SPARSE or BUSY section is an arrangement unit, so it plays
-    BALANCED (traced) wherever it would make any event worse. Repair records what does not
-    play as asked and BUSY over a quarter of the song. Whether density should mean light (as built) or movement
-    is put to the owner. Renderer revision 19.
+    unchanged. SPARSE keeps every head as BALANCED around each event and transition and
+    BUSY drops its accents there; each SPARSE or BUSY section is an arrangement unit, so
+    it plays BALANCED (traced) wherever it would make any event worse. Repair records what
+    does not play as asked and BUSY over a quarter of the song. Whether density should
+    mean light (as built) or movement is put to the owner. Renderer revision 20.
     ([user guide](../docs/user-guide.md#how-a-sections-density-reaches-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-w10d-density/README.md))
-  - **Not rendered yet: modifiers.** Accepted and ignored (a per-section trace diagnostic
-    says so); no renderer has rendered them. The owner has directed that all of the song
-    intent be rendered on this renderer, with nothing cut from the planner contract; the
-    remaining work is modifiers
-    ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
+  - **Not rendered on this branch: modifiers.** Accepted and ignored (a per-section trace
+    diagnostic says so). Built on its own side branch (`feat/mh-true-up-p3-modifiers`) as
+    arrangement units judged by `pipeline.worse`, not merged yet
+    ([handoff](../changes/2026_11_12_mh_true_up/plan/handoff.md#side-branches)).
 
   `twinklr run`, `show`, `eval-report`, `inject` and `regenerate` all use it;
   `regenerate` re-renders the whole song. Gate time on eight heads and a four-minute
@@ -184,7 +183,7 @@ See [product/overview.md](product/overview.md).
   The owner accepted its look for one song on their rig in the house preview on
   2026-11-16. That render applied no planner intensity, colour, events or cues: the
   acceptance covers the templates' motion and timing, not the absence of song intent,
-  which W4–W9 add with owner views (W4's, colour and gobo, is pending). There is no hardware result, and the profile timings
+  which W4–W10 add, each with an owner view still pending. There is no hardware result, and the profile timings
   used were chosen, not measured ([record](../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p3-viewing-render/README.md)).
   `inject` and `regenerate` have been run only against a fake xLights client.
   Reference: [user guide](../docs/user-guide.md#job_configjson-job-config),
@@ -257,11 +256,11 @@ points that shape current behavior:
 ## Active work
 
 Active changes are listed in [changes/ACTIVE.md](../changes/ACTIVE.md). The moving-head
-true-up's single-renderer cutover is complete on the unmerged branch `feat/mh-true-up-p3`
-([handoff](../changes/2026_11_12_mh_true_up/plan/handoff.md)), with a known regression:
-the planner's song intent is only partly rendered (section colour and gobo, W4). Its next
-work is rendering the rest, tasks W5–W9 of
-[song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md). The table below is the
+true-up's single renderer is on the unmerged branch `feat/mh-true-up-p3`
+([handoff](../changes/2026_11_12_mh_true_up/plan/handoff.md)). It renders the planner's
+song intent again, except density and modifiers, which are on side branches. Merging is
+the owner's decision. Open owner questions are collected in
+[owner decisions pending](../changes/2026_11_12_mh_true_up/plan/owner-decisions-pending.md). The table below is the
 twinklr-reactivation-review build campaign: its code and tooling are merged and
 independently verified, and what remains is empirical evidence and owner decisions, not
 implementation.

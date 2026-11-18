@@ -262,12 +262,16 @@ def test_the_planners_events_still_play_inside_rest(kind: str) -> None:
 @pytest.mark.parametrize("kind", RIGS)
 def test_a_planner_shutter_event_on_rests_first_beat_replaces_it(kind: str, action: str) -> None:
     """Same-frame precedence: a planner shutter event on REST's own frame wins, so the
-    section plays exactly as that event at BALANCED."""
+    section plays as that event at BALANCED: the same frames lit and dark, every lit frame
+    the same (a head REST keeps a dark cue for may move otherwise while dark)."""
     events = [event(1, 1, action)]
     rested = play([m.plan_section("s1", 1, 8, "mirror_wings", events=events, density="REST")], kind)
     plain = play([m.plan_section("s1", 1, 8, "mirror_wings", events=events)], kind)
     for head in HEADS:
-        assert Frames(rested).raw(head) == Frames(plain).raw(head), head
+        a, b = Frames(rested), Frames(plain)
+        assert a.dark(head) == b.dark(head), head
+        lit = [i for i, dark in enumerate(a.dark(head)) if not dark]
+        assert [a.raw(head)[i] for i in lit] == [b.raw(head)[i] for i in lit], head
     assert density_of(rested)["plays"].startswith(f"nothing: the planner's {action}")
 
 
@@ -726,3 +730,88 @@ def test_rest_is_not_an_arrangement_unit(monkeypatch: pytest.MonkeyPatch) -> Non
     pipeline.render()
     assert pipeline.arrangement_renders == 0
     assert density_of(pipeline)["plays"] == "dark"
+
+
+@pytest.mark.parametrize("template_id", ["mirror_wings", "fly_in_cascade"])
+@pytest.mark.parametrize("kind", RIGS)
+def test_rest_plays_every_hit_on_every_head_that_plays_it_at_balanced(
+    kind: str, template_id: str
+) -> None:
+    """REST enters as BALANCED does (its boundary and entry decided on the BALANCED cues),
+    so a hit inside it finds the same cues: on its section's first downbeat (where the
+    heads reposition and it moves) and mid-section, every head that plays it at BALANCED
+    plays it, lit from REST's darkness; and every head of the rig has an outcome."""
+
+    def plan(density: str) -> list[PlanSection]:
+        return [
+            m.plan_section(
+                "s1", 1, 4, "target_orbit", color="red", gobo="dots", events=[event(3, 1, "hit")]
+            ),
+            m.plan_section(
+                "s2",
+                5,
+                8,
+                template_id,
+                density=density,
+                events=[event(5, 1, "hit"), event(7, 3, "hit")],
+            ),
+        ]
+
+    rested, plain = play(plan("REST"), kind), play(plan("BALANCED"), kind)
+    assert [said for said in worse(plain, rested) if "hit" in said] == []
+    assert rested.render_record is not None
+    for look in rested.render_record["section_looks"]:
+        for entry in look.get("events", []):
+            assert set(entry["heads"]) == set(HEADS), entry
+
+
+@pytest.mark.parametrize("kind", RIGS)
+def test_sparse_keeps_off_a_transition_that_plays_at_balanced(kind: str) -> None:
+    """The owner-rig case: an ENTRY crossfade into SPARSE on target_orbit plays on every
+    head it plays on at BALANCED, the heads lit as BALANCED through its window, and the
+    trace's played status is the frames' (the render without transitions keeps off the
+    same window)."""
+    entering = [transition("crossfade")]
+
+    def plan(density: str) -> list[PlanSection]:
+        return [
+            m.plan_section("s1", 1, 4, "mirror_wings"),
+            m.plan_section("s2", 5, 8, "target_orbit", density=density, transitions=entering),
+        ]
+
+    sparse, plain = play(plan("SPARSE"), kind), play(plan("BALANCED"), kind)
+    assert density_of(sparse, "s2")["alternates"] == "cycle"
+    ((_, (start, end)),) = windows(sparse)
+    assert windows(sparse) == windows(plain)
+    assert sparse.render_record is not None and plain.render_record is not None
+
+    def played(pipeline: RenderingPipeline) -> dict[str, str]:
+        assert pipeline.render_record is not None
+        (entry,) = [
+            t
+            for look in pipeline.render_record["section_looks"]
+            for t in look.get("transitions", [])
+        ]
+        return {h: o.get("plays", "not played")[:8] for h, o in entry["heads"].items()}
+
+    assert played(sparse) == played(plain)
+    for head in HEADS:
+        a, b = Frames(sparse).raw(head), Frames(plain).raw(head)
+        assert a[start // FRAME : end // FRAME] == b[start // FRAME : end // FRAME], head
+    assert worse(plain, sparse) == []
+
+
+@pytest.mark.parametrize("kind", RIGS)
+def test_sparse_keeps_a_colour_lit_from_the_section_before(kind: str) -> None:
+    """A colour change in the previous section still lit as SPARSE starts plays its whole
+    lit run there: never shown more briefly, so SPARSE need not give way."""
+
+    def plan(density: str) -> list[PlanSection]:
+        return [
+            m.plan_section("s1", 1, 4, "mirror_wings", events=[event(4, 1, "color", color="red")]),
+            m.plan_section("s2", 5, 8, "mirror_wings", density=density),
+        ]
+
+    sparse, plain = play(plan("SPARSE"), kind), play(plan("BALANCED"), kind)
+    assert worse(plain, sparse) == []
+    assert "gave_way" not in density_of(sparse, "s2")
