@@ -79,11 +79,13 @@ RENDERED_INTENT_FIELDS = frozenset(
         "exit",
         "motif_id",
         "variation",
+        "modifiers",
     }
 )
 """The section song-intent fields (`PlanSection.set_intent_fields`) the renderer plays:
 colour and gobo here, intensity in `intensity.py`, events and the lyric cues they land on
-in `events.py`, transitions in `transitions.py`, motif and variation in `arrangement.py`."""
+in `events.py`, transitions in `transitions.py`, motif and variation in `arrangement.py`,
+the parts' modifiers in `modifiers.py`."""
 
 FIXED_ROLE_COLORS: dict[PaletteRole, ColorPreset] = {
     PaletteRole.PRIMARY: ColorPreset.RED,
@@ -573,6 +575,25 @@ class TemplateOffer(BaseModel):
     when none)."""
     """Ladder variants (`narrow`, `slow`) that play the same frames as the base here: still
     played where a section names one, never a variation's step (left out when none)."""
+    modifiers: dict[str, tuple[str, ...]] = Field(
+        default_factory=dict, exclude_if=lambda value: not value
+    )
+    """Per modifier key, the values offered for this template here (`modifiers`: proven on
+    its effective variant); left out when none."""
+    modifier_refusals: dict[str, str] = Field(
+        default_factory=dict, exclude_if=lambda value: not value
+    )
+    """Per recognised `key=value` not offered here, why (left out when none)."""
+    modifier_exclusions: dict[str, dict[str, str]] = Field(
+        default_factory=dict, exclude_if=lambda value: not value
+    )
+    """Per admitted variant (`base` for no preset), each offered `key=value` that does not
+    fit it, and why (left out when none)."""
+    modifier_phases: dict[str, dict[str, DarkPhases]] = Field(
+        default_factory=dict, exclude_if=lambda value: not value
+    )
+    """Per admitted variant, each offered `spread=<value>` that moves its darkness, its dark
+    phases with it (left out when none)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -1002,7 +1023,7 @@ def offer_for_prompt(
     on (a role the palette has no stop for marked missing, one landing on the same wheel
     colour as an earlier role marked so; the fixed role table where a section has no
     macro palette); gobos and strobe speeds by how many heads have them; whether a hit is
-    possible; the wheel change time against half a beat; the templates with a dark phase
+    possible; the modifiers each template offers; the wheel change time against half a beat; the templates with a dark phase
     long enough for a wheel change; and the states a template cannot hold. Sections
     that share a palette share one entry. With `half_beats` (half the beat before each
     section boundary), how many boundaries a dip fits before (`dip_boundaries`), since
@@ -1136,7 +1157,16 @@ def offer_for_prompt(
             wheel_beats.append(
                 {"template_id": template_id, **wheel_event_beats(phases, offer.beat_ms)}
             )
+    modifiers = [
+        {
+            "template_id": template_id,
+            "offered": [f"{key} {'|'.join(values)}" for key, values in template.modifiers.items()],
+        }
+        for template_id, template in offer.templates.items()
+        if template.modifiers
+    ]
     return {
+        "modifiers": modifiers,
         "fitted_variants": fitted,
         "variant_windows": variant_windows,
         "variations": variations,
@@ -1260,7 +1290,8 @@ def describe_look(record: Mapping[str, Any]) -> list[str]:
     state, each boundary's dark dip, what its intensity plays
     (`intensity.describe_intensity`), what each event played (`events.describe_events`)
     and what its transitions played (`transitions.describe_transitions`), led by the
-    variant its motif and variation resolved to (`arrangement`), where it has one."""
+    variant its motif and variation resolved to (`arrangement`), where it has one, and the
+    modifiers its part plays and does not (`modifiers`), where it asks for any."""
     lines = []
     arrangement = record.get("arrangement") or {}
     motif = arrangement.get("motif")
@@ -1278,6 +1309,14 @@ def describe_look(record: Mapping[str, Any]) -> list[str]:
         if variant.get("reason"):
             line += f"; {variant['reason']}"
         lines.append(line)
+    modifiers = arrangement.get("modifiers")
+    if modifiers is not None:
+        played = ", ".join(modifiers["applied"]) or "none"
+        lines.append(f"modifiers: {played} play")
+        lines += [
+            f"modifier {entry['modifier']} does not play: {entry['reason']}"
+            for entry in modifiers.get("not_applied", [])
+        ]
     for key, noun in (("color", "colour"), ("gobo", "gobo")):
         entry = record.get(key)
         if entry is None:

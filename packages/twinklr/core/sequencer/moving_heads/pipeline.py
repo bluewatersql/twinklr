@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from twinklr.core.formats.xlights.layout.models.rgb_effects import Model
     from twinklr.core.formats.xlights.sequence.emission import EmissionRequest
     from twinklr.core.sequencer.models.context import FixtureContext
-    from twinklr.core.sequencer.models.template import TemplateDoc, TemplatePreset
+    from twinklr.core.sequencer.models.template import Template, TemplateDoc, TemplatePreset
 
 from twinklr.core.agents.sequencer.moving_heads import ChoreographyPlan
 from twinklr.core.agents.sequencer.moving_heads.models import PlanSection, flatten_section
@@ -135,6 +135,17 @@ from twinklr.core.sequencer.moving_heads.intensity import (
     effective_intensity,
     shape_for,
     shape_section,
+)
+from twinklr.core.sequencer.moving_heads.modifiers import (
+    MODIFIERS,
+    Modifier,
+    ModifierPlay,
+    aim_fits,
+    candidates,
+    modify,
+    played_template,
+    resolve_modifiers,
+    spelled,
 )
 from twinklr.core.sequencer.moving_heads.song_intent import (
     DarkPhases,
@@ -1840,6 +1851,16 @@ def admit_templates(
         beat_grid,
         {
             t: TemplateOffer(
+                **_admit_modifiers(
+                    t,
+                    passing[t],
+                    whole_compiles,
+                    reach,
+                    profiles=profiles,
+                    phase_map=phase_map,
+                    start_limit_ms=start_limit,
+                    end_limit_ms=end_limit,
+                ),
                 variants={
                     "base" if p is None else p: _dark_phases(
                         whole_compiles[t, p], profiles, phase_map
@@ -2134,6 +2155,179 @@ def _entered_frames(
             )
         )
     return frames
+
+
+def _admit_modifiers(
+    template_id: str,
+    passing: Sequence[str | None],
+    whole_compiles: Mapping[
+        tuple[str, str | None],
+        tuple[list[FixtureSegment], TemplateCompileContext, TemplatePreset | None, float],
+    ],
+    reach: Mapping[tuple[str, str | None], Mapping[str, _Reach]],
+    *,
+    profiles: Mapping[str, FixtureCapabilities],
+    phase_map: MusicalPhaseMap,
+    start_limit_ms: int,
+    end_limit_ms: int,
+) -> dict[str, Any]:
+    """An admitted template's modifier offer (`modifiers`, module docstring), as
+    `TemplateOffer` fields.
+
+    Each value `modifiers.candidates` applies to the template's effective variant (its
+    first passing ladder rung) is compiled on it at bar 1 over the song, where the
+    compile checks every frame's range and speed and the rig's topology; it is offered
+    where its first two cycles then do not play like the unmodified variant's
+    (`_cues_alike`, the twin-variant rule), and each other recognised value is refused
+    with why. Its placements are not planned again: a modifier is a phase shift, a time
+    reversal or a tilt translation of the variant's own path, so every dark gap between
+    a head's own cues spans the same time and the same travel as in the variant, whose
+    placements the gate planned. Per other passing variant, each offered `aim` that would
+    leave a head's operable tilt range (`aim_fits`, over that variant's compiled tilt)
+    is excluded. A `spread` that moves the effective variant's darkness publishes each
+    passing variant's dark phases with it, from a compile over its first three cycles
+    (`_dark_phases` reads the second); it is excluded on a variant where that does not
+    compile."""
+    from twinklr.core.sequencer.moving_heads.compile.step import CompileError
+    from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
+        UnsupportedRigShapeError,
+    )
+
+    refused = (CompileError, PhysicalChannelError, UnsupportedRigShapeError, ValueError)
+    document = get_template(template_id)
+    effective = next(p for p in passing if p not in VARIATION_PRESETS)
+    name = BASE if effective is None else effective
+    unmodified, context, preset, cycle_bars = whole_compiles[template_id, effective]
+    played = apply_preset(document.template, preset) if preset else document.template
+    # The first bar and two cycles, as the twin variants are compared.
+    shown = min(context.end_ms, context.bar_offset_to_ms(1 + 2 * math.ceil(cycle_bars)))
+    darkness = _dark_phases(whole_compiles[template_id, effective], profiles, phase_map)
+    offered: list[Modifier] = []
+    refusals: dict[str, str] = {}
+    moving: list[Modifier] = []
+    """Offered spreads that move the darkness."""
+    for spelled_name, why in candidates(played).items():
+        if why is not None:
+            refusals[spelled_name] = why
+            continue
+        key, _, value = spelled_name.partition("=")
+        modifier = (key, value)
+        try:
+            compiled = compile_template(
+                modify(played, [modifier]),
+                context,
+                None,
+                phase_map=phase_map,
+                start_limit_ms=start_limit_ms,
+                end_limit_ms=end_limit_ms,
+            )
+        except refused as error:
+            notes = "; ".join(getattr(error, "__notes__", ()))
+            refusals[spelled_name] = f"on {name} it does not compile here: {notes or error}"
+            continue
+        if _cues_alike(compiled.segments, unmodified, shown):
+            refusals[spelled_name] = (
+                f"on {name} it plays like the template without it here (the same darkness, "
+                f"every aim within {TWIN_POSE_DEG:g} degrees)"
+            )
+            continue
+        offered.append(modifier)
+        if key == "spread" and darkness != _dark_phases(
+            (compiled.segments, context, None, cycle_bars), profiles, phase_map
+        ):
+            moving.append(modifier)
+    exclusions: dict[str, dict[str, str]] = {}
+    phases: dict[str, dict[str, DarkPhases]] = {}
+    tilts = {
+        fixture_id: profile.axes["tilt"].operable_range
+        for fixture_id, profile in profiles.items()
+        if "tilt" in profile.axes
+    }
+    for preset_id in passing:
+        variant = BASE if preset_id is None else preset_id
+        tilt = {
+            fixture_id: poses[ChannelName.TILT]
+            for fixture_id, (poses, _) in reach[template_id, preset_id].items()
+            if ChannelName.TILT in poses and fixture_id in tilts
+        }
+        for modifier in offered:
+            if (
+                preset_id != effective
+                and modifier[0] == "aim"
+                and (why := aim_fits(modifier[1], tilt, tilts)) is not None
+            ):
+                exclusions.setdefault(variant, {})[spelled(modifier)] = why
+        _, context, preset, cycle_bars = whole_compiles[template_id, preset_id]
+        # The first three cycles: `_dark_phases` reads the second, and the third holds
+        # where its last dark window ends.
+        short = context.model_copy(
+            update={"duration_bars": min(context.duration_bars, 1 + 3 * math.ceil(cycle_bars))}
+        )
+        for modifier in moving:
+            try:
+                compiled = compile_template(
+                    played_template(document.template, preset, [modifier])[0],
+                    short,
+                    None,
+                    phase_map=phase_map,
+                    start_limit_ms=start_limit_ms,
+                    end_limit_ms=end_limit_ms,
+                )
+            except refused as error:
+                exclusions.setdefault(variant, {})[spelled(modifier)] = (
+                    f"it does not compile on {variant} here: {error}"
+                )
+                continue
+            phases.setdefault(variant, {})[spelled(modifier)] = _dark_phases(
+                (compiled.segments, short, None, cycle_bars), profiles, phase_map
+            )
+    order = [(key, value) for key, values in MODIFIERS.items() for value in values]
+    by_key: dict[str, tuple[str, ...]] = {}
+    for key, value in sorted(offered, key=order.index):
+        by_key[key] = (*by_key.get(key, ()), value)
+    return {
+        "modifiers": by_key,
+        "modifier_refusals": refusals,
+        "modifier_exclusions": exclusions,
+        "modifier_phases": phases,
+    }
+
+
+def _cues_alike(a: Sequence[FixtureSegment], b: Sequence[FixtureSegment], before_ms: int) -> bool:
+    """Whether two compiles of one template play alike before `before_ms`, by the
+    twin-variant rule (`_alike`) on their cues: the same cues (so the same darkness
+    between them), every channel the same but the aim, and every aim point within
+    `TWIN_POSE_DEG`."""
+
+    def cues(compiled: Sequence[FixtureSegment]) -> list[FixtureSegment]:
+        return sorted(
+            (cue for cue in compiled if cue.t0_ms < before_ms),
+            key=lambda cue: (cue.fixture_id, cue.t0_ms),
+        )
+
+    ours, theirs = cues(a), cues(b)
+    if len(ours) != len(theirs):
+        return False
+    for x, y in zip(ours, theirs, strict=True):
+        if (x.fixture_id, x.t0_ms, x.t1_ms) != (y.fixture_id, y.t0_ms, y.t1_ms):
+            return False
+        if x.channels.keys() != y.channels.keys():
+            return False
+        for channel, value in x.channels.items():
+            here, there = value.physical, y.channels[channel].physical
+            if channel not in (ChannelName.PAN, ChannelName.TILT):
+                if here != there:
+                    return False
+                continue
+            assert isinstance(here, ContinuousTrajectory)
+            assert isinstance(there, ContinuousTrajectory)
+            if [p.t_ms for p in here.points] != [p.t_ms for p in there.points] or any(
+                abs(p.value - q.value) >= TWIN_POSE_DEG
+                for p, q in zip(here.points, there.points, strict=True)
+                if p.t_ms < before_ms
+            ):
+                return False
+    return True
 
 
 def _overlay_exclusions(
@@ -2955,16 +3149,10 @@ def _unrendered_intent_message(section: PlanSection) -> str | None:
     """What of the section's song intent the renderer does not render yet (no renderer
     has); None for a section that sets none of it. Its colour and gobo
     (`song_intent.resolve_section_look`), its intensity (`intensity.shape_section`), its
-    events and their lyric cues (`events`), its transitions (`transitions`) and its motif
-    and variation (`arrangement`) render, so they are never listed."""
-    names = [
-        name
-        for name, is_set in (
-            ("density", section.density.value != "BALANCED"),
-            ("modifiers", any(part.modifiers for part in section.parts)),
-        )
-        if is_set
-    ]
+    events and their lyric cues (`events`), its transitions (`transitions`), its motif
+    and variation (`arrangement`) and its parts' modifiers (`modifiers`) render, so they
+    are never listed."""
+    names = [name for name, is_set in (("density", section.density.value != "BALANCED"),) if is_set]
     if not names:
         return None
     return (
@@ -3188,6 +3376,11 @@ class RenderingPipeline:
         self._give_way: dict[str, GiveWay] = {}
         """Per plan section, the variants its variation gave way to its events with
         (`_settle_arrangement`)."""
+        self._modifiers_give_way: dict[str, str] = {}
+        """Per placed part (its flattened section id), the song event its modifiers gave
+        way to, in words: none of them plays there (`_part_modifiers`). The hook by which
+        the song-outranks settling switches a part's modifiers off where they make an
+        event worse than the same plan without them (W10e); nothing sets it yet."""
         self._steps = True
         """False for the render the song's events are judged against: every part plays
         its source variant."""
@@ -3206,9 +3399,11 @@ class RenderingPipeline:
         Hashes the renderer and encoder revisions, the musical phase map built from the
         detected grid, any render locks and, for each section that renders a preset
         other than the one it names (`_section_preset`: the effective variant, or
-        none), the preset it renders, and its dark spans as snapped, when there are any.
+        none), the preset it renders, for each section whose modifiers play, those it
+        plays (`_part_modifiers`), and its dark spans as snapped, when there are any.
         """
         substitutions: list[tuple[str, str | None]] = []
+        played: list[tuple[str, list[str]]] = []
         for section in self.iterate_plan_sections(self.choreography_plan):
             (part,) = section.parts
             arrangement, index = self._arranged().get(section.section_id, (None, 0))
@@ -3219,6 +3414,9 @@ class RenderingPipeline:
                 self.admission,
                 None if arrangement is None else arrangement.parts[index],
             )
+            applied = self._part_modifiers(section, get_template(part.template_id), preset).applied
+            if applied:
+                played.append((section.section_id, [spelled(modifier) for modifier in applied]))
             rendered = None if preset is None else preset.preset_id
             offered = (
                 None
@@ -3247,6 +3445,23 @@ class RenderingPipeline:
             preset_substitutions=substitutions,
             dark_spans=self.dark_spans,
             focal_roles=self.rendered_focal_roles(),
+            modifiers=played,
+        )
+
+    def _part_modifiers(
+        self, section: PlanSection, template_doc: TemplateDoc, preset: TemplatePreset | None
+    ) -> ModifierPlay:
+        """What a placed part's modifiers play (`modifiers.resolve_modifiers`) on the
+        variant it plays (`preset`), over the gate's offer for its template, unless they
+        gave way to the song (`_modifiers_give_way`)."""
+        (part,) = section.parts
+        template_id = template_doc.template.template_id
+        return resolve_modifiers(
+            part.modifiers,
+            template_doc.template,
+            None if self.admission is None else self.admission.offer.templates.get(template_id),
+            BASE if preset is None else preset.preset_id,
+            gave_way=self._modifiers_give_way.get(section.section_id),
         )
 
     def rendered_palettes(self) -> dict[str, SectionPalette]:
@@ -3510,7 +3725,7 @@ class RenderingPipeline:
         unplayable: list[dict[str, str | int]] | None = (
             [] if policy.on_unplayable == "dark" else None
         )
-        basic_checked: set[tuple[str, str | None]] = set()
+        basic_checked: set[tuple[str, str | None, tuple[Modifier, ...]]] = set()
         in_window: list[dict[str, Any]] = []
         entry_windows: list[dict[str, Any]] = []
         time_markers: list[TimeMarker] = []
@@ -3558,6 +3773,11 @@ class RenderingPipeline:
                 diagnostics,
                 self.admission,
                 None if arrangement is None else arrangement.parts[part_index],
+            )
+            modifiers = self._part_modifiers(section, template_doc, preset)
+            # What compiles: the variant with its modifiers (`modifiers.played_template`).
+            compiled_template, compiled_preset = played_template(
+                template_doc.template, preset, modifiers.applied
             )
             context = TemplateCompileContext(
                 section_id=section.section_id,
@@ -3626,9 +3846,9 @@ class RenderingPipeline:
 
             def compile_section(
                 held_states: Mapping[str, Mapping[ChannelName, str]],
-                template_doc: TemplateDoc = template_doc,
+                template: Template = compiled_template,
                 context: TemplateCompileContext = context,
-                preset: TemplatePreset | None = preset,
+                preset: TemplatePreset | None = compiled_preset,
                 refused: int = refused,
                 compiled_steps: list[dict[str, str | int]] = compiled_steps,
                 events: SectionEvents = events,
@@ -3646,7 +3866,7 @@ class RenderingPipeline:
                 if unplayable is not None:
                     del unplayable[refused:]  # a recompile records its refusals again
                 result = compile_template(
-                    template_doc.template,
+                    template,
                     context,
                     preset,
                     phase_map=phase_map,
@@ -3697,13 +3917,13 @@ class RenderingPipeline:
                 return played
 
             section_cues = compile_section(held)
-            key = (template_doc.template.template_id, context.preset_id)
+            key = (template_doc.template.template_id, context.preset_id, modifiers.applied)
             if unplayable is not None and len(unplayable) > refused and key not in basic_checked:
                 # Only a refusal this placement adds is left dark: one the template shows
                 # from bar 1 over the song, where the gate places it, still raises.
                 basic_checked.add(key)
                 compile_template(
-                    template_doc.template,
+                    compiled_template,
                     context.model_copy(
                         update={
                             "section_id": "render_preflight",
@@ -3718,7 +3938,7 @@ class RenderingPipeline:
                             ),
                         }
                     ),
-                    preset,
+                    compiled_preset,
                     phase_map=phase_map,
                     start_limit_ms=start_limit,
                     end_limit_ms=end_limit,
@@ -3982,6 +4202,22 @@ class RenderingPipeline:
                             action="unchanged",
                         )
                     )
+            if modifiers.asked:
+                # What the part's modifiers play, and why any does not.
+                record.setdefault("arrangement", {})["modifiers"] = modifiers.record()
+                diagnostics.extend(
+                    MHDiagnostic(
+                        code="unsupported_attribute",
+                        severity="warning",
+                        message=(
+                            f"section {section.section_id!r}: its modifier {name} does not "
+                            f"play ({why})"
+                        ),
+                        section_id=section.section_id,
+                        action="unchanged",
+                    )
+                    for name, why in modifiers.not_applied
+                )
             offered = (
                 None
                 if self.admission is None or preset is None

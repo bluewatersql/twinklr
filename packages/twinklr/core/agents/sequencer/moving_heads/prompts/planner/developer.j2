@@ -66,7 +66,12 @@ answering the song.
   plays to the section's `end_bar`.
 - `template_id`: a template from the Template Library, exactly as written.
 - `preset_id`: a preset the template declares, or null for its base.
-- `modifiers`: a list of `{key, value}` entries; an empty list when unused.
+- `modifiers`: `{key, value}` entries that adjust the part's look, one per key; an empty
+  list when unused. Only the values What This Rig Can Show lists for the template play:
+  `spread` (`unison`: every head together; `wave`: heads follow one another; `wide_wave`:
+  a wider wave; `reversed`: the wave starts from the other end), `direction` `reverse`
+  (the path runs backwards: a circle turns the other way, a sway starts to the other
+  side, a lift drops), `aim` `low`/`high` (every head 10 degrees lower or higher).
 - `label`: a short name for the part in the sequence's timing marks (`pickup`, `drop`,
   `tail`), or null for a letter.
 - `reasoning`: why this template here.

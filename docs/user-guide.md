@@ -525,6 +525,18 @@ A section's `motif_id` and `variation` choose the variant each of its parts play
 
 The evaluation report prints the variant each part plays (`plays:` on its template line), the motif relation and the variant line under "played". The trace's `section_looks[].arrangement` says, for each section with a motif or a variation, the motif (`id`, `relation`, `source`) and the variant resolved (`asked`, `relative_to`, `from`, `plays`, the `named` preset, and the `reason` where the step cannot play).
 
+#### How a part's modifiers reach the lights
+
+A part's `modifiers` (`{key, value}` entries; the key is a free string in the planner contract) adjust the variant the part plays, computed in code on that variant, its preset applied, fitted or not (`sequencer/moving_heads/modifiers.py`, used by both the render and repair). The renderer knows three keys:
+
+- `spread`: how the template's wave runs across the heads (its phase distribution over pan and tilt, which the zoom and a cascade's lit window follow): `unison`, every head together (a two-winged template keeps its mirror); `wide_wave`, the wave twice as wide; `reversed`, the wave starts from the other end of the rig; and on a template whose heads move together, `wave`, a quarter-cycle wave from the rig's first head (it needs the rig's topology).
+- `direction: reverse`: the path runs backwards in time: the orbit and the wings turn the other way, a sway starts to the other side (a waving zoom with it), the snap drops from its lifted aim instead of lifting. A cascade's periodic sweep runs the same both ways, so it has none.
+- `aim: low | high`: every step's start tilt 10 degrees lower or higher.
+
+Each is a phase shift, a time reversal or a tilt translation of the variant's own path, so no head moves faster. **The offer.** The pre-planning check proves each value a template takes (the catalog's table is in [catalog/templates/moving_heads/README.md](../catalog/templates/moving_heads/README.md#modifiers)) on its effective variant: compiled at bar 1 over the song, and played unlike the variant without it (the "plays like" rule for variants: the same darkness and every aim within 3 degrees is not offered). On every other admitted variant an `aim` that would take a head's tilt out of its allowed range is excluded there. The planner is shown, per template, the values that play. **The render** plays each offered value that fits the variant the part plays, in the order spread, direction, aim; every other entry does not play, with why: a key or value the renderer does not know (keys and values are read case-blind, `-` and spaces as `_`), a second entry for a key (the first counts), a value not offered for the template here, or one that does not fit the variant. A part whose modifiers all fail plays exactly as without them. **Repair** (`rig_repair._modifier_repairs`, after the variation's) records each one that does not play with the same reason and the template's valid set, and keeps it in the plan; event predictions read the dark phases a played spread gives the variant (the gate publishes them). The trace's `section_looks[].arrangement.modifiers` lists `asked`, `applied` and each `not_applied` with its `reason`; a modifier that does not play also warns in the diagnostics, and the evaluation report prints what played. What plays is render identity.
+
+A modifier does not yet give way to the song: a modifier that would make a planned event worse than the same plan without it still plays (the render has one switch per part for it, `RenderingPipeline._modifiers_give_way`, for the settling that judges variations to use).
+
 Under `twinklr show` the moving heads' macro focal role in a section adjusts its intensity at render: `LEAD` plays one step up the intensity ladder (`as_authored`, `SLOW`, `SMOOTH` and `FAST` as `DRAMATIC`; `DRAMATIC` as `INTENSE`; on a template at full level that is the dip-and-return, more movement in the light, not more light), `SUPPORT` plays the planner's choice, `REST` at most the template's level (`DRAMATIC` and `INTENSE` as authored). The heads render as one rig, so a role applies only where every moving-head target holds it; a section that names none for them plays the planner's choice, and one that names different roles, or a role for some targets and none for others, plays the planner's choice with a warning. The planner's prompt under `show` lists each section's role and says so. A role that changes a section's intensity is render identity: the trace and the plan checkpoint record it as `focal_roles`, and `eval-report` re-renders with it (and names `focal roles` when they differ). `twinklr run` has no focal role.
 
 `moving_heads.initial_states` is never defaulted: a fixture without an entry has an unknown initial state and the run is refused before planning, because nothing establishes where a head is when the sequence starts (a previous sequence leaves it wherever it last aimed). The refusal lists every fixture without an entry and prints, as one object ready to paste into `moving_heads.initial_states`, the entry each profile's default bytes give: each axis at the value they encode, each discrete channel in its `default_state`, `settled`, and `dark` exactly when that dimmer level or shutter state extinguishes it. Pasting it asserts that each head really rests there, settled and dark as stated, when the sequence starts.
@@ -1018,10 +1030,10 @@ dimmer, which under `twinklr show` the heads' macro focal role adjusts
 lyric moment cues they land on ([how](#how-a-sections-events-reach-the-lights)), and its
 entry and exit transitions ([how](#how-a-sections-transitions-reach-the-lights)), and the
 variant its motif and variation resolve each part to
-([how](#how-a-sections-motif-and-variation-reach-the-lights)). It does not yet render
-the rest of the planner's song intent (density, modifiers), which no renderer has
-rendered; the trace's diagnostics name, per section, the intent fields it set that are
-not rendered. Rendering them is planned work
+([how](#how-a-sections-motif-and-variation-reach-the-lights)), and each part's modifiers
+([how](#how-a-parts-modifiers-reach-the-lights)). It does not yet render the rest of the
+planner's song intent (density), which no renderer has rendered; the trace's
+diagnostics name, per section, the intent fields it set that are not rendered. Rendering them is planned work
 ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 
 _Source: `packages/twinklr/core/pipeline/definitions/moving_heads.py` and `common.py`_

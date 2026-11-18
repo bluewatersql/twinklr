@@ -256,8 +256,9 @@ Factory: `TwinklrSession.from_directory(config_dir)` discovers `config.json` and
   lyric cue's emphasis, colour and gobo changes revealed on the beat) and transitions
   (`transitions.py`: entry and exit, each mode on its window at the boundary), and plays
   the variant each part's motif and variation resolve to (`arrangement.py`, which repair
-  reads too); density and modifiers are not rendered yet (no renderer has, [plan](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)),
-  and each section that sets any says which fields in the trace's diagnostics
+  reads too) with each part's modifiers (`modifiers.py`, which repair reads too); density
+  is not rendered yet (no renderer has, [plan](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)),
+  and each section that sets it says so in the trace's diagnostics
 - The template compiler turns the sections' parts into cues with
   typed physical trajectories; the transaction pass plans dark repositioning between
   them, and the frame encoder writes complete 20 ms frames as constant DMX effects

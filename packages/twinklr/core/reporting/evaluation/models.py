@@ -129,7 +129,8 @@ class TemplateSelection(BaseModel):
         ),
     )
     modifiers: dict[str, str] = Field(
-        default_factory=dict, description="Template modifiers applied"
+        default_factory=dict,
+        description="The part's modifiers the render plays (the trace's `arrangement`)",
     )
     reasoning: str = Field(default="", description="Agent's reasoning for template choice")
 

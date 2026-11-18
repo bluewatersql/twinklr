@@ -116,7 +116,7 @@ See [product/overview.md](product/overview.md).
     it within a beat, else not played. The trace records every event
     per head (unplaceable ones too) and every lyric cue with its offset from the lyric;
     the offer says what each event plays at the song's tempo; repair records, with the
-    render's tests, what will play otherwise. Renderer revision 17.
+    render's tests, what will play otherwise. Renderer revision 18.
     ([user guide](../docs/user-guide.md#how-a-sections-events-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w6-w7-events/README.md))
   - **Transitions** (W8, 2026-11-17, not yet seen by the owner). Each boundary plays its
@@ -135,7 +135,7 @@ See [product/overview.md](product/overview.md).
     transition counts as played on a head only where its frames differ from the plan
     rendered without transitions (else traced `nothing`, warned). Repair shortens one
     longer than its parts and records what plays otherwise; the trace lists each per
-    head. Renderer revision 17.
+    head. Renderer revision 18.
     ([user guide](../docs/user-guide.md#how-a-sections-transitions-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w8-transitions/README.md))
   - **Motif and variation** (W10b/W10c, 2026-11-18, not yet seen by the owner). Each
@@ -156,13 +156,24 @@ See [product/overview.md](product/overview.md).
     only briefly moves to a beat where it is shown half a beat (never losing a head that
     showed it), else is traced `brief`. The song outranks the arrangement: a variation
     that would make any event worse than its source variant gives way (render-decided,
-    repair-predicted). Renderer revision 17.
+    repair-predicted). Renderer revision 18.
     ([user guide](../docs/user-guide.md#how-a-sections-motif-and-variation-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-w10bc-motif-variation/README.md))
-  - **Not rendered yet: density and modifiers.** Accepted and ignored (a per-section
-    trace diagnostic says so); no renderer has rendered them. The owner has directed
-    that all of the song intent be rendered on this renderer, with nothing cut from the
-    planner contract; the remaining work is density
+  - **Modifiers** (W10e, 2026-11-18, not yet seen by the owner). A part's free
+    key/value `modifiers` play a closed set computed on the variant it plays: `spread`
+    (`unison`, `wave`, `wide_wave`, `reversed`), `direction: reverse` (the path backwards
+    in time), `aim: low|high` (start tilt 10 degrees). The gate offers per template the
+    values that compile on its effective variant and play unlike it, and excludes an aim
+    on another variant whose tilt it would take out of range; the planner sees the
+    offer. Anything else does not play, traced and repaired (`recorded`) with the same
+    reason. Not yet under the song-outranks rule: a modifier that worsens an event still
+    plays (one per-part switch is ready for that settling). Gate time x1.11-1.26 on the
+    test rigs. Renderer revision 18.
+    ([user guide](../docs/user-guide.md#how-a-parts-modifiers-reach-the-lights),
+    [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-w10e-modifiers/README.md))
+  - **Not rendered yet: density.** Accepted and ignored (a per-section trace diagnostic
+    says so); no renderer has rendered it. The owner has directed that all of the song
+    intent be rendered on this renderer, with nothing cut from the planner contract
     ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 
   `twinklr run`, `show`, `eval-report`, `inject` and `regenerate` all use it;

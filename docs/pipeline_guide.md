@@ -771,8 +771,10 @@ uv run twinklr run \
    Its timed accents play on the beat with the lyric moment cues they land on
    ([user guide](user-guide.md#how-a-sections-events-reach-the-lights)), and its entry and
    exit transitions at its boundaries
-   ([user guide](user-guide.md#how-a-sections-transitions-reach-the-lights)). It does not
-   yet render motif variation, density or modifiers, which no renderer has rendered
+   ([user guide](user-guide.md#how-a-sections-transitions-reach-the-lights)), its motif
+   and variation, and its parts' modifiers
+   ([user guide](user-guide.md#how-a-parts-modifiers-reach-the-lights)). It does not
+   yet render density, which no renderer has rendered
    ([song-intent rendering](../changes/2026_11_12_mh_true_up/plan/song-intent-rendering.md)).
 
 ### Demo Scripts

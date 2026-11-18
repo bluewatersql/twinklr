@@ -140,6 +140,25 @@ from `position.position_index` cannot see a missing head after the highest remai
 index, so removing the highest-index head shortens the row and can change the other
 heads' phases; declare a topology to keep them.
 
+## Modifiers
+
+A plan's part may carry `modifiers` (song-intent W10e). They are computed on the
+variant the part plays, never authored here as presets
+(`sequencer/moving_heads/modifiers.py`): `spread` changes the phase distribution that owns
+pan and tilt, `direction: reverse` runs the path backwards in time, `aim` moves every
+step's start tilt 10 degrees (proposed). What each family takes, from its steps:
+
+| Family | Takes | Does not take, because |
+|---|---|---|
+| `fly_out_cascade`, `fly_in_cascade` | spread `unison`, `wide_wave`, `reversed`; aim `low`, `high` | `wave` (already a wave); `direction` (a periodic sweep runs the same both ways) |
+| `mirror_wings`, `zoom_wave` | spread `unison`, `wide_wave`, `reversed`; direction `reverse`; aim `low`, `high` | `wave` (already a wave) |
+| `target_orbit`, `finite_snap_hold`, `masked_wheel_flick` | spread `wave`; direction `reverse`; aim `low`, `high` | `unison`, `wide_wave`, `reversed` (every head moves together) |
+
+The gate offers each of these on the family's effective variant where it compiles there
+and plays unlike the variant (`wave` needs the rig's topology), and excludes an `aim` on
+another variant whose tilt it would take out of a head's range (the snap's `wide`, on
+heads allowed to tilt only to 80 degrees). Their look has not been viewed.
+
 ## Zoom pilot (synthetic)
 
 `zoom_wave` is the bounded optical pilot (P2.5): one continuous optical axis, the zoom's

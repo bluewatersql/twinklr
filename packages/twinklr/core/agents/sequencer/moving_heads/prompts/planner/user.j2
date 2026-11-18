@@ -137,6 +137,9 @@ plays as its wheel colour, not darker or paler (`intensity` shapes the dimmer).
 {% if rig_offer.variant_windows %}
 - **A variation variant's first dark moment** opens elsewhere than its template's: {{ rig_offer.variant_windows | join(', ') }}.
 {% endif %}
+{% if rig_offer.modifiers %}
+- **Modifiers** that play here (any other is ignored, and repair says so): {% for t in rig_offer.modifiers %}`{{ t.template_id }}`: {{ t.offered | join(', ') }}{% if not loop.last %}; {% endif %}{% endfor %}.
+{% endif %}
 
 {% endif %}
 {% if audio_profile is defined and audio_profile %}
