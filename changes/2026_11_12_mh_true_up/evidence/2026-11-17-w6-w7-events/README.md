@@ -824,3 +824,25 @@ event-free plan identical in all 567; the event plans different in 63, all on
 other 504; no render errored; every wheel turn dark. The suite, pins, parity, ruff and
 mypy ran once for Part A and W8 together, after the last code edit (the W8 record's
 § Verification).
+
+### W8 fix round: A1's three-frame rule (M4, 2026-11-17)
+
+The W8 review found an A1 regression (its plan C at 120 BPM, `fly_out_cascade`, a gobo
+event on 4.2 followed by `strobe_fast` on 4.3): MH2 and MH3 were lit only in strobe
+flashes of one or two frames after the event, so no reveal of three frames running was
+found, the head was traced "never shows it lit" and the wheel did not turn: the flashes
+showed the **old** gobo. A1's three-frame rule had been applied to the reveal itself.
+
+Fixed in `events._note_reveal`: the wheel turns and the head shows the change from its
+first lit frame however short (`reveal_ms`); the three-frame run is recorded separately
+(`shown_ms`) and only `_shown_in_time` reads it, to count whether a head shows the change
+within a beat (which decides whether the event moves). "Never shows it lit" now means no
+lit frame at all before the section ends. Frame test
+`test_a_wheel_change_shown_only_in_short_lit_runs_still_turns_and_shows` (fails at
+`82bd2b0a`: the flashes show `open`; passes now: every lit frame from the reveal shows
+`stars`); the reviewer's `probe_a1c.py` over its 9 grids × 2 rigs: 0 problems (was 132 head-cases at `82bd2b0a`).
+Also (M6): where every head turns on the beat an event moves to exactly as on its own beat
+(dark on both, first lit at the same reveal), the move changes no frame; the trace's
+`moved` carries `changes_nothing`, and the event and lyric-cue lines read "first seen at
+bar … beat …" in place of "moved to" / "played at". Renderer revision 11 (the W8 record,
+§ Fix round 1).

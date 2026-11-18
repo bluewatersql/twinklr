@@ -60,6 +60,7 @@ from twinklr.core.sequencer.moving_heads.song_intent import (
 )
 from twinklr.core.sequencer.moving_heads.transitions import (
     LIT_MODES,
+    MIN_WINDOW_FRAMES,
     SPLIT_ON_BOUNDARY,
     SPLIT_SHARE,
     length_beats,
@@ -690,7 +691,8 @@ def _wheel_plays(
                     f"no head shows it lit within {WHEEL_LATE_BEATS:g} beat of its beat, nor of "
                     f"any beat within {WHEEL_MOVE_BARS} bar(s) of it in the section (the heads "
                     "are dark there, or the wheel change does not fit): it does not play; put "
-                    "it where the heads are lit, or after a `closed`"
+                    "it on a beat where the heads are lit (the `open` that ends a `closed` is "
+                    "one: the wheel turns in its darkness)"
                     + "".join(
                         f"; on its beat on {', '.join(sorted(f for f, (_, w, _) in first.items() if w == why))}: {why}"
                         for why in whys
@@ -983,7 +985,15 @@ def _transition_repairs(
       some heads have is recorded; one a channel cannot take is recorded with what it
       plays (`transitions.resolved_strategies`);
     - a `crossfade`, `morph` or `sweep` across a colour or gobo change is recorded: the
-      wheel turns in a dark cut at its split point, the rest plays lit.
+      wheel turns in a dark cut at its split point, the rest plays lit;
+    - a `snap` that plays as the plain cut is recorded (`_plays_nothing`);
+    - a colour, gobo or hit event the window yields to is recorded, and where too little
+      is left the transition does not play (`_yields_to_events`).
+
+    Not predicted: where a lit move is too fast for a head and the transition moves it in
+    a dark cut at its split point instead (it depends on the templates' poses at the
+    boundary), and where that cut would cover an incoming hit (that head plays no
+    transition); the render trace records both.
     """
     out = list(sections)
     repairs: list[PlanRepair] = []
@@ -1086,36 +1096,122 @@ def _transition_repairs(
             _, otherwise = resolved_strategies(kept)
             for said in otherwise:
                 note(RepairAction.RECORDED, said)
-            if kept.mode in LIT_MODES:
-                other = previous if kept.edge is TransitionEdge.ENTRY else following
-                outgoing, incoming = (
-                    (other, section) if kept.edge is TransitionEdge.ENTRY else (section, other)
-                )
-                if outgoing is not None and incoming is not None:
-                    turns = []
-                    for wheel in ("colour", "gobo"):
-                        before_states = _held_at_end(outgoing, offer, palettes, wheel)
-                        after_states = _held_at_start(incoming, offer, palettes, wheel)
-                        heads = sorted(
-                            f
-                            for f in after_states
-                            if f in before_states and before_states[f] != after_states[f]
-                        )
-                        if heads:
-                            turns.append(f"the {wheel} changes on {', '.join(heads)}")
-                    if turns:
-                        slowest = max((h.change_ms or 0 for h in offer.heads), default=0)
-                        note(
-                            RepairAction.RECORDED,
-                            f"{'; '.join(turns)}, and a wheel cannot turn lit: the transition "
-                            f"cuts dark at its split point for the turn ({slowest} ms) and plays "
-                            "lit around it; where its window is shorter than that, the heads "
-                            "enter as without a transition",
-                        )
+            other = previous if kept.edge is TransitionEdge.ENTRY else following
+            outgoing, incoming = (
+                (other, section) if kept.edge is TransitionEdge.ENTRY else (section, other)
+            )
+            for said in _plays_nothing(kept, outgoing, incoming, offer):
+                note(RepairAction.RECORDED, said)
+            if outgoing is not None:
+                for said in _yields_to_events(kept, outgoing, incoming, beat_grid):
+                    note(RepairAction.RECORDED, said)
+            if kept.mode in LIT_MODES and outgoing is not None and incoming is not None:
+                turns = []
+                for wheel in ("colour", "gobo"):
+                    before_states = _held_at_end(outgoing, offer, palettes, wheel)
+                    after_states = _held_at_start(incoming, offer, palettes, wheel)
+                    heads = sorted(
+                        f
+                        for f in after_states
+                        if f in before_states and before_states[f] != after_states[f]
+                    )
+                    if heads:
+                        turns.append(f"the {wheel} changes on {', '.join(heads)}")
+                if turns:
+                    slowest = max((h.change_ms or 0 for h in offer.heads), default=0)
+                    note(
+                        RepairAction.RECORDED,
+                        f"{'; '.join(turns)}, and a wheel cannot turn lit: the transition "
+                        f"cuts dark at its split point for the turn ({slowest} ms) and plays "
+                        "lit around it; where its window is shorter than that, the heads "
+                        "enter as without a transition",
+                    )
             changed.append(kept)
         if changed != list(section.transitions):
             out[index] = section.model_copy(update={"transitions": changed})
     return out, repairs
+
+
+def _plays_nothing(
+    transition: PlanTransition,
+    outgoing: PlanSection | None,
+    incoming: PlanSection | None,
+    offer: RigOffer,
+) -> list[str]:
+    """Where a `snap` is the plain cut, the frames the render plays without it: the song's
+    first ENTRY (the heads rest dark before it and are moved into place in the dark before
+    its first cue), and on the heads that always enter the incoming template dark after the
+    outgoing one (`RigOffer.dark_entries`: nothing to be in place for)."""
+    if transition.mode is not TransitionMode.SNAP:
+        return []
+    if outgoing is None and transition.edge is TransitionEdge.ENTRY:
+        return [
+            "the song's first ENTRY: the heads rest dark before it and are moved into place "
+            "in the dark before its first cue, so a snap plays as the plain cut (nothing)"
+        ]
+    if outgoing is None or incoming is None:
+        return []
+    after, before = incoming.parts[0].template_id, outgoing.parts[-1].template_id
+    dark = offer.dark_entries.get(_canonical(after), {}).get(_canonical(before), ())
+    if not dark:
+        return []
+    return [
+        f"{after} always enters dark after {before} on {', '.join(sorted(dark))}: there is "
+        "nothing to be in place for before the boundary, so a snap plays as the plain cut "
+        "(nothing) on those heads"
+    ]
+
+
+def _yields_to_events(
+    transition: PlanTransition,
+    outgoing: PlanSection,
+    incoming: PlanSection | None,
+    beat_grid: BeatGrid,
+) -> list[str]:
+    """A colour, gobo or hit event of the part the transition leaves that must still be
+    seen when its window would begin: until half a beat after its beat (at least: a head
+    dark on the beat shows it later) and, bound to a lyric cue, a quarter beat after the
+    cue. The window starts after it, no later than the boundary; where what is left is
+    shorter than the mode needs (`MIN_WINDOW_FRAMES`), the transition does not play."""
+    bars, beats = beat_grid.bar_boundaries, beat_grid.beat_boundaries
+    if len(beats) < 2:
+        return []
+    end_bar = outgoing.end_bar
+    boundary = bars[end_bar] if end_bar < len(bars) else beat_grid.duration_ms
+    at = min(max(bisect.bisect_left(beats, boundary), 1), len(beats) - 1)
+    beat = beats[at] - beats[at - 1]
+    length = float(length_beats(transition.length, beat_grid.beats_per_bar))
+    split = float(SPLIT_SHARE[transition.split])
+    if transition.mode is TransitionMode.SNAP or incoming is None:
+        before, after = length, 0.0
+    elif transition.mode in SPLIT_ON_BOUNDARY:
+        before, after = split * length, (1 - split) * length
+    else:
+        before, after = length / 2, length / 2
+    start, end = boundary - before * beat, boundary + after * beat
+    said = []
+    for event in outgoing.events:
+        if event.action.value not in ("color", "gobo", "hit"):
+            continue
+        frame = beat_grid.beat_time_ms(event.bar, event.beat)
+        if frame is None or not start - beat <= frame < boundary:
+            continue
+        seen = max(frame + beat / 2, -math.inf if event.cue_ms is None else event.cue_ms + beat / 4)
+        if seen <= start:
+            continue
+        left = end - min(seen, boundary)
+        least = MIN_WINDOW_FRAMES[transition.mode] * EFFECT_GRID_MS
+        said.append(
+            f"the event at {event.describe()} must be seen until about "
+            f"{round(seen - boundary):+d} ms from the boundary: the window starts after it"
+            + (
+                f", which leaves {max(0, round(left))} ms, less than the {least} ms a "
+                f"{transition.mode.value} needs: it does not play"
+                if left < least
+                else ""
+            )
+        )
+    return said
 
 
 def _held_at_start(

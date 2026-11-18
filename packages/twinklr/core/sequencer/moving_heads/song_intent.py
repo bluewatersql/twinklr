@@ -47,6 +47,7 @@ from twinklr.core.config.fixtures.state_tags import (
 )
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.models.enum import ChannelName
+from twinklr.core.sequencer.models.transition import TransitionLength
 from twinklr.core.sequencer.moving_heads.intensity import describe_intensity
 from twinklr.core.sequencer.moving_heads.libraries.color import (
     COLOR_PRESET_HEX,
@@ -54,6 +55,7 @@ from twinklr.core.sequencer.moving_heads.libraries.color import (
     canonical_hex,
 )
 from twinklr.core.sequencer.moving_heads.libraries.gobo import GoboPattern
+from twinklr.core.sequencer.moving_heads.transitions import length_beats
 from twinklr.core.sequencer.vocabulary.visual import PaletteRole
 
 if TYPE_CHECKING:
@@ -1042,10 +1044,9 @@ def _transitions_for_prompt(offer: RigOffer) -> dict[str, Any]:
     """What a transition is at this song's median beat: each length in ms; how long the
     slowest head takes to travel each pose axis' whole range (a lit move longer than the
     window, or for `sweep` its share after the split point, dips dark); the wheel change
-    a colour or gobo change across a lit transition dips dark for."""
-    from twinklr.core.sequencer.models.transition import TransitionLength
-    from twinklr.core.sequencer.moving_heads.transitions import length_beats
-
+    a colour or gobo change across a lit transition dips dark for; the template pairs a
+    `snap` is the plain cut on (`RigOffer.dark_entries`: the heads that always enter the
+    template dark after the other one)."""
     lengths = []
     if offer.beat_ms:
         for length in TransitionLength:
@@ -1055,6 +1056,16 @@ def _transitions_for_prompt(offer: RigOffer) -> dict[str, Any]:
         "lengths": lengths,
         "full_travel_ms": dict(sorted(offer.full_travel_ms.items())),
         "wheel_change_ms": offer.wheel_change_ms,
+        "dark_entries": [
+            {
+                "template": template,
+                "after": before,
+                "heads": "every head" if len(heads) == len(offer.heads) else ", ".join(heads),
+            }
+            for template, afters in sorted(offer.dark_entries.items())
+            for before, heads in sorted(afters.items())
+            if heads
+        ],
     }
 
 

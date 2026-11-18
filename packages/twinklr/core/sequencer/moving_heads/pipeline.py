@@ -3,6 +3,7 @@ from __future__ import annotations
 import bisect
 from collections import defaultdict
 from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
+import copy
 from dataclasses import asdict, dataclass, field
 from fractions import Fraction
 import functools
@@ -38,7 +39,7 @@ from twinklr.core.formats.xlights.sequence.models.xsq import (
     XSequence,
 )
 from twinklr.core.sequencer.models.context import TemplateCompileContext
-from twinklr.core.sequencer.models.enum import ChannelName
+from twinklr.core.sequencer.models.enum import ChannelName, TransitionMode
 from twinklr.core.sequencer.models.moving_heads.physical import (
     AXIS_KEYS,
     DISCRETE_KEYS,
@@ -438,78 +439,131 @@ def _event_spans(
     events: SectionEvents,
     records: Mapping[int, Mapping[str, Any]],
     window: tuple[int, int],
-    half_beat_ms: float,
+    beat_grid: BeatGrid,
+    *,
+    hits: bool,
 ) -> list[tuple[str, int, int]]:
-    """Where a part's events (but hits) command darkness or a wheel, `(label, start,
-    end)`: a closed, strobe or pulse event over its span, an `open` on its frame, a colour
-    or gobo event from its dark lead (or half the beat before it) to its reveal. A
-    transition yields to them."""
+    """Where a part's events command darkness or a wheel, or must be seen, `(label, start,
+    end)` on the frame grid (start floored, end ceiled): a closed, strobe or pulse event
+    over its span, an `open` on its frame, a colour or gobo event from its dark lead (or
+    half the beat before it) until it has been seen (`_seen_until`), and with `hits` a hit
+    from its beat until it has been seen. A transition yields to them."""
     spans: list[tuple[str, int, int]] = []
     lo, hi = window
+
+    def on_grid(label: str, start: float, end: float) -> None:
+        spans.append(
+            (
+                label,
+                math.floor(start / EFFECT_GRID_MS) * EFFECT_GRID_MS,
+                math.ceil(end / EFFECT_GRID_MS) * EFFECT_GRID_MS,
+            )
+        )
+
     for event, start, end in events.shutter_spans():
         if start < hi and end > lo:
-            spans.append((f"{event.action} at bar {event.bar} beat {event.beat}", start, end))
+            on_grid(f"{event.action} at bar {event.bar} beat {event.beat}", start, end)
     for event in events.events:
         if not lo <= event.frame_ms < hi:
             continue
         label = f"{event.action} at bar {event.bar} beat {event.beat}"
+        beat = beat_grid.beat_boundaries
+        length = (
+            beat[event.beat_index + 1] - beat[event.beat_index]
+            if event.beat_index + 1 < len(beat)
+            else beat[-1] - beat[-2]
+        )
         if event.action == "open":
-            spans.append((label, event.frame_ms, event.frame_ms + EFFECT_GRID_MS))
+            on_grid(label, event.frame_ms, event.frame_ms + EFFECT_GRID_MS)
         elif event.action in WHEEL_ACTIONS:
             heads = records.get(event.index, {}).get("heads", {}).values()
             starts = [h["dark_dip"]["from_ms"] for h in heads if "dark_dip" in h]
             reveals = [h["reveal_ms"] for h in heads if h.get("reveal_ms") is not None]
-            spans.append(
-                (
-                    label,
-                    min([*starts, event.frame_ms - round(half_beat_ms)]),
-                    max([*reveals, event.frame_ms + EFFECT_GRID_MS]),
-                )
+            on_grid(
+                label,
+                min([*starts, event.frame_ms - length / 2]),
+                _seen_until(max(reveals, default=event.frame_ms), event.cue_ms, length),
             )
+        elif event.action == "hit" and hits:
+            on_grid(label, event.frame_ms, _seen_until(event.frame_ms, event.cue_ms, length))
     return spans
+
+
+def _seen_until(shown_ms: float, cue_ms: int | None, beat_ms: float) -> float:
+    """Until when an event shown at `shown_ms` must stay seen before a transition may darken
+    or hand over the look: half a beat after it, and for one bound to a lyric cue a quarter
+    beat after the cue's own time, whichever is later (proposed, W8 fix round)."""
+    return max(shown_ms + beat_ms / 2, -math.inf if cue_ms is None else cue_ms + beat_ms / 4)
+
+
+@dataclass
+class _BoundaryPlay:
+    """What a boundary's transition plays (`_play_boundary`): the incoming cues with the
+    transition's own cues before them, each changed head's outgoing cues as cut, what
+    played per head, and the transition's trace entry."""
+
+    incoming: list[FixtureSegment]
+    outgoing: dict[str, list[FixtureSegment]]
+    played: dict[str, HeadTransition]
+    record: dict[str, Any]
+
+
+def _outgoing_of(
+    cues: Sequence[FixtureSegment],
+    kept: Mapping[str, Sequence[HeadFollow]],
+    part: tuple[str, str] | None,
+) -> tuple[dict[str, list[FixtureSegment]], dict[str, list[HeadFollow]]]:
+    """Each head's cues of the outgoing part (`part`: its section and segment ids; None
+    where the heads rest before), and how each head stands before them (its followed
+    cues up to them)."""
+    outgoing: dict[str, list[FixtureSegment]] = defaultdict(list)
+    if part is not None:
+        for cue in cues:
+            if (cue.section_id, cue.segment_id) == part:
+                outgoing[cue.fixture_id].append(cue)
+    before: dict[str, list[HeadFollow]] = {}
+    for fixture_id, history in kept.items():
+        own = outgoing.get(fixture_id)
+        first = next(
+            (j for j, follow in enumerate(history) if own and follow.segment is own[0]),
+            len(history),
+        )
+        before[fixture_id] = list(history[:first])
+    return {f: sorted(own, key=lambda c: c.t0_ms) for f, own in outgoing.items()}, before
 
 
 def _play_boundary(
     window: Window,
     *,
-    cues: list[FixtureSegment],
-    kept: dict[str, list[HeadFollow]],
-    outgoing_part: tuple[str, str] | None,
+    outgoing: Mapping[str, Sequence[FixtureSegment]],
+    before: Mapping[str, Sequence[HeadFollow]],
     incoming: Sequence[FixtureSegment],
     profiles: Mapping[str, FixtureCapabilities],
     initial_states: Mapping[str, InitialFixtureState],
     locks: Sequence[RenderLock],
     darken: Callable[[Sequence[FixtureSegment]], list[FixtureSegment]],
-) -> tuple[list[FixtureSegment], dict[str, HeadTransition], dict[str, Any]]:
+    protected: Sequence[tuple[str, int]] = (),
+) -> _BoundaryPlay:
     """`window`'s transition on every head (`transitions.play_head`, its own cues then
-    `darken`ed over the show's rests): each head's outgoing
-    cues (`outgoing_part`: their section and segment ids; None where the heads rest
-    before) are cut in `cues` and `kept` is followed again over them; returns the
-    incoming cues with the transition's own cues before them, what played per head, and
-    the transition's trace entry."""
+    `darken`ed over the show's rests), from each head's `outgoing` cues and how it stands
+    `before` them; `protected` the frames of events its darkness may not cover. A window
+    the events it yields to left too short plays on no head."""
     record = window.record()
     edge = "entry" if window.edge is TransitionEdge.ENTRY else "exit"
     heads_record: dict[str, Any] = {}
     played: dict[str, HeadTransition] = {}
+    cut: dict[str, list[FixtureSegment]] = {}
     new_incoming: list[FixtureSegment] = []
     by_head_in: dict[str, list[FixtureSegment]] = defaultdict(list)
     for cue in sorted(incoming, key=lambda cue: cue.t0_ms):
         by_head_in[cue.fixture_id].append(cue)
-    out_index: dict[str, list[int]] = defaultdict(list)
-    if outgoing_part is not None:
-        for i, cue in enumerate(cues):
-            if (cue.section_id, cue.segment_id) == outgoing_part:
-                out_index[cue.fixture_id].append(i)
-    for fixture_id in sorted(by_head_in.keys() | out_index.keys()):
-        own_out = sorted((cues[i] for i in out_index[fixture_id]), key=lambda c: c.t0_ms)
-        own_in = by_head_in[fixture_id]
-        identity = own_in[0] if own_in else own_out[-1]
-        history = kept.get(fixture_id, [])
-        first_out = next(
-            (j for j, follow in enumerate(history) if own_out and follow.segment is own_out[0]),
-            len(history),
-        )
-        prefix = history[:first_out]
+    for fixture_id in sorted(by_head_in.keys() | outgoing.keys()):
+        own_out, own_in = list(outgoing.get(fixture_id, ())), by_head_in[fixture_id]
+        if window.not_played is not None:
+            heads_record[fixture_id] = {"not_played": window.not_played}
+            new_incoming += own_in
+            continue
+        prefix = before.get(fixture_id, ())
         result = play_head(
             window,
             own_out,
@@ -519,41 +573,50 @@ def _play_boundary(
                 initial=initial_states.get(fixture_id),
                 locks=locks,
                 before=prefix[-1] if prefix else None,
+                protected=protected,
             ),
-            identity=identity,
+            identity=own_in[0] if own_in else own_out[-1],
             edge_label=edge,
         )
-        if result is None or (
-            not result.own and result.outgoing == own_out and result.incoming == own_in
-        ):
-            if result is not None:
-                heads_record[fixture_id] = result.record
+        heads_record[fixture_id] = result.record
+        if not result.own and result.outgoing == own_out and result.incoming == own_in:
             new_incoming += own_in
             continue
         result.own = darken(result.own)
-        if result.own or result.outgoing != own_out:
-            played[fixture_id] = result
-        heads_record[fixture_id] = result.record
+        played[fixture_id] = result
         if result.outgoing != own_out:
-            removed = set(out_index[fixture_id])
-            at = min(removed)
-            rest = [cue for i, cue in enumerate(cues) if i not in removed]
-            cues[:] = rest[:at] + result.outgoing + rest[at:]
-            kept[fixture_id] = prefix + follow_cues(
-                result.outgoing,
-                profiles[fixture_id],
-                frame_ms=EFFECT_GRID_MS,
-                after=prefix[-1] if prefix else None,
-            )
-            # Indices after the cut moved: find the other heads' outgoing cues again.
-            if outgoing_part is not None:
-                out_index = defaultdict(list)
-                for i, cue in enumerate(cues):
-                    if (cue.section_id, cue.segment_id) == outgoing_part:
-                        out_index[cue.fixture_id].append(i)
+            cut[fixture_id] = result.outgoing
         new_incoming += result.own + result.incoming
     record["heads"] = heads_record
-    return new_incoming, played, record
+    return _BoundaryPlay(new_incoming, cut, played, record)
+
+
+def _cut_outgoing(
+    cues: list[FixtureSegment],
+    kept: dict[str, list[HeadFollow]],
+    before: Mapping[str, Sequence[HeadFollow]],
+    outgoing: Mapping[str, Sequence[FixtureSegment]],
+    play: _BoundaryPlay,
+    profiles: Mapping[str, FixtureCapabilities],
+) -> None:
+    """Replace each changed head's outgoing cues in `cues` (in place, where they stood)
+    with the transition's cut ones, and follow `kept` again over them."""
+    replaced = {id(cue): fixture_id for fixture_id in play.outgoing for cue in outgoing[fixture_id]}
+    rebuilt: list[FixtureSegment] = []
+    placed: set[str] = set()
+    for cue in cues:
+        fixture_id = replaced.get(id(cue))
+        if fixture_id is None:
+            rebuilt.append(cue)
+        elif fixture_id not in placed:
+            placed.add(fixture_id)
+            rebuilt += play.outgoing[fixture_id]
+    cues[:] = rebuilt
+    for fixture_id, cut in play.outgoing.items():
+        prefix = list(before.get(fixture_id, ()))
+        kept[fixture_id] = prefix + follow_cues(
+            cut, profiles[fixture_id], frame_ms=EFFECT_GRID_MS, after=prefix[-1] if prefix else None
+        )
 
 
 def _plays_as_authored(
@@ -3139,7 +3202,6 @@ class RenderingPipeline:
                         if section.start_bar - 1 < len(bars)
                         else context.start_ms
                     )
-                    half = _half_beat_before(self.beat_grid, downbeat)
                     not_before: list[tuple[str, int]] = []
                     if left is not None and previous is not None:
                         prior = previous.section_id
@@ -3152,7 +3214,8 @@ class RenderingPipeline:
                                     for i in range(len(previous.events))
                                 },
                                 left[1],
-                                half,
+                                self.beat_grid,
+                                hits=True,
                             )
                         ]
                         if prior in transition_end:
@@ -3165,7 +3228,7 @@ class RenderingPipeline:
                     not_after = [
                         (f"it ends before the part it enters plays its {label}", start)
                         for label, start, _ in _event_spans(
-                            events, played_box[0].records, window, half
+                            events, played_box[0].records, window, self.beat_grid, hits=False
                         )
                     ]
                     boundary_window = window_for(
@@ -3180,16 +3243,29 @@ class RenderingPipeline:
                         not_before=not_before,
                         not_after=not_after,
                     )
-                    section_cues, entered_by, transition_record = _play_boundary(
+                    leaving_cues, standing = _outgoing_of(
+                        cues, kept, None if left is None else left[2]
+                    )
+                    play = _play_boundary(
                         boundary_window,
-                        cues=cues,
-                        kept=kept,
-                        outgoing_part=None if left is None else left[2],
+                        outgoing=leaving_cues,
+                        before=standing,
                         incoming=section_cues,
                         profiles=profiles,
                         initial_states=policy.initial_states,
                         locks=self.locks,
                         darken=rested,
+                        protected=[
+                            (f"hit at bar {e.bar} beat {e.beat}", e.frame_ms)
+                            for e in events.hits()
+                            if boundary_window.start_ms <= e.frame_ms < boundary_window.end_ms
+                        ],
+                    )
+                    _cut_outgoing(cues, kept, standing, leaving_cues, play, profiles)
+                    section_cues, entered_by, transition_record = (
+                        play.incoming,
+                        play.played,
+                        play.record,
                     )
                     transition_end[base_id] = boundary_window.end_ms
                     transition_heads += entered_by.values()
@@ -3334,24 +3410,26 @@ class RenderingPipeline:
                             for i in range(len(last_section.events))
                         },
                         (part_start, part_end),
-                        _half_beat_before(self.beat_grid, bars[-1] if bars else end),
+                        self.beat_grid,
+                        hits=True,
                     )
                 ],
             )
-            own, closed_heads, closing_record = _play_boundary(
+            leaving_cues, standing = _outgoing_of(cues, kept, identity)
+            play = _play_boundary(
                 closing,
-                cues=cues,
-                kept=kept,
-                outgoing_part=identity,
+                outgoing=leaving_cues,
+                before=standing,
                 incoming=[],
                 profiles=profiles,
                 initial_states=policy.initial_states,
                 locks=self.locks,
                 darken=rested,
             )
-            cues.extend(own)
-            transition_heads += closed_heads.values()
-            part_records[part_id].setdefault("transitions", []).append(closing_record)
+            _cut_outgoing(cues, kept, standing, leaving_cues, play, profiles)
+            cues.extend(play.incoming)
+            transition_heads += play.played.values()
+            part_records[part_id].setdefault("transitions", []).append(play.record)
         section_looks.extend(record for record in part_records.values() if len(record) > 1)
         if dropped:
             logger.warning(
@@ -3565,6 +3643,8 @@ class RenderingPipeline:
         self.frames = tuple(frames)
         self.runs = runs
         self.requests = requests
+        if any(section.transitions for section in self.choreography_plan.sections):
+            diagnostics += self._transitions_played(section_looks)
         self.render_record = {
             "render_fingerprint": self.fingerprint(),
             "renderer_revision": RENDERER_REVISION,
@@ -3725,6 +3805,84 @@ class RenderingPipeline:
             )
             self.sequence = xsq
         return list(result.segments)
+
+    def _transitions_played(self, section_looks: Sequence[dict[str, Any]]) -> list[MHDiagnostic]:
+        """The played rule for transitions, as for hits: a transition counts as played on a
+        head only where the head's frames over its window (and its darkness) differ from
+        the same plan rendered without transitions; on a head where they do not, its trace
+        entry says `nothing` and why. Returns one warning per section where a transition
+        played nothing or did not play on some head."""
+        baseline = copy.copy(self)
+        baseline.choreography_plan = self.choreography_plan.model_copy(
+            update={
+                "sections": [
+                    s.model_copy(update={"transitions": []})
+                    for s in self.choreography_plan.sections
+                ]
+            }
+        )
+        baseline.output_path = None
+        quiet = logger.disabled
+        logger.disabled = True  # its warnings are this render's own, already logged
+        try:
+            baseline.render()
+        finally:
+            logger.disabled = quiet
+        frames: dict[str, dict[int, Any]] = defaultdict(dict)
+        for frame in self.frames:
+            frames[frame.fixture_id][frame.time_ms] = frame.channels
+        without: dict[str, dict[int, Any]] = defaultdict(dict)
+        for frame in baseline.frames:
+            without[frame.fixture_id][frame.time_ms] = frame.channels
+        said = {
+            TransitionMode.SNAP: "the plain cut: its darkness before the boundary changes no "
+            "frame (the head enters as it would without it)",
+            TransitionMode.BLACKOUT: "the head is dark over the window without it",
+        }
+        diagnostics = []
+        for look in section_looks:
+            for entry in look.get("transitions", []):
+                start, end = entry["window_ms"]
+                nothing, not_played = [], []
+                for fixture_id, outcome in sorted(entry.get("heads", {}).items()):
+                    if "not_played" in outcome:
+                        not_played.append(f"{fixture_id} ({outcome['not_played']})")
+                        continue
+                    if outcome["plays"].startswith("nothing: "):
+                        nothing.append(fixture_id)
+                        continue
+                    a = min(start, *outcome.get("dark_ms", [start]))
+                    b = max(end, *outcome.get("dark_ms", [end]), *outcome.get("window_ms", [end]))
+                    times = range(a, b, EFFECT_GRID_MS)
+                    if all(frames[fixture_id].get(t) == without[fixture_id].get(t) for t in times):
+                        mode = TransitionMode(entry["mode"])
+                        kept = {
+                            k: v for k, v in outcome.items() if k == "strategies_played_otherwise"
+                        }
+                        outcome.clear()
+                        outcome["plays"] = "nothing: " + said.get(
+                            mode, "it changes no frame on this head"
+                        )
+                        outcome.update(kept)
+                        nothing.append(fixture_id)
+                parts = []
+                if nothing:
+                    parts.append(f"played nothing on {', '.join(nothing)}")
+                if not_played:
+                    parts.append(f"not played on {'; '.join(not_played)}")
+                if parts:
+                    diagnostics.append(
+                        MHDiagnostic(
+                            code="unsupported_attribute",
+                            severity="warning",
+                            message=f"section {look['section_id']!r}: transition "
+                            f"{entry['edge']} {entry['mode']} " + "; ".join(parts) + " (the "
+                            "trace's section_looks transitions)",
+                            section_id=look["section_id"],
+                            action="unchanged",
+                        )
+                    )
+        return diagnostics
 
     def _plan_templates(self) -> list[TemplateDoc]:
         """The template documents the plan's sections name, once each.

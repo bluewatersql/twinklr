@@ -243,7 +243,10 @@ bound by the binder); scratch `w8/realistic_table.py`, `w8/realistic_table.txt`;
 | chorus_2 EXIT blackout BEAT, HALF | the song's end: after the part's colour event at 61.4, dark over the window to rest (187780–188520 ms) |
 
 Every transition is traced on every head; every wheel byte change is dark (the test's
-independent reader).
+independent reader). Superseded in two rows by § Fix round 1: chorus_2's ENTRY crossfade
+plays on no head (its dark cut would cover the hit on 53.1, H4), and the closing blackout
+starts at 188160 ms, after the colour on 61.4 has been seen (H3); the snaps are now
+`nothing` by the played rule (H2).
 
 ## Repair and the planner
 
@@ -261,7 +264,8 @@ transition:
 Not predicted (the render's trace says): a lit move too fast for the head (it needs both
 templates' poses at the boundary, which the offer does not carry), a dark cut that does not
 fit the window, a window clamped by events or the head's unbroken cues, a `snap` that plays
-nothing. The planner's prompt gives each length in milliseconds at the median beat and how
+nothing. (Fix round 1 predicts the `snap` that plays nothing and the clamp by events seen
+before the window; § Fix round 1.) The planner's prompt gives each length in milliseconds at the median beat and how
 long the slowest head takes to cross its whole pan and tilt range, says what each mode,
 strategy, curve and split plays, the precedence, the dark cut, and how events, hits and
 intensity compose; the judge is told the same in short.
@@ -410,3 +414,263 @@ Scratch (session-local, not committed):
 `compare_partB.txt`, `sweep_transitions.py`, `worked_examples.py`/`.txt`,
 `realistic_table.py`/`.txt`, `record_transition_pins.py`, `parity_probe.py`,
 `a1_agree.py`, `a2_agree.py`, `partA_probes.txt`).
+
+## Fix round 1 (review of `82bd2b0a` and the owner-rig render, 2026-11-17)
+
+**Provenance.** The independent review of `82bd2b0a` returned REQUEST CHANGES, and the
+owner-rig render of the real Need A Favor plan (the coordinator's evidence under the
+session's `p4view/transitions/`, read only for its trace and frames) found three more
+defects. Fixed by the executor agent in the same worktree, uncommitted; the review's
+scripts (`w8rev/tools/`) were rerun against this tree. No provider call, no network, no
+xLights, nothing under `~/xlights`, `data/` or `artifacts/`; `make validate` not run (the
+integrator's). Every value below is still a proposal for the owner's W8 view.
+
+### H1: a colour or gobo event inside a window crashed the render
+
+`pipeline._event_spans` started a wheel event's span half a beat before its frame
+(`frame_ms - round(half_beat_ms)`, off the 20 ms grid), and `window_for` copied the clamp
+unquantized, so the transition's cues fell off the frame grid (`ValueError … off the 20 ms
+frame grid`; the reviewer's repro: 120 BPM, `mirror_wings` into `mirror_wings`, ENTRY
+crossfade BAR split HALF, `color blue` on 5.2; 122 of its 1,200 fuzzed plans).
+Fixed at the source: every event span is floored at its start and ceiled at its end to the
+frame grid, and `window_for` ceils a `not_before` clamp and floors a `not_after` one.
+The repro renders; the reviewer's fuzzer (`fuzz.py`, the same 1,200 seeds) on this tree:
+**0 errors, 0 lit wheel changes, 0 lit moves beyond the head's speed**. Tests:
+`test_a_colour_event_inside_a_window_off_the_frame_grid_renders_on_the_grid` (the
+repro) and `test_random_plans_with_events_inside_transition_windows_render_honestly`
+(12 seeded random plans: templates, parts, intensity, both edges' transitions of every
+mode, length, curve and split, events near the boundaries, a show's rest; no render
+raises, no wheel byte changes lit, every transition traced on every head with what it
+plays or why not, every window on the frame grid).
+
+### H2: blackout dark over its whole window; the played rule
+
+- **`blackout` is dark over its whole window on every head**, as a show's rest is, whether
+  or not the head has a cue there: it no longer narrows to the head's unbroken cue runs
+  (`transitions._sides`). The reviewer's `probe_blackout.py` (`fly_out_cascade` into
+  `fly_in_cascade` and `mirror_wings` into `fly_in_cascade`, TWO_BARS): 0 lit frames in the
+  window on every head (was 25 to 50 on each at `82bd2b0a`). Test
+  `test_blackout_is_dark_over_its_whole_window_where_a_head_has_no_cue`.
+- **A transition counts as played on a head only where its frames differ from the
+  transition-free render.** A render whose plan has transitions renders the same plan
+  without them once more (no output files, its warnings silenced: they are the render's
+  own) and compares each head's frames over the transition's window and darkness
+  (`RenderingPipeline._transitions_played`); where they are identical the head's entry is
+  replaced by `plays: nothing: <why>` (a `snap`: "the plain cut: its darkness before the
+  boundary changes no frame"; a `blackout`: "the head is dark over the window without it").
+  `_attempt` also says `nothing` up front where it knows (a `snap` into a head that enters
+  dark; a `snap` with nothing to move or turn; a head dark on both sides between its
+  cues; an empty window, such as the song's first ENTRY `snap`). A per-section warning
+  counts the heads a transition played nothing or did not play on. **Cost:** a plan with
+  transitions renders twice (a plan without them is untouched).
+- **Repair** records a `snap` that is the plain cut (`rig_repair._plays_nothing`): the
+  song's first ENTRY, and on the heads the gate found always enter the incoming template
+  dark after the outgoing one (`RigOffer.dark_entries`). **The prompt** says it: the
+  developer prompt that `snap` ignores `curve` and `split` and `blackout` ignores `curve`,
+  and that a `snap` is the plain cut on the song's first ENTRY and into a template the
+  heads enter dark; the user prompt lists the rig's template pairs a `snap` is the plain
+  cut on (`_transitions_for_prompt`'s `dark_entries`).
+
+### H3: events must be seen before a transition begins
+
+The integrator's decision, as implemented (`pipeline._seen_until`, `_event_spans`): a
+colour or gobo event (from its first reveal on any head) and a hit keep a minimum visible
+time, until the later of half a beat after the reveal (the hit's beat) and, for a
+cue-bound event, the cue's own time plus a quarter beat; a darkening or handover window
+starts after it, on the frame grid (never past the boundary: the outgoing look ends
+there). Where what is left of the window is shorter than its mode needs
+(`transitions.MIN_WINDOW_FRAMES`, proposed: four frames for the blending modes and
+`fade_via_black`, one for `snap` and `blackout`), the transition plays on no head, traced
+`not_played` with the reason on the window and on every head. Repair predicts it
+(`rig_repair._yields_to_events`, from the event's beat and lyric: "at least", since a head
+dark on its beat reveals later) and records the clamp, and that the transition does not
+play where too little is left.
+
+The owner-render case on the synthetic `REALISTIC` fixture (78.3 BPM, two pickup beats):
+chorus_2's NEUTRAL colour on 61.4, bound to its lyric 40 ms after the beat, is revealed at
+187760 ms; it must be seen until max(187760 + 383, 187794 + 192) = 188143 ms, so the
+closing blackout starts at 188160 ms (was 187780): white is lit for 20 frames before it
+(was one frame in the owner render, 186580 → 186600). Asserted in
+`test_the_realistic_plan_plays_its_transitions_honestly` (window start, white lit on every
+head from the reveal to it, dark over the window), and render against repair in
+`test_repair_predicts_a_window_yielding_to_an_event_seen_before_it` (a cue-bound colour
+seen past the boundary: at 120 BPM the crossfade keeps a quarter beat and plays; at 240
+BPM it keeps 60 ms and plays on no head; repair says the same).
+
+### H4: a transition's darkness may not lose an event
+
+A head whose transition would darken (its dark cut, or a lit move's fallback cut) a hit
+that plays on it without the transition plays no transition: its boundary's own entry,
+traced `not_played` ("its darkness (…) would cover the hit at bar … beat …, which plays on
+this head without the transition"); `HeadContext.protected` carries the incoming part's
+hits in the window. On `REALISTIC`, break → chorus_2's ENTRY crossfade BEAT (one-sided:
+the break's `strobe_medium` runs to the boundary) needs a dark cut on 160940–161260 ms
+for ACCENT → PRIMARY, which would cover the hit on 53.1 (160940 ms): no head plays the
+crossfade, and the hit plays lit (255) on every head (asserted in the realistic test).
+In the owner render only MH1 and MH4 took the fallback; on the synthetic fixture the
+colour turn makes all four need the cut.
+
+### M1: a one-sided crossfade
+
+Where events clamp a crossfade's window to one side of the boundary (its split point on
+the window's edge) there is no handover point: the level eases from the outgoing look to
+the incoming one along the curve (traced "clamped to one side of the boundary: the level
+eases …"), no lit-to-lit jump at either edge. The reviewer's `repro_clamp.py`: every case
+eases (the `closed` cases end dark, traced "it ends dark"). Test
+`test_a_crossfade_clamped_to_one_side_eases_its_level_without_a_jump`.
+
+### M2: `snap` turns the wheels held at its cut
+
+`snap` read the outgoing wheel state at the window's start, not at its dark cut; on a
+`masked_wheel_flick` outgoing section (its flick colour changes inside the window) the
+transaction pass then could not join the cut. It now reads the state one frame before
+the cut (re-read as the cut is sized). The reviewer's `probe_snapflick.py` (BAR, red into
+blue): all four heads play the snap (was MH2 and MH4 `not_played`, "cannot play the dark
+cut … in time"). Test `test_snap_turns_the_wheels_held_at_its_dark_cut`.
+
+### M3: the trace says what the frames show
+
+- `dark_outlasts_window_to_ms` only where the darkness runs past the window's end (was
+  written wherever a head's window shrank).
+- `plays` is derived from the levels: a lit mode whose last level is 0 says "it ends dark
+  (the incoming look is dark there)", whose first is 0 "it starts dark"; a one-sided
+  crossfade says so (above).
+- `curve_played` only for the modes the curve shapes (not `snap`, `blackout`), and the
+  prompt now states what those two ignore (above; the earlier claim in § Decisions 7 that
+  the prompt said it was untrue at `82bd2b0a`).
+
+### M4: A1's three-frame rule
+
+Recorded in the [W6/W7 record](../2026-11-17-w6-w7-events/README.md#w8-fix-round-a1s-three-frame-rule-m4-2026-11-17):
+the wheel turns and the head shows the new state from its first lit frame however short;
+the three-frame run only counts "shown within a beat".
+
+### M5: the intro's ENTRY crossfade replaces pre-positioning (confirmed, intended)
+
+Without a transition the render pre-positions the heads in the dark before the first cue
+(frames differ 160–1020 ms) and the heads are lit at full from 1540 ms, moving with
+`target_orbit`. With the intro's ENTRY crossfade (TWO_BARS, HALF, from rest) the
+transition's own cues start from the rest pose, so nothing pre-positions: the heads move
+from rest inside the window, dark until its split point (4620 ms), and the light comes up
+from 4740 ms along ease_in_sine (MH1 level 1, 27, 112, 255 at 4740, 5500, 6500, 7660 ms).
+While lit in the window the head's largest step is 186 16-bit words a frame, on the
+window's last frame at full, against up to 150 for the template's own orbit after it:
+the head eases onto the moving orbit, it does not swing at full (scratch `w8fix/m5.py`).
+Whether that look is wanted is the owner's (PENDING-OWNER, § Look questions 6).
+
+### M6: a move that changes nothing
+
+Colour 49.1 on `REALISTIC` was traced as moved to 49.3 (+1520 ms) though the frames
+equal those of playing it on its own beat (every head is dark from 49.1 and first lit at
+49.3 either way). Where every head's cues on the new beat equal those on its own beat,
+the move changes no frame: `moved.changes_nothing` says so and the lines read "first
+seen at bar 49 beat 3, +1520 ms: the heads are dark from its own beat until then" (the
+lyric-cue line "first seen at" in place of "played at"). Rendered frames do not change.
+
+### LOW
+
+- The prompt's and repair's "after a `closed`, where the heads are lit" (self-
+  contradictory) now reads "on a beat where the heads are lit (the `open` that ends a
+  `closed` is one: the wheel turns in its darkness)".
+- The broad `except Exception` in `transitions.easing` is gone: every curve in the library
+  samples (25 played names, checked).
+- `_attempt` is split (`_sides`, a `_Sides` dataclass for the two looks and the head's
+  window, `_dark_cut`, `_lighting`, `_own_cues`, `_ends`; no closures);
+  `_play_boundary` no longer mutates `cues`/`kept` or rebuilds indices mid-loop (it returns
+  a `_BoundaryPlay`; `_outgoing_of` reads the outgoing cues and how each head stands
+  before them, `_cut_outgoing` replaces the cut cues once); `_transitions_for_prompt`'s
+  imports are at module level.
+- Repair still cannot predict the lit-move fallback (it needs the templates' poses at the
+  boundary, which the offer does not carry) or a dark cut over an incoming hit (H4):
+  recorded in `_transition_repairs`' docstring and the user guide; the trace records both.
+
+### Revision, pins, caches
+
+- **`RENDERER_REVISION` 10 → 11.**
+- **Pins:** every pin re-recorded fingerprint only, refusing any moved frame: `PINS`,
+  `MULTI_PIN`, `GATED_PIN`, `INTENT_PIN`, `FAST_INTENT_PIN`, `INTENSITY_PINS`,
+  `EVENT_PINS` and `TRANSITION_PINS` frames and `.xsq` unchanged. Combined-show golden
+  moving-head fingerprint `fdc28b5b…` → `ec32a76a…`.
+- **Planner cache:** re-keyed (the developer and user prompts changed, and the prompt's
+  offer gains `transitions.dark_entries`): every song plans again once (paid).
+- **Contract:** unchanged (no schema change).
+
+### Byte matrix, fuzzing and identity (fix round)
+
+- **Byte matrix** (scratch `w8fix/matrix_fix.py`: the W8 harness, 567 configurations,
+  with plan F added: plan E's eight sections with events inside the windows, each section's
+  first beat a hit and its second a colour change, its third beat from the end a hit and its
+  last beat a colour change bound to a lyric 40 ms after it). Base `git archive 82bd2b0a`
+  against this tree (`w8fix/compare_fix.txt`, `w8fix/compare_fix_frames.txt`):
+  - **every plan without a transition identical in all 567** (every leaf): the gate, plans
+    A and B, plan C without its transition (`cn`), plan D without its transition at all six
+    levels (`dn_*`);
+  - **plan F: 567 of 567 errored at `82bd2b0a`** (`ValueError`: a segment off the 20 ms
+    frame grid, H1, or "no value is defined at … ms"), **none on this tree**, every wheel
+    byte change dark through close latency and settle in all 567;
+  - frames different, by design: plan C (one crossfade, events) in 63 (all
+    `fam4_notopo`), plan D (one crossfade) in 330, plan E (every mode) in 501; traces
+    differ wherever a transition plays (the new trace keys and `nothing` outcomes);
+  - **attribution:** with M1 (the one-sided crossfade) switched off in a scratch copy
+    (`w8fix/noM1`), plans D and E equal `82bd2b0a` frame for frame in 24 of 24 gated
+    configurations sampled (six rigs × four grids) and plan C on `fam4_notopo` in 3 of 3:
+    every frame difference sampled is M1 (a head whose window starts on the boundary,
+    clamped by its cue runs or by events, now eases its level instead of starting at the
+    handover); no lit dimmer jump at a played window's edge in those plans on either tree;
+  - no render errored on this tree; every wheel byte change dark in every plan C (six
+    levels), C without its transition, E and F render: 567 each.
+- **The reviewer's fuzzer** (`w8rev/tools/fuzz.py`, seeds 0–1199, on the final tree):
+  0 errors (122 at `82bd2b0a`), 0 lit wheel changes, 0 lit moves beyond the head's speed;
+  lit dimmer jumps above 100 at a played window's edge in 13 seeds (38 of the 1,078 that
+  rendered at `82bd2b0a`). Of the 13, 12 vanish with the plan's events stripped: a hit's
+  flash or a strobe's first flash on the window's edge frame (the event's own look); the
+  thirteenth (seed 1132) is a crossfade with a `pan fade_via_black` strategy whose window
+  events clamp to 340 ms, its dark cut taking all but two frames, so the light fades
+  255 → 128 → dark in two frames (recorded, not changed: the fade is as long as the window
+  leaves).
+- **Transition-free identity** (the reviewer's `ident.py`, 648 renders: three rigs × nine
+  grids × four levels × plans A, B and C, with and without a show's rest): plans A and B
+  identical to both `0e02e969` and `82bd2b0a` in 324 of 324 (162 more are the harness's
+  invalid `SUBTLE` level, refused alike on every tree); plan C (events, no transition)
+  differs from `82bd2b0a` in 108, every one a render where `82bd2b0a` traced a head
+  "never shows it lit" (M4: the wheel now turns for lit runs shorter than three frames).
+- **The reviewer's repros** on this tree: `repro_offgrid.py` renders; `probe_blackout.py`
+  0 lit frames inside any blackout window; `repro_clamp.py` every clamped crossfade eases;
+  `probe_snapflick.py` every head plays the snap; `probe_a1c.py` 0 problems.
+
+### Verification (this tree, fresh, after the last code edit)
+
+| Command | Result |
+|---|---|
+| `uv run pytest -q --no-cov` | 7157 passed, 30 skipped (7135 at `82bd2b0a`; 22 new cases) |
+| `uv run pytest tests/regression/test_mh_pins.py tests/golden -q --no-cov` | 62 passed, 1 skipped (every fingerprint re-recorded; frames and `.xsq` unchanged) |
+| `uv run pytest tests/regression/test_mh_intent_parity.py -q --no-cov` | 26 passed; `--runxfail`: 26 passed (baseline and assertions unchanged) |
+| `uv run ruff check .` | All checks passed |
+| `uv run ruff format --check .` | 1307 files already formatted |
+| `uv run mypy .` | No issues in 654 source files |
+
+New tests: `test_transitions_render.py` the off-grid repro, blackout over cue gaps (2),
+the played rule, snap's cut wheels, the one-sided crossfade, repair against render for a
+yield (2) and the first-ENTRY snap, the seeded random plans (12), and the realistic test's
+H3 and H4 assertions; `test_events_render.py` the short-lit-run wheel change (M4). Run on
+`82bd2b0a`'s code with these test files: every one of the 11 targeted cases fails there,
+and 8 of the 12 random plans (a first-ENTRY `snap` traced on no head); the other 4 random
+plans pass on both trees.
+
+Scratch (session-local, not committed):
+`/private/tmp/claude-501/-Users-ondeck-work-github-twinklr/9cfb5b66-fff4-47db-adcb-766b50dc61e9/scratchpad/w8fix/`
+(`matrix_fix.py`, `run_matrix.sh`, `matrix_base.jsonl`, `matrix_fix.jsonl`,
+`compare_fix.txt`, `compare_fix_frames.txt`, `noM1/`, `dcheck.py`, `ccheck.py`,
+`djump.py`, `fz2/`, `id_fix_*.jsonl`, `realistic.py`, `m4.py`, `m5.py`, `m6.py`,
+`seed.py`, `edge_noev.py`).
+
+### Look questions added (PENDING-OWNER)
+
+8. **Seen before a transition**: half a beat after a colour, gobo or hit, and a quarter beat
+   after its lyric, before a darkening or handover window begins (the integrator's rule);
+   the minimum window (four frames; a frame for `snap` and `blackout`).
+9. **A head that would lose a hit** to its transition's darkness plays no transition (its
+   plain entry): on `REALISTIC` the break → chorus_2 crossfade then plays on no head.
+10. **The intro from rest** (M5): dark until the split point, the head easing onto its
+    moving orbit as the light comes up, instead of pre-positioned and lit at full from the
+    boundary.

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 import math
+import random
 from typing import Any
 
 import pytest
@@ -30,7 +31,11 @@ from tests.unit.sequencer.moving_heads.test_events_render import (
     render,
     rig,
 )
-from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
+from twinklr.core.agents.sequencer.moving_heads.models import (
+    ChoreographyPlan,
+    PlanEvent,
+    PlanSection,
+)
 from twinklr.core.agents.sequencer.moving_heads.rig_repair import repair_rig_intent
 from twinklr.core.sequencer.models.transition import PlanTransition
 from twinklr.core.sequencer.moving_heads.song_intent import rig_offer
@@ -511,6 +516,74 @@ def test_a_transition_longer_than_its_parts_is_shortened_by_repair() -> None:
     assert repaired.sections[1].entry.length.value == "TWO_BARS"
 
 
+@pytest.mark.parametrize(("bpm", "plays"), [(120, True), (240, False)])
+def test_repair_predicts_a_window_yielding_to_an_event_seen_before_it(
+    bpm: int, plays: bool
+) -> None:
+    """A colour change on the outgoing section's last beat, bound to a lyric late in that
+    beat, must be seen until a quarter beat after the lyric, past the boundary: a BEAT
+    crossfade split three quarters starts on the boundary. At 120 BPM a quarter beat is
+    left and it plays; at 240 BPM less than four frames are, and it plays on no head.
+    Repair says the same."""
+    beat_grid = grid(bpm, bars=4)
+    at = beat_grid.beat_time_ms(2, 4)
+    assert at is not None
+    late = int(at + 0.9 * 60_000 / bpm)
+    sections = [
+        m.plan_section(
+            "s1",
+            1,
+            2,
+            "mirror_wings",
+            events=[event(2, 4, "color", color="blue", moment_cue_id="c", cue_ms=late)],
+        ),
+        m.plan_section(
+            "s2",
+            3,
+            4,
+            "mirror_wings",
+            color="blue",
+            transitions=[transition("ENTRY", "crossfade", "BEAT", split="THREE_QUARTERS")],
+        ),
+    ]
+    repaired = repair_rig_intent(
+        ChoreographyPlan(sections=sections, overall_strategy=""),
+        rig_offer(rig(), beat_grid),
+        {},
+        beat_grid,
+    )
+    said = [r.reason for r in repaired.repairs if r.item.startswith("entry transition")]
+    pipeline = render(sections, beat_grid=beat_grid)
+    (entry,) = transitions_of(pipeline)
+
+    assert any("must be seen until" in why for why in said)
+    assert any("color at bar 2 beat 4" in why for why in entry["clamped"])
+    assert entry["window_ms"][0] == entry["boundary_ms"]
+    if plays:
+        assert not any("does not play" in why for why in said)
+        assert all("not_played" not in o for o in entry["heads"].values())
+    else:
+        assert any("it does not play" in why for why in said)
+        assert all("not_played" in o for o in entry["heads"].values())
+
+
+def test_repair_records_a_snap_on_the_first_entry_as_the_plain_cut() -> None:
+    beat_grid = grid(120, bars=4)
+    sections = [
+        m.plan_section("s1", 1, 4, "mirror_wings", transitions=[transition("ENTRY", "snap")])
+    ]
+    repaired = repair_rig_intent(
+        ChoreographyPlan(sections=sections, overall_strategy=""),
+        rig_offer(rig(), beat_grid),
+        {},
+        beat_grid,
+    )
+    (entry,) = transitions_of(render(sections, beat_grid=beat_grid))
+
+    assert any("plays as the plain cut" in r.reason for r in repaired.repairs)
+    assert all(o["plays"].startswith("nothing: the plain cut") for o in entry["heads"].values())
+
+
 def test_the_trace_reads_as_a_line() -> None:
     pipeline = render(pair(transition("ENTRY", "fade_via_black")))
     (line,) = describe_transitions(transitions_of(pipeline))
@@ -666,11 +739,255 @@ def test_the_realistic_plan_plays_its_transitions_honestly() -> None:
     (verse_1,) = by_section["verse_1"]
     assert all("color turns" in o["plays"] for o in verse_1["heads"].values())
     for snap in (by_section["chorus_1"][0], by_section["break"][0]):
-        assert all(
-            o["plays"].startswith("the head is dark from the boundary")
-            for o in snap["heads"].values()
-        )
+        assert all(o["plays"].startswith("nothing: the plain cut") for o in snap["heads"].values())
     closing = by_section["chorus_2|B"][-1]
     assert closing["edge"] == "EXIT" and closing["mode"] == "blackout"
     end = closing["window_ms"][1] // FRAME
     assert all(frames.dark(h)[end - 1] for h in HEADS)
+    # The NEUTRAL colour on 61.4, bound to its lyric 40 ms after the beat, is seen for half
+    # a beat after its reveal (later than a quarter beat after the lyric) before the
+    # blackout begins: the window starts there, on the frame grid.
+    colour = next(e for e in looks(pipeline)["chorus_2|B"]["events"] if e["action"] == "color")
+    beat = 60_000 / 78.3
+    for head in HEADS:
+        reveal = colour["heads"][head]["reveal_ms"]
+        seen = max(reveal + beat / 2, colour["cue_ms"] + beat / 4)
+        assert closing["window_ms"][0] == math.ceil(seen / FRAME) * FRAME
+        states, dark = frames.state(head, "color"), frames.dark(head)
+        shown = range(reveal // FRAME, closing["window_ms"][0] // FRAME)
+        assert all(not dark[i] and states[i] == "white" for i in shown)
+        assert all(dark[i] for i in window_frames(closing))
+    # The hit on 53.1 is the crossfade's first frame: the dark cut its colour change needs
+    # would cover it, so no head plays the transition and the hit plays on every head.
+    (entry,) = by_section["chorus_2|A"]
+    hit = next(e for e in looks(pipeline)["chorus_2|A"]["events"] if e["action"] == "hit")
+    for head in HEADS:
+        assert "would cover the hit at bar 53 beat 1" in entry["heads"][head]["not_played"]
+        assert hit["heads"][head]["played_ms"] == hit["frame_ms"]
+        assert frames.dimmer(head)[hit["frame_ms"] // FRAME] == 255
+    assert pipeline.render_record is not None
+    warnings = [d["message"] for d in pipeline.render_record["diagnostics"]]
+    assert any("transition ENTRY snap played nothing on MH1" in w for w in warnings)
+    assert any("transition ENTRY crossfade not played on MH1" in w for w in warnings)
+
+
+# --- fix round: events inside windows, the played rule, edges --------------------------
+
+
+def test_a_colour_event_inside_a_window_off_the_frame_grid_renders_on_the_grid() -> None:
+    """At 120 BPM a colour event on 5.2 inside a crossfade's window clamps it half a beat
+    before its beat, off the 20 ms grid: the clamp lands on the grid, the change turns
+    dark and is shown."""
+    pipeline = render(
+        pair(
+            transition("ENTRY", "crossfade", split="HALF"),
+            first="mirror_wings",
+            events=[event(5, 2, "color", color="blue")],
+        )
+    )
+    frames = Frames(pipeline)
+    (entry,) = transitions_of(pipeline)
+
+    assert all(ms % FRAME == 0 for ms in entry["window_ms"])
+    assert any("color at bar 5 beat 2" in why for why in entry["clamped"])
+    assert set(entry["heads"]) == set(HEADS)
+    assert_wheels_turn_dark(frames)
+    assert all("blue" in frames.state(h, "color") for h in HEADS)
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [("fly_out_cascade", "fly_in_cascade"), ("mirror_wings", "fly_in_cascade")],
+)
+def test_blackout_is_dark_over_its_whole_window_where_a_head_has_no_cue(
+    first: str, second: str
+) -> None:
+    """The cascades leave heads without a cue around the boundary: a blackout is still dark
+    over its whole window on every head, as a show's rest is, and counts as played."""
+    pipeline = render(pair(transition("ENTRY", "blackout", "TWO_BARS"), first=first, second=second))
+    frames = Frames(pipeline)
+    (entry,) = transitions_of(pipeline)
+
+    for head in HEADS:
+        assert all(frames.dark(head)[i] for i in window_frames(entry))
+        assert entry["heads"][head]["plays"] == "dark over the whole window"
+        assert "curve_played" not in entry["heads"][head]
+
+
+def test_a_transition_that_changes_no_frame_is_traced_as_playing_nothing() -> None:
+    """A snap into a template its heads enter dark changes nothing on them: the trace says
+    `nothing` and why, and the section's warning counts it."""
+    pipeline = render(pair(transition("ENTRY", "snap"), second="fly_in_cascade"))
+    plain = render(pair(second="fly_in_cascade"))
+    (entry,) = transitions_of(pipeline)
+    nothing = [h for h, o in entry["heads"].items() if o["plays"].startswith("nothing: ")]
+
+    assert nothing
+    for head in nothing:
+        assert Frames(pipeline).raw(head) == Frames(plain).raw(head)
+    assert pipeline.render_record is not None
+    assert any(
+        "transition ENTRY snap played nothing" in d["message"]
+        for d in pipeline.render_record["diagnostics"]
+    )
+
+
+def test_snap_turns_the_wheels_held_at_its_dark_cut() -> None:
+    """`masked_wheel_flick` red into `mirror_wings` blue under a BAR snap: the flick changes
+    the outgoing colour inside the snap's window, so the snap turns each wheel from the
+    colour the head holds at its dark cut, never lit, and plays on every head."""
+    sections = [
+        m.plan_section("s1", 1, 4, "masked_wheel_flick", color="red"),
+        m.plan_section(
+            "s2", 5, 8, "mirror_wings", color="blue", transitions=[transition("ENTRY", "snap")]
+        ),
+    ]
+    pipeline = render(sections)
+    frames = Frames(pipeline)
+    (entry,) = transitions_of(pipeline)
+
+    assert_wheels_turn_dark(frames)
+    for head, outcome in entry["heads"].items():
+        assert "not_played" not in outcome, head
+        before, after = outcome["wheels_turn"]["color"]
+        cut = outcome["dark_ms"][0] // FRAME
+        assert frames.state(head, "color")[cut - 1] == before
+        assert after == "blue"
+
+
+def test_a_crossfade_clamped_to_one_side_eases_its_level_without_a_jump() -> None:
+    """A strobe on 4.4 starts the crossfade's window at the boundary (its split point on
+    the window's edge): the level eases from the outgoing look to the incoming one, with no
+    lit-to-lit jump at either edge."""
+    sections = pair(
+        transition("ENTRY", "crossfade", "TWO_BARS", split="HALF"),
+        first="mirror_wings",
+        second="target_orbit",
+    )
+    sections[0] = sections[0].model_copy(
+        update={"events": [PlanEvent.model_validate(event(4, 4, "strobe_fast"))]}
+    )
+    pipeline = render(sections, fixture_group=rig(strobes=True))
+    frames = Frames(pipeline)
+    (entry,) = transitions_of(pipeline)
+
+    assert entry["window_ms"][0] == entry["boundary_ms"]
+    played = [h for h, o in entry["heads"].items() if "clamped to one side" in o.get("plays", "")]
+    assert played
+    for head in played:
+        a, b = entry["heads"][head].get("window_ms", entry["window_ms"])
+        level, dark = frames.dimmer(head), frames.dark(head)
+        for i in (a // FRAME, b // FRAME):
+            if not dark[i] and not dark[i - 1]:
+                assert abs(level[i] - level[i - 1]) <= 100
+
+
+FUZZ_TEMPLATES = (
+    "fly_out_cascade",
+    "fly_in_cascade",
+    "target_orbit",
+    "mirror_wings",
+    "finite_snap_hold",
+    "masked_wheel_flick",
+)
+FUZZ_ACTIONS = ("closed", "strobe_fast", "pulse", "hit", "color", "gobo", "hit", "color")
+
+
+def _fuzz_grid(rnd: random.Random) -> BeatGrid:
+    choice = rnd.randrange(4)
+    if choice == 0:
+        return grid(120, 14)
+    if choice == 1:
+        return m.pickup_grid(60_000 / 78.3, 14, pickup=2)
+    if choice == 2:
+        return m.pickup_grid(60_000 / 129, 14, pickup=1, beats_per_bar=3)
+    return m.bars_grid(*(60_000 / rnd.uniform(96, 150) for _ in range(14 * 4)))
+
+
+def _fuzz_plan(rnd: random.Random, beat_grid: BeatGrid) -> list[PlanSection]:
+    """Random valid sections over the grid: templates, parts, intensity, both edges'
+    transitions (any mode, length, curve, split), and events near the boundaries."""
+    per_bar, bars = beat_grid.beats_per_bar, len(beat_grid.bar_boundaries) - 1
+    sections: list[PlanSection] = []
+    start = 1
+    while start <= bars:
+        end = min(bars, start + rnd.choice((1, 2, 3)))
+        transitions = [
+            transition(
+                edge,
+                rnd.choice(MODES),
+                rnd.choice(("BEAT", "HALF_BAR", "BAR", "TWO_BARS")),
+                curve=rnd.choice(("linear", "ease_in_out_sine", "s_curve", "ease_out_quad")),
+                split=rnd.choice(("QUARTER", "HALF", "THREE_QUARTERS")),
+            )
+            for edge in ("ENTRY", "EXIT")
+            if rnd.random() < 0.6
+        ]
+        events = []
+        for _ in range(rnd.choice((0, 1, 2, 3))):
+            action = rnd.choice(FUZZ_ACTIONS)
+            bar = rnd.choice((start, end))
+            beat = (
+                rnd.choice((1, 2, per_bar)) if bar == start else rnd.choice((per_bar - 1, per_bar))
+            )
+            fields: dict[str, Any] = {}
+            if action == "color":
+                fields["color"] = rnd.choice(("red", "blue", "white"))
+            if action == "gobo":
+                fields["gobo"] = rnd.choice(("dots", "stars"))
+            events.append(event(bar, max(1, beat), action, **fields))
+        kwargs: dict[str, Any] = {
+            "intensity": rnd.choice((None, "SLOW", "SMOOTH", "FAST", "DRAMATIC", "INTENSE")),
+            "color": rnd.choice((None, "red", "blue")),
+        }
+        template = rnd.choice(FUZZ_TEMPLATES)
+        try:
+            section = m.plan_section(
+                f"s{len(sections) + 1}", start, end, template,
+                transitions=transitions, events=events, **kwargs,
+            )  # fmt: skip
+        except ValueError:
+            section = m.plan_section(
+                f"s{len(sections) + 1}", start, end, template, transitions=transitions, **kwargs
+            )
+        if end > start and rnd.random() < 0.3:
+            section = section.model_copy(
+                update={
+                    "parts": [
+                        section.parts[0],
+                        section.parts[0].model_copy(
+                            update={"start_bar": end, "template_id": rnd.choice(FUZZ_TEMPLATES)}
+                        ),
+                    ]
+                }
+            )
+        sections.append(section)
+        start = end + 1
+    return sections
+
+
+@pytest.mark.parametrize("seed", range(12))
+def test_random_plans_with_events_inside_transition_windows_render_honestly(seed: int) -> None:
+    """Seeded random plans (events near the boundaries, every mode, intensity, parts and
+    a show's rest): none raises, no wheel changes lit, every transition is traced on every
+    head with what it plays or why not, and every window lies on the frame grid."""
+    rnd = random.Random(seed)
+    beat_grid = _fuzz_grid(rnd)
+    sections = _fuzz_plan(rnd, beat_grid)
+    rest: tuple[tuple[int, int], ...] = ()
+    if rnd.random() < 0.3:
+        at = round(beat_grid.bar_boundaries[rnd.randrange(1, 5)])
+        rest = ((at - 300, at + 400),)
+    pipeline = render(
+        sections,
+        beat_grid=beat_grid,
+        fixture_group=rig(close=20, settle=150, strobes=True),
+        dark_spans=rest,
+    )
+
+    assert_wheels_turn_dark(Frames(pipeline))
+    for entry in transitions_of(pipeline):
+        assert all(ms % FRAME == 0 for ms in entry["window_ms"])
+        assert set(entry["heads"]) == set(HEADS)
+        for outcome in entry["heads"].values():
+            assert ("plays" in outcome) != ("not_played" in outcome)

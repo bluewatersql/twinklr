@@ -180,7 +180,8 @@ their home aim). Deterministic code places and plays each:
 - `snap`: a cut on the boundary, into a drop or on a downbeat hit: where the heads must
   move or turn a wheel for the new look they go dark just before the boundary (at most
   `length` before it) and are in place, lit, on its first beat; where nothing changes it
-  is the plain cut
+  is the plain cut (the song's first `ENTRY`; into a template the heads enter dark). It
+  ignores `curve` and `split`
 - `crossfade`: one look hands over to the next, between related sections: the light eases
   down to half the lower of the two looks' levels at the boundary and up to the new
   look's, the aim easing across; the window starts `split` of `length` before the boundary
@@ -192,13 +193,17 @@ their home aim). Deterministic code places and plays each:
 - `fade_via_black`: the light fades to dark by the boundary (the fade-out takes `split`
   of `length`), the heads change in the dark, and it fades up, into a quiet bridge or
   outro
-- `blackout`: the heads are dark over the window (`split` of it before the boundary),
-  changing in the dark, into a drop after a stop, or a dead stop at the end
+- `blackout`: every head is dark over the window (`split` of it before the boundary),
+  changing in the dark, into a drop after a stop, or a dead stop at the end; it ignores
+  `curve`
 - A colour or gobo wheel never turns lit: across a colour or gobo change a `crossfade`,
   `morph` or `sweep` dips dark at its split point for the turn and plays lit around it,
   as does a lit move faster than the heads travel; where the dip does not fit the window
   the heads enter as without a transition. An event inside the window (but a hit) plays
-  and the window yields to it; a hit plays on the transition's level. A section's
+  and the window yields to it, and it begins only after a colour, gobo or hit event before
+  it has been seen (half a beat, and a quarter beat after its lyric cue); a hit plays on
+  the transition's level, and a head whose dark dip would cover a hit plays no
+  transition. A section's
   intensity resumes after the transition with an accent.
 - `length`: how long the change lasts, from one beat to eight bars, on the song's beats;
   measure it against the phrase: a beat or half a bar for a cut-like change, one or two

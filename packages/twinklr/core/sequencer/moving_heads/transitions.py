@@ -18,13 +18,17 @@ share, is where the change turns (`split_ms`).
 - `morph` and `sweep` centre the window on the boundary, so the split point falls before
   it (a split under half) or after it;
 - `snap` has no blend: its length bounds how early before the boundary the heads may go
-  dark to be in place, lit, on the boundary's frame.
+  dark to be in place, lit, on the boundary's frame (the wheels turning from the states
+  held at that cut); its curve and split shape nothing.
 
 A window stays inside the two parts it joins, ends before the incoming part's first event
 that commands darkness or a wheel (`closed`, a strobe, `pulse`, `color`, `gobo`) and
-starts after the outgoing part's last such event's span (the event plays, the transition
-yields), and starts after the previous boundary's window; a hit inside it plays on the
-transition's level. Each clamp is recorded.
+starts after the outgoing part's last such event's span, and after its colour, gobo and hit
+events have been seen (`pipeline._seen_until`; the event plays, the transition yields), and
+starts after the previous boundary's window; each clamp lands on the frame grid and is
+recorded, and where less of the window is left than its mode needs (`MIN_WINDOW_FRAMES`)
+it plays on no head. A hit inside it plays on the transition's level; a head whose dark
+cut would cover a hit that plays on it without the transition plays no transition.
 
 **What each channel does** (`MODE_STRATEGIES`, overridden per channel by the plan's
 `channels`; `zoom` follows `pan`):
@@ -42,8 +46,9 @@ transition's level. Each clamp is recorded.
   it along the curve;
 - `sequence`: as `snap`, with the cut made by the shutter (closed before the cut, the
   dimmer held), where the head has a shutter state that extinguishes; else a dimmer cut;
-- `dark` (`blackout`): the head is dark over the whole window (cut to dark at its start,
-  cut in at its end), turning and moving in that darkness.
+- `dark` (`blackout`): every head is dark over the whole window, whether or not it has a
+  cue there (cut to dark at its start, cut in at its end), turning and moving in that
+  darkness; the curve shapes nothing.
 
 A colour or gobo wheel never blends: a wheel whose state differs across the boundary
 turns in a dark cut at the split point (its strategy shaping the cut's edges; `smooth` or
@@ -53,7 +58,13 @@ transaction pass needs for the change (`worst_case_entry_ms`), centred on the sp
 by `split` (`fade_via_black` from the boundary, `snap` up to it). A lit move faster than
 the head travels (`travel_speed_per_s`), or a cut that does not fit the window, falls back
 on that head: a lit move to a dark cut at the split point, a cut that does not fit to no
-transition (the boundary's own entry: its dip, its window); each is recorded.
+transition (the boundary's own entry: its dip, its window); each is recorded. A crossfade
+whose window events clamp to one side of the boundary has no handover point: its level
+eases from the outgoing look to the incoming one.
+
+A transition counts as played on a head only where the head's frames differ from the same
+plan rendered without transitions (`pipeline.RenderingPipeline._transitions_played`); where
+they do not, its trace says `nothing` and why.
 
 The transition is played on the cues before intensity and hits: it is cut out of the
 outgoing and incoming cues and played as its own cues (`TRANSITION_METADATA_KEY`),
@@ -208,6 +219,17 @@ _STRATEGY: dict[TransitionStrategy, Behaviour] = {
     TransitionStrategy.SEQUENCE: "sequence",
 }
 
+MIN_WINDOW_FRAMES: dict[TransitionMode, int] = {
+    TransitionMode.SNAP: 1,
+    TransitionMode.CROSSFADE: 4,
+    TransitionMode.MORPH: 4,
+    TransitionMode.SWEEP: 4,
+    TransitionMode.FADE_VIA_BLACK: 4,
+    TransitionMode.BLACKOUT: 1,
+}
+"""Proposed (W8 fix round). The least of its window, in frames, a transition the events
+it yields to have shortened still plays in; less, it plays on no head."""
+
 LIT_MODES = frozenset({TransitionMode.CROSSFADE, TransitionMode.MORPH, TransitionMode.SWEEP})
 SPLIT_ON_BOUNDARY = frozenset(
     {TransitionMode.CROSSFADE, TransitionMode.FADE_VIA_BLACK, TransitionMode.BLACKOUT}
@@ -304,12 +326,8 @@ def easing(curve: CurveLibrary) -> tuple[Callable[[float], float], str]:
     if curve in _EASING_ONLY:
         function = _EASING_ONLY[curve](start=0.0, end=1.0, duration=1.0)
         return (lambda p: float(function.ease(p))), curve.value
-    try:
-        definition = build_default_registry().get(curve.value)
-        points = definition.generator(_SAMPLES + 1)
-        values = [float(point.v) for point in points]
-    except Exception:  # a curve the library cannot sample plays linear
-        return (lambda p: p), "linear"
+    points = build_default_registry().get(curve.value).generator(_SAMPLES + 1)
+    values = [float(point.v) for point in points]
     # The library samples [0, 1) at i/n: the last sample stands for p = 1.
     first, last = values[0], values[-1]
     if abs(last - first) < 0.5:
@@ -348,6 +366,9 @@ class Window:
     split_ms: int
     rest: Literal["before", "after"] | None
     clamps: tuple[str, ...] = ()
+    not_played: str | None = None
+    """Why it plays on no head: the events it yields to leave less of it than its mode
+    needs (`MIN_WINDOW_FRAMES`)."""
 
     @property
     def mode(self) -> TransitionMode:
@@ -376,6 +397,8 @@ class Window:
             record["against"] = "the head at rest (its initial pose, dark)"
         if self.clamps:
             record["clamped"] = list(self.clamps)
+        if self.not_played:
+            record["not_played"] = self.not_played
         return record
 
 
@@ -430,15 +453,25 @@ def window_for(
         if end is not None:
             notes.append("it ends no later than the part it enters")
         end = latest_ms
+    planned = (start, end)
     for why, ms in not_before:
+        ms = math.ceil(ms / FRAME) * FRAME  # on the frame grid, never earlier
         if start < ms:
             start = min(ms, boundary)
             notes.append(why)
     for why, ms in not_after:
+        ms = math.floor(ms / FRAME) * FRAME
         if ms < end:
             end = max(ms, boundary)
             notes.append(why)
     start, end = min(start, boundary), max(end, boundary)
+    not_played = None
+    least = MIN_WINDOW_FRAMES[transition.mode] * FRAME
+    if (start, end) != planned and end - start < least:
+        not_played = (
+            f"the events it yields to leave {end - start} ms of its window, less than the "
+            f"{least} ms a {transition.mode.value} needs"
+        )
     if transition.mode in SPLIT_ON_BOUNDARY or transition.mode is TransitionMode.SNAP:
         split_ms = boundary if rest is None else start + round(float(split) * (end - start))
     else:
@@ -453,6 +486,7 @@ def window_for(
         split_ms=split_ms,
         rest=rest,
         clamps=tuple(notes),
+        not_played=not_played,
     )
 
 
@@ -581,12 +615,14 @@ class HeadTransition:
 class HeadContext:
     """What the transaction pass needs to judge one head's cues: its profile, its run's
     initial state, the locks, and how the head stands after its cues before the
-    outgoing ones."""
+    outgoing ones; and the frames of events that play on this head without the
+    transition, which its darkness may not cover (`protected`: label, frame)."""
 
     profile: FixtureCapabilities
     initial: InitialFixtureState | None
     locks: Sequence[RenderLock]
     before: HeadFollow | None
+    protected: Sequence[tuple[str, int]] = ()
 
 
 def play_head(
@@ -597,57 +633,280 @@ def play_head(
     *,
     identity: FixtureSegment,
     edge_label: str,
-) -> HeadTransition | None:
+) -> HeadTransition:
     """`window`'s transition on one head (`outgoing` and `incoming`: its cues on each
-    side, in time order; one side empty where the head rests there), or None where it
-    plays nothing (a `snap` that needs no darkness, a window with no frames). Tries the
-    mode as resolved; a lit move too fast for the head moves dark at the split point; a
-    cut that does not fit the window, or joins the transaction pass cannot play, fall
-    back to no transition (the record says why)."""
-    profile = context.profile
-    behaviours, notes = resolved_strategies(window.transition, profile)
+    side, in time order; one side empty where the head rests there). Tries the mode as resolved; a lit move too fast for the head
+    moves in a dark cut at the split point; where that cut, or any darkness it adds,
+    would cover an event that plays on the head without the transition, where a cut
+    does not fit the window, or where the transaction pass cannot play a join, the head
+    plays no transition (its boundary's own entry; the record says why). A head it
+    changes nothing on is recorded `plays: nothing (…)`."""
+    behaviours, notes = resolved_strategies(window.transition, context.profile)
     if window.end_ms <= window.start_ms:
-        return None
-    attempt = _attempt(window, outgoing, incoming, context, behaviours, identity, edge_label)
-    if attempt is None:
-        return None
-    if isinstance(attempt, str) and attempt.startswith("nothing: "):
+        why = (
+            "the plain cut: the heads rest dark before the song's first section and are "
+            "moved into place in the dark before its first cue"
+            if window.rest == "before" and window.mode is TransitionMode.SNAP
+            else "its window has no frames here"
+        )
         return HeadTransition(
             outgoing=list(outgoing),
             own=[],
             incoming=list(incoming),
-            record={"plays": attempt.removeprefix("nothing: ")},
+            record={"plays": f"nothing: {why}"},
         )
-    if isinstance(attempt, str) and attempt.startswith("lit:"):
+    attempt = _attempt(window, outgoing, incoming, context, behaviours, identity, edge_label)
+    fallback = None
+    if isinstance(attempt, _Lit):
         moved = {
-            channel: (
-                "snap" if channel in _POSE and behaviour in ("smooth", "sweep") else behaviour
-            )
+            channel: "snap" if channel in _POSE and behaviour in ("smooth", "sweep") else behaviour
             for channel, behaviour in behaviours.items()
         }
-        retried = _attempt(window, outgoing, incoming, context, moved, identity, edge_label)
-        if isinstance(retried, HeadTransition):
-            retried.record["fallback"] = (
-                f"{attempt.removeprefix('lit:')}: the aim moves in a dark cut at the split point "
-                "instead"
-            )
-            if notes:
-                retried.record["strategies_played_otherwise"] = notes
-            return retried
-        attempt = retried if isinstance(retried, str) else attempt
-    if isinstance(attempt, str):
-        return HeadTransition(
-            outgoing=list(outgoing),
-            own=[],
-            incoming=list(incoming),
-            record={
-                "not_played": attempt.removeprefix("lit:"),
-                **({"strategies_played_otherwise": notes} if notes else {}),
-            },
-        )
+        fallback = f"{attempt.why}: the aim moves in a dark cut at the split point instead"
+        attempt = _attempt(window, outgoing, incoming, context, moved, identity, edge_label)
+        if isinstance(attempt, _Lit):
+            attempt = attempt.why
+    if isinstance(attempt, _Nothing):
+        record: dict[str, Any] = {"plays": f"nothing: {attempt.why}"}
+    elif isinstance(attempt, str):
+        record = {"not_played": attempt}
+    else:
+        if fallback is not None:
+            attempt.record["fallback"] = fallback
+        if notes:
+            attempt.record["strategies_played_otherwise"] = notes
+        return attempt
     if notes:
-        attempt.record["strategies_played_otherwise"] = notes
-    return attempt
+        record["strategies_played_otherwise"] = notes
+    return HeadTransition(outgoing=list(outgoing), own=[], incoming=list(incoming), record=record)
+
+
+@dataclass(frozen=True)
+class _Nothing:
+    """A head the transition has nothing to change on, and why."""
+
+    why: str
+
+
+@dataclass(frozen=True)
+class _Lit:
+    """A lit move the head cannot travel, and why (it falls back to a dark cut)."""
+
+    why: str
+
+
+@dataclass
+class _Sides:
+    """One head's two looks around its own window `[start_ms, end_ms)` and split point,
+    and how its channels change between them (`behaviours`, the curve's `shape`)."""
+
+    window: Window
+    outgoing: Sequence[FixtureSegment]
+    incoming: Sequence[FixtureSegment]
+    out_look: _Look
+    in_look: _Look
+    profile: FixtureCapabilities
+    behaviours: Mapping[ChannelName, Behaviour]
+    start_ms: int
+    end_ms: int
+    split_ms: int
+    shape: Callable[[float], float]
+    state_ms: int = 0
+    """Where the outgoing look's wheel states are read: the window's start, or `snap`'s
+    dark cut."""
+
+    def __post_init__(self) -> None:
+        self.state_ms = self.start_ms
+
+    def p(self, t: int) -> float:
+        span = self.end_ms - self.start_ms
+        return 0.0 if span <= FRAME else min(1.0, (t - self.start_ms) / (span - FRAME))
+
+    def out_dim(self, t: int) -> float:
+        """The outgoing level at `t`: dark where it has no cue (a gap, its rest), its last
+        level held past its last cue."""
+        end = self.outgoing[-1].t1_ms if self.outgoing else self.start_ms
+        if not self.outgoing or (t not in self.out_look.covered and t < end):
+            return 0.0
+        return _value(self.out_look.dimmer, t, before=True) or 0.0
+
+    def in_dim(self, t: int) -> float:
+        """The incoming level at `t`: dark where it has no cue, its first level held
+        before its first cue."""
+        start = self.incoming[0].t0_ms if self.incoming else self.end_ms
+        if not self.incoming or (t not in self.in_look.covered and t >= start):
+            return 0.0
+        return _value(self.in_look.dimmer, t, before=False) or 0.0
+
+    def out_state(self, channel: ChannelName) -> str | None:
+        series = self.out_look.states.get(channel) or self.in_look.states.get(channel)
+        if not series:
+            return None
+        return series.get(self.state_ms - FRAME) or _state_near(series, self.state_ms, before=True)
+
+    def in_state(self, channel: ChannelName) -> str | None:
+        series = self.in_look.states.get(channel) or self.out_look.states.get(channel)
+        if not series:
+            return None
+        return series.get(self.end_ms) or _state_near(series, self.end_ms - FRAME, before=False)
+
+    @property
+    def pose_channels(self) -> list[ChannelName]:
+        return [
+            c
+            for c in (*_POSE, ChannelName.ZOOM)
+            if c in self.out_look.pose and c in self.in_look.pose
+        ]
+
+    def pose_at(self, channel: ChannelName, t: int) -> float:
+        behaviour = self.behaviours.get(
+            ChannelName.PAN if channel is ChannelName.ZOOM else channel, "smooth"
+        )
+        out_v = _value(self.out_look.pose[channel], t, before=True)
+        in_v = _value(self.in_look.pose[channel], t, before=False)
+        held = _value(self.out_look.pose[channel], self.start_ms - FRAME, before=True)
+        assert out_v is not None and in_v is not None and held is not None
+        s = self.split_ms
+        if behaviour in ("smooth", "crossfade"):
+            value = out_v + (in_v - out_v) * self.shape(warped(self.p(t), self.window.split))
+        elif behaviour == "sweep":
+            q = 0.0 if t < s else (t - s + FRAME) / max(FRAME, self.end_ms - s)
+            value = held + (in_v - held) * self.shape(min(1.0, q))
+        else:  # snap, fade, sequence, dark: the outgoing aim to the split point
+            value = out_v if t < s else in_v
+        return _clamped(self.profile, channel, value)
+
+    def wheels_turn(self) -> list[ChannelName]:
+        return [
+            c
+            for c in _WHEELS
+            if (state := self.out_state(c)) is not None and state != self.in_state(c)
+        ]
+
+    def dark_pose(self) -> list[ChannelName]:
+        s = self.split_ms
+        return [
+            c
+            for c in _POSE
+            if c in self.pose_channels
+            and self.behaviours.get(c) in ("snap", "fade", "sequence", "dark")
+            and _moves(
+                self.profile,
+                c,
+                _value(self.out_look.pose[c], s - FRAME, before=True),
+                _value(self.in_look.pose[c], s, before=False),
+            )
+        ]
+
+    def need_ms(self, last_lit_ms: int, first_lit_ms: int) -> int | None:
+        return _need_ms(
+            self.profile,
+            self.pose_channels,
+            self.pose_at,
+            self.out_state,
+            self.in_state,
+            last_lit_ms,
+            first_lit_ms,
+        )
+
+
+def _sides(
+    window: Window,
+    outgoing: Sequence[FixtureSegment],
+    incoming: Sequence[FixtureSegment],
+    context: HeadContext,
+    behaviours: Mapping[ChannelName, Behaviour],
+) -> _Sides | _Nothing | str:
+    """The head's two looks and its own window: inside the cues that run unbroken into the
+    boundary on each side (the transaction pass moves a head only between its cues, in the
+    dark, so a lit blend cannot reach across a gap); from rest, no earlier than the head
+    can be revealed. `blackout` and `snap` keep the boundary's window: darkness needs no
+    cue to blend."""
+    profile = context.profile
+    rest = None if context.initial is None else _rest_look(context.initial, profile)
+    out_look = _read(outgoing, profile) if outgoing else rest
+    in_look = _read(incoming, profile) if incoming else rest
+    if out_look is None or in_look is None:
+        return "the head's initial state is unknown, so it has no rest to transition with"
+    mode, boundary = window.mode, window.boundary_ms
+    w0, w1, s = window.start_ms, window.end_ms, window.split_ms
+    if mode is TransitionMode.SNAP:
+        if incoming and incoming[0].t0_ms > boundary:
+            return _Nothing(
+                "the plain cut: the head enters the section dark, with nothing to be in place for"
+            )
+    elif mode is not TransitionMode.BLACKOUT:
+        if outgoing:
+            run = _run_into(outgoing, boundary)
+            w0 = boundary if run is None else max(w0, run)
+        elif window.rest == "before" and context.initial is not None:
+            w0 = max(w0, _from_rest_ms(profile, context.initial, in_look, w0))
+        if incoming:
+            run = _run_from(incoming, boundary)
+            w1 = boundary if run is None else min(w1, run)
+        if w1 - w0 < 2 * FRAME:
+            return _Nothing("the head is dark on both sides of the boundary (between its cues)")
+    if mode in SPLIT_ON_BOUNDARY or mode is TransitionMode.SNAP:
+        s = min(max(s, w0), w1)
+    else:
+        s = min(max(w0, w0 + round(window.split * (w1 - w0) / FRAME) * FRAME), w1)
+    shape, _ = easing(window.transition.curve)
+    return _Sides(
+        window=window,
+        outgoing=outgoing,
+        incoming=incoming,
+        out_look=out_look,
+        in_look=in_look,
+        profile=profile,
+        behaviours=behaviours,
+        start_ms=w0,
+        end_ms=w1,
+        split_ms=s,
+        shape=shape,
+    )
+
+
+def _dark_cut(sides: _Sides, light: Behaviour, needs: bool) -> tuple[int, int] | None | str:
+    """The dark cut the change needs (None when it needs none), placed by the mode: a
+    `blackout`'s whole window (longer where the change needs more), `snap`'s up to the
+    boundary (the outgoing wheels read at its start), `fade_via_black`'s from the boundary,
+    a lit mode's around its split point by `split`; or why it does not fit."""
+    if not needs:
+        return None
+    window, mode = sides.window, sides.window.mode
+    s, w0, w1 = sides.split_ms, sides.start_ms, sides.end_ms
+    need = sides.need_ms(s - FRAME, s)
+    gap: tuple[int, int] | None = None
+    for _ in range(4):
+        if need is None:
+            return "a term of the change in the dark (a speed, latency or settle) is unknown"
+        if mode is TransitionMode.BLACKOUT:
+            gap = (w0, max(w1, w0 + need))
+        elif mode is TransitionMode.SNAP:
+            gap = (window.boundary_ms - need, window.boundary_ms)
+            sides.state_ms = gap[0]  # the wheels it turns are the ones held at its cut
+        elif light == "fade" and window.rest is None:
+            gap = (window.boundary_ms, window.boundary_ms + need)
+        else:
+            lead = quantize_cue(round(window.split * need)).actual_ms
+            start = max(w0, min(s - lead, w1 - need))
+            gap = (start, start + need)
+        exact = sides.need_ms(gap[0] - FRAME, gap[1])
+        if exact is None or exact <= gap[1] - gap[0]:
+            break
+        need = exact
+    assert gap is not None
+    if mode is TransitionMode.SNAP and gap[0] < w0:
+        return (
+            f"the {gap[1] - gap[0]} ms of darkness the heads need to be in place does not fit "
+            f"the {w1 - w0} ms before the boundary the length allows"
+        )
+    if mode in LIT_MODES and (gap[0] < w0 or gap[1] > w1):
+        return (
+            f"the {gap[1] - gap[0]} ms of darkness the change needs at the split point does "
+            f"not fit the {w1 - w0} ms window"
+        )
+    return gap
 
 
 def _attempt(
@@ -658,116 +917,29 @@ def _attempt(
     behaviours: Mapping[ChannelName, Behaviour],
     identity: FixtureSegment,
     edge_label: str,
-) -> HeadTransition | str | None:
-    """One try at the head's transition: the head's new cues, why it cannot play (a
-    string, `lit:` first where a lit move is too fast), or None where nothing plays."""
-    profile = context.profile
-    w0, w1, s = window.start_ms, window.end_ms, window.split_ms
-    mode = window.mode
-    split = window.split
-    rest = None if context.initial is None else _rest_look(context.initial, profile)
-    out_look = _read(outgoing, profile) if outgoing else rest
-    in_look = _read(incoming, profile) if incoming else rest
-    if out_look is None or in_look is None:
-        return "the head's initial state is unknown, so it has no rest to transition with"
-    # The head's own window: inside the cues that run unbroken into the boundary on each
-    # side (the transaction pass moves a head between its cues, in the dark, so a lit
-    # blend cannot reach across a gap), and, from rest, no earlier than the head can be
-    # revealed.
-    boundary = window.boundary_ms
-    if mode is TransitionMode.SNAP:
-        # `snap` cuts the outgoing cues for its darkness wherever they run.
-        if incoming and incoming[0].t0_ms > boundary:
-            return "nothing: the head is dark from the boundary in the section it enters"
-    elif outgoing:
-        run = _run_into(outgoing, boundary)
-        w0 = boundary if run is None else max(w0, run)
-    elif window.rest == "before" and context.initial is not None:
-        w0 = max(w0, _from_rest_ms(profile, context.initial, in_look, w0))
-    if incoming:
-        run = _run_from(incoming, boundary)
-        w1 = boundary if run is None else min(w1, run)
-    if w1 - w0 < 2 * FRAME and mode not in (TransitionMode.SNAP, TransitionMode.BLACKOUT):
-        return "nothing: the head is dark on both sides of the boundary (between its cues)"
-    if mode in SPLIT_ON_BOUNDARY or mode is TransitionMode.SNAP:
-        s = min(max(s, w0), w1)
-    else:
-        s = min(max(w0, w0 + round(split * (w1 - w0) / FRAME) * FRAME), w1)
-    shape, curve_played = easing(window.transition.curve)
-    out_end = outgoing[-1].t1_ms if outgoing else w0
-    in_start = incoming[0].t0_ms if incoming else w1
-
-    def p_of(t: int) -> float:
-        return 0.0 if w1 - w0 <= FRAME else min(1.0, (t - w0) / (w1 - w0 - FRAME))
-
-    # A look is dark where it has no cue (a gap, its rest); past its last cue the
-    # outgoing look holds its last level, before its first the incoming its first.
-    def out_dim(t: int) -> float:
-        if not outgoing or (t not in out_look.covered and t < out_end):
-            return 0.0
-        return _value(out_look.dimmer, t, before=True) or 0.0
-
-    def in_dim(t: int) -> float:
-        if not incoming or (t not in in_look.covered and t >= in_start):
-            return 0.0
-        return _value(in_look.dimmer, t, before=False) or 0.0
-
-    def out_state(channel: ChannelName) -> str | None:
-        series = out_look.states.get(channel) or in_look.states.get(channel)
-        if not series:
-            return None
-        return series.get(w0 - FRAME) or _state_near(series, w0, before=True)
-
-    def in_state(channel: ChannelName) -> str | None:
-        series = in_look.states.get(channel) or out_look.states.get(channel)
-        if not series:
-            return None
-        return series.get(w1) or _state_near(series, w1 - FRAME, before=False)
-
-    pose_channels = [
-        c for c in (*_POSE, ChannelName.ZOOM) if c in out_look.pose and c in in_look.pose
-    ]
-
-    def pose_at(channel: ChannelName, t: int) -> float:
-        behaviour = behaviours.get(
-            ChannelName.PAN if channel is ChannelName.ZOOM else channel, "smooth"
-        )
-        out_v = _value(out_look.pose[channel], t, before=True)
-        in_v = _value(in_look.pose[channel], t, before=False)
-        held = _value(out_look.pose[channel], w0 - FRAME, before=True)
-        assert out_v is not None and in_v is not None and held is not None
-        if behaviour in ("smooth", "crossfade"):
-            value = out_v + (in_v - out_v) * shape(warped(p_of(t), split))
-        elif behaviour == "sweep":
-            q = 0.0 if t < s else (t - s + FRAME) / max(FRAME, w1 - s)
-            value = held + (in_v - held) * shape(min(1.0, q))
-        else:  # snap, fade, sequence, dark: the outgoing aim to the split point
-            value = out_v if t < s else in_v
-        return _clamped(profile, channel, value)
-
-    # The darkness the change needs at the split point: a wheel that turns, an aim that
-    # moves under a dark strategy, a dark strategy on the light.
-    wheels_turn = [
-        c for c in _WHEELS if (state := out_state(c)) is not None and state != in_state(c)
-    ]
-    dark_pose = [
-        c
-        for c in _POSE
-        if c in pose_channels
-        and behaviours.get(c) in ("snap", "fade", "sequence", "dark")
-        and _moves(
-            profile,
-            c,
-            _value(out_look.pose[c], s - FRAME, before=True),
-            _value(in_look.pose[c], s, before=False),
-        )
-    ]
+) -> HeadTransition | _Nothing | _Lit | str:
+    """One try at the head's transition: the head's new cues; nothing to change; a lit
+    move too fast (`_Lit`); or why it cannot play (a string)."""
+    sides = _sides(window, outgoing, incoming, context, behaviours)
+    if not isinstance(sides, _Sides):
+        return sides
+    profile, mode = context.profile, window.mode
     light = behaviours.get(ChannelName.DIMMER, "smooth")
+    one_sided = (
+        light == "crossfade"
+        and window.rest is None
+        and sides.split_ms in (sides.start_ms, sides.end_ms)
+    )
+    if one_sided:
+        # Clamped to one side of the boundary there is no handover point: the level
+        # eases from the outgoing look to the incoming one (no jump at either edge).
+        light = "smooth"
     dark_by = [*_POSE, *_WHEELS, ChannelName.SHUTTER, ChannelName.DIMMER]
     edges_fade = any(behaviours.get(c) == "fade" for c in dark_by)
     edges_shutter = (
         any(behaviours.get(c) == "sequence" for c in dark_by) and _shutter_dark(profile) is not None
     )
+    wheels_turn, dark_pose = sides.wheels_turn(), sides.dark_pose()
     needs_dark = (
         bool(wheels_turn)
         or bool(dark_pose)
@@ -775,87 +947,138 @@ def _attempt(
         or mode is TransitionMode.BLACKOUT
     )
     if mode is TransitionMode.SNAP and not needs_dark:
-        return "nothing: a plain cut, nothing to move or turn"
-    gap: tuple[int, int] | None = None
-    if needs_dark:
-        need = _need_ms(profile, pose_channels, pose_at, out_state, in_state, s - FRAME, s)
-        for _ in range(4):
-            if need is None:
-                return "a term of the change in the dark (a speed, latency or settle) is unknown"
-            if mode is TransitionMode.BLACKOUT:
-                gap = (w0, max(w1, w0 + need))
-            elif mode is TransitionMode.SNAP:
-                gap = (window.boundary_ms - need, window.boundary_ms)
-            elif light == "fade" and window.rest is None:
-                gap = (window.boundary_ms, window.boundary_ms + need)
-            else:
-                lead = quantize_cue(round(split * need)).actual_ms
-                start = max(w0, min(s - lead, w1 - need))
-                gap = (start, start + need)
-            exact = _need_ms(
-                profile, pose_channels, pose_at, out_state, in_state, gap[0] - FRAME, gap[1]
-            )
-            if exact is None or exact <= gap[1] - gap[0]:
-                break
-            need = exact
-        assert gap is not None
-        if mode is TransitionMode.SNAP and gap[0] < w0:
+        return _Nothing("the plain cut: nothing to move or turn before the boundary")
+    gap = _dark_cut(sides, light, needs_dark)
+    if isinstance(gap, str):
+        return gap
+    if mode is TransitionMode.SNAP:
+        wheels_turn = sides.wheels_turn()  # read again at the cut
+    if gap is not None:
+        covered = [label for label, at in context.protected if gap[0] <= at < gap[1]]
+        if covered:
             return (
-                f"the {gap[1] - gap[0]} ms of darkness the heads need to be in place does not "
-                f"fit the {w1 - w0} ms before the boundary the length allows"
+                f"its darkness ({gap[0]}-{gap[1]} ms) would cover the {covered[0]}, which "
+                "plays on this head without the transition"
             )
-        if mode in LIT_MODES and (gap[0] < w0 or gap[1] > w1):
-            return (
-                f"the {gap[1] - gap[0]} ms of darkness the change needs at the split point "
-                f"does not fit the {w1 - w0} ms window"
-            )
-        if mode in (TransitionMode.FADE_VIA_BLACK, TransitionMode.BLACKOUT) and gap[1] > w1:
-            w1 = gap[1]  # the darkness outlasts the window: the light comes up after it
-    # The cues on each side, cut where the transition takes over.
+        if (
+            mode in (TransitionMode.FADE_VIA_BLACK, TransitionMode.BLACKOUT)
+            and gap[1] > sides.end_ms
+        ):
+            sides.end_ms = gap[1]  # the darkness outlasts the window: the light comes up after
+    w0, w1, s = sides.start_ms, sides.end_ms, sides.split_ms
     if mode is TransitionMode.SNAP:
         assert gap is not None
-        kept_out = _cut(outgoing, end_ms=gap[0])
-        kept_in = list(incoming)
+        kept_out, kept_in = _cut(outgoing, end_ms=gap[0]), list(incoming)
         spans: list[tuple[int, int]] = []
     else:
-        kept_out = _cut(outgoing, end_ms=w0)
-        kept_in = _cut(incoming, start_ms=w1)
+        kept_out, kept_in = _cut(outgoing, end_ms=w0), _cut(incoming, start_ms=w1)
         spans = [(w0, gap[0]), (gap[1], w1)] if gap is not None else [(w0, s), (s, w1)]
-    # The light at each frame of the transition's own cues.
-    lit_frames: list[tuple[int, float, float, float, float]] = []
+    lighting = _lighting(sides, light, spans, gap if edges_fade else None)
+    own = _own_cues(
+        sides, spans, lighting.levels(), gap if edges_shutter else None, identity, edge_label
+    )
+    too_fast = _too_fast(own, profile)
+    if too_fast is not None:
+        return _Lit(too_fast)
+    joins_ok, why = _joins(kept_out, own, kept_in, context, gap)
+    if not joins_ok:
+        return why
+    levels = lighting.levels()
+    record: dict[str, Any] = {
+        "plays": _describe(
+            mode, gap, wheels_turn, dark_pose, window.rest, one_sided, _ends(levels, spans)
+        )
+    }
+    if mode not in (TransitionMode.SNAP, TransitionMode.BLACKOUT):
+        record["curve_played"] = easing(window.transition.curve)[1]
+    if (w0, w1, s) != (window.start_ms, window.end_ms, window.split_ms):
+        record["window_ms"] = [w0, w1]
+        record["split_ms"] = s
+    if gap is not None:
+        record["dark_ms"] = [gap[0], gap[1]]
+        if gap[1] > window.end_ms:
+            record["dark_outlasts_window_to_ms"] = gap[1]
+    if wheels_turn:
+        record["wheels_turn"] = {
+            c.value: [sides.out_state(c), sides.in_state(c)] for c in wheels_turn
+        }
+    return HeadTransition(
+        outgoing=kept_out,
+        own=own,
+        incoming=kept_in,
+        record=record,
+        carries_wheels=bool(wheels_turn) and gap is not None,
+        lighting=lighting if "dimmer" in profile.axes else None,
+    )
+
+
+def _ends(levels: Mapping[int, float], spans: Sequence[tuple[int, int]]) -> tuple[float, float]:
+    """The transition's first and last level (0 where it has no lit frames)."""
+    times = sorted(t for a, b in spans for t in range(a, b, FRAME))
+    return (levels.get(times[0], 0.0), levels.get(times[-1], 0.0)) if times else (0.0, 0.0)
+
+
+def _lighting(
+    sides: _Sides,
+    light: Behaviour,
+    spans: Sequence[tuple[int, int]],
+    fade_gap: tuple[int, int] | None,
+) -> _Light:
+    """How the transition's dimmer is made on each of its frames: the two looks' levels,
+    the progress, and (with `fade_gap`) the fade into and out of the dark cut."""
+    w0, w1 = sides.start_ms, sides.end_ms
+    frames: list[tuple[int, float, float, float, float]] = []
     for a, b in spans:
         for t in range(a, b, FRAME):
             factor = 1.0
-            if gap is not None and edges_fade:
-                if t < gap[0]:
-                    factor = 1.0 - shape(min(1.0, (t - w0 + FRAME) / max(FRAME, gap[0] - w0)))
+            if fade_gap is not None:
+                if t < fade_gap[0]:
+                    factor = 1.0 - sides.shape(
+                        min(1.0, (t - w0 + FRAME) / max(FRAME, fade_gap[0] - w0))
+                    )
                 else:
-                    factor = shape(min(1.0, (t - gap[1] + FRAME) / max(FRAME, w1 - gap[1])))
+                    factor = sides.shape(
+                        min(1.0, (t - fade_gap[1] + FRAME) / max(FRAME, w1 - fade_gap[1]))
+                    )
                 factor = min(1.0, max(0.0, factor))
-            lit_frames.append((t, out_dim(t), in_dim(t), p_of(t), factor))
-    lighting = _Light(
+            frames.append((t, sides.out_dim(t), sides.in_dim(t), sides.p(t), factor))
+    return _Light(
         start_ms=w0,
         end_ms=w1,
-        split_ms=s,
-        split=split,
-        curve=window.transition.curve,
+        split_ms=sides.split_ms,
+        split=sides.window.split,
+        curve=sides.window.transition.curve,
         behaviour=light,
-        frames=tuple(lit_frames),
+        frames=tuple(frames),
     )
-    levels = lighting.levels()
-    own: list[FixtureSegment] = []
+
+
+def _own_cues(
+    sides: _Sides,
+    spans: Sequence[tuple[int, int]],
+    levels: Mapping[int, float],
+    shutter_gap: tuple[int, int] | None,
+    identity: FixtureSegment,
+    edge_label: str,
+) -> list[FixtureSegment]:
+    """The transition's own cues, one per span (before the cut, after it): the pose as its
+    channels' behaviours make it, the dimmer at `levels`, the wheels and shutter each side's
+    (with `shutter_gap`, `sequence`: the shutter closed before the cut)."""
+    profile = sides.profile
     closed = _shutter_dark(profile)
+    own: list[FixtureSegment] = []
     for side, (a, b) in enumerate(spans):
         if b <= a:
             continue
         channels: dict[ChannelName, ChannelValue] = {}
-        for channel in pose_channels:
+        for channel in sides.pose_channels:
             channels[channel] = ChannelValue(
                 channel=channel,
                 physical=ContinuousTrajectory(
                     unit="degree",
                     points=tuple(
-                        PhysicalPoint(t_ms=t, value=pose_at(channel, t)) for t in range(a, b, FRAME)
+                        PhysicalPoint(t_ms=t, value=sides.pose_at(channel, t))
+                        for t in range(a, b, FRAME)
                     ),
                     interpolation="hold",
                 ),
@@ -874,23 +1097,13 @@ def _attempt(
         for channel in (ChannelName.SHUTTER, *_WHEELS):
             if DISCRETE_KEYS[channel] not in profile.discrete:
                 continue
-            state = out_state(channel) if side == 0 else in_state(channel)
+            state = sides.out_state(channel) if side == 0 else sides.in_state(channel)
             if state is None:
                 continue
             events = [DiscretePoint(t_ms=a, state=state)]
-            if (
-                channel is ChannelName.SHUTTER
-                and side == 0
-                and gap is not None
-                and edges_shutter
-                and closed is not None
-            ):
-                # `sequence`: the shutter closes before the cut, the dimmer held.
+            if channel is ChannelName.SHUTTER and side == 0 and shutter_gap and closed:
                 shut = max(a, b - _shutter_cut_ms(profile))
-                events = [
-                    *([events[0]] if shut > a else []),
-                    DiscretePoint(t_ms=shut, state=closed),
-                ]
+                events = [*events[: int(shut > a)], DiscretePoint(t_ms=shut, state=closed)]
             channels[channel] = ChannelValue(
                 channel=channel, physical=DiscreteTrajectory(events=tuple(events))
             )
@@ -909,34 +1122,7 @@ def _attempt(
                 }
             )
         )
-    too_fast = _too_fast(own, profile)
-    if too_fast is not None:
-        return f"lit:{too_fast}"
-    joins_ok, why = _joins(kept_out, own, kept_in, context, gap)
-    if not joins_ok:
-        return why
-    record: dict[str, Any] = {
-        "plays": _describe(mode, gap, wheels_turn, dark_pose, window.rest),
-        "curve_played": curve_played,
-    }
-    if (w0, w1, s) != (window.start_ms, window.end_ms, window.split_ms):
-        # The head's own window: inside its unbroken cues, or the darkness outlasting it.
-        record["window_ms"] = [w0, w1]
-        record["split_ms"] = s
-    if gap is not None:
-        record["dark_ms"] = [gap[0], gap[1]]
-    if wheels_turn:
-        record["wheels_turn"] = {c.value: [out_state(c), in_state(c)] for c in wheels_turn}
-    if w1 != window.end_ms:
-        record["dark_outlasts_window_to_ms"] = w1
-    return HeadTransition(
-        outgoing=kept_out,
-        own=own,
-        incoming=kept_in,
-        record=record,
-        carries_wheels=bool(wheels_turn) and gap is not None,
-        lighting=lighting if "dimmer" in profile.axes else None,
-    )
+    return own
 
 
 @dataclass(frozen=True)
@@ -958,9 +1144,7 @@ class _Light:
         shape, _ = easing(self.curve)
         by_time = {t: (o * out_gain, i) for t, o, i, _, _ in self.frames}
         o_s = by_time.get(self.split_ms - FRAME, (0.0, 0.0))[0]
-        i_s = by_time.get(self.split_ms, (0.0, by_time.get(self.split_ms + FRAME, (0.0, 0.0))[1]))[
-            1
-        ]
+        i_s = by_time.get(self.split_ms, (0.0, 0.0))[1]
         handover = CROSSFADE_FLOOR * min(o_s, i_s)
         w0, w1, s = self.start_ms, self.end_ms, self.split_ms
         out: dict[int, float] = {}
@@ -1194,21 +1378,25 @@ def _describe(
     gap: tuple[int, int] | None,
     wheels_turn: Sequence[ChannelName],
     dark_pose: Sequence[ChannelName],
-    rest: Literal["before", "after"] | None = None,
+    rest: Literal["before", "after"] | None,
+    one_sided: bool,
+    ends: tuple[float, float],
 ) -> str:
+    """What the transition plays on a head, in words, as its frames show it."""
     if rest is not None:
         coming = "comes up from" if rest == "before" else "comes to"
         how = {
             TransitionMode.SNAP: "a cut",
-            TransitionMode.CROSSFADE: "the light handing over at the split point",
+            TransitionMode.CROSSFADE: "dark to the split point, then the light up",
             TransitionMode.MORPH: "every continuous channel easing",
-            TransitionMode.SWEEP: "holding to the split point, then travelling lit",
+            TransitionMode.SWEEP: "holding to the split point, then travelling",
             TransitionMode.FADE_VIA_BLACK: "a fade, dark from the split point"
             if rest == "after"
             else "dark to the split point, then a fade up",
             TransitionMode.BLACKOUT: "dark over the window",
         }[mode]
         return f"{coming} rest (the initial pose, dark): {how}"
+    first, last = ends
     said = {
         TransitionMode.SNAP: "dark before the boundary, in place lit on its frame",
         TransitionMode.CROSSFADE: "the light hands over at the split point, the aim eases across",
@@ -1219,6 +1407,16 @@ def _describe(
         "fades up",
         TransitionMode.BLACKOUT: "dark over the whole window",
     }[mode]
+    if mode in LIT_MODES:
+        if one_sided:
+            said = (
+                "clamped to one side of the boundary: the level eases from the outgoing look "
+                "to the incoming one, the aim eases across"
+            )
+        if last == 0:
+            said += "; it ends dark (the incoming look is dark there)"
+        elif first == 0:
+            said += "; it starts dark (the outgoing look is dark there)"
     if gap is not None and mode in LIT_MODES:
         why = [f"{c.value} turns" for c in wheels_turn] + [f"{c.value} moves" for c in dark_pose]
         said += f"; a dark cut at the split point ({', '.join(why) or 'a dark strategy'})"
@@ -1247,8 +1445,8 @@ def describe_transitions(entries: Sequence[Mapping[str, Any]]) -> list[str]:
         for fixture_id, outcome in sorted(entry.get("heads", {}).items()):
             if "not_played" in outcome:
                 what = f"not played ({outcome['not_played']})"
-            elif "curve_played" not in outcome:
-                what = f"nothing ({outcome['plays']})"
+            elif outcome["plays"].startswith("nothing: "):
+                what = f"nothing ({outcome['plays'].removeprefix('nothing: ')})"
             else:
                 what = outcome["plays"]
                 if "window_ms" in outcome:

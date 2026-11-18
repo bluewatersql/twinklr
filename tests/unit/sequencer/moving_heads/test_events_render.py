@@ -787,6 +787,44 @@ def test_a_colour_event_on_a_flick_takes_over_the_flick() -> None:
         assert later - {"white"} <= {"red", "blue"}  # the template's later flicks
 
 
+def test_a_wheel_change_shown_only_in_short_lit_runs_still_turns_and_shows() -> None:
+    """A gobo event on a cascade's dark beat, where a strobe then lights the head in
+    flashes of a frame or two: the wheel still turns and every lit frame shows the new
+    gobo (the three-frame rule only counts showing it within a beat, for moving it)."""
+    plan = [
+        m.plan_section(
+            "e0",
+            1,
+            4,
+            "fly_out_cascade",
+            color="red",
+            events=[
+                event(2, 1, "hit"),
+                event(2, 3, "color", color="blue"),
+                event(3, 2, "closed"),
+                event(3, 4, "open"),
+                event(4, 2, "gobo", gobo="stars"),
+                event(4, 3, "strobe_fast"),
+                event(4, 4, "hit"),
+            ],
+        )
+    ]
+    pipeline = render(plan, beat_grid=grid(120, 6), fixture_group=rig(close=20, settle=150))
+    frames = Frames(pipeline)
+    gobo = next(e for e in looks(pipeline)["e0"]["events"] if e["action"] == "gobo")
+    end = frame_of(grid(120, 6).bar_boundaries[4])
+
+    assert_wheels_turn_dark(frames)
+    short = [h for h in HEADS if gobo["heads"][h]["shown_ms"] is None]
+    assert short  # some head is lit only in short runs after the event
+    for head in HEADS:
+        outcome = gobo["heads"][head]
+        assert "not_played" not in outcome and outcome["reveal_ms"] is not None
+        states, dark = frames.state(head, "gobo"), frames.dark(head)
+        lit = [states[i] for i in range(outcome["reveal_ms"] // FRAME, end) if not dark[i]]
+        assert lit and set(lit) == {outcome["state"]}, head
+
+
 def two_parts(events: Sequence[dict[str, Any]]) -> PlanSection:
     """One section over bars 1-8 in two parts of `mirror_wings` (bars 1-4 and 5-8)."""
     one = section(events)

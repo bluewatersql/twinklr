@@ -903,28 +903,34 @@ def _note_reveal(
     frame_ms: int,
     profile: FixtureCapabilities,
 ) -> None:
-    """Record when the head first shows `state` lit at or after the event's frame, for at
-    least `HIT_MIN_LIT_FRAMES` frames running (a frame or two of the new colour before the
-    head goes dark is not showing it), and how late that is where the head is dark on the
-    beat (a template's dark phase) or a template overlay holds its own state there."""
+    """Record when the head first shows `state` lit at or after the event's frame
+    (`reveal_ms`, on any lit frame; how late that is where the head is dark on the beat or
+    a template overlay holds its own state there), and when it first shows it for
+    `HIT_MIN_LIT_FRAMES` frames running (`shown_ms`: a frame or two of the new state
+    before the head goes dark does not count toward showing it within a beat, though it
+    plays)."""
     shows: dict[int, bool] = {}
     for cue in own:
         levels = _levels(cue, profile)
         for t in range(max(cue.t0_ms, frame_ms), cue.t1_ms, FRAME):
             shows[t] = _lit(cue, profile, levels, t) and _state(cue, channel, profile, t) == state
-    for t in sorted(shows):
-        if all(shows.get(t + k * FRAME, False) for k in range(HIT_MIN_LIT_FRAMES)):
-            record["reveal_ms"] = t
-            if t > frame_ms + HIT_LATE_FRAMES * FRAME and "deferred" not in record:
-                record["late"] = {
-                    "late_ms": t - frame_ms,
-                    "reason": "the head is dark on the beat (its template's dark phase) "
-                    "or its template's overlay holds its own state there; it shows the "
-                    "change from its next reveal",
-                }
-            return
-    record["reveal_ms"] = None
-    record["late"] = {"reason": "the head never shows it lit before the section's end"}
+    lit = [t for t in sorted(shows) if shows[t]]
+    record["shown_ms"] = next(
+        (t for t in lit if all(shows.get(t + k * FRAME, False) for k in range(HIT_MIN_LIT_FRAMES))),
+        None,
+    )
+    if not lit:
+        record["reveal_ms"] = None
+        record["late"] = {"reason": "the head never shows it lit before the section's end"}
+        return
+    record["reveal_ms"] = lit[0]
+    if lit[0] > frame_ms + HIT_LATE_FRAMES * FRAME and "deferred" not in record:
+        record["late"] = {
+            "late_ms": lit[0] - frame_ms,
+            "reason": "the head is dark on the beat (its template's dark phase) or its "
+            "template's overlay holds its own state there; it shows the change from its next "
+            "reveal",
+        }
 
 
 # --- applying a section's events ---------------------------------------------------------
@@ -1085,11 +1091,12 @@ def apply_section_events(
 
 
 def _shown_in_time(record: Mapping[str, Any], event: TimedEvent, beat_grid: BeatGrid) -> bool:
-    """Whether a head's outcome for a wheel event shows the change lit within
-    `WHEEL_LATE_BEATS` of the event's frame (a frame of grid tolerance)."""
-    reveal = record.get("reveal_ms")
+    """Whether a head's outcome for a wheel event shows the change lit for
+    `HIT_MIN_LIT_FRAMES` frames running within `WHEEL_LATE_BEATS` of the event's frame (a
+    frame of grid tolerance)."""
+    shown = record.get("shown_ms")
     latest = event.frame_ms + WHEEL_LATE_BEATS * _beat_ms(beat_grid, event.frame_ms) + FRAME
-    return "not_played" not in record and reveal is not None and reveal <= latest
+    return "not_played" not in record and shown is not None and shown <= latest
 
 
 def _play_wheel_events(
@@ -1212,6 +1219,12 @@ def _play_wheel_events(
                     direction = side
                     break
         position = beat_grid.bar_and_beat(chosen.beat_index)
+        # Moving it changes no frame where every head turns the same as on its own beat
+        # (dark on both, shown from the same next reveal): then "moved" only names where
+        # it is first seen.
+        unchanged = direction is not None and all(
+            outcomes[f][0] == first[f][0] and outcomes[f][2] == first[f][2] for f in turning
+        )
         for fixture_id, (_, new) in turning.items():
             own, record, turned = outcomes[fixture_id]
             if not shown:
@@ -1252,6 +1265,11 @@ def _play_wheel_events(
                     "reason": f"no head shows it within {WHEEL_LATE_BEATS:g} beat of its own "
                     "beat (dark there, or the wheel change does not fit)",
                 }
+                if unchanged:
+                    record["moved"]["changes_nothing"] = (
+                        "the heads turn as they would on its own beat and first show it there "
+                        "(their next reveal): the move names where it is seen"
+                    )
             played.head(event, fixture_id, record)
             if turned:
                 by_head[fixture_id] = own
@@ -1702,6 +1720,8 @@ def cue_summary(entry: Mapping[str, Any]) -> dict[str, Any]:
             # Where it played on the bar grid: the beat it moved to.
             summary["played_bar"] = outcome["moved"]["bar"]
             summary["played_beat"] = outcome["moved"]["beat"]
+            if "changes_nothing" in outcome["moved"]:
+                summary["seen_only"] = True
         if "deferred" in outcome:
             summary.setdefault("late", {})[fixture_id] = outcome["deferred"]["late_ms"]
         elif "late" in outcome and "late_ms" in outcome["late"]:
@@ -1790,7 +1810,13 @@ def _describe_outcome(outcome: Mapping[str, Any]) -> str:
             "template's overlay there)"
         elif "late" in outcome:
             said += f" ({outcome['late']['reason']})"
-        if "moved" in outcome:
+        if "moved" in outcome and "changes_nothing" in outcome["moved"]:
+            moved = outcome["moved"]
+            said += (
+                f" (first seen at bar {moved['bar']} beat {moved['beat']}, "
+                f"{moved['offset_ms']:+d} ms: the heads are dark from its own beat until then)"
+            )
+        elif "moved" in outcome:
             moved = outcome["moved"]
             said += (
                 f" (moved {moved['direction']} to bar {moved['bar']} beat {moved['beat']}, "
@@ -1831,8 +1857,9 @@ def describe_lyric_cue(entry: Mapping[str, Any]) -> str:
     for event in entry.get("events", []):
         line = f"{event['action']} at bar {event['bar']} beat {event['beat']}"
         if event.get("played_bar") is not None:
+            verb = "first seen" if event.get("seen_only") else "played"
             line = (
-                f"{event['action']} planned at bar {event['bar']} beat {event['beat']}, played "
+                f"{event['action']} planned at bar {event['bar']} beat {event['beat']}, {verb} "
                 f"at bar {event['played_bar']} beat {event['played_beat']}"
             )
         by_time: dict[int, list[str]] = {}
