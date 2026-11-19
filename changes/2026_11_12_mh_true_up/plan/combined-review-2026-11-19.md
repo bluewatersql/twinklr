@@ -71,6 +71,8 @@ coordination schedule first. Sequence or ripple the named LEAD and SUPPORT
 groups, retain the other groups as a steady bed at their assigned brightness,
 and preserve display foundation effects beneath the step pattern. Keep explicit
 call/response windows and fixture safety rules. Do not add another rendering path.
+Keep zone and split targets together as teams. Share steps for short sections
+and overlap half a beat for ripple so two teams still trade prominence.
 
 Confirm a named group and the moving heads still get scheduled on a graph longer
 than the music section, and verify that named accents still rotate on actual

@@ -861,6 +861,50 @@ def _stepped_macro(mode: CoordinationMode) -> MacroPlan:
     )
 
 
+@pytest.mark.parametrize("mode", [CoordinationMode.SEQUENCED, CoordinationMode.RIPPLE])
+def test_short_section_gives_every_named_team_a_turn(mode: CoordinationMode) -> None:
+    macro = _stepped_macro(mode)
+    section = macro.sections[0]
+    macro.sections[0] = section.model_copy(
+        update={"section": section.section.model_copy(update={"end_ms": 1_100})}
+    )
+
+    schedule = coordination_schedule(macro, _grid(), _graph())
+    assert {target for window in schedule for target in window.target_ids} == {
+        group.id for group in _graph().groups
+    }
+    rests = moving_head_dark_spans(
+        macro, _grid(), _graph(), moving_head_target_ids={"MOVING_HEADS"}
+    )
+    assert rests == ((0, 500),)
+
+
+def test_ripple_does_not_restart_effect_while_a_team_remains_active() -> None:
+    macro = _stepped_macro(CoordinationMode.RIPPLE)
+    coordinated = coordinate_display_render_plan(
+        _render_plan("MEGA_TREE", lane=LaneKind.RHYTHM),
+        macro,
+        _grid(),
+        _graph(),
+        moving_head_target_ids={"MOVING_HEADS"},
+    )
+
+    assert _ranges(coordinated, "MEGA_TREE") == [(0, 800), (1_600, 2_450), (3_300, 4_100)]
+
+
+def test_two_team_ripple_retains_a_clear_beat_for_each_lead_change() -> None:
+    schedule = coordination_schedule(_macro(mode=CoordinationMode.RIPPLE), _grid(), _graph())
+    rhythm = [w for w in schedule if w.phase == "ripple"]
+
+    assert [(w.start_ms, w.end_ms, w.target_ids) for w in rhythm[:5]] == [
+        (0, 500, ("MEGA_TREE",)),
+        (500, 800, ("ARCH_LEFT", "MEGA_TREE")),
+        (800, 1_100, ("ARCH_LEFT",)),
+        (1_100, 1_350, ("MEGA_TREE", "ARCH_LEFT")),
+        (1_350, 1_600, ("MEGA_TREE",)),
+    ]
+
+
 @pytest.mark.parametrize(
     ("macro", "expected"),
     [
@@ -875,8 +919,8 @@ def _stepped_macro(mode: CoordinationMode) -> MacroPlan:
         (_call_response_macro("MEGA_TREE"), ()),
         # The house zone consumes one step as a team, though it has three groups.
         (_stepped_macro(CoordinationMode.SEQUENCED), ((0, 500), (1_100, 2_200), (2_700, 3_800))),
-        # A ripple carries the head step one beat further on each repeat.
-        (_stepped_macro(CoordinationMode.RIPPLE), ((0, 500), (1_600, 2_200), (3_300, 3_800))),
+        # A ripple carries the head step into the next beat's first half.
+        (_stepped_macro(CoordinationMode.RIPPLE), ((0, 500), (1_350, 2_200), (3_000, 3_800))),
     ],
     ids=["unified", "complementary", "mh-responds", "mh-unpaired", "sequenced", "ripple"],
 )

@@ -42,6 +42,11 @@ pipeline executes the common audio/profile/lyrics/macro prefix once, then joins 
 and display branches at one in-memory render barrier. The binding ownership, focal,
 palette, call/response, and catalog policy is recorded in the
 [coordinated-show decision](../../memories/decisions/coordinated-show-contract.md).
+For sequenced and ripple looks, the render advances through the macro's assigned
+lead and support teams on detected beats. A zone or split takes one step as a
+team, and short sections share beats between teams when needed. Ripple overlaps
+the first half of each new step with its predecessor. The house foundation and
+the other groups retain their planned coverage and focal-role brightness.
 
 ## Execution semantics
 

@@ -267,17 +267,39 @@ def coordination_schedule(
             continue
 
         boundaries = _section_boundaries(section, beat_grid, StepUnit.BEAT, 1)
-        for index, (start, end) in enumerate(pairwise(boundaries)):
+        intervals = [(start, end) for start, end in pairwise(boundaries) if start < end]
+        if len(steps) > len(intervals):
+            # Share steps in a short section so every named team still appears.
+            team_count = len(steps)
+            interval_count = len(intervals)
+            steps = [
+                tuple(
+                    target
+                    for team in steps[
+                        index * team_count // interval_count : (index + 1)
+                        * team_count
+                        // interval_count
+                    ]
+                    for target in team
+                )
+                for index in range(interval_count)
+            ]
+        phase = section.coordination_intent.value.lower()
+        for index, (start, end) in enumerate(intervals):
             active = steps[index % len(steps)]
             if (
                 section.coordination_intent == CoordinationMode.RIPPLE
                 and index > 0
                 and len(steps) > 1
             ):
-                active += steps[(index - 1) % len(steps)]
-            windows.append(
-                CoordinationWindow(start, end, active, section.coordination_intent.value.lower())
-            )
+                # Give the new team the second half of the beat on its own.
+                # With only two teams a whole-beat overlap hides every change.
+                overlap_end = start + (end - start) // 2
+                if start < overlap_end:
+                    previous = steps[(index - 1) % len(steps)]
+                    windows.append(CoordinationWindow(start, overlap_end, active + previous, phase))
+                    start = overlap_end
+            windows.append(CoordinationWindow(start, end, active, phase))
     return tuple(windows)
 
 
@@ -301,12 +323,18 @@ def _windows_for(
     section: MacroSection,
     target_id: str,
 ) -> list[tuple[int, int]]:
-    return [
-        (window.start_ms, window.end_ms)
-        for window in schedule
-        if section.section.start_ms <= window.start_ms < section.section.end_ms
-        and target_id in window.target_ids
-    ]
+    active: list[tuple[int, int]] = []
+    for window in schedule:
+        if not (
+            section.section.start_ms <= window.start_ms < section.section.end_ms
+            and target_id in window.target_ids
+        ):
+            continue
+        if active and active[-1][1] == window.start_ms:
+            active[-1] = (active[-1][0], window.end_ms)
+        else:
+            active.append((window.start_ms, window.end_ms))
+    return active
 
 
 def _event_brightness(event: RenderEvent) -> float:
