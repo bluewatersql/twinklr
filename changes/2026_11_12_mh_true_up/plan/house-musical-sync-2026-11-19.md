@@ -109,3 +109,8 @@ use original audio-section edges for a BASE placement startingbar1beat1 with
 SECTION duration. Preserve opening coverage with this one rule and replace the
 opening-only exception. No other placement's timing changes. Verify both edges
 with a non-bar-aligned interior section and replay all three saved new plans.
+
+Independent review found a one-frame dark gap when the shared audio boundary
+rounds upward: outgoing SECTION end floored while incoming start rounded. Snap
+both foundation edges to the same nearest frame, with the song end still a hard
+cap. Add adjacent-section regressions for upward-rounded boundaries.

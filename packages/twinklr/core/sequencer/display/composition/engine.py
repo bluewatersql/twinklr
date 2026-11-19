@@ -774,7 +774,11 @@ class CompositionEngine:
                 # edges lie between detected downbeats. Rhythmic references stay
                 # anchored to the detected grid, as do later BASE placements.
                 start_ms = self._timing_resolver.snap(audio_bounds[0])
-                section_end_ms = min(audio_bounds[1], int(self._beat_grid.duration_ms))
+                # Adjacent foundations share one frame boundary; flooring only
+                # the outgoing edge would leave a dark frame when start rounds up.
+                section_end_ms = min(
+                    self._timing_resolver.snap(audio_bounds[1]), int(self._beat_grid.duration_ms)
+                )
             end_ms = self._timing_resolver.resolve_end_ms(
                 start_ms=start_ms,
                 duration=placement.duration,

@@ -966,3 +966,29 @@ def test_full_section_foundation_covers_interior_partial_bars_only() -> None:
     assert bounds(LaneKind.ACCENT, placement) == {(4000, 10000)}
     later = placement.model_copy(update={"start": PlanningTimeRef(bar=1, beat=2)})
     assert bounds(LaneKind.BASE, later) == {(4500, 10000)}
+
+
+def test_adjacent_section_foundations_share_quantized_boundary() -> None:
+    """A raw boundary rounding upward cannot create a dark frame between beds."""
+    placement = GroupPlacement(
+        placement_id="foundation",
+        target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
+        template_id="gtpl_base_wash_split",
+        start=PlanningTimeRef(bar=1, beat=1),
+        duration=EffectDuration.SECTION,
+        intensity=IntensityLevel.MED,
+    )
+    for shared_ms, expected_ms in [(9715, 9720), (19133, 19140)]:
+        engine = _make_engine(
+            section_boundaries=[("intro", 3805, shared_ms), ("next", shared_ms, 28000)]
+        )
+        plan = _make_plan_set(placements=[placement])
+        plan.section_plans.append(plan.section_plans[0].model_copy(update={"section_id": "next"}))
+        result = engine.compose(plan)
+        bounds = {
+            (event.start_ms, event.end_ms)
+            for group in result.groups
+            for layer in group.layers
+            for event in layer.events
+        }
+        assert bounds == {(3800, expected_ms), (expected_ms, 28000)}
