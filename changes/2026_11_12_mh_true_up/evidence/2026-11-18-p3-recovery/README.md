@@ -75,6 +75,7 @@ seven lyric cues. The saved plan requests no modifiers.
   It is H.264/AAC at 960 by 480, 50 fps and 197.4 seconds. The file is
   `~/xlights/_twinklr_verify/p4_view/phase3_recovered.pwGxi9DO/phase3_need_a_favor_fixture_preview.mp4`.
 
-Owner look judgment is **PENDING-OWNER**. Merge/push, hardware, live xLights
-injection and regeneration, and a full paid planner run on the final contract
-remain open. The saved-plan replay is a transport and viewing check.
+The owner approved the fixture preview and authorized the Phase 3 merge, push
+and one fresh paid planner attempt on 2026-11-19. The preview covers the saved plan
+and fixture output. Modifier look, hardware and live xLights injection and
+regeneration remain open.
