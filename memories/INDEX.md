@@ -29,6 +29,8 @@ in `context/`; memories explain why, and what we learned.
 
 ## Learnings
 
+- [musical-sync-needs-rendered-evidence.md](learnings/musical-sync-needs-rendered-evidence.md) — waveform alignment and light coverage do not prove musical response; track named musical events through planning, emission and rendered light (2026-11-19)
+
 - [reactivation-review-2026-08.md](learnings/reactivation-review-2026-08.md) — historical `aa8d325` review conclusions (readiness, verified defect classes, external facts, strengths), with a pointer to current campaign truth
 - [known-test-failures.md](learnings/known-test-failures.md) — historical gate baseline at `aa8d325` (2026-08-13): 120 failures classified; superseded by the green integrated campaign gate
 - [live-provider-run-lessons.md](learnings/live-provider-run-lessons.md) — live provider lessons: reasoning models reject temperature, 300 s timeout, config schema drift, degenerate-segment aborts, Claude rejects planner schemas as too large to compile, Ollama Cloud ignores `response_format`, proxy TLS

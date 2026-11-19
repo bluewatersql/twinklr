@@ -1,0 +1,133 @@
+---
+type: evidence
+status: active
+area: display-rendering
+updated: 2026-11-19
+---
+
+# House musical synchronization repair
+
+The owner rejected the recovered house previews: unrelated flashes and missing
+musical transitions, while the moving heads looked closer to sync. This overrides
+any implication that waveform alignment or whole-song light coverage established
+musical quality. The rejected artifacts remain under
+`~/xlights/_twinklr_verify/recovery-review-2026-11-19/`.
+
+## Reproduced causes
+
+- A declared RHYTHM PULSE compiled to the same free-running effect without the
+  detected grid or lane timing driver. BEATS and BARS produced the same output.
+- Coordination reapplied the 300 ms rhythmic fade to short beat windows. In the
+  rejected XSQ, a 300 ms fade was written into each short rhythmic window.
+  The first pixel audit also included diagnostic moving-head dots; its peak-delay
+  numbers are not accepted as isolated house timing evidence.
+- The macro CUT at 18.065 s retained a one-second BASE fade in the rejected XSQ.
+  A replay assertion failed on that exported fade.
+- House planning manufactured bars from nominal tempo, while composition used
+  detected bars/beats. The planner also lost lyric timestamps and MomentCues and
+  did not receive audio-profile musical objectives. Moving-head planning already
+  consumed richer musical evidence.
+
+## Repair and regressions
+
+`ec0ffb6e`, `10b90aa5`, and `3ed4f234` carry the repair. Only explicit PULSE, or
+SPARKLE tagged beat/offbeat, gets a detected-clock brightness envelope in RHYTHM.
+BEATS and BARS use their own clocks; half-time and offbeat tags retain their
+cadence. Ordinary spatial/decorative layers keep their motion. The absolute
+envelope survives coordination slicing and is clipped into each emitted xLights
+brightness curve. The effect's intensity and focal-role brightness still apply.
+
+CUT removes incoming and outgoing section fades, including a floored outgoing
+end at a non-frame-aligned boundary. Sliced effects no longer restart arrival
+fades. Planner timing uses the renderer's detected references. Planning,
+refinement and section judging receive timestamped cues, profile objectives,
+section dynamics, nearest-beat offsets and the section's detected beat table.
+No planner-output schema or moving-head implementation changes.
+
+Red-to-green regressions cover irregular beats, BARS, half-time, offbeat,
+untimed sparkle, preservation of rolling layers, absolute-phase slicing, CUT,
+timed cue retention and shared planning/judge evidence. Review added cases with
+CUT at 2,211 ms, a bar at 2,005 ms beside beat 2,000 ms, and a section/bar at
+2,011 ms beside beat 2,000 ms. Live planning exposed the related false rejection
+of a frame-rounded first beat at 18,060 ms against raw section start 18,065 ms.
+Those failures are repaired without asking the LLM to move the mandatory base.
+
+## Independent review
+
+`/root/pickup_review` reviewed immutable commits independently, read-only.
+Initial verdict: changes requested for the outgoing CUT frame and pulse anchor.
+Second verdict: changes requested for admissible first-beat bounds.
+Final verdict at `3ed4f234`: approved for code correctness; all nine stage-pipeline
+regressions passed independently. Earlier independent narrow suites passed 418
+and 423 tests. This is not a rendered look verdict.
+
+## Scratch replay and live planning
+
+Scratch root: `~/xlights/_twinklr_verify/house-sync-2026-11-19/`.
+`rerender.py`, `replan.py`, `export-wide.py`, measurement scripts, saved plans,
+source-input references, and generated outputs remain local and untracked.
+The original moving-head XML and existing EffectDB/ColorPalettes prefixes are
+preserved exactly. The production layout/network hashes are checked after
+xLights export. Physical fixture output stays disabled.
+
+A saved-plan diagnostic replay precedes fresh planning, so its difference is the
+renderer repair. In Dance Jams, 39/40 strongest masked house-region brightness rises
+were within 40 ms of a detected beat (rejected replay: 23/40). It does not prove
+all light changes are musical: textures can move independently, an offbeat can be
+intentional, and Strobe still selects pixels randomly. The mask excludes both moving heads and their indicator dots. The saved-plan diagnostic
+is retained separately under `saved-plan-diagnostic/`.
+
+Fresh house-only planning uses the three authorized cached song analyses, audio
+profiles, macro plans and grids. Favor also has a retained lyric-analysis model.
+Dance and Hey have no retained lyric-analysis model in this run, so their musical
+context uses the audio profile. Provider purpose: exercise the repaired musical
+context and choose responses, not rerun audio/MH analysis. Approval is recorded
+in the implementation brief (2026-11-13 and 2026-11-19 rows). Completed sections
+are retained; failed validation is investigated before retrying. Two planner
+iterations per section attempt. Early failed attempts encountered the frame-bound
+bug above. Favor's old cached SongBundle has a retired `coverage_pct` lyric-quality
+key, removed only in the scratch replay reader; the cached file is unchanged.
+
+## Final verification
+
+All 28 fresh sections planned successfully (Dance14, Favor7, Hey7), and all three
+sequences exported and decoded. Verification retained exact MH XML/DB prefixes,
+29,842 decoded frames and 588 audio windows with zero offset. Frame comparisons
+show visible house changes at Dance18.06,23.64,31.62,44.04 seconds and Hey93.32,
+107.06,107.48 seconds. These are timing observations, not a taste verdict.
+
+The same check found Favor verse_1's particle hits at43.04,45.32,54.40 barely
+changed the house. xLights Meteors builds a particle population; its native
+warmup experiment improved pixel activity slightly but did not make those
+reliable impacts. It is not being added to production. Source:
+[xLights Meteors](https://raw.githubusercontent.com/xLightsSequencer/xLights/master/src-core/effects/MeteorsEffect.cpp).
+The recipe construction was already shaped but absent from the prompts. A narrow
+follow-up displays ACCENT constructions and instructs planning/judging to use an
+available solid On HIT for an indispensable immediate arrival, with motif textures
+as companions. Only the failed Favor verse is being replanned; its first plan and
+video measurements remain retained. Final verification is pending that replacement.
+
+The first complete full gate at3ed4f234 reported 4 failures,7811 passes and30 skips:
+three old populated-prompt contexts lacked the new optional musical_context field,
+and the current display replay's EffectDB count changed30→32. Optional guards are
+fixed. A hermetic control with the new pulse compiler disabled restores exactly30;
+with it enabled, four unfaded settings variants replace two old variants (net+2).
+All other replay metrics are identical. Only that current replay metric is updated;
+the historical XSQ, original metrics and recipe snapshot remain unchanged.
+A fresh full gate will validate the follow-up.
+
+Prior gate attempts: a sequential run was interrupted to use parallel workers;
+the first parallel command failed before tests because `uv sync` had pruned the
+local pytest-xdist installation. Restoring xdist in the local environment and
+using `UV_NO_SYNC=1 UV_OFFLINE=1` resolved that environment issue. A gate started
+on the intermediate commit was superseded after review fixes. The final command
+runs against `3ed4f234` with `PYTEST_ADDOPTS='-n 8 --dist loadfile' make validate`.
+
+## Limits and owner verdict
+
+The previous previews remain **REJECTED**. New previews need an owner look
+judgment; none is fabricated here. No hardware run or new sealed proof.
+Placement timing_hint and recipe timing_offset_beats are outside this repair;
+the rejected saved placements all used ON_BEAT. Untimed decorative effects are
+not made beat-synchronous by this change. The detected clock itself is retained;
+this repair does not claim a new beat-tracking or calibration result.
