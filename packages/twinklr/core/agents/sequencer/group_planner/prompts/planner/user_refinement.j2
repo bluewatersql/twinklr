@@ -66,7 +66,7 @@ References system prompt rules and existing conversation context.
 
 ## Instructions
 
-{% if musical_context %}
+{% if musical_context is defined and musical_context %}
 ## Musical Events and Responses
 
 The bar/beat references below use the detected grid that renders this section.
@@ -96,3 +96,19 @@ Detected beat times for translating the objectives above (absolute milliseconds)
 3. Apply the specific fixes listed above directly where they reference exact template/target/lane changes
 {% endif %}
 4. Return the complete revised SectionCoordinationPlan
+
+{% if recipe_catalog is defined and recipe_catalog %}
+## Accent Recipe Construction
+
+These catalog recipes are also valid choices. Choose by their actual construction,
+not by a template name containing "hit". Meteors streams particles into a buffer;
+a short HIT duration does not guarantee a visible first-frame impact on sparse
+outlines. For an indispensable crisp arrival, use a listed On recipe at HIT duration
+on the intended target, optionally with a motif texture alongside it. Particle trails
+can decorate the response but must not be its sole evidence of an immediate impact.
+{% for recipe in recipe_catalog.entries %}
+{% if recipe.template_type == "ACCENT" %}
+- `{{ recipe.recipe_id }}`: {{ recipe.composition }}
+{% endif %}
+{% endfor %}
+{% endif %}

@@ -647,7 +647,6 @@ class GroupPlannerStage:
         # Validate emitted frame positions against emitted frame bounds too.
         if beat_grid is not None:
             from twinklr.core.formats.xlights.sequence.emission import EmissionSession
-
             from twinklr.core.sequencer.display.composition.timing_resolver import TimingResolver
             from twinklr.core.sequencer.vocabulary import PlanningTimeRef, TimingHint
 

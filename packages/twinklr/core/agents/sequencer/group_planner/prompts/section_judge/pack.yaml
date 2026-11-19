@@ -29,6 +29,8 @@ variables:
     - taxonomy
 
   optional:
+    - musical_context
+    - recipe_catalog
     - iteration
     - learning_context
 

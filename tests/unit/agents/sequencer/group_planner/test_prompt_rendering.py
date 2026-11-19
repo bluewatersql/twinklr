@@ -264,3 +264,39 @@ def test_section_judge_high_threshold_separates_calibration_from_approval() -> N
     assert "approval-worthy" not in normalized
     assert "approval status at 8.5 or above" in normalized
     assert "approval is determined solely by the configured threshold" in normalized
+
+
+def test_accent_recipe_construction_reaches_planner_prompt(section_context_without_fe):
+    """A 'hit' label must not hide that the recipe is a streaming particle effect."""
+    from pathlib import Path
+
+    from jinja2 import Environment, FileSystemLoader
+
+    variables = shape_planner_context(section_context_without_fe)
+    variables["recipe_catalog"] = {
+        "entries": [
+            {
+                "recipe_id": "test_particle_hit",
+                "template_type": "ACCENT",
+                "composition": "Meteors(foreground)",
+                "name": "Particle Hit",
+            },
+            {
+                "recipe_id": "test_fill_hit",
+                "template_type": "ACCENT",
+                "composition": "On(foreground)",
+                "name": "Fill Hit",
+            },
+        ]
+    }
+    directory = (
+        Path(__file__).resolve().parents[5]
+        / "packages/twinklr/core/agents/sequencer/group_planner/prompts/planner"
+    )
+    rendered = (
+        Environment(loader=FileSystemLoader(str(directory)))
+        .get_template("user.j2")
+        .render(**variables)
+    )
+    assert "test_particle_hit" in rendered and "Meteors(foreground)" in rendered
+    assert "test_fill_hit" in rendered and "On(foreground)" in rendered

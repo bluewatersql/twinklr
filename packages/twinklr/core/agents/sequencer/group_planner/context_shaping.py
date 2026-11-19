@@ -660,6 +660,7 @@ def shape_section_judge_context(
         },
         "template_catalog": judge_template_catalog,  # Same filtered catalog planner saw
         "template_catalog_full": full_catalog_simplified,  # Full catalog for ID validation
+        "recipe_catalog": _shape_recipe_catalog(section_context),
         # Theme context for validation
         "theme_definition": theme_definition_dict,
         "theming_ids": theming_ids,  # For validating theme_id, tags, palette_id

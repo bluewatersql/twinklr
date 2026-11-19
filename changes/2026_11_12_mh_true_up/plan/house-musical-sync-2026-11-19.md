@@ -67,3 +67,24 @@ are not implemented by this repair; the rejected saved plans all used ON_BEAT.
 Untimed decorative textures and Strobe pixel selection remain effect-native.
 They must not be described as beat-driven. Owner taste verdict remains REJECTED
 for the prior previews; new results require a new owner judgment.
+
+
+## Rendered accent follow-up
+
+Fresh Favor verse_1 exposes a further planning-input omission: the shaped recipe
+construction existed but no planner template rendered it. Names saying "hit"
+concealed Meteors particle streams that barely changed the house at 43.04, 45.32,
+and 54.40 seconds. A scratch native warmup experiment did not make these robust
+impacts; no warmup behavior is being added to production. Expose the existing
+ACCENT recipe constructions to planning, refinement and judging, and require an
+available solid On hit for an indispensable immediate arrival. Keep motif textures
+as companions. Replan only the demonstrated failed verse, retain its first attempt,
+and verify its actual pixel response. This keeps creative choice in the LLM and
+uses the existing catalog/render path; no injected global flashes or replacements.
+
+Full validation also found optional musical-context guards missing from old prompt
+contexts, and a replay metric changed from 30 to 32 EffectDB entries because pulsed
+layers now disable native shimmer and fades. Update only the current replay metric
+`tests/regression/baselines/02_rudolph_display.replay.metrics.json` after checking
+the added settings variants (four added and two retired; net two). Preserve the historical XSQ, original metrics,
+recipe snapshot, effect vocabulary, layer counts and timing pins.
