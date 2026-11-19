@@ -1030,31 +1030,34 @@ def test_a_focal_role_not_held_by_every_moving_head_target_is_warned(
     assert "MOVING_HEADS LEAD, WINDOWS none" in caplog.text
 
 
-def test_palette_cut_keeps_house_lit_until_boundary_and_enters_without_fade() -> None:
+@pytest.mark.parametrize("boundary", [2200, 2211])
+def test_palette_cut_keeps_house_lit_until_boundary_and_enters_without_fade(boundary: int) -> None:
     from twinklr.core.sequencer.display.models.palette import TransitionSpec
 
     macro = _macro()
     first = macro.sections[0].model_copy(
         update={
-            "section": SongSectionRef(section_id="intro", name="intro", start_ms=0, end_ms=2200)
+            "section": SongSectionRef(section_id="intro", name="intro", start_ms=0, end_ms=boundary)
         }
     )
     second = macro.sections[0].model_copy(
         update={
-            "section": SongSectionRef(section_id="drop", name="drop", start_ms=2200, end_ms=4400)
+            "section": SongSectionRef(
+                section_id="drop", name="drop", start_ms=boundary, end_ms=4400
+            )
         }
     )
     macro = macro.model_copy(update={"sections": [first, second]})
     before = _event("MEGA_TREE").model_copy(
         update={
-            "end_ms": 2200,
+            "end_ms": int(boundary // 20) * 20,
             "source": _event("MEGA_TREE").source.model_copy(update={"section_id": "intro"}),
             "transition_out": TransitionSpec(duration_ms=1000),
         }
     )
     after = _event("MEGA_TREE").model_copy(
         update={
-            "start_ms": 2200,
+            "start_ms": round(boundary / 20) * 20,
             "transition_in": TransitionSpec(duration_ms=1000),
         }
     )

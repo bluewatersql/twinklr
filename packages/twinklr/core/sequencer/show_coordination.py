@@ -462,11 +462,13 @@ def coordinate_display_render_plan(
     schedule = coordination_schedule(macro_plan, beat_grid, graph)
     expander = TargetExpander(graph)
     sections = {item.section.section_id: item for item in macro_plan.sections}
-    cut_times = {
-        EmissionSession.quantize_boundary(sections[stop.applies_from_section_id].section.start_ms)
+    cut_boundaries = {
+        sections[stop.applies_from_section_id].section.start_ms
         for stop in macro_plan.palette_arc
         if stop.transition == PaletteTransition.CUT
     }
+    cut_times = {EmissionSession.quantize_boundary(t) for t in cut_boundaries}
+    cut_end_times = cut_times | {int(t // 20) * 20 for t in cut_boundaries}
     groups = []
     for group in render_plan.groups:
         layers = []
@@ -494,7 +496,8 @@ def coordinate_display_render_plan(
                         if event.start_ms in cut_times
                         else event.transition_in,
                         "transition_out": None
-                        if event.end_ms in cut_times
+                        if section.section.end_ms in cut_boundaries
+                        and event.end_ms in cut_end_times
                         else event.transition_out,
                     },
                     deep=True,

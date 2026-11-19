@@ -338,7 +338,8 @@ class GroupPlannerStage:
             for bar in timing.bar_map
             for beat in range(1, timing.beats_per_bar + 1)
         ]
-        positions = [p for p in positions if start_ms <= p[0] < end_ms]
+        planning_start, planning_end = timing.resolve_section_bounds_ms(section_id)
+        positions = [p for p in positions if planning_start <= p[0] < planning_end]
 
         def anchored(moment: dict[str, Any]) -> dict[str, Any]:
             if positions:
@@ -643,7 +644,14 @@ class GroupPlannerStage:
         else:
             beat_grid = None
 
-        # Build section bounds using MS TimeRefs (exact millisecond values)
+        # Validate emitted frame positions against emitted frame bounds too.
+        if beat_grid is not None:
+            from twinklr.core.formats.xlights.sequence.emission import EmissionSession
+
+            section_start_ms = EmissionSession.quantize_boundary(section_start_ms)
+            section_end_ms = int(section_end_ms // 20) * 20
+
+        # Build section bounds using MS TimeRefs
         section_bounds = {
             section_id: SectionBounds(
                 section_id=section_id,

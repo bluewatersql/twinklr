@@ -35,7 +35,12 @@ def rhythm_points(
     else:
         # A phrase/lyric placement names one timed gesture, not a repeating beat.
         boundaries = [float(context.start_ms), float(context.end_ms)]
-    boundaries = [t for t in boundaries if t >= context.section_start_ms]
+    anchor = context.section_start_ms
+    if context.timing_driver == GPTimingDriver.BEATS and boundaries:
+        # Bar detection can be a few ms after its beat; placement resolution uses
+        # that nearest beat too. Dropping it would also shift half-time parity.
+        anchor = min(boundaries, key=lambda t: abs(t - anchor))
+    boundaries = [t for t in boundaries if t >= anchor]
     stride = 2 if "half-time" in tags else 1
     phase = 0.5 if "offbeat" in tags else 0.0
     onsets = [

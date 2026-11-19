@@ -256,3 +256,35 @@ def test_musical_context_retains_events_and_maps_detected_beat_times() -> None:
     }
     assert result["beat_times"][1] == {"bar": 1, "beat": 2, "timestamp_ms": 1300}
     assert all(900 <= beat["timestamp_ms"] < 4900 for beat in result["beat_times"])
+
+
+@pytest.mark.parametrize("boundary", [2205, 2211])
+def test_detected_section_boundary_contains_its_frame_quantized_first_beat(boundary: int) -> None:
+    stage = _make_stage()
+    timing = stage._build_timing_context(
+        _make_bundle(
+            {
+                "tempo_bpm": 120.0,
+                "assumptions": {"beats_per_bar": 4},
+                "beats_s": [0, 0.5, 1, 1.5, boundary / 1000, 2.7, 3.2, 3.7, 4.2],
+                "bars_s": [0, boundary / 1000, 4.2],
+            }
+        ),
+        section_id="drop",
+        section_start_ms=boundary,
+        section_end_ms=4200,
+    )
+    from twinklr.core.sequencer.vocabulary import PlanningTimeRef, TimingHint
+
+    start = timing.resolve_planning_time_ref(
+        PlanningTimeRef(bar=1, beat=1, timing_hint=TimingHint.ON_BEAT)
+    )
+    assert timing.resolve_section_bounds_ms("drop")[0] <= start
+    context = stage._build_musical_context(
+        None, None, timing, section_id="drop", start_ms=boundary, end_ms=4200
+    )
+    assert context["beat_times"][0] == {
+        "bar": 1,
+        "beat": 1,
+        "timestamp_ms": round(boundary / 20) * 20,
+    }

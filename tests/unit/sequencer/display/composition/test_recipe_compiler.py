@@ -352,3 +352,34 @@ def test_coordinated_brightness_curve_keeps_absolute_phase_and_role_brightness()
     assert values[0] == "0.000000:0.020000"
     assert "0.500000:0.100000" in values  # 500 ms stays 500 ms; 40% / 400% curve range.
     assert values[-1] == "1.000000:0.000000"
+
+
+@pytest.mark.parametrize(
+    "tags,expected", [([], [2000, 2500, 3000, 3500, 4000]), (["half-time"], [2000, 3000, 4000])]
+)
+def test_pulse_phase_uses_nearest_beat_when_bar_is_slightly_late(tags, expected) -> None:
+    from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+
+    base = _make_recipe()
+    recipe = base.model_copy(
+        update={
+            "tags": tags,
+            "layers": (base.layers[0].model_copy(update={"motion": [MotionVerb.PULSE]}),),
+        }
+    )
+    grid = BeatGrid.from_tempo(120, total_bars=3).model_copy(
+        update={"bar_boundaries": [5.0, 2005.0, 4005.0]}
+    )
+    context = _make_context().model_copy(
+        update={
+            "lane": LaneKind.RHYTHM,
+            "beat_grid": grid,
+            "section_start_ms": 2005.0,
+            "start_ms": 2000,
+            "end_ms": 4000,
+        }
+    )
+    event = (
+        RecipeCompiler(RecipeCatalog(recipes=[recipe])).compile(_make_placement(), context)[0].event
+    )
+    assert [t for t, value in event.brightness_points if value == 1.0] == expected
