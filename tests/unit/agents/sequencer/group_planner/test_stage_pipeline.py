@@ -288,3 +288,25 @@ def test_detected_section_boundary_contains_its_frame_quantized_first_beat(bound
         "beat": 1,
         "timestamp_ms": round(boundary / 20) * 20,
     }
+
+
+def test_noncoincident_detected_bar_keeps_its_first_beat_admissible() -> None:
+    stage = _make_stage()
+    timing = stage._build_timing_context(
+        _make_bundle(
+            {
+                "tempo_bpm": 120.0,
+                "assumptions": {"beats_per_bar": 4},
+                "beats_s": [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5],
+                "bars_s": [0, 2.011, 4.011],
+            }
+        ),
+        section_id="drop",
+        section_start_ms=2011,
+        section_end_ms=4011,
+    )
+    assert timing.resolve_section_bounds_ms("drop")[0] == 2000
+    context = stage._build_musical_context(
+        None, None, timing, section_id="drop", start_ms=2011, end_ms=4011
+    )
+    assert context["beat_times"][0] == {"bar": 1, "beat": 1, "timestamp_ms": 2000}

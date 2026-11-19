@@ -648,7 +648,16 @@ class GroupPlannerStage:
         if beat_grid is not None:
             from twinklr.core.formats.xlights.sequence.emission import EmissionSession
 
-            section_start_ms = EmissionSession.quantize_boundary(section_start_ms)
+            from twinklr.core.sequencer.display.composition.timing_resolver import TimingResolver
+            from twinklr.core.sequencer.vocabulary import PlanningTimeRef, TimingHint
+
+            first_beat_ms = TimingResolver(beat_grid).resolve_start_ms(
+                PlanningTimeRef(bar=1, beat=1, timing_hint=TimingHint.ON_BEAT),
+                section_start_bar,
+            )
+            section_start_ms = min(
+                EmissionSession.quantize_boundary(section_start_ms), first_beat_ms
+            )
             section_end_ms = int(section_end_ms // 20) * 20
 
         # Build section bounds using MS TimeRefs
