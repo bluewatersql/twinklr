@@ -861,6 +861,17 @@ def _stepped_macro(mode: CoordinationMode) -> MacroPlan:
     )
 
 
+def test_call_response_requires_a_renderable_frame_for_each_phase() -> None:
+    macro = _call_response_macro("MOVING_HEADS")
+    section = macro.sections[0]
+    macro.sections[0] = section.model_copy(
+        update={"section": section.section.model_copy(update={"start_ms": 496, "end_ms": 1_040})}
+    )
+
+    with pytest.raises(ValueError, match="too short for both call and response phases"):
+        coordination_schedule(macro, _grid(), _graph())
+
+
 @pytest.mark.parametrize("mode", [CoordinationMode.SEQUENCED, CoordinationMode.RIPPLE])
 def test_short_section_gives_every_named_team_a_turn(mode: CoordinationMode) -> None:
     macro = _stepped_macro(mode)

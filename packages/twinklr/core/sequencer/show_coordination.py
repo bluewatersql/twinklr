@@ -163,7 +163,7 @@ def _alternating_windows(
         raise ValueError(f"Section '{section.section.section_id}' is too short to coordinate")
     windows: list[CoordinationWindow] = []
     for index, (start, end) in enumerate(pairwise(boundaries)):
-        if end <= start:
+        if EmissionSession.quantize_boundary(end) <= EmissionSession.quantize_boundary(start):
             continue
         is_call = index % 2 == 0
         windows.append(
