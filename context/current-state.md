@@ -2,7 +2,7 @@
 type: context
 status: active
 area: overview
-updated: 2026-11-18
+updated: 2026-11-19
 ---
 
 # Twinklr — Current State
@@ -192,8 +192,12 @@ See [product/overview.md](product/overview.md).
   The owner accepted its look for one song on their rig in the house preview on
   2026-11-16. That render applied no planner intensity, colour, events or cues: the
   acceptance covers the templates' motion and timing, not the absence of song intent,
-  which W4–W10 add, each with an owner view still pending. There is no hardware result, and the profile timings
-  used were chosen, not measured ([record](../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p3-viewing-render/README.md)).
+  which W4–W10 add. On 2026-11-19 the owner approved the fixture preview from the saved
+  song plan, which included variation and density. Modifier look review and hardware
+  measurements remain open. The earlier house preview and the recovered fixture preview
+  have separate evidence records
+  ([house preview](../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p3-viewing-render/README.md),
+  [fixture preview](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-p3-recovery/README.md)).
   `inject` and `regenerate` have been run only against a fake xLights client.
   Reference: [user guide](../docs/user-guide.md#job_configjson-job-config),
   [catalog README](../catalog/templates/moving_heads/README.md).
@@ -229,15 +233,12 @@ See [product/overview.md](product/overview.md).
 
 ## Quality gate
 
-This page owns the rolling gate snapshot. Latest recorded full gate: `6f2a9f6`
-(2026-11-12), `make validate` green with 5,718 passed, 39 skipped
-([record](../changes/2026_11_12_knowledge_optimization/handoff.md)); the skips are
-optional or local-only boundaries. Last recorded coverage: 89% at `03b75e9` (2026-08-30).
-There are no accepted failures. The gate includes an offline regression harness (`tests/regression/`):
-the moving-head output pins and a hermetic display replay. The unmerged
-`feat/mh-true-up-p3` implementation passed `make validate` at `d08ef508`
-on 2026-11-18 (7,785 passed and 30 skipped). See the
+The latest recorded full `make validate` gate on the history of `main` ran on
+`d08ef508` (2026-11-18) with 7,785 passed, 30 skipped, and 91% coverage.
+Later test-only checks and documentation are recorded in the
 [Phase 3 integration evidence](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-p3-recovery/README.md).
+There are no accepted failures. The gate includes the moving-head output pins and a
+hermetic display replay under `tests/regression/`.
 
 ## Live evidence
 
@@ -247,30 +248,31 @@ on 2026-11-18 (7,785 passed and 30 skipped). See the
 | 2026-11-12 | Claude `claude-opus-5-5`, every role | 6/6 stages, about $0.95; on par with the baseline (251 effects vs 262; indicative, different song); human judgment PENDING-OWNER | [evaluation](../evaluations/2026-11-12-claude-baseline-live-run/README.md) |
 | 2026-11-12 | Ollama cloud `glm-5.3:cloud`, every role | 6/6 stages, 0 schema repairs; on par with the baseline (256 effects vs 262; indicative, different song) | [evidence](../changes/twinklr-reactivation-review/evidence/2026-11-12-p4-t2-ollama-cloud-pipeline/README.md) |
 | 2026-11-16 | Claude `claude-opus-5-5`, `Need A Favor`, owner 4-head rig, the current moving-head renderer | 29,631 effects; xLights reproduced every moving-head byte; look accepted by the owner for this song, rig and house preview: the templates' motion and timing, with no planner intensity, colour, events or cues applied (not a hardware result) | [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p3-viewing-render/README.md) |
+| 2026-11-19 | Claude `claude-opus-5-5`, `Need A Favor`, final Phase 3 contract on `main` | 7/7 stages, 28,294 timed effect placements, ten planner-requested modifiers applied, last 10.1 s dark beyond the beat grid | [live evidence](../changes/2026_11_12_mh_true_up/evidence/2026-11-19-p3-final-live/README.md) |
 
-The three earlier runs rendered moving heads with the renderer deleted on 2026-11-16;
+The first three runs rendered moving heads with the renderer deleted on 2026-11-16;
 their effect counts are not comparable with the current renderer's.
 
 Provider behavior learned from these runs is in
 [live-provider-run-lessons.md](../memories/learnings/live-provider-run-lessons.md). The
 points that shape current behavior:
 
-- Claude refuses to compile the five planner schemas (`compiled grammar is too large`).
+- Earlier Claude probes found five schemas that exceeded structured-output grammar limits.
   The adapter recognizes them before sending (union-parameter limit and a schema-size
   proxy) and sends them once with the schema in the prompt only, validated client-side, so
-  planner output on Claude has no server-side schema guarantee. The owner deferred a
-  schema redesign.
+  those calls use local validation. The 2026-11-19 run logged that fallback for audio
+  profile and macro only, with no fallback logged for the moving-head planner or judge.
 - Ollama Cloud does not enforce `response_format`; the schema travels in the prompt.
 - On OpenAI, strict mode passes for 7 of 8 roles; `audio_profile` shows runaway output.
 
 ## Active work
 
 Active changes are listed in [changes/ACTIVE.md](../changes/ACTIVE.md). The moving-head
-true-up's single renderer is on the unmerged branch `feat/mh-true-up-p3`
-([handoff](../changes/2026_11_12_mh_true_up/plan/handoff.md)). It renders the planner's
-song intent again, except density and modifiers, which are on side branches. Merging is
-the owner's decision. Open owner questions are collected in
-[owner decisions pending](../changes/2026_11_12_mh_true_up/plan/owner-decisions-pending.md). The table below is the
+true-up's single renderer is on `main` as of 2026-11-19 and applies density and
+per-part modifiers alongside the other song intent. Its remaining acceptance work
+and follow-ups are in the [handoff](../changes/2026_11_12_mh_true_up/plan/handoff.md)
+and [owner decision list](../changes/2026_11_12_mh_true_up/plan/owner-decisions-pending.md).
+The table below is the
 twinklr-reactivation-review build campaign: its code and tooling are merged and
 independently verified, and what remains is empirical evidence and owner decisions, not
 implementation.

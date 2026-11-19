@@ -1,6 +1,6 @@
 # Active Changes
 
-_Last updated: 2026-11-18._
+_Last updated: 2026-11-19._
 
 One row per workstream. Keep rows short: status, where the work lives, and the next
 action. Detail and history belong in the change folder.
@@ -11,7 +11,7 @@ action. Detail and history belong in the change folder.
 |---|---|---|---|---|
 | [`twinklr-reactivation-review/`](twinklr-reactivation-review/spec.md) | **Build campaign: code complete, empirical exits open.** Phases 0 and 1K are complete. Phases 1P, 2P, 2K, and 3 have every implementation task merged and independently verified, but their owner, live, xLights, and real-data exits are not met. Phase 4 has 6 of 7 tasks merged; P4-T7 is optional and NO-GO. | `main`; integrator is the orchestrating session | Owner actions, in [runbook order](twinklr-reactivation-review/runbooks/README.md): decide whether the 2026-11-12 Ollama cloud pipeline pass closes P4-T2; watch `rendered.xsq` and record the Claude-baseline judgment; xLights GUI acceptance (runbook 04); P2K-T2 owner-corpus run (runbook 02). | [build/plan/HANDOFF.md](twinklr-reactivation-review/build/plan/HANDOFF.md) |
 | [`2026_11_12_knowledge_optimization/`](2026_11_12_knowledge_optimization/brief.md) | Restructure of the agent router, context, memories, and prompts for multi-agent, multi-workstream use, aligned to the OnDeck layout. Documentation only. | `chore/knowledge-optimization` | Owner review, then merge and close. | [handoff.md](2026_11_12_knowledge_optimization/handoff.md) |
-| [`2026_11_12_mh_true_up/`](2026_11_12_mh_true_up/implementation-brief.md) | Phases 0–2 are on `main`. Phase 3 integrates the single renderer and full song intent, including density and modifiers. Independent reviews completed. See the integration evidence for validation and preview status. Hardware, look acceptance and real xLights injection are open. | `feat/mh-true-up-p3`, worktree `twinklr-mh-true-up` | Owner look review and merge/push decision. The final paid planner run requires authorization. | [Handoff](2026_11_12_mh_true_up/plan/handoff.md), [integration evidence](2026_11_12_mh_true_up/evidence/2026-11-18-p3-recovery/README.md) |
+| [`2026_11_12_mh_true_up/`](2026_11_12_mh_true_up/implementation-brief.md) | Phase 3 merged and pushed at `8b8075c7`. The owner approved the saved-plan fixture preview. The fresh Claude run passed 7/7 and rendered ten modifiers. | `main` | Review the fresh sequence and resolve remaining look, hardware, and real xLights checks. | [Handoff](2026_11_12_mh_true_up/plan/handoff.md), [live evidence](2026_11_12_mh_true_up/evidence/2026-11-19-p3-final-live/README.md) |
 
 Standing boundaries for the campaign (sealed P3-T4 and P3-T7 ledgers, owner-gated live
 work) are in [context/current-state.md](../context/current-state.md#permanent-boundaries).

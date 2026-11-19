@@ -3,15 +3,16 @@ type: handoff
 status: active
 area: research-and-planning
 change: 2026_11_12_mh_true_up
-updated: 2026-11-18
+updated: 2026-11-19
 ---
 
 # Handoff — Moving-head technical design and implementation plans
 
-## Start here — current state, 2026-11-18
+## Start here — current state, 2026-11-19
 
-Phase 3 code is integrated locally on `feat/mh-true-up-p3` in `twinklr-mh-true-up`.
-`main` and its tracked remote remain at Phase 2 (`7356b376`). The single renderer
+Phase 3 was fast-forwarded to `main` and pushed to GitHub on 2026-11-19 at
+`8b8075c7` on owner approval. The owner also approved the saved-plan fixture preview
+and one fresh paid planner run. The single renderer
 cutover and W0–W10 restore the planner's song intent through palette, colour and gobo,
 intensity, transitions, beat and lyric events, variation, density and per-part modifiers.
 The merged renderer revision is 22. See [current state](../../../context/current-state.md)
@@ -31,10 +32,12 @@ Temporary backups preserved the pre-recovery worktree contents and indexes.
 
 ### What remains, in order
 
-1. Owner look review on the recovered build and the [open product decisions](owner-decisions-pending.md).
-2. Owner decision to merge and push Phase 3. Confirm authorization for a fresh paid
-   `twinklr run` or `show` using the final planner contract. The offline replay reused
-   a saved plan and cannot prove provider acceptance or fresh planning.
+1. The approved fresh paid `twinklr run` completed 7/7 stages and rendered ten
+   planner-requested modifiers. The [live evidence](../evidence/2026-11-19-p3-final-live/README.md)
+   records the finished sequence and the dark song tail. Fresh output look review
+   remains open.
+2. The [owner decision list](owner-decisions-pending.md) retains the individual look and
+   product decisions that the saved-plan fixture preview did not exercise.
 3. Early entry repositioning, which could let a variation and the next section's downbeat
    hit coexist. Today the variation gives way. See D1 in the [W10b/c record](../evidence/2026-11-18-w10bc-motif-variation/README.md).
 4. Decide how to park a head that cannot go dark after its final cue. The renderer
