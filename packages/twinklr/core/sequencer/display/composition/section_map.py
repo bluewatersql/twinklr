@@ -17,8 +17,8 @@ from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 class SectionBarRange:
     """A section's position resolved against the BeatGrid.
 
-    All values are derived from the BeatGrid — the source of truth
-    for all timing in the rendering pipeline.
+    Bar references use the detected BeatGrid. An opening pickup and a final
+    partial bar retain their audio-sourced section boundaries.
 
     Attributes:
         section_id: Section identifier (e.g. ``chorus_2``).
@@ -26,7 +26,7 @@ class SectionBarRange:
         end_bar: 0-indexed bar in the song where this section ends
             (first bar of the *next* section, or song end).
         start_ms: Start bar time, or the section's earlier opening pickup.
-        end_ms: Exact ms from the BeatGrid for the end bar.
+        end_ms: End bar time, or the section's final partial-bar boundary.
     """
 
     section_id: str
@@ -49,6 +49,8 @@ def build_section_bar_map(
 
     For each section, snaps its ``start_ms`` and ``end_ms`` to the
     nearest bar boundary in the BeatGrid and records the bar indices.
+    Opening pickups before the first downbeat and final partial bars retain
+    their audio-sourced edges alongside those detected bar references.
     The renderer then uses these indices to anchor section-relative
     bar/beat references to absolute song positions.
 
