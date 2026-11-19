@@ -114,3 +114,14 @@ Independent review found a one-frame dark gap when the shared audio boundary
 rounds upward: outgoing SECTION end floored while incoming start rounded. Snap
 both foundation edges to the same nearest frame, with the song end still a hard
 cap. Add adjacent-section regressions for upward-rounded boundaries.
+
+## Owner-requested CI pause — 2026-11-19
+
+The owner identified Dance Jams house as the problem reference and explicitly
+requested disabling failing CI to avoid spend while the project is in a bad state.
+Pause the repository's CI and Jekyll build workflows through GitHub's workflow
+state, cancel any queued/running instances, and verify both are disabled with no
+active runs. Preserve workflow source, dependency security automation, branch
+protection, and local quality commands. Scope is operational configuration and
+its documentation; no renderer or preview changes. Re-enable these two workflows
+only when the owner requests it. Root owns the operation and documentation.

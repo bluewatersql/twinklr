@@ -1,7 +1,7 @@
 ---
 type: context
 area: engineering
-updated: 2026-11-17
+updated: 2026-11-19
 ---
 
 # Engineering Conventions
@@ -31,11 +31,20 @@ make env-check    # verify uv / Python / .env setup
 ## Quality gates
 
 All commits must pass: ruff (0 issues), mypy (0 errors), pytest (0 failures, coverage
-≥ 65%). `main` is green and there are no accepted failures. The `aa8d325` failure set in
+≥ 65%). There are no accepted local gate failures on `main`. The `aa8d325` failure set in
 [memories/learnings/known-test-failures.md](../../memories/learnings/known-test-failures.md)
-is a historical baseline, not a waiver. CI (`.github/workflows/ci.yml`) runs a format
-check, lint, mypy, the tests not marked `local_only` (without coverage), and
-`make version-check`.
+is a historical baseline, not a waiver. CI (`.github/workflows/ci.yml`) is configured
+for format checking, lint, mypy, tests not marked `local_only` (without coverage),
+and `make version-check`.
+
+**Remote build pause (owner direction, 2026-11-19):** GitHub's CI and Jekyll Pages
+workflows are manually disabled to avoid build spending during repair. Local
+quality commands remain available. The workflow files and branch protections are
+unchanged; dependency security automation remains active. Pages uses the disabled
+Jekyll workflow for builds. Re-enable only on owner request with
+`gh workflow enable ci.yml` and `gh workflow enable jekyll-gh-pages.yml` in this
+repository. This pause does not establish CI health. See the
+[dated operation record](../../changes/2026_11_12_mh_true_up/evidence/2026-11-19-house-musical-sync/README.md#owner-requested-remote-build-pause).
 
 ## Style
 

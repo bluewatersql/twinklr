@@ -10,6 +10,12 @@ updated: 2026-11-19
 
 ## Start here — current state, 2026-11-19
 
+Owner follow-up names Dance Jams house as the problem reference. CI and Jekyll
+Pages builds are manually disabled on owner request to avoid spend during repair;
+see [engineering conventions](../../../context/engineering/conventions.md#quality-gates)
+and the [operation evidence](../evidence/2026-11-19-house-musical-sync/README.md#owner-requested-remote-build-pause).
+Do not re-enable remote builds without owner direction.
+
 The owner **rejected the house rendering** after viewing the recovered previews:
 flashes appear unrelated to the song and expected transitions are absent. Moving
 heads look closer to sync. Continue under

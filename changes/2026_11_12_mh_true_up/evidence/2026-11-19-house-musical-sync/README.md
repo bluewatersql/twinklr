@@ -195,3 +195,32 @@ Placement timing_hint and recipe timing_offset_beats are outside this repair;
 the rejected saved placements all used ON_BEAT. Untimed decorative effects are
 not made beat-synchronous by this change. The detected clock itself is retained;
 this repair does not claim a new beat-tracking or calibration result.
+
+## Owner-requested remote build pause
+
+On 2026-11-19, the owner's delayed clarification named Dance Jams house as the
+problem reference and explicitly requested disabling CI to avoid spend. This is
+not a new acceptance verdict for the replacement previews.
+
+GitHub workflow state was changed through `gh workflow disable`:
+
+- CI, ID `334141543`: verified `disabled_manually`.
+- Jekyll Pages build, ID `234609300`: verified `disabled_manually`.
+
+The latest [Pages run](https://github.com/bluewatersql/twinklr/actions/runs/44587174591)
+failed at `Build with Jekyll`; deployment was skipped. The latest
+[CI run](https://github.com/bluewatersql/twinklr/actions/runs/44587174481) was still
+running and received an explicit cancellation request. Readback verified
+`status: completed`, `conclusion: cancelled`. The recent CI history contains cancellations, so this record
+does not infer that every recent CI run failed tests. No remote job was rerun.
+
+Pages reports `build_type: workflow`; disabling Jekyll stops its automatic builds.
+Workflow source, dependency security automation, branch protection and local gate
+commands are unchanged. The local full gate above remains evidence for its source
+commit only; no new full gate was run for this remote-setting/documentation-only
+operation. Validation is GitHub state readback and `git diff --check`.
+
+Independent review (`/root/pickup_review`) approved the four-file documentation
+delta and independently read back both disabled workflows, the cancelled CI run,
+empty queued/running lists, workflow-based Pages, and active Dependency Graph.
+No tests or renderer changes were part of this operation.
