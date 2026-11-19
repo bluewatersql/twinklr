@@ -32,6 +32,8 @@ from twinklr.core.sequencer.vocabulary import (
     StepUnit,
 )
 
+MAX_SONG_NARRATIVE_ASSETS = 4
+
 
 class NarrativeAssetDirective(BaseModel):
     """A directive for a figurative/narrative asset to be created.
@@ -419,7 +421,9 @@ class GroupPlanSet(BaseModel):
     section_plans: list[SectionCoordinationPlan] = Field(min_length=1)
 
     # Aggregated + deduplicated narrative asset directives across all sections
-    narrative_assets: list[NarrativeAssetDirective] = Field(default_factory=list, max_length=4)
+    narrative_assets: list[NarrativeAssetDirective] = Field(
+        default_factory=list, max_length=MAX_SONG_NARRATIVE_ASSETS
+    )
 
     holistic_evaluation: HolisticEvaluation | None = Field(
         default=None,

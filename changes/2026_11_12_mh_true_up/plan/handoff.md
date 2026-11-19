@@ -54,8 +54,7 @@ Temporary backups preserved the pre-recovery worktree contents and indexes.
    Phase 5, four other Claude schemas that lack server-side enforcement, and audio
    beyond the beat grid. Planner caches re-key and `regenerate` refuses sequences
    injected before the cutover. See [cache learning](../../../memories/learnings/model-dump-hashes-rekey-caches.md).
-9. After merge, retire the two feature worktrees and the two detached validation
-   worktrees when the owner no longer needs them.
+9. The owner requested the [three-song combined review and workspace cleanup](combined-review-2026-11-19.md). Retired workspaces and active feature refs have been removed.
 
 ### Commits since the C1.5 documents
 

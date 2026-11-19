@@ -17,7 +17,10 @@ from twinklr.core.agents.sequencer.group_planner.orchestrator import (
 )
 from twinklr.core.pipeline.result import failure_result, success_result
 from twinklr.core.sequencer.planning import GroupPlanSet, SectionCoordinationPlan
-from twinklr.core.sequencer.planning.group_plan import NarrativeAssetDirective
+from twinklr.core.sequencer.planning.group_plan import (
+    MAX_SONG_NARRATIVE_ASSETS,
+    NarrativeAssetDirective,
+)
 
 if TYPE_CHECKING:
     from twinklr.core.agents.audio.lyrics.models import (
@@ -735,8 +738,8 @@ class GroupPlanAggregatorStage:
     ) -> list[NarrativeAssetDirective]:
         """Collect and deduplicate narrative directives across sections.
 
-        Deduplicates by directive_id. When duplicates exist, the first occurrence
-        is kept and section_ids are merged.
+        Deduplicates by directive_id. The first occurrence is kept and section_ids
+        are merged. The song-level budget retains directives in first-seen order.
 
         Args:
             section_plans: List of SectionCoordinationPlan objects
@@ -771,10 +774,15 @@ class GroupPlanAggregatorStage:
                     section_map[did] = []
                 section_map[did].append(section_id)
 
-        # Build aggregated directives with section_ids populated
+        selected = list(directives_by_id.values())[:MAX_SONG_NARRATIVE_ASSETS]
+        if len(selected) < len(directives_by_id):
+            logger.warning(
+                "Retaining %d of %d unique narrative asset directives within the song budget",
+                len(selected),
+                len(directives_by_id),
+            )
         aggregated = [
-            d.model_copy(update={"section_ids": section_map[d.directive_id]})
-            for d in directives_by_id.values()
+            d.model_copy(update={"section_ids": section_map[d.directive_id]}) for d in selected
         ]
 
         if aggregated:

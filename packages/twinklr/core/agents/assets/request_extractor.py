@@ -16,7 +16,7 @@ import logging
 
 from twinklr.core.agents.assets.models import AssetCategory, AssetSpec
 from twinklr.core.agents.audio.lyrics.models import LyricContextModel
-from twinklr.core.sequencer.planning.group_plan import GroupPlanSet
+from twinklr.core.sequencer.planning.group_plan import MAX_SONG_NARRATIVE_ASSETS, GroupPlanSet
 from twinklr.core.sequencer.theming.catalog import PALETTE_REGISTRY, ItemNotFoundError
 from twinklr.core.sequencer.vocabulary import BackgroundMode
 
@@ -347,7 +347,7 @@ def _extract_narrative_specs(
     Returns:
         List of narrative AssetSpec objects.
     """
-    directives = plan_set.narrative_assets[:4]
+    directives = plan_set.narrative_assets[:MAX_SONG_NARRATIVE_ASSETS]
     if not directives:
         return []
 

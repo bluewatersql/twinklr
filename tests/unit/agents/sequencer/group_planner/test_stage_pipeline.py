@@ -5,9 +5,14 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
+
 from twinklr.core.agents.audio.profile.models import SongSectionRef
 from twinklr.core.agents.sequencer.group_planner.context import MacroSectionPlanningInput
-from twinklr.core.agents.sequencer.group_planner.stage import GroupPlannerStage
+from twinklr.core.agents.sequencer.group_planner.stage import (
+    GroupPlanAggregatorStage,
+    GroupPlannerStage,
+)
 from twinklr.core.audio.models import SongBundle, SongTiming
 from twinklr.core.sequencer.planning import (
     FocalAssignment,
@@ -22,6 +27,7 @@ from twinklr.core.sequencer.planning import (
     PaletteTransition,
     SectionCoordinationPlan,
 )
+from twinklr.core.sequencer.planning.group_plan import NarrativeAssetDirective
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
@@ -164,3 +170,34 @@ def test_build_section_context_receives_lossless_typed_macro_projection() -> Non
     assert extracted.motif_ids == []
     assert extracted.start_ms == 0
     assert extracted.end_ms == 6000
+
+
+@pytest.mark.asyncio
+async def test_aggregate_caps_narrative_assets_after_deduplication() -> None:
+    def section(section_id: str, *ids: str) -> SectionCoordinationPlan:
+        return SectionCoordinationPlan(
+            section_id=section_id,
+            theme=ThemeRef(theme_id="theme.abstract.neon", scope=ThemeScope.SECTION),
+            lane_plans=[LanePlan(lane=LaneKind.BASE, target_roles=["OUTLINE"])],
+            narrative_assets=[
+                NarrativeAssetDirective(
+                    directive_id=id_,
+                    subject="An illuminated tree",
+                    category="image_cutout",
+                    visual_description="A tree outlined with bright white lights.",
+                    story_context="The first glimpse of the display.",
+                )
+                for id_ in ids
+            ],
+        )
+
+    intro = section("intro", "tree", "house", "star")
+    chorus = section("chorus", "tree", "bell", "candle")
+    result = await GroupPlanAggregatorStage().execute([intro, chorus], MagicMock())
+
+    assert result.success, result.error
+    assert result.output is not None
+    assets = result.output.narrative_assets
+    assert [asset.directive_id for asset in assets] == ["tree", "house", "star", "bell"]
+    assert assets[0].section_ids == ["intro", "chorus"]
+    assert result.output.section_plans == [intro, chorus]
