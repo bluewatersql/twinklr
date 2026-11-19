@@ -8,6 +8,11 @@ updated: 2026-11-19
 
 # Three-song house and moving-head previews
 
+**Quality review failed.** The owner reported long dark stretches, poor sync, and
+missed transitions. The original verification checked export and playback.
+The [Dance Jams audit](dance-jams-quality-audit.md) confirms those failures in
+the sequence itself. The clips remain evidence of that run.
+
 On 2026-11-19, `twinklr show` completed for three songs using Claude Opus 5.5 and
 the owner's four-head fixture config. Need A Favor and Dance Jams were named in
 current test evidence. Hey Come Look At My House was chosen based on its earlier
@@ -27,7 +32,7 @@ their manifests. The `previews/` folder contains the 1280×720 H.264 MP4s with
 AAC audio exported from xLights 2026.20. FFmpeg decoded both streams in full for
 all three files. The xLights instance was closed after export, and SHA-256 checks
 confirmed the production layout and network XML files matched their starting
-hashes. No fixture output was enabled. Human look judgment is PENDING-OWNER.
+hashes. No fixture output was enabled.
 
 ## Run corrections and limitations
 

@@ -1,6 +1,6 @@
 ---
 type: plan
-status: complete
+status: active
 area: engineering
 change: 2026_11_12_mh_true_up
 updated: 2026-11-19
@@ -59,3 +59,6 @@ owner media and corpora, reusable configs and assets, and the new deliveries.
 All three combined sequences rendered in xLights and produced decodable previews
 with audio. The [dated run record](../evidence/2026-11-19-combined-review/README.md)
 lists the outputs, the scratch coordination corrections, and the validation gate.
+The subsequent owner review rejected the results. The
+[Dance Jams quality audit](../evidence/2026-11-19-combined-review/dance-jams-quality-audit.md)
+records the reproduced coordination blackout, dropped transition cues, and recovery checks.

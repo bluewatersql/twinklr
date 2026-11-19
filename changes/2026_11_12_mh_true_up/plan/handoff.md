@@ -54,10 +54,12 @@ Temporary backups preserved the pre-recovery worktree contents and indexes.
    Phase 5, four other Claude schemas that lack server-side enforcement, and audio
    beyond the beat grid. Planner caches re-key and `regenerate` refuses sequences
    injected before the cutover. See [cache learning](../../../memories/learnings/model-dump-hashes-rekey-caches.md).
-9. The [three-song combined review and workspace cleanup](combined-review-2026-11-19.md)
-   is complete. The [run record](../evidence/2026-11-19-combined-review/README.md)
-   lists three house and moving-head sequences, their xLights previews, and the
-   scratch plan corrections. Human review of the previews remains PENDING-OWNER.
+9. The [three-song combined run and workspace cleanup](combined-review-2026-11-19.md)
+   produced three previews. The owner rejected them for long dark stretches, poor
+   sync, and missed transitions. The
+   [Dance Jams quality audit](../evidence/2026-11-19-combined-review/dance-jams-quality-audit.md)
+   reproduces the 35-second coordination blackout and records the missed cues.
+   Start the preview recovery there before rerendering the suite.
 
 ### Commits since the C1.5 documents
 
