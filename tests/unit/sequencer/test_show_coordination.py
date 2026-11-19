@@ -889,7 +889,7 @@ def test_ripple_does_not_restart_effect_while_a_team_remains_active() -> None:
         moving_head_target_ids={"MOVING_HEADS"},
     )
 
-    assert _ranges(coordinated, "MEGA_TREE") == [(0, 800), (1_600, 2_450), (3_300, 4_100)]
+    assert _ranges(coordinated, "MEGA_TREE") == [(0, 800), (1_600, 2_460), (3_300, 4_100)]
 
 
 def test_two_team_ripple_retains_a_clear_beat_for_each_lead_change() -> None:
@@ -903,6 +903,29 @@ def test_two_team_ripple_retains_a_clear_beat_for_each_lead_change() -> None:
         (1_100, 1_350, ("MEGA_TREE", "ARCH_LEFT")),
         (1_350, 1_600, ("MEGA_TREE",)),
     ]
+
+
+def test_coordination_discards_a_slice_with_no_xlights_frame() -> None:
+    plan = _render_plan("ARCH_LEFT", lane=LaneKind.RHYTHM)
+    layer = plan.groups[0].layers[0]
+    event = layer.events[0]
+    plan.groups[0].layers[0] = layer.model_copy(
+        update={
+            "events": [
+                event.model_copy(update={"event_id": "tail", "start_ms": 480, "end_ms": 504}),
+                event.model_copy(update={"event_id": "next", "start_ms": 504, "end_ms": 650}),
+            ]
+        }
+    )
+    coordinated = coordinate_display_render_plan(
+        plan,
+        _macro(mode=CoordinationMode.SEQUENCED),
+        _grid(),
+        _graph(),
+        moving_head_target_ids={"MOVING_HEADS"},
+    )
+
+    assert _ranges(coordinated, "ARCH_LEFT") == [(500, 660)]
 
 
 @pytest.mark.parametrize(

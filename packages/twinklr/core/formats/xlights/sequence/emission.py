@@ -137,14 +137,15 @@ class EmissionSession:
         return max(occupied, default=-1) + 1
 
     @staticmethod
-    def _quantize(value: int) -> int:
+    def quantize_boundary(value: int) -> int:
+        """Snap one effect boundary without reserving a minimum duration."""
         return ((value + EFFECT_GRID_MS // 2) // EFFECT_GRID_MS) * EFFECT_GRID_MS
 
     @classmethod
     def quantize_interval(cls, start_ms: int, end_ms: int) -> tuple[int, int]:
         """Snap endpoints to the effect grid without collapsing positive intervals."""
-        start = cls._quantize(start_ms)
-        end = cls._quantize(end_ms)
+        start = cls.quantize_boundary(start_ms)
+        end = cls.quantize_boundary(end_ms)
         if end <= start:
             end = start + EFFECT_GRID_MS
         return start, end

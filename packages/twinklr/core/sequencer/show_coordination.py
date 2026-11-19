@@ -14,6 +14,7 @@ from itertools import pairwise
 import logging
 import re
 
+from twinklr.core.formats.xlights.sequence.emission import EmissionSession
 from twinklr.core.sequencer.display.brightness import intensity_to_brightness
 from twinklr.core.sequencer.display.models.palette import ResolvedPalette
 from twinklr.core.sequencer.display.models.render_event import RenderEvent
@@ -423,8 +424,10 @@ def _normalize_display_role_budgets(
 def _slice_event(event: RenderEvent, windows: list[tuple[int, int]]) -> list[RenderEvent]:
     result: list[RenderEvent] = []
     for index, (window_start, window_end) in enumerate(windows):
-        start = max(event.start_ms, window_start)
-        end = min(event.end_ms, window_end)
+        start = EmissionSession.quantize_boundary(max(event.start_ms, window_start))
+        end = EmissionSession.quantize_boundary(min(event.end_ms, window_end))
+        # A slice without its own frame must not be expanded into the next
+        # effect's frame by the emitter's minimum-duration rule.
         if start < end:
             result.append(
                 event.model_copy(
