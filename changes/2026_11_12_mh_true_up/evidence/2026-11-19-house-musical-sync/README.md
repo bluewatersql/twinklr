@@ -90,13 +90,13 @@ key, removed only in the scratch replay reader; the cached file is unchanged.
 
 ## Final verification
 
-All 28 fresh sections planned successfully (Dance14, Favor7, Hey7), and all three
+All 28 fresh sections planned successfully (Dance 14, Favor 7, Hey 7), and all three
 sequences exported and decoded. Verification retained exact MH XML/DB prefixes,
 29,842 decoded frames and 588 audio windows with zero offset. Frame comparisons
-show visible house changes at Dance18.06,23.64,31.62,44.04 seconds and Hey93.32,
+show visible house changes at Dance 18.06, 23.64, 31.62, 44.04 seconds and Hey 93.32,
 107.06,107.48 seconds. These are timing observations, not a taste verdict.
 
-The same check found Favor verse_1's particle hits at43.04,45.32,54.40 barely
+The same check found Favor verse_1's particle hits at 43.04, 45.32, 54.40 barely
 changed the house. xLights Meteors builds a particle population; its native
 warmup experiment improved pixel activity slightly but did not make those
 reliable impacts. It is not being added to production. Source:
@@ -105,32 +105,87 @@ The recipe construction was already shaped but absent from the prompts. A narrow
 follow-up displays ACCENT constructions and instructs planning/judging to use an
 available solid-fill HIT (On or Color Wash) for an indispensable immediate arrival, with motif textures
 as companions. Only the failed Favor verse was replanned; its first plan and video remain retained.
-The replacement explicitly holds the43.04s energy sag instead of claiming a particle
-hit there, starts a sustained call/response at45.32s, and places a visible windows
-impact at54.40s. In a house-only ROI, that54.40s boundary changed155 pixels by at
-least20 levels, versus zero in the first attempt. The32.42s arrival and96.20s chorus
+The replacement explicitly holds the 43.04 s energy sag instead of claiming a particle
+hit there, starts a sustained call/response at 45.32 s, and places a visible windows
+impact at 54.40 s. In a house-only ROI, that 54.40 s boundary changed 155 pixels by at
+least 20 levels, versus zero in the first attempt. The 32.42 s arrival and 96.20 s chorus
 also change visibly. `final-verification.json` and cue contact sheets retain the
 frame comparisons. This establishes those selected responses, not every possible
 musical event or a human taste verdict.
 
-The first complete full gate at3ed4f234 reported 4 failures,7811 passes and30 skips:
+The first complete full gate at `3ed4f234` reported 4 failures, 7811 passes and 30 skips:
 three old populated-prompt contexts lacked the new optional musical_context field,
-and the current display replay's EffectDB count changed30→32. Optional guards are
-fixed. A hermetic control with the new pulse compiler disabled restores exactly30;
+and the current display replay's EffectDB count changed 30→32. Optional guards are
+fixed. A hermetic control with the new pulse compiler disabled restores exactly 30;
 with it enabled, four unfaded settings variants replace two old variants (net+2).
 All other replay metrics are identical. Only that current replay metric is updated;
 the historical XSQ, original metrics and recipe snapshot remain unchanged.
-The follow-up targeted suite passed479 tests. Independent follow-up review approved
-519037b2 plus the solid-fill wording correction, with48 independently passing
-prompt/context/replay checks and7 passing corrected-wording prompt tests.
-A fresh full gate will validate the final source snapshot.
+The follow-up targeted suite passed 479 tests. Independent follow-up review approved
+519037b2 plus the solid-fill wording correction, with 48 independently passing
+prompt/context/replay checks and 7 passing corrected-wording prompt tests.
+The all-CUT audit then found Favor's final verse at 192.133 s had no incoming
+foundation until 193.400 s. `bf52c987` makes BASE/SECTION placements starting at
+bar 1 beat 1 cover the audio section's actual edges; explicit later placements and
+other lanes keep their detected references. Independent review caught a 20 ms gap
+when the outgoing edge floored but the incoming edge rounded upward. `a5e52265`
+quantizes shared foundation edges consistently, retaining the song-duration cap.
+The reviewer approved the final delta after 237 independent composition,
+coordination and replay tests. All 11 requested CUT starts now have immediate
+unfaded house events (Dance 4, Favor 4, Hey 3), including Favor at 192.140 s.
+No fallback substitutions were used. Final full-gate result follows below.
 
 Prior gate attempts: a sequential run was interrupted to use parallel workers;
 the first parallel command failed before tests because `uv sync` had pruned the
 local pytest-xdist installation. Restoring xdist in the local environment and
-using `UV_NO_SYNC=1 UV_OFFLINE=1` resolved that environment issue. A gate started
-on the intermediate commit was superseded after review fixes. The final command uses `PYTEST_ADDOPTS='-n 8 --dist loadfile' make validate`;
+using `UV_NO_SYNC=1 UV_OFFLINE=1` resolved that environment issue. Intermediate gates were explicitly stopped when rendered CUT audits and
+independent review found the partial-bar and shared-frame foundation defects.
+These interrupted runs are not passing validation evidence. The final command uses `PYTEST_ADDOPTS='-n 8 --dist loadfile' make validate`;
 its final snapshot and result are recorded below.
+
+## Final artifacts and render checks
+
+Final render source: `a5e52265`. All three saved new plans were replayed after
+that commit and exported through xLights 2026.20. The 11 CUT starts were checked
+against the final trace and native effect settings; all have incoming events and
+no incoming fade. Favor's final verse now changes 1,168 house pixels at 192.140 s,
+instead of waiting until 193.400 s. Contact sheets were inspected for each song.
+The final videos retain 29,842 frames; 588 half-second audio windows sampled
+throughout the songs all measure 0 ms offset (minimum correlation 0.978).
+Moving-head XML and existing effect/palette prefixes match the original exactly.
+The full videos and comparison clip decode without errors.
+
+Local artifacts beneath the scratch root:
+
+- `previews/dance-before-after.mp4`: 36-second comparison, song time 16–52 s;
+  rejected render left, repaired render right, current source audio.
+- `previews/dance-house-preview.mp4`
+- `previews/favor-house-preview.mp4`
+- `previews/hey-house-preview.mp4`
+- `sequences/`: three corresponding XSQs with trace/evaluation sidecars.
+- `final-verification.json`, `cut-verification.json`, `*-cue-contact.png`:
+  final technical observations, not owner look judgments.
+- `export-final.log`, `verify-final.log`, `rerender-final.log`: final run logs.
+- `delivery-manifest.json`: source commit, artifact sizes and SHA-256 hashes.
+
+xLights fixture output stayed off. The widened preview pane was restored after
+export through CUA (divider 1450→513, followed by an accessibility-state read).
+The automation API returned `xLights closed.`. A later process check confirmed
+xLights absent (`post-close-verification.log`), and SHA-256 checks of the production
+`xlights_rgbeffects.xml` and `xlights_networks.xml` both passed again after close.
+
+## Completion gate
+
+PASS: clean-tree source snapshot `a5e52265`, command
+`UV_NO_SYNC=1 UV_OFFLINE=1 PYTEST_ADDOPTS='-n 8 --dist loadfile' make validate`.
+Result: 7,818 passed, 30 skipped, 43 warnings in 737.29 seconds; 91% coverage.
+Formatting left all 1,321 files unchanged; lint passed; mypy passed 661 source files.
+Exit status 0. Full log retained at the scratch root as
+`make-validate-a5e52265.log`. No source edits followed this gate; final changes are
+documentation only. Generated root test/lint/type/coverage caches were moved to
+Trash afterward (`cleanup.json`); deliverables and reproducibility evidence remain.
+The prior recovery branch was already merged and removed. Integration follows the
+owner's recorded commit/merge/sync instruction; the completed feature branch is
+removed after the fast-forward to `main`.
 
 ## Limits and owner verdict
 

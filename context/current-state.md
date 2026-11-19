@@ -207,11 +207,12 @@ See [product/overview.md](product/overview.md).
   intent overrides recipe blend metadata
   ([decision](../memories/decisions/lane-blend-mode-overrides-recipe.md)).
   Display output keeps every section lit: a brightness floor, a beat grid extended to the
-  end of the song, full-section foundations covering the opening pickup before the first
-  detected downbeat, and a foundation-coverage rule in the group planner
+  end of the song, full-section foundations covering the actual audio-section edges (including
+  pickups and partial bars), and a foundation-coverage rule in the group planner
   ([decision](../memories/decisions/display-stays-lit.md)).
   Explicit RHYTHM pulses and beat/offbeat-tagged sparkle use detected beat/bar
-  brightness envelopes; coordination slicing preserves their phase. Palette CUT
+  brightness envelopes; coordination slicing preserves their phase. Adjacent
+  full-section foundations share one quantized frame boundary. Palette CUT
   removes section-edge fades. House planning and judging receive timed musical
   cues, audio-profile objectives, detected beat references and actual accent recipe
   construction. Streaming particles alone do not guarantee an immediate impact.

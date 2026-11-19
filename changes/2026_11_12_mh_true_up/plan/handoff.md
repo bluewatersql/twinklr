@@ -13,15 +13,29 @@ updated: 2026-11-19
 The owner **rejected the house rendering** after viewing the recovered previews:
 flashes appear unrelated to the song and expected transitions are absent. Moving
 heads look closer to sync. Continue under
-[house musical synchronization](house-musical-sync-2026-11-19.md) on
-`codex/house-musical-sync`. The prior technical checks below do not establish
+[house musical synchronization](house-musical-sync-2026-11-19.md) integrated on `main`. The prior technical checks below do not establish
 musical responsiveness or house look acceptance. The
 [house repair evidence](../evidence/2026-11-19-house-musical-sync/README.md) records
-clock/fade/cue-context fixes, independent review, rendered cue checks, and the
+clock/fade/cue-context and partial-bar foundation fixes, independent review, rendered cue checks, and the
 rejected Favor particle-hit attempt. Three replacement previews are under
 `~/xlights/_twinklr_verify/house-sync-2026-11-19/previews/`; moving-head XML is
-unchanged. Final gate recording remains in progress; new owner look judgment is
+unchanged. Source `a5e52265` is independently approved, including 237 composition,
+coordination and replay checks. All 11 CUT starts are immediate and unfaded;
+Favor's final cut is visible at 192.140 s. xLights is closed, fixture output stayed
+off, and production show hashes match. The clean-tree full gate on `a5e52265` passed: 7,818 tests,
+30 skips, 43 warnings and 91% coverage, using `UV_NO_SYNC=1 UV_OFFLINE=1
+PYTEST_ADDOPTS='-n 8 --dist loadfile' make validate`. The final evidence log is
+`make-validate-a5e52265.log` in the scratch root. New owner look judgment is
 PENDING-OWNER, while the prior previews remain REJECTED.
+
+This session adds the display `composition/rhythm.py` compiler and its regressions;
+updates composition/export/coordination and group-planner timing/context/prompt
+files; updates the current replay EffectDB count with a reproduced control; and
+adds the house-sync plan, evidence and rendered-evidence learning. No tracked
+files were deleted. The commit range from `03213e9e` to `a5e52265` identifies the
+implementation and tests; the final documentation commit records delivery.
+Next action is owner playback judgment on the three new previews, starting with
+`previews/dance-before-after.mp4`. No further provider run is needed to view them.
 
 The [recovered whole-song review](../evidence/2026-11-19-combined-review/recovery-review.md)
 continues the session that failed with the chat API's audio-input error. It found
