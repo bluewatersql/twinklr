@@ -103,9 +103,15 @@ reliable impacts. It is not being added to production. Source:
 [xLights Meteors](https://raw.githubusercontent.com/xLightsSequencer/xLights/master/src-core/effects/MeteorsEffect.cpp).
 The recipe construction was already shaped but absent from the prompts. A narrow
 follow-up displays ACCENT constructions and instructs planning/judging to use an
-available solid On HIT for an indispensable immediate arrival, with motif textures
-as companions. Only the failed Favor verse is being replanned; its first plan and
-video measurements remain retained. Final verification is pending that replacement.
+available solid-fill HIT (On or Color Wash) for an indispensable immediate arrival, with motif textures
+as companions. Only the failed Favor verse was replanned; its first plan and video remain retained.
+The replacement explicitly holds the43.04s energy sag instead of claiming a particle
+hit there, starts a sustained call/response at45.32s, and places a visible windows
+impact at54.40s. In a house-only ROI, that54.40s boundary changed155 pixels by at
+least20 levels, versus zero in the first attempt. The32.42s arrival and96.20s chorus
+also change visibly. `final-verification.json` and cue contact sheets retain the
+frame comparisons. This establishes those selected responses, not every possible
+musical event or a human taste verdict.
 
 The first complete full gate at3ed4f234 reported 4 failures,7811 passes and30 skips:
 three old populated-prompt contexts lacked the new optional musical_context field,
@@ -114,14 +120,17 @@ fixed. A hermetic control with the new pulse compiler disabled restores exactly3
 with it enabled, four unfaded settings variants replace two old variants (net+2).
 All other replay metrics are identical. Only that current replay metric is updated;
 the historical XSQ, original metrics and recipe snapshot remain unchanged.
-A fresh full gate will validate the follow-up.
+The follow-up targeted suite passed479 tests. Independent follow-up review approved
+519037b2 plus the solid-fill wording correction, with48 independently passing
+prompt/context/replay checks and7 passing corrected-wording prompt tests.
+A fresh full gate will validate the final source snapshot.
 
 Prior gate attempts: a sequential run was interrupted to use parallel workers;
 the first parallel command failed before tests because `uv sync` had pruned the
 local pytest-xdist installation. Restoring xdist in the local environment and
 using `UV_NO_SYNC=1 UV_OFFLINE=1` resolved that environment issue. A gate started
-on the intermediate commit was superseded after review fixes. The final command
-runs against `3ed4f234` with `PYTEST_ADDOPTS='-n 8 --dist loadfile' make validate`.
+on the intermediate commit was superseded after review fixes. The final command uses `PYTEST_ADDOPTS='-n 8 --dist loadfile' make validate`;
+its final snapshot and result are recorded below.
 
 ## Limits and owner verdict
 

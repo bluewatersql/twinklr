@@ -15,7 +15,13 @@ flashes appear unrelated to the song and expected transitions are absent. Moving
 heads look closer to sync. Continue under
 [house musical synchronization](house-musical-sync-2026-11-19.md) on
 `codex/house-musical-sync`. The prior technical checks below do not establish
-musical responsiveness or house look acceptance.
+musical responsiveness or house look acceptance. The
+[house repair evidence](../evidence/2026-11-19-house-musical-sync/README.md) records
+clock/fade/cue-context fixes, independent review, rendered cue checks, and the
+rejected Favor particle-hit attempt. Three replacement previews are under
+`~/xlights/_twinklr_verify/house-sync-2026-11-19/previews/`; moving-head XML is
+unchanged. Final gate recording remains in progress; new owner look judgment is
+PENDING-OWNER, while the prior previews remain REJECTED.
 
 The [recovered whole-song review](../evidence/2026-11-19-combined-review/recovery-review.md)
 continues the session that failed with the chat API's audio-input error. It found

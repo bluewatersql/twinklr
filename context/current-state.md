@@ -210,6 +210,13 @@ See [product/overview.md](product/overview.md).
   end of the song, full-section foundations covering the opening pickup before the first
   detected downbeat, and a foundation-coverage rule in the group planner
   ([decision](../memories/decisions/display-stays-lit.md)).
+  Explicit RHYTHM pulses and beat/offbeat-tagged sparkle use detected beat/bar
+  brightness envelopes; coordination slicing preserves their phase. Palette CUT
+  removes section-edge fades. House planning and judging receive timed musical
+  cues, audio-profile objectives, detected beat references and actual accent recipe
+  construction. Streaming particles alone do not guarantee an immediate impact.
+  The owner rejected the previous house previews; new timing/render checks do not
+  establish taste acceptance ([repair evidence](../changes/2026_11_12_mh_true_up/evidence/2026-11-19-house-musical-sync/README.md)).
   `packages/twinklr/core/sequencer/display/`, `packages/twinklr/core/curves/`
 - **xLights delivery and iteration** — self-contained `.xsq`, `.xtiming`, and `.xmap`
   output; a pinned automation client for preview rendering; guarded `inject` and
