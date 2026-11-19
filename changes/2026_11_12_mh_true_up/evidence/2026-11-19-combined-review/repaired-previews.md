@@ -8,6 +8,10 @@ updated: 2026-11-19
 
 # Repaired house and moving-head previews
 
+The [recovered whole-song review](recovery-review.md) adds the opening-pickup
+foundation fix and newer, fully scanned previews. This record retains the first
+coordination and cue repair evidence.
+
 The owner requested a repair after rejecting the first three previews. The
 [original Dance Jams audit](dance-jams-quality-audit.md) records the failed run.
 The three replacement sequences and 1280×720 xLights 2026.20 previews are under

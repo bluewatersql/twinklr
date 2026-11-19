@@ -2,7 +2,7 @@
 type: decision
 status: accepted
 created: 2026-11-12
-updated: 2026-11-13
+updated: 2026-11-19
 confidence: confirmed
 tags: [display, rendering, group-planner, brightness, xlights, owner-acceptance]
 ---
@@ -83,6 +83,15 @@ for the whole section) were replaced by abstract wording in `7bf495a` (2026-08-1
 - A fresh live Claude plan with the final Rule 12 wording: 7 sections, all planned in
   one iteration, six approved at 7.4–7.8 (the 0.6 s outro has no verdict), 735,296
   tokens. Rendered by xLights: mean 49.9, darkest 2 s window 13.0.
+
+## Opening pickup fix (2026-11-19)
+
+The 2026-11-19 [recovery review](../../changes/2026_11_12_mh_true_up/evidence/2026-11-19-combined-review/recovery-review.md)
+found that a full-section foundation still waited for the first detected downbeat,
+leaving an audible opening pickup unlit. The composition engine now retains that
+opening section boundary for BASE placements at bar 1 beat 1 with SECTION duration.
+Accents, later starts and expanded coordination windows retain their beat timing.
+This applies the existing foundation rule; it introduces no new look verdict.
 
 ## Open items for the owner
 

@@ -10,6 +10,18 @@ updated: 2026-11-19
 
 ## Start here — current state, 2026-11-19
 
+The [recovered whole-song review](../evidence/2026-11-19-combined-review/recovery-review.md)
+continues the session that failed with the chat API's audio-input error. It found
+and repaired a display foundation that waited for the opening downbeat, and records
+the independent code review and the xLights preview-size export correction.
+The replacement artifacts are under
+`~/xlights/_twinklr_verify/recovery-review-2026-11-19/`.
+The full gate on `a1326e31` passed with 7,798 tests, 30 skips and 91% coverage.
+All 29,842 final video frames were scanned; 588 audio comparisons measured
+zero offset, and no audible dark interval lasting at least one second remained.
+Implementation and evidence are integrated on `main`.
+Human look acceptance and physical verification remain open.
+
 Phase 3 was fast-forwarded to `main` and pushed to GitHub on 2026-11-19 at
 `8b8075c7` on owner approval. The owner also approved the saved-plan fixture preview
 and one fresh paid planner run. The single renderer

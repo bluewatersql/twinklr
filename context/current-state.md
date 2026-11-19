@@ -207,7 +207,8 @@ See [product/overview.md](product/overview.md).
   intent overrides recipe blend metadata
   ([decision](../memories/decisions/lane-blend-mode-overrides-recipe.md)).
   Display output keeps every section lit: a brightness floor, a beat grid extended to the
-  end of the song, and a foundation-coverage rule in the group planner
+  end of the song, full-section foundations covering the opening pickup before the first
+  detected downbeat, and a foundation-coverage rule in the group planner
   ([decision](../memories/decisions/display-stays-lit.md)).
   `packages/twinklr/core/sequencer/display/`, `packages/twinklr/core/curves/`
 - **xLights delivery and iteration** — self-contained `.xsq`, `.xtiming`, and `.xmap`
@@ -235,10 +236,10 @@ See [product/overview.md](product/overview.md).
 ## Quality gate
 
 The latest recorded full `make validate` gate on the history of `main` ran on
-`d0450c31` (2026-11-19) with 7,797 passed, 30 skipped, and 91% coverage.
+`a1326e31` (2026-11-19) with 7,798 passed, 30 skipped, and 91% coverage.
 There are no accepted failures. The gate includes the moving-head output pins and a
 hermetic display replay under `tests/regression/`.
-[Repaired three-song preview record](../changes/2026_11_12_mh_true_up/evidence/2026-11-19-combined-review/repaired-previews.md)
+[Recovered three-song review record](../changes/2026_11_12_mh_true_up/evidence/2026-11-19-combined-review/recovery-review.md)
 
 ## Live evidence
 
