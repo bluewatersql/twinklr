@@ -59,7 +59,9 @@ Temporary backups preserved the pre-recovery worktree contents and indexes.
    sync, and missed transitions. The
    [Dance Jams quality audit](../evidence/2026-11-19-combined-review/dance-jams-quality-audit.md)
    reproduces the 35-second coordination blackout and records the missed cues.
-   Start the preview recovery there before rerendering the suite.
+   The [replacement run](../evidence/2026-11-19-combined-review/repaired-previews.md)
+   verifies the repaired scheduling, four Dance Jams cues, and the three new
+   previews. Owner look review and physical verification remain open.
 
 ### Commits since the C1.5 documents
 

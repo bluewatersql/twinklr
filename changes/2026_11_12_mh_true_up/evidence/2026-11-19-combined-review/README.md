@@ -11,7 +11,8 @@ updated: 2026-11-19
 **Quality review failed.** The owner reported long dark stretches, poor sync, and
 missed transitions. The original verification checked export and playback.
 The [Dance Jams audit](dance-jams-quality-audit.md) confirms those failures in
-the sequence itself. The clips remain evidence of that run.
+the sequence itself. The clips remain evidence of that run. The
+[repair record](repaired-previews.md) links the checked replacement results.
 
 On 2026-11-19, `twinklr show` completed for three songs using Claude Opus 5.5 and
 the owner's four-head fixture config. Need A Favor and Dance Jams were named in

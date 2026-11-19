@@ -81,3 +81,7 @@ trace and preview. Verify the preview's audio against the original soundtrack.
 The earlier approvals cover the three source tracks, live replanning, and xLights
 exports from the expendable layout. Preserve the failed runs as evidence and keep
 real fixture output disabled.
+
+The [repair record](../evidence/2026-11-19-combined-review/repaired-previews.md)
+identifies all three replacement previews, the Dance Jams cue checks, and the
+recorded scratch edits. The owner look review remains open.
