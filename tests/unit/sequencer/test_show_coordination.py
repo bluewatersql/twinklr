@@ -872,6 +872,23 @@ def test_call_response_requires_a_renderable_frame_for_each_phase() -> None:
         coordination_schedule(macro, _grid(), _graph())
 
 
+def test_call_response_starts_with_call_after_an_empty_pickup() -> None:
+    macro = _call_response_macro("MOVING_HEADS")
+    section = macro.sections[0]
+    macro.sections[0] = section.model_copy(
+        update={"section": section.section.model_copy(update={"start_ms": 496, "end_ms": 2_200})}
+    )
+
+    schedule = coordination_schedule(macro, _grid(), _graph())
+    assert [
+        (window.start_ms, window.phase) for window in schedule if window.phase != "unpaired_support"
+    ] == [
+        (500, "call"),
+        (1_100, "response"),
+        (1_600, "call"),
+    ]
+
+
 @pytest.mark.parametrize("mode", [CoordinationMode.SEQUENCED, CoordinationMode.RIPPLE])
 def test_short_section_gives_every_named_team_a_turn(mode: CoordinationMode) -> None:
     macro = _stepped_macro(mode)
