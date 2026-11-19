@@ -66,6 +66,30 @@ References system prompt rules and existing conversation context.
 
 ## Instructions
 
+{% if musical_context %}
+## Musical Events and Responses
+
+The bar/beat references below use the detected grid that renders this section.
+Respond to these musical events when choosing accents, changes of motion, and
+pullbacks. Do not scatter accents at arbitrary evenly spaced bars. The original
+timestamp is the audio fact; `render_ms` is the nearest available beat and its
+offset is shown explicitly. Describe each response in `planning_notes`.
+{% for objective in musical_context.objectives %}
+- Objective: {{ objective }}
+{% endfor %}
+{% if musical_context.characteristics %}
+Section dynamics: {{ musical_context.characteristics | join(', ') }}.
+{% endif %}
+{% for moment in musical_context.moments %}
+- {{ moment.timestamp_ms }} ms — {{ moment.text }} [{{ moment.emphasis }}]: {{ moment.visual_hint }}{% if moment.bar is defined %}; bar {{ moment.bar }} beat {{ moment.beat }}, ON_BEAT → {{ moment.render_ms }} ms (offset {{ moment.offset_ms }} ms){% endif %}.
+{% endfor %}
+
+Detected beat times for translating the objectives above (absolute milliseconds):
+{% for beat in musical_context.beat_times %}
+{{ beat.bar }}:{{ beat.beat }}={{ beat.timestamp_ms }}{% if not loop.last %}, {% endif %}
+{% endfor %}
+{% endif %}
+
 1. Address ALL ERROR severity issues first
 2. Keep working structure — only fix flagged issues
 {% if revision_request and revision_request.specific_fixes %}

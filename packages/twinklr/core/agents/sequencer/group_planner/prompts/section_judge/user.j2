@@ -48,7 +48,31 @@ CATEGORICAL PLANNING VERSION
 **Musical Length:** {{ section_duration_bars }} bars ({{ section_duration_beats }} beats)
 **Valid Bar Range:** 1 to {{ available_bars }} (section_max_bar = {{ section_max_bar }})
 
-⚠️ **Bar range is authoritative.** The section tempo determines bar count — do NOT infer bar limits from duration in seconds. A placement at bar {{ section_max_bar }} is valid.
+⚠️ **Bar range is authoritative.** The detected grid determines bar count — do NOT infer bar limits from duration in seconds. A placement at bar {{ section_max_bar }} is valid.
+
+{% if musical_context %}
+## Musical Events and Responses
+
+The bar/beat references below use the detected grid that renders this section.
+Respond to these musical events when choosing accents, changes of motion, and
+pullbacks. Do not scatter accents at arbitrary evenly spaced bars. The original
+timestamp is the audio fact; `render_ms` is the nearest available beat and its
+offset is shown explicitly. Describe each response in `planning_notes`.
+{% for objective in musical_context.objectives %}
+- Objective: {{ objective }}
+{% endfor %}
+{% if musical_context.characteristics %}
+Section dynamics: {{ musical_context.characteristics | join(', ') }}.
+{% endif %}
+{% for moment in musical_context.moments %}
+- {{ moment.timestamp_ms }} ms — {{ moment.text }} [{{ moment.emphasis }}]: {{ moment.visual_hint }}{% if moment.bar is defined %}; bar {{ moment.bar }} beat {{ moment.beat }}, ON_BEAT → {{ moment.render_ms }} ms (offset {{ moment.offset_ms }} ms){% endif %}.
+{% endfor %}
+
+Detected beat times for translating the objectives above (absolute milliseconds):
+{% for beat in musical_context.beat_times %}
+{{ beat.bar }}:{{ beat.beat }}={{ beat.timestamp_ms }}{% if not loop.last %}, {% endif %}
+{% endfor %}
+{% endif %}
 
 ## Available Groups (by role)
 
@@ -115,6 +139,8 @@ matches section energy ({{ energy_target }}) and duration matches musical intent
 
 2) **Quality Assessment**
 - templates appropriate for lanes + section intent
+- major supplied musical arrivals and pullbacks have a visible response at their mapped bar/beat, or a specific musical reason for restraint in planning_notes
+- arbitrary periodic accents and uninterrupted textures do not count as responses to timed musical events
 - coordination readable + coherent
 - primary targets get meaningful ACCENT treatment
 - **energy alignment**: intensity levels match energy target ({{ energy_target }})

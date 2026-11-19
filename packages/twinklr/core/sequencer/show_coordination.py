@@ -23,6 +23,7 @@ from twinklr.core.sequencer.planning.models import (
     FocalRoleKind,
     MacroPlan,
     MacroSection,
+    PaletteTransition,
 )
 from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
 from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
@@ -435,6 +436,12 @@ def _slice_event(event: RenderEvent, windows: list[tuple[int, int]]) -> list[Ren
                         "event_id": f"{event.event_id}|coord-{index}",
                         "start_ms": start,
                         "end_ms": end,
+                        "transition_in": (
+                            event.transition_in
+                            if start == event.start_ms and event.source.lane != LaneKind.RHYTHM
+                            else None
+                        ),
+                        "transition_out": event.transition_out if end == event.end_ms else None,
                     },
                     deep=True,
                 )
@@ -455,6 +462,11 @@ def coordinate_display_render_plan(
     schedule = coordination_schedule(macro_plan, beat_grid, graph)
     expander = TargetExpander(graph)
     sections = {item.section.section_id: item for item in macro_plan.sections}
+    cut_times = {
+        EmissionSession.quantize_boundary(sections[stop.applies_from_section_id].section.start_ms)
+        for stop in macro_plan.palette_arc
+        if stop.transition == PaletteTransition.CUT
+    }
     groups = []
     for group in render_plan.groups:
         layers = []
@@ -478,6 +490,12 @@ def coordinate_display_render_plan(
                     update={
                         "brightness_scale": _ROLE_SCALE[role],
                         "palette": _resolved_palette(macro_plan, event.source.section_id),
+                        "transition_in": None
+                        if event.start_ms in cut_times
+                        else event.transition_in,
+                        "transition_out": None
+                        if event.end_ms in cut_times
+                        else event.transition_out,
                     },
                     deep=True,
                 )

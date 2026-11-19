@@ -10,6 +10,13 @@ updated: 2026-11-19
 
 ## Start here — current state, 2026-11-19
 
+The owner **rejected the house rendering** after viewing the recovered previews:
+flashes appear unrelated to the song and expected transitions are absent. Moving
+heads look closer to sync. Continue under
+[house musical synchronization](house-musical-sync-2026-11-19.md) on
+`codex/house-musical-sync`. The prior technical checks below do not establish
+musical responsiveness or house look acceptance.
+
 The [recovered whole-song review](../evidence/2026-11-19-combined-review/recovery-review.md)
 continues the session that failed with the chat API's audio-input error. It found
 and repaired a display foundation that waited for the opening downbeat, and records

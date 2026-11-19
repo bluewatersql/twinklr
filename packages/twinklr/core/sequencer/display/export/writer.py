@@ -22,6 +22,7 @@ from twinklr.core.formats.xlights.sequence.trace import (
     EmissionTraceEntry,
 )
 from twinklr.core.sequencer.display.brightness import event_brightness_percent
+from twinklr.core.sequencer.display.composition.rhythm import brightness_curve
 from twinklr.core.sequencer.display.effects.protocol import (
     RenderContext,
 )
@@ -217,6 +218,21 @@ class XSQWriter:
             settings.effect_name,
             brightness_scale=event.brightness_scale,
         )
+        if event.brightness_points:
+            # On already applies intensity in its effect settings; other effects
+            # carry their complete intensity/role budget in the palette curve.
+            peak = (
+                100
+                if settings.effect_name == "On" or palette.brightness is None
+                else palette.brightness
+            )
+            palette = palette.model_copy(
+                update={
+                    "brightness_curve": brightness_curve(
+                        event.brightness_points, event.start_ms, event.end_ms, peak
+                    )
+                }
+            )
         palette_string = build_palette_string(palette)
         trace: DisplayEmissionTrace = {
             "backend": "display",

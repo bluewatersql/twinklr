@@ -281,3 +281,74 @@ def test_recipe_compiler_falls_back_for_placeholder_effect_type() -> None:
     assert len(effects) == 1
     # Should fall back to resolve_effect_type which maps this to "Color Wash"
     assert effects[0].event.effect_type == "Color Wash"
+
+
+def test_pulse_layer_uses_detected_beats_and_preserves_rolling_layer() -> None:
+    """A phrase-long PULSE must modulate on actual beats, not run a fixed shimmer."""
+    from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+
+    base = _make_recipe()
+    pulse = base.layers[0].model_copy(update={"motion": [MotionVerb.PULSE]})
+    roll = base.layers[0].model_copy(update={"layer_index": 1, "motion": [MotionVerb.ROLL]})
+    recipe = base.model_copy(update={"layers": (pulse, roll)})
+    grid = BeatGrid.from_tempo(120, total_bars=2)
+    grid = grid.model_copy(
+        update={"beat_boundaries": [0.0, 400.0, 1000.0, 1600.0, 2200.0, 3000.0, 4000.0]}
+    )
+    context = _make_context().model_copy(update={"lane": LaneKind.RHYTHM, "beat_grid": grid})
+    effects = RecipeCompiler(RecipeCatalog(recipes=[recipe])).compile(_make_placement(), context)
+    points = effects[0].event.model_dump().get("brightness_points", [])
+    assert [t for t, value in points if value == 1.0] == [0, 400, 1000, 1600, 2200, 3000, 4000]
+    assert effects[1].event.model_dump().get("brightness_points", []) == []
+
+
+@pytest.mark.parametrize(
+    ("tags", "motion", "driver", "expected"),
+    [
+        (["half-time"], MotionVerb.PULSE, "BEATS", [0, 1000, 2200, 4000]),
+        (["offbeat"], MotionVerb.SPARKLE, "BEATS", [200, 700, 1300, 1900, 2600, 3500]),
+        (["beat"], MotionVerb.SPARKLE, "BARS", [0, 2200, 4000]),
+        ([], MotionVerb.SPARKLE, "BEATS", []),
+    ],
+)
+def test_declared_rhythm_cadence(tags, motion, driver, expected) -> None:
+    from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+    from twinklr.core.sequencer.vocabulary import GPTimingDriver
+
+    base = _make_recipe()
+    recipe = base.model_copy(
+        update={"tags": tags, "layers": (base.layers[0].model_copy(update={"motion": [motion]}),)}
+    )
+    grid = BeatGrid.from_tempo(120, total_bars=2).model_copy(
+        update={
+            "beat_boundaries": [0.0, 400.0, 1000.0, 1600.0, 2200.0, 3000.0, 4000.0],
+            "bar_boundaries": [0.0, 2200.0, 4000.0],
+        }
+    )
+    context = _make_context().model_copy(
+        update={
+            "lane": LaneKind.RHYTHM,
+            "beat_grid": grid,
+            "timing_driver": GPTimingDriver(driver),
+        }
+    )
+    event = (
+        RecipeCompiler(RecipeCatalog(recipes=[recipe])).compile(_make_placement(), context)[0].event
+    )
+    assert [t for t, value in event.brightness_points if value == 1.0] == expected
+
+
+def test_coordinated_brightness_curve_keeps_absolute_phase_and_role_brightness() -> None:
+    from twinklr.core.sequencer.display.composition.rhythm import brightness_curve
+
+    curve = brightness_curve(
+        [(0, 1), (250, 0), (480, 0), (500, 1), (750, 0), (980, 0), (1000, 1)],
+        200,
+        800,
+        40,
+    )
+    # Slice starts 200 ms into the original decay, not at a restarted peak.
+    values = curve.split("Values=")[1].rstrip("|").split(";")
+    assert values[0] == "0.000000:0.020000"
+    assert "0.500000:0.100000" in values  # 500 ms stays 500 ms; 40% / 400% curve range.
+    assert values[-1] == "1.000000:0.000000"

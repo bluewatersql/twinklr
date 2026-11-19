@@ -12,6 +12,7 @@ import json
 from typing import Any
 
 from twinklr.core.sequencer.display.composition.models import CompiledEffect, TemplateCompileError
+from twinklr.core.sequencer.display.composition.rhythm import rhythm_points
 from twinklr.core.sequencer.display.composition.template_compiler import (
     TemplateCompileContext,
 )
@@ -121,7 +122,30 @@ class RecipeCompiler:
             effect_type, _, _ = self._resolve_layer_effect(layer, source)
             self._validate_effect_type(effect_type, source)
 
-        return [self._layer_to_compiled_effect(layer, context, source) for layer in result.layers]
+        compiled = []
+        layers_by_index = {layer.layer_index: layer for layer in recipe.layers}
+        for layer in result.layers:
+            effect = self._layer_to_compiled_effect(layer, context, source)
+            points = rhythm_points(recipe, layers_by_index[layer.layer_index], context)
+            if points:
+                # The declared pulse owns brightness; a fixed shimmer or a lane
+                # fade would add another, unrelated clock on top of it.
+                parameters = dict(effect.event.parameters)
+                parameters["shimmer"] = False
+                effect = effect.model_copy(
+                    update={
+                        "event": effect.event.model_copy(
+                            update={
+                                "brightness_points": points,
+                                "parameters": parameters,
+                                "transition_in": None,
+                                "transition_out": None,
+                            }
+                        )
+                    }
+                )
+            compiled.append(effect)
+        return compiled
 
     def _build_environment(self, context: TemplateCompileContext) -> RenderEnvironment:
         """Build RenderEnvironment from compile context."""

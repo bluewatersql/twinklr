@@ -211,3 +211,28 @@ class TestBuildSectionLyricContext:
         assert result["characters"] == ["Rudolph", "Santa"]
         assert result["themes"] == ["underdog", "redemption"]
         assert result["has_narrative"] is True
+
+
+def test_moment_only_lyrics_keep_timestamp_for_musical_placement() -> None:
+    from twinklr.core.agents.audio.lyrics.models import MomentCue
+
+    lyrics = _make_lyric_context()
+    lyrics.moment_cues = [
+        MomentCue(
+            cue_id="drop",
+            timestamp_ms=12500,
+            section_id="verse",
+            emphasis="HIGH",
+            text="Look at my house",
+            visual_hint="Snap to the house on this line",
+        )
+    ]
+    stage = GroupPlannerStage.__new__(GroupPlannerStage)
+    result = stage._build_section_lyric_context(
+        lyrics,
+        section_id="verse",
+        start_ms=10000,
+        end_ms=20000,
+    )
+    assert result is not None
+    assert result["moment_cues"][0]["timestamp_ms"] == 12500

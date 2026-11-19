@@ -103,6 +103,11 @@ class RenderEvent(BaseModel):
         le=1.0,
         description="Focal-role dimming applied to the lit brightness (1.0 = none)",
     )
+    brightness_points: list[tuple[float, float]] = Field(
+        default_factory=list,
+        description="Absolute song milliseconds and relative brightness (0–1). "
+        "Kept in song time through coordination slicing; normalized only at export.",
+    )
     transition_in: TransitionSpec | None = Field(
         default=None,
         description="Optional incoming transition",

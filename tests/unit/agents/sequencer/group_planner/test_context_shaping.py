@@ -967,3 +967,14 @@ def test_template_simplification_includes_computed_affinity_tags(section_context
         assert "affinity_tags" in entry
         assert isinstance(entry["affinity_tags"], list)
         assert len(entry["affinity_tags"]) > 0
+
+
+def test_planner_and_judge_share_timed_musical_evidence(section_context):
+    evidence = {
+        "moments": [{"timestamp_ms": 1300, "bar": 1, "beat": 2}],
+        "objectives": ["Pull back at the break"],
+        "beat_times": [],
+    }
+    section_context.musical_context = evidence
+    assert shape_planner_context(section_context)["musical_context"] == evidence
+    assert shape_section_judge_context(section_context)["musical_context"] == evidence

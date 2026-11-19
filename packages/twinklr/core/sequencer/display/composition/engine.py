@@ -812,6 +812,9 @@ class CompositionEngine:
             render_scope_ordinal=render_scope_ordinal,
             transition_in=transition_in,
             transition_out=transition_out,
+            beat_grid=self._beat_grid,
+            timing_driver=next(p.timing_driver for p in section.lane_plans if p.lane == lane),
+            section_start_ms=self._beat_grid.bar_boundaries[section_start_bar],
         )
 
         # Delegate to compiler — raises TemplateCompileError on failure

@@ -201,3 +201,58 @@ async def test_aggregate_caps_narrative_assets_after_deduplication() -> None:
     assert [asset.directive_id for asset in assets] == ["tree", "house", "star", "bell"]
     assert assets[0].section_ids == ["intro", "chorus"]
     assert result.output.section_plans == [intro, chorus]
+
+
+def test_planner_bar_and_beat_names_resolve_to_the_renderers_detected_grid() -> None:
+    from twinklr.core.sequencer.vocabulary import PlanningTimeRef
+
+    bundle = _make_bundle(
+        {
+            "tempo_bpm": 120.0,
+            "assumptions": {"beats_per_bar": 4},
+            "beats_s": [0.0, 0.4, 1.0, 1.3, 1.9, 2.5, 3.0, 3.3, 4.0, 4.5, 5.0],
+            "bars_s": [1.0, 3.0, 5.0],
+        }
+    )
+    timing = _make_stage()._build_timing_context(
+        bundle,
+        section_id="verse",
+        section_start_ms=900,
+        section_end_ms=4800,
+    )
+    assert timing.bar_map[1].start_ms == 1000
+    assert timing.resolve_planning_time_ref(PlanningTimeRef(bar=1, beat=2)) == 1300
+    assert timing.resolve_planning_time_ref(PlanningTimeRef(bar=2, beat=3)) == 4000
+
+
+def test_musical_context_retains_events_and_maps_detected_beat_times() -> None:
+    stage = _make_stage()
+    bundle = _make_bundle(
+        {
+            "tempo_bpm": 120.0,
+            "assumptions": {"beats_per_bar": 4},
+            "beats_s": [1, 1.3, 1.8, 2.4, 3, 3.5, 4, 4.5, 5],
+            "bars_s": [1, 3, 5],
+        }
+    )
+    timing = stage._build_timing_context(
+        bundle, section_id="verse", section_start_ms=900, section_end_ms=4900
+    )
+    result = stage._build_musical_context(
+        None,
+        {"moment_cues": [{"timestamp_ms": 1280, "text": "Hook"}]},
+        timing,
+        section_id="verse",
+        start_ms=900,
+        end_ms=4900,
+    )
+    assert result["moments"][0] == {
+        "timestamp_ms": 1280,
+        "text": "Hook",
+        "bar": 1,
+        "beat": 2,
+        "render_ms": 1300,
+        "offset_ms": 20,
+    }
+    assert result["beat_times"][1] == {"bar": 1, "beat": 2, "timestamp_ms": 1300}
+    assert all(900 <= beat["timestamp_ms"] < 4900 for beat in result["beat_times"])

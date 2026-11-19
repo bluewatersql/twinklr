@@ -1028,3 +1028,41 @@ def test_a_focal_role_not_held_by_every_moving_head_target_is_warned(
         moving_head_focal_roles(macro, _graph(), moving_head_target_ids={"MOVING_HEADS", "WINDOWS"})
     assert "section 'drop'" in caplog.text
     assert "MOVING_HEADS LEAD, WINDOWS none" in caplog.text
+
+
+def test_palette_cut_keeps_house_lit_until_boundary_and_enters_without_fade() -> None:
+    from twinklr.core.sequencer.display.models.palette import TransitionSpec
+
+    macro = _macro()
+    first = macro.sections[0].model_copy(
+        update={
+            "section": SongSectionRef(section_id="intro", name="intro", start_ms=0, end_ms=2200)
+        }
+    )
+    second = macro.sections[0].model_copy(
+        update={
+            "section": SongSectionRef(section_id="drop", name="drop", start_ms=2200, end_ms=4400)
+        }
+    )
+    macro = macro.model_copy(update={"sections": [first, second]})
+    before = _event("MEGA_TREE").model_copy(
+        update={
+            "end_ms": 2200,
+            "source": _event("MEGA_TREE").source.model_copy(update={"section_id": "intro"}),
+            "transition_out": TransitionSpec(duration_ms=1000),
+        }
+    )
+    after = _event("MEGA_TREE").model_copy(
+        update={
+            "start_ms": 2200,
+            "transition_in": TransitionSpec(duration_ms=1000),
+        }
+    )
+    plan = _render_plan("MEGA_TREE")
+    plan.groups[0].layers[0].events = [before, after]
+    result = coordinate_display_render_plan(
+        plan, macro, _grid(), _graph(), moving_head_target_ids=set()
+    )
+    events = result.groups[0].layers[0].events
+    assert events[0].transition_out is None
+    assert events[1].transition_in is None

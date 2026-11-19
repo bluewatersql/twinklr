@@ -18,7 +18,8 @@ from twinklr.core.sequencer.display.models.palette import ResolvedPalette
 from twinklr.core.sequencer.templates.group.models.coordination import (
     GroupPlacement,
 )
-from twinklr.core.sequencer.vocabulary import LaneKind
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.vocabulary import GPTimingDriver, LaneKind
 
 # ------------------------------------------------------------------
 # Compile context — all context the compiler needs from the engine
@@ -58,6 +59,9 @@ class TemplateCompileContext(BaseModel):
     render_scope_ordinal: int = Field(default=0, ge=0)
     transition_in: Any = None
     transition_out: Any = None
+    beat_grid: BeatGrid | None = None
+    timing_driver: GPTimingDriver = GPTimingDriver.BEATS
+    section_start_ms: float = 0.0
 
 
 # ------------------------------------------------------------------

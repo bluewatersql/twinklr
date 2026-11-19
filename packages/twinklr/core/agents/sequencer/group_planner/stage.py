@@ -224,6 +224,7 @@ class GroupPlannerStage:
             section_id=input.section.section_id,
             section_start_ms=input.section.start_ms,
             section_end_ms=input.section.end_ms,
+            beat_grid=context.get_state("beat_grid"),
         )
 
         from twinklr.core.sequencer.planning import FocalRoleKind, MacroPlan
@@ -300,9 +301,98 @@ class GroupPlannerStage:
             motif_ids=macro_section.motif_ids,
             palette=macro_input.resolved_palette.model_dump(mode="json"),
             lyric_context=section_lyric_context,
+            musical_context=self._build_musical_context(
+                context.get_state("audio_profile"),
+                section_lyric_context,
+                timing_context,
+                section_id=input.section.section_id,
+                start_ms=input.section.start_ms,
+                end_ms=input.section.end_ms,
+            ),
             recipe_catalog=self.recipe_catalog,
             **fe_fields,
         )
+
+    @staticmethod
+    def _build_musical_context(
+        profile: Any,
+        lyrics: dict[str, Any] | None,
+        timing: TimingContext,
+        *,
+        section_id: str,
+        start_ms: int,
+        end_ms: int,
+    ) -> dict[str, Any]:
+        """Retain audio facts and map them to the same references rendering consumes."""
+        from twinklr.core.agents.audio.profile.models import AudioProfileModel
+        from twinklr.core.sequencer.vocabulary import PlanningTimeRef, TimingHint
+
+        positions = [
+            (
+                timing.resolve_planning_time_ref(
+                    PlanningTimeRef(bar=bar, beat=beat, timing_hint=TimingHint.ON_BEAT)
+                ),
+                bar,
+                beat,
+            )
+            for bar in timing.bar_map
+            for beat in range(1, timing.beats_per_bar + 1)
+        ]
+        positions = [p for p in positions if start_ms <= p[0] < end_ms]
+
+        def anchored(moment: dict[str, Any]) -> dict[str, Any]:
+            if positions:
+                time, bar, beat = min(positions, key=lambda p: abs(p[0] - moment["timestamp_ms"]))
+                moment = {
+                    **moment,
+                    "bar": bar,
+                    "beat": beat,
+                    "render_ms": time,
+                    "offset_ms": time - moment["timestamp_ms"],
+                }
+            return moment
+
+        moments = [anchored(dict(cue)) for cue in (lyrics or {}).get("moment_cues", [])]
+        objectives: list[str] = []
+        characteristics: list[str] = []
+        if isinstance(profile, AudioProfileModel):
+            objectives = [
+                text
+                for item in profile.planner_hints.section_objectives
+                if item.section_id == section_id
+                for text in item.objectives
+            ]
+            characteristics = [
+                text
+                for item in profile.energy_profile.section_profiles
+                if item.section_id == section_id
+                for text in item.characteristics
+            ]
+            for peak in profile.energy_profile.peaks:
+                if start_ms <= peak.start_ms < end_ms:
+                    moments.append(
+                        anchored(
+                            {
+                                "timestamp_ms": peak.start_ms,
+                                "text": "Energy peak",
+                                "emphasis": "HIGH",
+                                "visual_hint": "Answer the musical arrival",
+                            }
+                        )
+                    )
+        for phrase in (lyrics or {}).get("key_phrases", []):
+            if start_ms <= phrase["timestamp_ms"] < end_ms and not any(
+                m["timestamp_ms"] == phrase["timestamp_ms"] for m in moments
+            ):
+                moments.append(anchored(dict(phrase)))
+        return {
+            "moments": sorted(moments, key=lambda m: m["timestamp_ms"]),
+            "beat_times": [
+                {"bar": bar, "beat": beat, "timestamp_ms": time} for time, bar, beat in positions
+            ],
+            "objectives": objectives,
+            "characteristics": characteristics,
+        }
 
     def _extract_fe_fields(self, *, section_id: str) -> dict[str, Any]:
         """Extract FE context fields from the loaded artifact bundle.
@@ -465,6 +555,7 @@ class GroupPlannerStage:
         section_id: str,
         section_start_ms: int,
         section_end_ms: int,
+        beat_grid: Any = None,
     ) -> TimingContext:
         """Build timing context from audio bundle with section bounds.
 
@@ -514,6 +605,44 @@ class GroupPlannerStage:
             current_ms += bar_duration_ms
             bar_num += 1
 
+        # Use the renderer's detected bar/beat vocabulary whenever analysis supplies
+        # a grid. The nominal map above is only for inputs without detected timing.
+        from twinklr.core.sequencer.display.composition.section_map import build_section_bar_map
+        from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+
+        if (
+            beat_grid is None
+            and audio_bundle.features.get("beats_s")
+            and audio_bundle.features.get("bars_s")
+        ):
+            beat_grid = BeatGrid.from_song_features(
+                audio_bundle.features, duration_ms=timing_info.duration_ms
+            )
+        section_start_bar = 0
+        if isinstance(beat_grid, BeatGrid):
+            beat_grid = beat_grid.extended_to_duration()
+            section_range = build_section_bar_map(
+                [(section_id, section_start_ms, section_end_ms)], beat_grid
+            )[section_id]
+            section_start_bar = section_range.start_bar
+            beats_per_bar = beat_grid.beats_per_bar
+            bar_map = {}
+            for absolute in range(section_start_bar, len(beat_grid.bar_boundaries)):
+                start = beat_grid.bar_boundaries[absolute]
+                if start >= section_end_ms and bar_map:
+                    break
+                end = (
+                    beat_grid.bar_boundaries[absolute + 1]
+                    if absolute + 1 < len(beat_grid.bar_boundaries)
+                    else beat_grid.duration_ms
+                )
+                bar = absolute - section_start_bar + 1
+                bar_map[bar] = BarInfo(
+                    bar=bar, start_ms=round(start), duration_ms=max(1, round(end - start))
+                )
+        else:
+            beat_grid = None
+
         # Build section bounds using MS TimeRefs (exact millisecond values)
         section_bounds = {
             section_id: SectionBounds(
@@ -528,6 +657,8 @@ class GroupPlannerStage:
             beats_per_bar=beats_per_bar,
             bar_map=bar_map,
             section_bounds=section_bounds,
+            beat_grid=beat_grid,
+            section_start_bar=section_start_bar,
         )
 
     def _build_section_lyric_context(
@@ -572,6 +703,7 @@ class GroupPlannerStage:
                             "beat_type": beat.beat_type,
                             "description": beat.description,
                             "visual_opportunity": beat.visual_opportunity,
+                            "timestamp_range": beat.timestamp_range,
                         }
                     )
 
@@ -585,11 +717,17 @@ class GroupPlannerStage:
                             "text": phrase.text,
                             "visual_hint": phrase.visual_hint,
                             "emphasis": phrase.emphasis,
+                            "timestamp_ms": phrase.timestamp_ms,
                         }
                     )
 
+        moments = [
+            cue.model_dump(mode="json")
+            for cue in (getattr(lyric_context_model, "moment_cues", None) or [])
+            if start_ms <= cue.timestamp_ms < end_ms
+        ]
         # Skip if no section-specific content
-        if not section_beats and not section_phrases:
+        if not section_beats and not section_phrases and not moments:
             return None
 
         return {
@@ -599,6 +737,7 @@ class GroupPlannerStage:
             "mood_arc": lyric_context_model.mood_arc or "",
             "story_beats": section_beats,
             "key_phrases": section_phrases,
+            "moment_cues": moments,
         }
 
     @staticmethod

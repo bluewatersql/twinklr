@@ -146,6 +146,10 @@ class SectionPlanningContext(BaseModel):
         default=None,
         description="Section-scoped lyric context (story beats, key phrases, characters)",
     )
+    musical_context: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Section musical objectives and timestamped moments with detected bar/beat anchors",
+    )
 
     # Recipe catalog (optional, from FE pipeline Phase 2)
     recipe_catalog: RecipeCatalog | None = Field(

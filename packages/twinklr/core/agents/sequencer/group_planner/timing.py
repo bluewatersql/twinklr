@@ -9,6 +9,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.sequencer.templates.group.models import TimeRef, TimeRefKind
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.vocabulary import (
     DURATION_BEATS,
     EffectDuration,
@@ -52,6 +53,8 @@ class TimingContext(BaseModel):
     beats_per_bar: int = Field(default=4, ge=1)
     bar_map: dict[int, BarInfo] = Field(default_factory=dict)
     section_bounds: dict[str, SectionBounds] = Field(default_factory=dict)
+    beat_grid: BeatGrid | None = None
+    section_start_bar: int = 0
 
     def resolve_to_ms(self, ref: TimeRef) -> int:
         """Resolve a TimeRef to milliseconds.
@@ -151,6 +154,10 @@ class TimingContext(BaseModel):
         Raises:
             ValueError: If bar not found in bar_map
         """
+        if self.beat_grid is not None:
+            from twinklr.core.sequencer.display.composition.timing_resolver import TimingResolver
+
+            return TimingResolver(self.beat_grid).resolve_start_ms(ref, self.section_start_bar)
         bar_info = self.bar_map.get(ref.bar)
         if bar_info is None:
             raise ValueError(f"Bar {ref.bar} not found in bar_map")

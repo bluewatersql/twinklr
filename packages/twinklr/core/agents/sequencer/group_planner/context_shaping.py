@@ -371,6 +371,7 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "support_targets": section_context.support_targets,
         "support_targets_typed": section_context.support_targets_typed,
         "priority_roles": all_target_roles,
+        "musical_context": section_context.musical_context,
         "notes": section_context.notes,
         # Section-scoped shared context (FILTERED + SIMPLIFIED)
         "display_graph": section_choreo_graph,
@@ -645,6 +646,7 @@ def shape_section_judge_context(
         "support_targets": section_context.support_targets,
         "support_targets_typed": section_context.support_targets_typed,
         "priority_roles": all_target_roles,
+        "musical_context": section_context.musical_context,
         # Section-scoped shared context
         "display_graph": {
             "groups_by_role": groups_by_role,
