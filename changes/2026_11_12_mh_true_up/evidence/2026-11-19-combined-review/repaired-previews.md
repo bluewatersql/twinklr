@@ -75,4 +75,15 @@ checksums matched their starting values.
   Need A Favor, and 2:19.100 in Hey Come Look At My House. House effects cover
   the last passages. No general beat-tracker settings changed.
 
+## Repository validation
+
+Independent review exercised the scheduler, typed call/response, the fixture
+travel and shutter invariants, and the unchanged encoded-frame and sequence
+digests in the existing pins. The final coordination and combined renderer tests
+passed 64 checks. A clean detached checkout at `d0450c31` passed
+`make validate` with the Anthropic dependency set and eight workers using
+`--dist loadfile`. Format, lint, and mypy passed. Pytest reported 7,797 passed,
+30 skipped, 43 warnings, and 91% coverage. An earlier 12-worker attempt using
+`--dist worksteal` hit native Python worker crashes and was stopped.
+
 Owner look judgment and physical fixture verification remain open.
