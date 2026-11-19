@@ -1,6 +1,6 @@
 ---
 type: plan
-status: active
+status: complete
 area: engineering
 change: 2026_11_12_mh_true_up
 updated: 2026-11-19
@@ -53,3 +53,9 @@ commit IDs from their integrated copies, so their exact histories are retained
 under `refs/archive/twinklr-cleanup-2026-11-19/`. Retired worktree files and
 obsolete generated artifacts go to Trash. Keep tracked regression fixtures,
 owner media and corpora, reusable configs and assets, and the new deliveries.
+
+## Outcome
+
+All three combined sequences rendered in xLights and produced decodable previews
+with audio. The [dated run record](../evidence/2026-11-19-combined-review/README.md)
+lists the outputs, the scratch coordination corrections, and the validation gate.

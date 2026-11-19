@@ -234,11 +234,10 @@ See [product/overview.md](product/overview.md).
 ## Quality gate
 
 The latest recorded full `make validate` gate on the history of `main` ran on
-`d08ef508` (2026-11-18) with 7,785 passed, 30 skipped, and 91% coverage.
-Later test-only checks and documentation are recorded in the
-[Phase 3 integration evidence](../changes/2026_11_12_mh_true_up/evidence/2026-11-18-p3-recovery/README.md).
+`52ef1a10` (2026-11-19) with 7,787 passed, 30 skipped, and 91% coverage.
 There are no accepted failures. The gate includes the moving-head output pins and a
 hermetic display replay under `tests/regression/`.
+[Three-song combined review record](../changes/2026_11_12_mh_true_up/evidence/2026-11-19-combined-review/README.md)
 
 ## Live evidence
 
