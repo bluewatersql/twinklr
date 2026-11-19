@@ -180,6 +180,10 @@ class CompositionEngine:
         self._section_map: dict[str, SectionBarRange] = (
             build_section_bar_map(section_boundaries, beat_grid) if section_boundaries else {}
         )
+        self._section_audio_bounds = {
+            section_id: (start_ms, end_ms)
+            for section_id, start_ms, end_ms in (section_boundaries or [])
+        }
         self._template_compiler: TemplateCompiler | None = template_compiler
 
     def compose(self, plan_set: GroupPlanSet) -> RenderPlan:
@@ -758,16 +762,19 @@ class CompositionEngine:
                 placement.start,
                 section_start_bar=section_start_bar,
             )
-            section_range = self._section_map.get(section.section_id)
+            audio_bounds = self._section_audio_bounds.get(section.section_id)
             if (
                 lane == LaneKind.BASE
                 and placement.duration == EffectDuration.SECTION
                 and placement.start.bar == 1
                 and placement.start.beat == 1
-                and section_range is not None
-                and section_range.start_bar == 0
+                and audio_bounds is not None
             ):
-                start_ms = min(start_ms, self._timing_resolver.snap(section_range.start_ms))
+                # SECTION foundation covers the audio section, even when its
+                # edges lie between detected downbeats. Rhythmic references stay
+                # anchored to the detected grid, as do later BASE placements.
+                start_ms = self._timing_resolver.snap(audio_bounds[0])
+                section_end_ms = min(audio_bounds[1], int(self._beat_grid.duration_ms))
             end_ms = self._timing_resolver.resolve_end_ms(
                 start_ms=start_ms,
                 duration=placement.duration,

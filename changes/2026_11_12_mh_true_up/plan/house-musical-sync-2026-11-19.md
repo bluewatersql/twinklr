@@ -97,3 +97,15 @@ production show hashes. Selected audio events have visible house responses in th
 frame audit, including the revised Favor54.40s windows impact. Independent code
 review is approved. See the dated evidence record for the final gate and artifacts.
 New owner look judgment remains PENDING-OWNER; previous renders remain REJECTED.
+
+
+## Interior section edges
+
+The all-CUT audit found Favor verse_3's requested192.133s CUT had no incoming
+house effect until193.400s. Full-section BASE was anchored to the nearest detected
+bar; the earlier opening-pickup exception did not cover interior partial bars.
+Keep the detected bar map for beat references and explicit later placements, but
+use original audio-section edges for a BASE placement startingbar1beat1 with
+SECTION duration. Preserve opening coverage with this one rule and replace the
+opening-only exception. No other placement's timing changes. Verify both edges
+with a non-bar-aligned interior section and replay all three saved new plans.

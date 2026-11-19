@@ -939,3 +939,30 @@ def test_opening_foundation_covers_pickup_without_shifting_accents() -> None:
         )
         == 2040
     )
+
+
+def test_full_section_foundation_covers_interior_partial_bars_only() -> None:
+    """A transition between downbeats must not wait for, or end at, a snapped bar."""
+    engine = _make_engine(section_boundaries=[("intro", 3805, 9705)])
+    placement = GroupPlacement(
+        placement_id="foundation",
+        target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
+        template_id="gtpl_base_wash_split",
+        start=PlanningTimeRef(bar=1, beat=1),
+        duration=EffectDuration.SECTION,
+        intensity=IntensityLevel.MED,
+    )
+
+    def bounds(lane, candidate):
+        result = engine.compose(_make_plan_set(placements=[candidate], lane=lane))
+        return {
+            (e.start_ms, e.end_ms)
+            for g in result.groups
+            for layer in g.layers
+            for e in layer.events
+        }
+
+    assert bounds(LaneKind.BASE, placement) == {(3800, 9700)}
+    assert bounds(LaneKind.ACCENT, placement) == {(4000, 10000)}
+    later = placement.model_copy(update={"start": PlanningTimeRef(bar=1, beat=2)})
+    assert bounds(LaneKind.BASE, later) == {(4500, 10000)}
