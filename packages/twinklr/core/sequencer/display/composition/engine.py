@@ -83,6 +83,7 @@ from twinklr.core.sequencer.templates.group.models.coordination import (
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
+    EffectDuration,
     IntensityLevel,
     LaneKind,
     StepUnit,
@@ -757,6 +758,16 @@ class CompositionEngine:
                 placement.start,
                 section_start_bar=section_start_bar,
             )
+            section_range = self._section_map.get(section.section_id)
+            if (
+                lane == LaneKind.BASE
+                and placement.duration == EffectDuration.SECTION
+                and placement.start.bar == 1
+                and placement.start.beat == 1
+                and section_range is not None
+                and section_range.start_bar == 0
+            ):
+                start_ms = min(start_ms, self._timing_resolver.snap(section_range.start_ms))
             end_ms = self._timing_resolver.resolve_end_ms(
                 start_ms=start_ms,
                 duration=placement.duration,

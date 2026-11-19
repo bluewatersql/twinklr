@@ -85,3 +85,18 @@ real fixture output disabled.
 The [repair record](../evidence/2026-11-19-combined-review/repaired-previews.md)
 identifies all three replacement previews, the Dance Jams cue checks, and the
 recorded scratch edits. The owner look review remains open.
+
+## Recovery review — 2026-11-19
+
+The owner requested continuation after the chat failed during audio inspection.
+Resume the unfinished whole-song preview evaluation from `c73d3480` on
+`codex/recover-render-review`. Reuse the authorized local plans and media; retain
+previous previews. The recovered frame audit found an audible opening with no
+house light in Hey Come Look At My House before its first downbeat. Verify and
+repair the opening foundation timing while preserving beat-aligned accents,
+explicit coordination windows, and moving-head timing. Acceptance: the opening
+section's full-section BASE placement covers its actual start; later-starting and
+non-BASE placements retain their timing; replacement previews are decoded and
+measured against the original audio. Run composition regressions, independent
+review and the full validation gate. Root owns implementation and artifacts;
+review is read-only. No source or evidence deletion is planned.

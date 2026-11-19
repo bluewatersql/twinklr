@@ -25,7 +25,7 @@ class SectionBarRange:
         start_bar: 0-indexed bar in the song where this section starts.
         end_bar: 0-indexed bar in the song where this section ends
             (first bar of the *next* section, or song end).
-        start_ms: Exact ms from the BeatGrid for the start bar.
+        start_ms: Start bar time, or the section's earlier opening pickup.
         end_ms: Exact ms from the BeatGrid for the end bar.
     """
 
@@ -88,6 +88,10 @@ def build_section_bar_map(
         end_bar = max(end_bar, start_bar)
 
         start_ms = beat_grid.bar_boundaries[start_bar]
+        # The opening pickup can precede the first detected downbeat. Keep its
+        # real start for full-section foundations; bar references stay detected.
+        if start_bar == 0 and raw_start_ms < start_ms:
+            start_ms = max(0.0, float(raw_start_ms))
         end_ms = beat_grid.bar_boundaries[end_bar]
         # A section that runs past the last bar boundary ends where it says it does
         # (within the song), so the final partial bar is not left unlit.

@@ -898,3 +898,44 @@ class TestAssetOverlayRendering:
         rhythm_sub = {i for i in layer_indices if 6 <= i <= 10}
         assert len(rhythm_sub) >= 1, f"Expected RHYTHM sub-layers, got {layer_indices}"
         assert 11 in layer_indices  # RHYTHM overlay in sub-layer scheme
+
+
+def test_opening_foundation_covers_pickup_without_shifting_accents() -> None:
+    """An audible pickup before the first downbeat keeps its full-section bed."""
+    grid = _make_beat_grid().model_copy(
+        update={
+            "bar_boundaries": [1540.0 + 2000 * i for i in range(16)],
+            "beat_boundaries": [40.0 + 500 * i for i in range(64)],
+        }
+    )
+    engine = _make_engine(beat_grid=grid, section_boundaries=[("intro", 0, 5540)])
+    placement = GroupPlacement(
+        placement_id="foundation",
+        target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
+        template_id="gtpl_base_wash_split",
+        start=PlanningTimeRef(bar=1, beat=1),
+        duration=EffectDuration.SECTION,
+        intensity=IntensityLevel.MED,
+    )
+
+    def start_for(lane: LaneKind, candidate: GroupPlacement) -> int:
+        plan = engine.compose(_make_plan_set(placements=[candidate], lane=lane))
+        return min(
+            event.start_ms
+            for group in plan.groups
+            for layer in group.layers
+            for event in layer.events
+        )
+
+    assert start_for(LaneKind.BASE, placement) == 0
+    assert start_for(LaneKind.ACCENT, placement) == 1540
+    assert (
+        start_for(LaneKind.BASE, placement.model_copy(update={"duration": EffectDuration.PHRASE}))
+        == 1540
+    )
+    assert (
+        start_for(
+            LaneKind.BASE, placement.model_copy(update={"start": PlanningTimeRef(bar=1, beat=2)})
+        )
+        == 2040
+    )
