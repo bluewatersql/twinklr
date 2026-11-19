@@ -62,3 +62,20 @@ lists the outputs, the scratch coordination corrections, and the validation gate
 The subsequent owner review rejected the results. The
 [Dance Jams quality audit](../evidence/2026-11-19-combined-review/dance-jams-quality-audit.md)
 records the reproduced coordination blackout, dropped transition cues, and recovery checks.
+
+## Repair
+
+The owner requested a fix. Use Dance Jams to reproduce and verify the repair
+before generating new previews for the other two songs. Work on the combined
+coordination schedule first. Sequence or ripple the named LEAD and SUPPORT
+groups, retain the other groups as a steady bed at their assigned brightness,
+and preserve display foundation effects beneath the step pattern. Keep explicit
+call/response windows and fixture safety rules. Do not add another rendering path.
+
+Confirm a named group and the moving heads still get scheduled on a graph longer
+than the music section, and verify that named accents still rotate on actual
+beat boundaries. Inspect the previously missed Dance Jams cues in the revised
+trace and preview. Verify the preview's audio against the original soundtrack.
+The earlier approvals cover the three source tracks, live replanning, and xLights
+exports from the expendable layout. Preserve the failed runs as evidence and keep
+real fixture output disabled.

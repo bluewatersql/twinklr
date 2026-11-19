@@ -134,7 +134,8 @@ See [product/overview.md](product/overview.md).
     transition counts as played on a head only where its frames differ from the plan
     rendered without transitions (else traced `nothing`, warned). Repair shortens one
     longer than its parts and records what plays otherwise; the trace lists each per
-    head. Renderer revision 20.
+    head. A snap without channel overrides can reposition during an outgoing shutter
+    close that lasts through the boundary.
     ([user guide](../docs/user-guide.md#how-a-sections-transitions-reach-the-lights),
     [record](../changes/2026_11_12_mh_true_up/evidence/2026-11-17-w8-transitions/README.md))
   - **Motif and variation** (W10b/W10c, 2026-11-18, not yet seen by the owner). Each

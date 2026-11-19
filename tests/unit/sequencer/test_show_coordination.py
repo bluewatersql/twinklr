@@ -125,7 +125,7 @@ def _macro(
     )
 
 
-def _event(group_id: str) -> RenderEvent:
+def _event(group_id: str, lane: LaneKind = LaneKind.BASE) -> RenderEvent:
     return RenderEvent(
         event_id=f"event-{group_id}",
         start_ms=0,
@@ -135,14 +135,14 @@ def _event(group_id: str) -> RenderEvent:
         intensity=0.7,
         source=RenderEventSource(
             section_id="drop",
-            lane=LaneKind.BASE,
+            lane=lane,
             group_id=group_id,
             template_id="recipe",
         ),
     )
 
 
-def _render_plan(*group_ids: str) -> RenderPlan:
+def _render_plan(*group_ids: str, lane: LaneKind = LaneKind.BASE) -> RenderPlan:
     return RenderPlan(
         render_id="render",
         duration_ms=4_400,
@@ -152,8 +152,8 @@ def _render_plan(*group_ids: str) -> RenderPlan:
                 layers=[
                     RenderLayerPlan(
                         layer_index=0,
-                        layer_role=LaneKind.BASE,
-                        events=[_event(group_id)],
+                        layer_role=lane,
+                        events=[_event(group_id, lane)],
                     )
                 ],
             )
@@ -667,7 +667,7 @@ def test_coordination_mode_changes_display_timing_and_moving_head_rests() -> Non
     ]
     unified_macro = _macro(mode=CoordinationMode.UNIFIED, roles=roles)
     sequenced_macro = _macro(mode=CoordinationMode.SEQUENCED, roles=roles)
-    display_source = _render_plan("MEGA_TREE", "ARCH_LEFT", "ARCH_RIGHT")
+    display_source = _render_plan("MEGA_TREE", "ARCH_LEFT", "ARCH_RIGHT", lane=LaneKind.RHYTHM)
 
     unified_display = coordinate_display_render_plan(
         display_source,
@@ -692,6 +692,39 @@ def test_coordination_mode_changes_display_timing_and_moving_head_rests() -> Non
 
     assert _ranges(unified_display, "MEGA_TREE") != _ranges(sequenced_display, "MEGA_TREE")
     assert unified_rests != sequenced_rests
+
+
+@pytest.mark.parametrize("mode", [CoordinationMode.SEQUENCED, CoordinationMode.RIPPLE])
+def test_large_layout_keeps_music_sections_lit_while_named_targets_take_steps(
+    mode: CoordinationMode,
+) -> None:
+    graph = _graph()
+    unused = [ChoreoGroup(id=f"UNUSED_{n}", role="UNUSED") for n in range(126)]
+    graph = graph.model_copy(update={"groups": [*unused, *graph.groups]})
+    macro = _macro(
+        mode=mode,
+        roles=[
+            FocalRole(
+                target=PlanTarget(type=TargetType.GROUP, id=target),
+                role=FocalRoleKind.LEAD if target == "MEGA_TREE" else FocalRoleKind.SUPPORT,
+            )
+            for target in ("MEGA_TREE", "ARCH_LEFT", "ARCH_RIGHT")
+        ],
+    )
+    plan = _render_plan("MEGA_TREE", "ARCH_LEFT", "WINDOWS")
+    plan.groups[1] = _render_plan("ARCH_LEFT", lane=LaneKind.RHYTHM).groups[0]
+    heads = {"MOVING_HEADS"}
+
+    coordinated = coordinate_display_render_plan(
+        plan, macro, _grid(), graph, moving_head_target_ids=heads
+    )
+
+    assert moving_head_dark_spans(macro, _grid(), graph, moving_head_target_ids=heads) == ()
+    assert _ranges(coordinated, "MEGA_TREE") == [(0, 4_400)]
+    assert _ranges(coordinated, "WINDOWS") == [(0, 4_400)]
+    rhythm_windows = _ranges(coordinated, "ARCH_LEFT")
+    assert rhythm_windows
+    assert 0 < sum(end - start for start, end in rhythm_windows) < 4_400
 
 
 def test_repeated_call_response_target_fails_closed() -> None:
@@ -740,7 +773,7 @@ def test_coordination_normalization_is_idempotent_for_cached_branch_outputs() ->
 def test_raw_recipe_ids_containing_coord_marker_are_still_coordinated(
     template_id: str,
 ) -> None:
-    source = _render_plan("MEGA_TREE")
+    source = _render_plan("MEGA_TREE", lane=LaneKind.RHYTHM)
     raw_event = source.groups[0].layers[0].events[0]
     compiler_style_id = f"recipe_{template_id}_0_{'a' * 64}"
     raw_event = raw_event.model_copy(
@@ -808,6 +841,26 @@ def _call_response_macro(response: str) -> MacroPlan:
     )
 
 
+def _stepped_macro(mode: CoordinationMode) -> MacroPlan:
+    return _macro(
+        mode=mode,
+        roles=[
+            FocalRole(
+                target=PlanTarget(type=TargetType.GROUP, id="MEGA_TREE"),
+                role=FocalRoleKind.LEAD,
+            ),
+            FocalRole(
+                target=PlanTarget(type=TargetType.GROUP, id="MOVING_HEADS"),
+                role=FocalRoleKind.SUPPORT,
+            ),
+            FocalRole(
+                target=PlanTarget(type=TargetType.ZONE, id=ChoreoTag.HOUSE.value),
+                role=FocalRoleKind.SUPPORT,
+            ),
+        ],
+    )
+
+
 @pytest.mark.parametrize(
     ("macro", "expected"),
     [
@@ -820,10 +873,10 @@ def _call_response_macro(response: str) -> MacroPlan:
         ),
         # Unpaired in a call/response section, they keep the whole section.
         (_call_response_macro("MEGA_TREE"), ()),
-        # Sequenced over the graph's five targets, they hold beats 1 and 6 only.
-        (_macro(mode=CoordinationMode.SEQUENCED), ((500, 2_700), (3_300, 4_400))),
-        # A ripple keeps them one beat longer each time.
-        (_macro(mode=CoordinationMode.RIPPLE), ((1_100, 2_700), (3_800, 4_400))),
+        # The house zone consumes one step as a team, though it has three groups.
+        (_stepped_macro(CoordinationMode.SEQUENCED), ((0, 500), (1_100, 2_200), (2_700, 3_800))),
+        # A ripple carries the head step one beat further on each repeat.
+        (_stepped_macro(CoordinationMode.RIPPLE), ((0, 500), (1_600, 2_200), (3_300, 3_800))),
     ],
     ids=["unified", "complementary", "mh-responds", "mh-unpaired", "sequenced", "ripple"],
 )

@@ -28,7 +28,7 @@ from twinklr.core.sequencer.templates.group.models.coordination import PlanTarge
 from twinklr.core.sequencer.templates.group.target_expander import TargetExpander
 from twinklr.core.sequencer.theming import get_palette
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
-from twinklr.core.sequencer.vocabulary import CoordinationMode, StepUnit
+from twinklr.core.sequencer.vocabulary import CoordinationMode, LaneKind, StepUnit
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +65,7 @@ _ROLE_SCALE_FLOOR = {
 # this exact terminal form is coordinator-owned; template/local/FE IDs may safely
 # contain ``|coord-`` anywhere inside the compiler-generated prefix.
 _COORDINATED_EVENT_SUFFIX = re.compile(r"\|coord-\d+$")
+_STEPPED_MODES = {CoordinationMode.SEQUENCED, CoordinationMode.RIPPLE}
 
 
 def _expand(expander: TargetExpander, target: PlanTarget) -> tuple[str, ...]:
@@ -222,35 +223,58 @@ def coordination_schedule(
                 )
             continue
 
-        targets = list(all_target_ids)
-        if section.coordination_intent in {
-            CoordinationMode.UNIFIED,
-            CoordinationMode.COMPLEMENTARY,
-        }:
+        if section.coordination_intent not in _STEPPED_MODES:
             windows.append(
                 CoordinationWindow(
                     section.section.start_ms,
                     section.section.end_ms,
-                    tuple(targets),
+                    all_target_ids,
                     section.coordination_intent.value.lower(),
                 )
             )
             continue
-        if section.coordination_intent == CoordinationMode.CALL_RESPONSE:
-            raise ValueError(
-                f"CALL_RESPONSE section '{section.section.section_id}' requires a typed pair"
+
+        # The look steps between its assigned lead and support groups. Stepping
+        # through every layout group can use up the section before any planned
+        # effect or moving head gets an active window.
+        steps: list[tuple[str, ...]] = []
+        participants: set[str] = set()
+        for role in (FocalRoleKind.LEAD, FocalRoleKind.SUPPORT):
+            for assignment in section.focal_roles:
+                if assignment.role != role:
+                    continue
+                team = tuple(
+                    target
+                    for target in _expand(expander, assignment.target)
+                    if target not in participants
+                )
+                if team:
+                    steps.append(team)
+                    participants.update(team)
+        background = tuple(
+            target_id for target_id in all_target_ids if target_id not in participants
+        )
+        if background:
+            windows.append(
+                CoordinationWindow(
+                    section.section.start_ms,
+                    section.section.end_ms,
+                    background,
+                    "background",
+                )
             )
+        if not steps:
+            continue
 
         boundaries = _section_boundaries(section, beat_grid, StepUnit.BEAT, 1)
         for index, (start, end) in enumerate(pairwise(boundaries)):
-            if section.coordination_intent == CoordinationMode.SEQUENCED:
-                active: tuple[str, ...] = (targets[index % len(targets)],)
-            else:  # RIPPLE: current target overlaps the previous propagation position.
-                active = tuple(
-                    dict.fromkeys(
-                        (targets[index % len(targets)], targets[(index - 1) % len(targets)])
-                    )
-                )
+            active = steps[index % len(steps)]
+            if (
+                section.coordination_intent == CoordinationMode.RIPPLE
+                and index > 0
+                and len(steps) > 1
+            ):
+                active += steps[(index - 1) % len(steps)]
             windows.append(
                 CoordinationWindow(start, end, active, section.coordination_intent.value.lower())
             )
@@ -426,7 +450,14 @@ def coordinate_display_render_plan(
                     },
                     deep=True,
                 )
-                active = _windows_for(schedule, section, target_id)
+                if (
+                    section.coordination_intent in _STEPPED_MODES
+                    and event.source.lane == LaneKind.BASE
+                ):
+                    # The stepped pattern rides on the planned foundation.
+                    active = [(section.section.start_ms, section.section.end_ms)]
+                else:
+                    active = _windows_for(schedule, section, target_id)
                 events.extend(_slice_event(normalized, active))
             layers.append(layer.model_copy(update={"events": events}, deep=True))
         if any(layer.events for layer in layers):

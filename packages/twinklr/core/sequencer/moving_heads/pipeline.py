@@ -4630,6 +4630,8 @@ class RenderingPipeline:
                                 left[1],
                                 self.beat_grid,
                                 hits=True,
+                                reuse_closed_tail=chosen.mode == TransitionMode.SNAP
+                                and not chosen.channels,
                                 records={
                                     i: event_records.get((prior, i), {})
                                     for i in range(len(previous.events))

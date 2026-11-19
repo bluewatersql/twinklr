@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 BACKEND_ID = "xlights_dmx"
 """The backend the renderer writes: xLights DMX effects in an `.xsq`."""
 
-RENDERER_REVISION = "22"
+RENDERER_REVISION = "23"
 """Bumped by hand in the commit that intentionally changes the renderer's output; the
 render identity also carries the frame encoder's own version. 3: a section's colour and
 gobo are rendered (song-intent rendering W4), so a plan that sets them renders

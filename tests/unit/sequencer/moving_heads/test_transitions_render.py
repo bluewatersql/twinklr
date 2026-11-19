@@ -149,6 +149,24 @@ def test_snap_goes_dark_before_the_boundary_and_is_in_place_lit_on_its_frame() -
         assert not dark[b] and not dark[start // FRAME - 1]
 
 
+def test_entry_snap_repositions_during_an_outgoing_shutter_close() -> None:
+    g = grid(120)
+    sections = pair(transition("ENTRY", "snap", "BEAT"))
+    sections[0] = m.plan_section("s1", 1, 4, "finite_snap_hold", events=[event(4, 4, "closed")])
+    pipeline = render(sections, beat_grid=g)
+    frames = Frames(pipeline)
+    close, downbeat = beat_frame(g, 4, 4), beat_frame(g, 5, 1)
+    (entry,) = transitions_of(pipeline)
+
+    assert entry["window_ms"] == [close * FRAME, downbeat * FRAME]
+    assert entry.get("not_played") is None
+    for head in HEADS:
+        dark = frames.dark(head)
+        assert not dark[close - 1]
+        assert all(dark[close:downbeat])
+        assert not dark[downbeat]
+
+
 def test_crossfade_hands_the_light_over_at_the_boundary_never_dark() -> None:
     """A quarter of the bar before the boundary to three quarters after: the dimmer eases
     down to half the lower look's level on the boundary and up again; never dark; the aim

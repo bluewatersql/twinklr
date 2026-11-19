@@ -325,6 +325,7 @@ def yield_spans(
     beat_grid: BeatGrid,
     *,
     hits: bool,
+    reuse_closed_tail: bool = False,
     records: Mapping[int, Mapping[str, Any]] | None = None,
     hit_frames: Mapping[int, Sequence[int]] | None = None,
 ) -> list[tuple[str, int, int]]:
@@ -337,7 +338,8 @@ def yield_spans(
     from the earliest frame it plays on until seen from the latest (`hit_frames`: where it
     plays on each head without the transition; without them, its beat's frame). A window
     starts after the `until` of the part it leaves and ends before the `from` of the part
-    it enters. The render and the plan repair both read it (the repair without records)."""
+    it enters. An outgoing snap can reposition during a final closed hold, so its
+    bound is the instant the hold starts. The render and plan repair both read this."""
     spans: list[tuple[str, int, int]] = []
     lo, hi = window
     beats = beat_grid.beat_boundaries
@@ -358,7 +360,8 @@ def yield_spans(
     for event, start, end in events.shutter_spans():
         if start < hi and end > lo:
             # Its span reaches at least as far as its seen time (a beat of it, or its end).
-            on_grid(event, start, end)
+            closed_tail = reuse_closed_tail and event.action == "closed" and end >= hi
+            on_grid(event, start, start if closed_tail else end)
     for event in events.events:
         if not lo <= event.frame_ms < hi:
             continue

@@ -25,7 +25,8 @@ A window stays inside the two parts it joins, ends before the incoming part's fi
 that commands darkness or a wheel (`closed`, a strobe, `pulse`, `open`, `color`, `gobo`)
 and, for `DARK_MODES`, its first hit; starts after the outgoing part's last such event's
 span and after every event that shows something has been seen (`events.yield_spans`,
-`events.seen_until`: the event plays, the transition yields); and starts after the previous
+`events.seen_until`: the event plays, the transition yields). An unmodified snap can
+prepare during a closed hold that runs up to the boundary. A window starts after the previous
 boundary's window. Each clamp lands on the frame grid and is recorded, and where less of
 the window is left than its mode needs (`MIN_WINDOW_FRAMES`) it plays on no head. A hit
 inside it plays on the transition's level; a head whose darkness would cover the frame a

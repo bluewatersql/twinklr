@@ -1775,7 +1775,17 @@ def played_window(
     def yields(
         section: PlanSection, window: tuple[int, int], said: str, *, hits: bool, until: bool
     ) -> list[tuple[str, int]]:
-        spans = yield_spans(section_events(section, beat_grid), window, beat_grid, hits=hits)
+        spans = yield_spans(
+            section_events(section, beat_grid),
+            window,
+            beat_grid,
+            hits=hits,
+            reuse_closed_tail=until
+            and outgoing is not None
+            and incoming is not None
+            and transition.mode == TransitionMode.SNAP
+            and not transition.channels,
+        )
         return [(f"{said} {label}", end if until else start) for label, start, end in spans]
 
     if incoming is None:
