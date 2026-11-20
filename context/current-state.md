@@ -253,10 +253,10 @@ See [product/overview.md](product/overview.md).
 ## Quality gate
 
 The latest recorded full `make validate` gate on the history of `main` ran on
-`4453160c` (2026-11-20) with 7,858 passed, 30 skipped, and 91% coverage.
+`caafbf9e` (2026-11-20) with 7,910 passed, 30 skipped, 43 warnings, and 91% coverage.
 There are no accepted failures. The gate includes the moving-head output pins and a
 hermetic display replay under `tests/regression/`.
-[Movement restoration gate record](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-movement-restoration/README.md#fresh-checks)
+[Arrangement restoration gate record](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-arrangement-restoration/README.md#final-clean-tree-gate)
 
 The [complete arrangement sampler](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-arrangement-restoration/README.md)
 contains 61 labeled base entries, including seven static aim references, with two-second

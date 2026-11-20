@@ -17,11 +17,11 @@ with names and two-second dark pauses. Artifacts are ready under
 `/Users/ondeck/xlights/_twinklr_verify/movement-arrangements-2026-11-20/`:
 `movement-sampler-labeled.mp4` and `movement-sampler-show.zip`.
 
-Root owns `codex/restore-template-arrangements`, current source `d4868e87`.
+Restoration is integrated on `main`; validated source is `caafbf9e`.
 Independent code review approved the restored targets, formation aims, hybrid path,
 repeat/order contracts, fades and intrinsic states. All 52 arrangement tests pass.
-Independent artifact review approved the delivery. The fresh full gate is running;
-integration remains pending.
+Independent artifact review approved the delivery. The clean-tree full gate passed:
+7,910 tests, 30 skips, 43 warnings and 91% coverage. CI/Pages remain paused.
 The video was rendered from `577b242c`; `d4868e87` adds presets only, with all base
 objects independently proved unchanged. Human look judgment is PENDING-OWNER.
 See [plan](arrangement-restoration-2026-11-20.md) and

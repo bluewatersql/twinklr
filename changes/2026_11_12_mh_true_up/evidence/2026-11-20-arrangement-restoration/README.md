@@ -24,7 +24,7 @@ were weakened. Independent early review corrected mirror aim ordering and circle
 traversal direction. Review also found and fixed a short clipped-tail exception and omitted intrinsic
 blue/prism/fast-shutter states. These now have contract and emitted-frame tests.
 Latest arrangement suite: 52 passed in 11.55s. Independent code and artifact review
-approved; full gate is running on `d4868e87`.
+approved; the final full gate passed on `caafbf9e` (details below).
 
 Preview root: `/Users/ondeck/xlights/_twinklr_verify/movement-arrangements-2026-11-20/`.
 The preview uses neutral white light except intrinsic masks/flick, and labels the
@@ -60,7 +60,7 @@ The MP4 muxer begins the first chapter at zero, including the two-second intro;
 all remaining chapter starts and every chapter end match the manifest.
 
 Video SHA-256: `cb2d9f529e945e741c7ad690d643a37253c2b08ad8a58ad94d674b9076ea1766`.
-Rendered from clean `577b242c`; final source `d4868e87` adds only the missing
+Rendered from clean `577b242c`; catalog source `d4868e87` adds only the missing
 reach/rate preset ladders. Independent comparison proved all base objects unchanged,
 so the delivered base preview represents the final source without another render.
 
@@ -74,5 +74,21 @@ The gate on `d4868e87` also exposed a stale loader test asserting 25 catalog ent
 Its exact inventory assertion now expects the verified 62 (25 + 37); the unchanged
 loading/idempotence checks and all 20 loader tests pass (0.10s). Independent review
 approved the count correction and independently reran the affected test (0.08s).
-This changes no renderer, catalog or preview bytes. The complete gate will rerun
+This changes no renderer, catalog or preview bytes. The complete gate reran
 on the committed correction; no failed run is treated as a passing gate.
+
+
+## Final clean-tree gate
+
+`caafbf9e`, 2026-11-20: `UV_NO_SYNC=1 UV_OFFLINE=1
+PYTEST_ADDOPTS='-n 12 --dist worksteal' make validate` exited 0. Format left all
+1,324 files unchanged; Ruff passed; mypy passed 661 source files; pytest reported
+**7,910 passed, 30 skipped, 43 warnings in 431.39s**, with 91% coverage. No source
+changes were produced by the gate. Full log: `make-validate.log` in the preview root.
+The preceding gate on `d4868e87` completed with the one stale inventory assertion
+failure, 7,909 passes and 30 skips; preserved as `make-validate-d4868e87-failed.log`.
+
+The final gate source differs from the rendered source only by preset additions,
+the corrected inventory expectation and reviewed documentation; renderer and base
+arrangements are unchanged. Technical restoration and delivery are complete.
+Owner playback judgment remains PENDING-OWNER. CI/Pages remain paused.

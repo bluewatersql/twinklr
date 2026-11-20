@@ -1,6 +1,6 @@
 ---
 type: plan
-status: active
+status: complete
 area: engineering
 updated: 2026-11-20
 ---
@@ -41,3 +41,11 @@ positions, test support and source-derived fixture contracts, focused tests, cov
 and current-state documents, evidence/handoff. No provider requests, hardware output
 or house changes. Expendable preview and commit/merge/sync remain owner authorized.
 CI/Pages stay paused. Human look judgment and physical calibration stay PENDING-OWNER.
+
+
+Technical acceptance complete: all 37 arrangements restored, prior 25 retained,
+independent code/artifact review approved, and full gate passed on `caafbf9e`:
+7,910 passed, 30 skipped, 91% coverage. The 61-entry, 10:40 labeled video and matching
+portable show are delivered. See the [final evidence](../evidence/2026-11-20-arrangement-restoration/README.md).
+Human look judgment and physical calibration remain PENDING-OWNER; these are not
+claimed by technical completion.
