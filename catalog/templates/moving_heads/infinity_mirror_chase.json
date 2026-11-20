@@ -77,5 +77,97 @@
         "chase"
       ]
     }
-  }
+  },
+  "presets": [
+    {
+      "preset_id": "narrow",
+      "step_patches": {
+        "main": {
+          "movement": {
+            "pan_extent_deg": 17.5,
+            "tilt_extent_deg": 12.5
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "slow",
+      "step_patches": {
+        "main": {
+          "movement": {
+            "period_beats": 32.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide",
+      "step_patches": {
+        "main": {
+          "movement": {
+            "pan_extent_deg": 52.5,
+            "tilt_extent_deg": 37.5
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "fast",
+      "step_patches": {
+        "main": {
+          "movement": {
+            "period_beats": 8.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+slow",
+      "step_patches": {
+        "main": {
+          "movement": {
+            "pan_extent_deg": 17.5,
+            "tilt_extent_deg": 12.5,
+            "period_beats": 32.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+fast",
+      "step_patches": {
+        "main": {
+          "movement": {
+            "pan_extent_deg": 17.5,
+            "tilt_extent_deg": 12.5,
+            "period_beats": 8.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+slow",
+      "step_patches": {
+        "main": {
+          "movement": {
+            "pan_extent_deg": 52.5,
+            "tilt_extent_deg": 37.5,
+            "period_beats": 32.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+fast",
+      "step_patches": {
+        "main": {
+          "movement": {
+            "pan_extent_deg": 52.5,
+            "tilt_extent_deg": 37.5,
+            "period_beats": 8.0
+          }
+        }
+      }
+    }
+  ]
 }

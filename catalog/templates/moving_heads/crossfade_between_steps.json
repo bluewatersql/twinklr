@@ -139,5 +139,135 @@
         "multi_step"
       ]
     }
-  }
+  },
+  "presets": [
+    {
+      "preset_id": "narrow",
+      "step_patches": {
+        "a": {
+          "movement": {
+            "pan_extent_deg": 17.5
+          }
+        },
+        "b": {
+          "movement": {
+            "pan_extent_deg": 17.5
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "slow",
+      "step_patches": {
+        "a": {
+          "movement": {
+            "period_beats": 16.0
+          }
+        },
+        "b": {
+          "movement": {
+            "period_beats": 16.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide",
+      "step_patches": {
+        "a": {
+          "movement": {
+            "pan_extent_deg": 52.5
+          }
+        },
+        "b": {
+          "movement": {
+            "pan_extent_deg": 52.5
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "fast",
+      "step_patches": {
+        "a": {
+          "movement": {
+            "period_beats": 4.0
+          }
+        },
+        "b": {
+          "movement": {
+            "period_beats": 4.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+slow",
+      "step_patches": {
+        "a": {
+          "movement": {
+            "pan_extent_deg": 17.5,
+            "period_beats": 16.0
+          }
+        },
+        "b": {
+          "movement": {
+            "pan_extent_deg": 17.5,
+            "period_beats": 16.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+fast",
+      "step_patches": {
+        "a": {
+          "movement": {
+            "pan_extent_deg": 17.5,
+            "period_beats": 4.0
+          }
+        },
+        "b": {
+          "movement": {
+            "pan_extent_deg": 17.5,
+            "period_beats": 4.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+slow",
+      "step_patches": {
+        "a": {
+          "movement": {
+            "pan_extent_deg": 52.5,
+            "period_beats": 16.0
+          }
+        },
+        "b": {
+          "movement": {
+            "pan_extent_deg": 52.5,
+            "period_beats": 16.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+fast",
+      "step_patches": {
+        "a": {
+          "movement": {
+            "pan_extent_deg": 52.5,
+            "period_beats": 4.0
+          }
+        },
+        "b": {
+          "movement": {
+            "pan_extent_deg": 52.5,
+            "period_beats": 4.0
+          }
+        }
+      }
+    }
+  ]
 }

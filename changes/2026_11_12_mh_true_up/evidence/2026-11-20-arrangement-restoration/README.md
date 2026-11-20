@@ -32,3 +32,10 @@ light programs; preview overrides live only in scratch. Longer arcs get full cyc
 including both orders of Crossfade Between Steps, with two-second dark separators.
 No paid calls, hardware output or production-show changes. CI/Pages remain paused.
 Owner visual judgment stays PENDING-OWNER.
+
+The first full gate on `577b242c` found that restored moving arrangements lacked the
+catalog-required narrow/slow/wide/fast and combined presets. The run was interrupted
+after that failure to avoid spending time on an invalid snapshot. Added the existing
+reach/rate ladder to every restored moving arrangement; static arrangements keep no
+movement presets. The unchanged catalog-wide variant contract test then passed.
+Base arrangements and preview frames are unchanged by these preset additions.

@@ -62,5 +62,97 @@
         "atmospheric"
       ]
     }
-  }
+  },
+  "presets": [
+    {
+      "preset_id": "narrow",
+      "step_patches": {
+        "main": {
+          "movement": {
+            "pan_extent_deg": 9.0,
+            "tilt_extent_deg": 6.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "slow",
+      "step_patches": {
+        "main": {
+          "movement": {
+            "period_beats": 64.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide",
+      "step_patches": {
+        "main": {
+          "movement": {
+            "pan_extent_deg": 27.0,
+            "tilt_extent_deg": 18.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "fast",
+      "step_patches": {
+        "main": {
+          "movement": {
+            "period_beats": 16.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+slow",
+      "step_patches": {
+        "main": {
+          "movement": {
+            "pan_extent_deg": 9.0,
+            "tilt_extent_deg": 6.0,
+            "period_beats": 64.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+fast",
+      "step_patches": {
+        "main": {
+          "movement": {
+            "pan_extent_deg": 9.0,
+            "tilt_extent_deg": 6.0,
+            "period_beats": 16.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+slow",
+      "step_patches": {
+        "main": {
+          "movement": {
+            "pan_extent_deg": 27.0,
+            "tilt_extent_deg": 18.0,
+            "period_beats": 64.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+fast",
+      "step_patches": {
+        "main": {
+          "movement": {
+            "pan_extent_deg": 27.0,
+            "tilt_extent_deg": 18.0,
+            "period_beats": 16.0
+          }
+        }
+      }
+    }
+  ]
 }
