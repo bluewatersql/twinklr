@@ -1,6 +1,6 @@
 ---
 type: plan
-status: active
+status: complete
 area: engineering
 updated: 2026-11-20
 ---
@@ -80,5 +80,5 @@ honestly rather than claim those implementations had behavior they never rendere
 `493518db` implements polyline/organic motion and eighteen restored arrangements;
 `af774e99` adds public-field accountability tests. Independent code and artifact
 reviews approved. The 24-entry replacement sample (4:02) has passed byte, native
-visibility, pause, label and package checks. Full local gate remains in progress;
+visibility, pause, label and package checks. Full local gate passed on `4453160c`: 7,858 passed, 30 skipped, 91% coverage;
 see [dated evidence](../evidence/2026-11-20-movement-restoration/README.md).

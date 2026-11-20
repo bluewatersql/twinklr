@@ -17,12 +17,15 @@ routines restore distinct paths and fixture coordination, and all original movem
 names/template uses are explicitly mapped. Replacement sample:
 `~/xlights/_twinklr_verify/movement-restored-2026-11-20/movement-sampler-labeled.mp4`
 and `movement-sampler-show.zip`: 24 entries once each, 4:02 total, dark pauses and
-labels, all artifact checks independently approved. Full local gate is running.
+labels, all artifact checks independently approved. Full local gate passed on `4453160c`: 7,858 passed, 30 skipped, 43 warnings,
+91% coverage. Source and delivery are ready for owner playback judgment.
 See [restoration evidence](../evidence/2026-11-20-movement-restoration/README.md)
 and [plan](movement-restoration-2026-11-20.md). Owner look judgment remains open.
 The earlier artifact checks below do not establish complete movement coverage.
 
-The requested sequential movement sampler is generated from current production
+### Earlier sampler — coverage rejected
+
+The earlier sequential movement sampler was generated from current production
 renderer frames: 62 movement examples with two-second dark pauses. The native
 xLights video, labeled version and matching sequence/show package live under
 `~/xlights/_twinklr_verify/movement-sampler-2026-11-20/`. See the
@@ -30,9 +33,11 @@ xLights video, labeled version and matching sequence/show package live under
 [plan](movement-sampler-2026-11-20.md). No application source or catalog changes.
 The sampler uses a synthetic preview profile; physical-rig admission is not implied.
 Final native/video/label/package verification passed; no paid work or hardware
-output. Delivery is complete, with owner playback judgment separate. Source
+output. Its coverage was subsequently rejected by the owner. Source
 `e0376f66` is unchanged; the dated evidence records the artifact checks and the
 explicitly skipped full application gate.
+
+### House rendering and other remaining acceptance
 
 Owner follow-up names Dance Jams house as the problem reference. CI and Jekyll
 Pages builds are manually disabled on owner request to avoid spend during repair;

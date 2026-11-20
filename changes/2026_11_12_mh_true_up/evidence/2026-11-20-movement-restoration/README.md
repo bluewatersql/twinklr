@@ -1,6 +1,6 @@
 ---
 type: evidence
-status: active
+status: complete
 area: engineering
 updated: 2026-11-20
 ---
@@ -61,15 +61,19 @@ found by the first full gate attempt.
   identified; 2,005 tests had passed. No passing full gate is claimed for that run.
 - After the accountability fix: all config inventory and restored production tests
   passed, 233 total.
-- The next full gate exposed one old CLI test that still expected the original
+- The next full gate on `af774e99` exposed one old CLI test that still expected the original
   seven template IDs. It was stopped, the assertion was updated to all 25 current
-  IDs, and the focused CLI/restored tests passed (26). No full pass is claimed.
+  IDs, and the focused CLI/restored tests passed (26). It stopped at 3,654 passed
+  and one failed; no full pass is claimed for that attempt.
 - Planning metadata now separates static/organic low-energy routines from
   high-energy bounce/pop-lock/zigzag. Motion-producing data is unchanged.
-- Final clean-tree full `make validate`: PENDING. Command:
+- Final clean-tree full `make validate` on `4453160c` passed: **7,858 passed,
+  30 skipped, 43 warnings, 91% coverage**, in 706.38 seconds. Format, lint and
+  mypy passed. Log: `make-validate-4453160c.log` in the scratch root. Command:
   `UV_NO_SYNC=1 UV_OFFLINE=1 PYTEST_ADDOPTS='-n 8 --dist loadfile' make validate`.
 - Independent reviewer `/root/pickup_review` approved code `493518db`, the narrow
-  `af774e99` additions, and final delivery artifacts, with no remaining findings.
+  `af774e99` additions, subsequent CLI/metadata changes, and final delivery
+  artifacts, with no remaining findings.
   The reviewer independently ran the focused tests, verified counterphase and
   symmetry, and accepted the explicit inventory scope without claiming old look parity.
 

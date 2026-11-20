@@ -247,16 +247,19 @@ See [product/overview.md](product/overview.md).
 ## Quality gate
 
 The latest recorded full `make validate` gate on the history of `main` ran on
-`a5e52265` (2026-11-19) with 7,818 passed, 30 skipped, and 91% coverage.
+`4453160c` (2026-11-20) with 7,858 passed, 30 skipped, and 91% coverage.
 There are no accepted failures. The gate includes the moving-head output pins and a
 hermetic display replay under `tests/regression/`.
-[House repair gate record](../changes/2026_11_12_mh_true_up/evidence/2026-11-19-house-musical-sync/README.md#completion-gate)
+[Movement restoration gate record](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-movement-restoration/README.md#fresh-checks)
 
-A sequential [movement sampler](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-movement-sampler/README.md)
-was rendered in xLights on 2026-11-20: 62 movement examples, two-second dark pauses,
-and labeled video. Its technical checks passed, but the owner rejected its movement
-coverage: speed/reach presets did not restore the deleted vocabulary. Restoration
-and a replacement sampler are in progress on `codex/restore-movement-vocabulary`.
+The [replacement movement sampler](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-movement-restoration/README.md)
+was rendered and independently verified on 2026-11-20: 24 routines/reference entries
+once each, two-second dark pauses, names and 4:02 total. The previous 62-entry
+sample's coverage was rejected because speed/reach variants did not replace lost
+movement behaviors. The restoration adds eighteen routines on the single renderer
+and explicitly maps the original vocabulary and template uses. Some formations need
+named rig aim presets; the preview supplies synthetic aims. Owner look judgment and
+physical-fixture acceptance remain open.
 
 ## Live evidence
 
