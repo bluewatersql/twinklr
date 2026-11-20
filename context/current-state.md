@@ -252,7 +252,7 @@ There are no accepted failures. The gate includes the moving-head output pins an
 hermetic display replay under `tests/regression/`.
 [Movement restoration gate record](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-movement-restoration/README.md#fresh-checks)
 
-The [replacement movement sampler](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-movement-restoration/README.md)
+The [replacement movement sampler](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-movement-sampler-regeneration/README.md)
 was rendered and independently verified on 2026-11-20: 24 routines/reference entries
 once each, two-second dark pauses, names and 4:02 total. The previous 62-entry
 sample's coverage was rejected because speed/reach variants did not replace lost

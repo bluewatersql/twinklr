@@ -10,6 +10,14 @@ updated: 2026-11-20
 
 ## Start here — current state, 2026-11-20
 
+Owner requested another fresh regeneration after integration. Latest deliverables
+are now under `~/xlights/_twinklr_verify/movement-sampler-regenerated-2026-11-20/`:
+`movement-sampler-labeled.mp4` and `movement-sampler-show.zip`. All 24 cases rebuilt
+from `22fac0fb`; duration remains 4:02 with two-second dark pauses. Fresh byte,
+video, label and package checks passed; no application changes. See
+[regeneration evidence](../evidence/2026-11-20-movement-sampler-regeneration/README.md).
+
+
 Owner rejected the prior sampler’s coverage: speed/reach variants do not replace
 removed movement vocabulary. The restoration is implemented and independently
 reviewed on `codex/restore-movement-vocabulary` (`493518db`, `af774e99`): eighteen

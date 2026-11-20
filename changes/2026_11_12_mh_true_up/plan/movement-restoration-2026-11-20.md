@@ -82,3 +82,19 @@ honestly rather than claim those implementations had behavior they never rendere
 reviews approved. The 24-entry replacement sample (4:02) has passed byte, native
 visibility, pause, label and package checks. Full local gate passed on `4453160c`: 7,858 passed, 30 skipped, 91% coverage;
 see [dated evidence](../evidence/2026-11-20-movement-restoration/README.md).
+
+## Owner-requested regeneration
+
+2026-11-20: owner asked to regenerate the sequence and video again. Root owns
+`codex/regenerate-movement-sampler`. Rebuild all 24 cases from current `main`
+(`22fac0fb`) into a fresh expendable show, render native xLights video, add labels,
+and package the matching sequence. Keep eight-second examples and two-second
+dark pauses. Validate byte agreement, visible motion, darkness, labels, video
+metadata and package integrity; obtain independent artifact review. No source
+changes or paid requests; CI stays paused. Existing authorization covers this
+synthetic scratch show and commit/merge/sync. Full application gate will not be
+repeated for this artifact-only regeneration; retain the prior source gate record.
+
+Regeneration complete: all artifact checks and independent review passed, with no
+findings. [Fresh evidence](../evidence/2026-11-20-movement-sampler-regeneration/README.md)
+records the new deliverables and skipped application gate. Owner judgment pending.
