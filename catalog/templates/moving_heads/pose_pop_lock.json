@@ -1,0 +1,190 @@
+{
+  "template": {
+    "template_id": "pose_pop_lock",
+    "version": 1,
+    "name": "Pop Lock / Hit",
+    "category": "medium_energy",
+    "repeat": {
+      "mode": "JOINER",
+      "cycle_bars": 4,
+      "loop_step_ids": [
+        "motion"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "motion",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0,
+            "duration_bars": 4
+          }
+        },
+        "movement": {
+          "shape": "polyline",
+          "mode": "periodic",
+          "pan_extent_deg": 25,
+          "tilt_extent_deg": 15,
+          "period_beats": 4,
+          "start_pan_deg": 0,
+          "start_tilt_deg": 30,
+          "path_knots": [
+            {
+              "phase": 0,
+              "x": 1,
+              "y": 1
+            },
+            {
+              "phase": 0.375,
+              "x": 1,
+              "y": 1
+            },
+            {
+              "phase": 0.5,
+              "x": -1,
+              "y": -1
+            },
+            {
+              "phase": 0.875,
+              "x": -1,
+              "y": -1
+            },
+            {
+              "phase": 1,
+              "x": 1,
+              "y": 1
+            }
+          ]
+        },
+        "dimmer": {
+          "period_beats": 4,
+          "duty_cycle": 1,
+          "low": 0,
+          "high": 1
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.5,
+            "group_count": 2
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "tags": [
+        "movement_restoration",
+        "polyline"
+      ],
+      "recommended_sections": [
+        "verse",
+        "chorus",
+        "bridge"
+      ],
+      "energy_range": [
+        20,
+        90
+      ],
+      "description": "Alternating heads switch between two poses, hold each, then return. Explicit eighth-cycle travel replaces the old instantaneous pulse; both old pop lock and hit shared that pulse."
+    }
+  },
+  "presets": [
+    {
+      "preset_id": "narrow",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 12.5,
+            "tilt_extent_deg": 7.5
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "slow",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "period_beats": 8
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 37.5,
+            "tilt_extent_deg": 22.5
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "fast",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "period_beats": 2.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+slow",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 12.5,
+            "tilt_extent_deg": 7.5,
+            "period_beats": 8
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+fast",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 12.5,
+            "tilt_extent_deg": 7.5,
+            "period_beats": 2.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+slow",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 37.5,
+            "tilt_extent_deg": 22.5,
+            "period_beats": 8
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+fast",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 37.5,
+            "tilt_extent_deg": 22.5,
+            "period_beats": 2.0
+          }
+        }
+      }
+    }
+  ]
+}

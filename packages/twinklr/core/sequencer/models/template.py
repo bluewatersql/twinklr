@@ -116,7 +116,7 @@ MIN_PERIOD_BEATS = 1 / 64
 20 ms frame, so anything shorter is an authoring error rather than a pulse."""
 
 
-RELATIVE_PATH_SHAPES = ("circle", "lissajous", "sweep")
+RELATIVE_PATH_SHAPES = ("circle", "lissajous", "sweep", "polyline", "organic")
 """Shapes evaluated as a centered displacement about the base aim; only these take a
 `PathTransform`."""
 
@@ -137,6 +137,21 @@ class PathTransform(BaseModel):
     phase_cycles: float = Field(default=0.0, allow_inf_nan=False)
 
 
+class PathKnot(BaseModel):
+    """One normalized displacement at an exact fraction of a movement period.
+
+    Equal consecutive displacements author a dwell; unequal ones author linear
+    travel. No instantaneous jumps are possible. Physical limits are checked after
+    the path is transformed and scaled into fixture degrees.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    phase: float = Field(ge=0, le=1, allow_inf_nan=False)
+    x: float = Field(ge=-1, le=1, allow_inf_nan=False)
+    y: float = Field(ge=-1, le=1, allow_inf_nan=False)
+
+
 class Movement(BaseModel):
     """Movement of a template step, in fixture-local degrees.
 
@@ -148,14 +163,27 @@ class Movement(BaseModel):
     finite) move about the start pose; each extent is that axis's maximum signed
     displacement before rotation, and `transform` rotates, shifts or reverses them
     (`evaluate_path` states each formula). `lissajous_ratio` is the pan and
-    tilt cycles per period, default 1:2. A start angle left unset comes from the
+    tilt cycles per period, default 1:2. `polyline` interpolates explicit phase/x/y
+    knots, with equal positions giving dwell; a periodic path must close exactly.
+    `organic` is deterministic periodic Perlin motion with independent axis fields.
+    Both use the same transform and degree extents. A start angle left unset comes from the
     step's position reference (`TemplateStep.component_refs`); a step without one
     must set both.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    shape: Literal["hold", "sine_pan", "sine_tilt", "linear", "circle", "lissajous", "sweep"]
+    shape: Literal[
+        "hold",
+        "sine_pan",
+        "sine_tilt",
+        "linear",
+        "circle",
+        "lissajous",
+        "sweep",
+        "polyline",
+        "organic",
+    ]
     mode: Literal["periodic", "finite"]
     start_pan_deg: float | None = Field(default=None, allow_inf_nan=False)
     start_tilt_deg: float | None = Field(default=None, allow_inf_nan=False)
@@ -172,6 +200,9 @@ class Movement(BaseModel):
         default=None, exclude_if=lambda value: value is None
     )
     transform: PathTransform | None = Field(default=None, exclude_if=lambda value: value is None)
+    path_knots: tuple[PathKnot, ...] | None = Field(
+        default=None, min_length=2, exclude_if=lambda value: value is None
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -185,10 +216,22 @@ class Movement(BaseModel):
             raise ValueError("linear motion is finite; periodic linear is not supported")
         if self.shape in ("sine_pan", "sine_tilt") and self.mode != "periodic":
             raise ValueError(f"{self.shape} is periodic; finite sine is not supported")
-        if self.shape in ("circle", "lissajous") and self.mode != "periodic":
+        if self.shape in ("circle", "lissajous", "organic") and self.mode != "periodic":
             raise ValueError(f"{self.shape} is periodic; a finite {self.shape} is not supported")
         if self.lissajous_ratio is not None and self.shape != "lissajous":
             raise ValueError("lissajous_ratio applies only to the lissajous shape")
+        if self.shape == "polyline":
+            knots = self.path_knots
+            if knots is None:
+                raise ValueError("polyline needs path_knots")
+            if knots[0].phase != 0 or knots[-1].phase != 1:
+                raise ValueError("path_knots must start at phase 0 and end at phase 1")
+            if any(a.phase >= b.phase for a, b in pairwise(knots)):
+                raise ValueError("path_knots phases must strictly increase")
+            if self.mode == "periodic" and (knots[0].x, knots[0].y) != (knots[-1].x, knots[-1].y):
+                raise ValueError("periodic path_knots must end at their starting displacement")
+        elif self.path_knots is not None:
+            raise ValueError("path_knots applies only to polyline")
         if self.transform is not None and self.shape not in RELATIVE_PATH_SHAPES:
             raise ValueError(
                 f"transform applies only to the relative shapes {list(RELATIVE_PATH_SHAPES)}; "

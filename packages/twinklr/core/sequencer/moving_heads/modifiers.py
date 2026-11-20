@@ -61,18 +61,23 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from fractions import Fraction
+import math
 from typing import TYPE_CHECKING, Any, Protocol
 
+from twinklr.core.config.fixtures.presets import PoseDegrees
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.topology import PhaseDistribution
 from twinklr.core.sequencer.models.template import (
     RELATIVE_PATH_SHAPES,
+    Movement,
     PathTransform,
     Template,
     TemplatePreset,
     TemplateStep,
 )
 from twinklr.core.sequencer.moving_heads.compile.preset import apply_preset
+from twinklr.core.sequencer.moving_heads.compile.step import evaluate_path
 
 if TYPE_CHECKING:
     from twinklr.core.sequencer.moving_heads.song_intent import TemplateOffer
@@ -173,6 +178,8 @@ def _reverse_step(step: TemplateStep) -> TemplateStep | None:
         reversed_ = movement.model_copy(
             update={"transform": transform.model_copy(update={"reverse": not transform.reverse})}
         )
+        if movement.shape == "polyline" and not _polyline_reverse_changes(movement, reversed_):
+            return None
         return step.model_copy(update={"movement": reversed_})
     negated = {
         "pan_extent_deg": -movement.pan_extent_deg,
@@ -188,6 +195,35 @@ def _reverse_step(step: TemplateStep) -> TemplateStep | None:
     elif zoom is not None and zoom.shape == "sine":
         zoom = zoom.model_copy(update={"extent_deg": -zoom.extent_deg})
     return step.model_copy(update={"movement": movement.model_copy(update=negated), "zoom": zoom})
+
+
+def _polyline_reverse_changes(original: Movement, reversed_: Movement) -> bool:
+    """Compare both paths at every break: equality there proves linear pieces equal.
+
+    Include transformed knots from both directions. This handles held segments,
+    shifted phase, finite endpoints and rotated/scaled axes without advertising a
+    no-op reverse for symmetric triangles or fan opening/closing.
+    """
+    assert original.path_knots is not None
+    shift = Fraction(str((original.transform or PathTransform()).phase_cycles))
+    phases = {Fraction(0), Fraction(1)}
+    for knot in original.path_knots:
+        phase = Fraction(str(knot.phase))
+        phases.update((phase - shift, 1 - shift - phase))
+    if original.mode == "periodic":
+        phases = {phase % 1 for phase in phases}
+    aim = PoseDegrees(pan_deg=0, tilt_deg=0)
+    return any(
+        not all(
+            math.isclose(a, b, abs_tol=1e-9)
+            for a, b in zip(
+                evaluate_path(original, aim, phase.numerator, phase.denominator),
+                evaluate_path(reversed_, aim, phase.numerator, phase.denominator),
+                strict=True,
+            )
+        )
+        for phase in phases
+    )
 
 
 def _referenced(step: TemplateStep) -> bool:

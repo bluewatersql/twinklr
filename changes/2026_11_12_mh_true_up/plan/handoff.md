@@ -10,6 +10,11 @@ updated: 2026-11-20
 
 ## Start here — current state, 2026-11-20
 
+Owner rejected the sampler’s coverage: speed/reach variants do not replace the
+removed movement vocabulary. Continue [movement restoration](movement-restoration-2026-11-20.md)
+on `codex/restore-movement-vocabulary`. The earlier artifact checks below remain
+technically valid but do not establish complete movement coverage.
+
 The requested sequential movement sampler is generated from current production
 renderer frames: 62 movement examples with two-second dark pauses. The native
 xLights video, labeled version and matching sequence/show package live under

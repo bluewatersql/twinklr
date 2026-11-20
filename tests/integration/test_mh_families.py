@@ -24,6 +24,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from tests.support.moving_heads import (
+    ALL_CATALOG_IDS,
     CATALOG_IDS,
     FAMILY_IDS,
     TEMPLATE_DIR,
@@ -92,7 +93,8 @@ def test_catalog_holds_the_families_each_explicit_and_degradable() -> None:
     the ladder's `narrow` and `slow` first, then the variation variants (`wide`, `fast`
     and the four reach+rate combinations)."""
     paths = sorted(TEMPLATE_CATALOG_DIR.glob("*.json"))
-    assert tuple(path.stem for path in paths) == CATALOG_IDS
+    assert tuple(path.stem for path in paths) == ALL_CATALOG_IDS
+    paths = [path for path in paths if path.stem in CATALOG_IDS]
     for path in paths:
         document = load_template_document(path)
         validate_template_document(document)
@@ -123,6 +125,9 @@ def test_each_variation_variant_is_its_reach_and_rate_patches() -> None:
     for path in sorted(TEMPLATE_CATALOG_DIR.glob("*.json")):
         document = load_template_document(path)
         steps = {step.step_id: step for step in document.template.steps}
+        if all(step.movement.shape == "hold" for step in steps.values()):
+            assert not document.presets  # Static references have no reach/rate variants.
+            continue
         patches = {
             preset.preset_id: {
                 step_id: patch.model_dump(exclude_none=True)
@@ -199,7 +204,7 @@ async def test_run_offers_the_families_and_template_dir_documents(
     with family_catalog(admit=False):
         offered = await _cli_offer(tmp_path, family_job(HEADS), family_rig(HEADS), TEMPLATE_DIR)
 
-    assert sorted(offered) == sorted([*CATALOG_IDS, TEMPLATE_ID])
+    assert sorted(offered) == sorted([*ALL_CATALOG_IDS, TEMPLATE_ID])
 
 
 @pytest.mark.parametrize(
@@ -222,7 +227,7 @@ async def test_template_dir_naming_the_catalog_loads_nothing_twice(
     ):
         offered = await _cli_offer(tmp_path, family_job(HEADS), family_rig(HEADS), spelling)
 
-    assert tuple(sorted(offered)) == CATALOG_IDS
+    assert tuple(sorted(offered)) == ALL_CATALOG_IDS
     # Rich wraps long paths; the words survive with their spacing normalized.
     assert "already admitted" in " ".join(capsys.readouterr().out.split())
 
@@ -233,7 +238,7 @@ async def test_runs_in_one_process_admit_the_catalog_once(tmp_path: Path) -> Non
     with family_catalog(admit=False):
         for _ in range(2):
             offered = await _cli_offer(tmp_path, family_job(HEADS), family_rig(HEADS))
-            assert tuple(sorted(offered)) == CATALOG_IDS
+            assert tuple(sorted(offered)) == ALL_CATALOG_IDS
 
 
 # --- Section succession ----------------------------------------------------------------

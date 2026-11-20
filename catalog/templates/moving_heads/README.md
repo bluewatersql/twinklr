@@ -22,7 +22,7 @@ of whose variants passes is left out of the offer, with every reason, and record
 passes, the family plays exactly as it did before the ladder. The gate also logs each
 admitted family's worst-case section-entry dip, over its admitted variants.
 
-Every family sets explicit start angles and names no rig position preset, authors its
+The original seven families set explicit start angles and name no rig position preset, author their
 dimmer, and declares `reposition_fallback: drop_accent` on every step, so a
 job that sets `moving_heads.reposition_fallback: drop_accent` plays a cue it cannot
 reposition into dark. Each declares two ladder variants as presets: `narrow` (less reach) and
@@ -31,7 +31,7 @@ the base at the song's tempo, or a beat too short for the flick's mask, the fami
 usually still plays through one of them; a variant can also fail where the base plays,
 and is then left out on its own.
 
-Each also declares the **variation variants** (song-intent W10a): `wide` (every extent
+Each moving family also declares the **variation variants** (song-intent W10a): `wide` (every extent
 `narrow` narrows, half again: ×1.5), `fast` (every period `slow` doubles, halved) and the
 four reach+rate combinations `narrow+slow`, `narrow+fast`, `wide+slow`, `wide+fast`, each
 exactly its reach patch then its rate patch. They ask for more reach or rate, so they are
@@ -45,6 +45,16 @@ families, each on its base variant, as rendered for one song on their rig in the
 house preview on 2026-11-16
 ([record](../../../changes/2026_11_12_mh_true_up/evidence/2026-11-16-p3-viewing-render/README.md)).
 The presets and `zoom_wave` have not been viewed, and no family has run on hardware.
+
+## Restored movement vocabulary
+
+Eighteen additional routines restore angular travel, pose-switch holds, organic motion
+and fixture arrangements lost in the renderer replacement. The catalog now has 25
+families, including the optical zoom pilot. Two new static reference families have
+no movement presets. Some restored arrangements require explicit rig position
+presets; they are excluded when those aims are absent. See the complete
+[original movement mapping and authoring contract](movement-coverage.md).
+Speed/reach variants are not counted as additional movement behaviors.
 
 ## Meter
 

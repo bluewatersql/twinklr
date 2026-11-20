@@ -1,0 +1,62 @@
+{
+  "template": {
+    "template_id": "static_tunnel",
+    "version": 1,
+    "name": "Static Tunnel / Accent Aim",
+    "category": "medium_energy",
+    "repeat": {
+      "mode": "JOINER",
+      "cycle_bars": 4,
+      "loop_step_ids": [
+        "motion"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "motion",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0,
+            "duration_bars": 4
+          }
+        },
+        "movement": {
+          "shape": "hold",
+          "mode": "periodic",
+          "pan_extent_deg": 0,
+          "tilt_extent_deg": 0
+        },
+        "dimmer": {
+          "period_beats": 4,
+          "duty_cycle": 1,
+          "low": 0,
+          "high": 1
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_tunnel"
+        }
+      }
+    ],
+    "metadata": {
+      "tags": [
+        "movement_restoration",
+        "hold"
+      ],
+      "recommended_sections": [
+        "verse",
+        "chorus",
+        "bridge"
+      ],
+      "energy_range": [
+        20,
+        90
+      ],
+      "description": "Reference: hold the rig-defined tunnel aims. Original accent_snap used a hold kernel; no invented snap motion. Requires movement_tunnel positions."
+    }
+  },
+  "presets": []
+}

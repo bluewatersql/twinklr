@@ -57,8 +57,11 @@ See [product/overview.md](product/overview.md).
   - The `render_preflight` gate, right after audio analysis and before any planner,
     dry-compiles every offered template and preset on the rig over the song. A family
     is offered through its first passing variant; a run with nothing left is refused.
-  - Seven families in `catalog/templates/moving_heads/` load on every run (six plus the
-    `zoom_wave` pilot, which needs a zoom axis); `--template-dir` adds JSON templates.
+  - Twenty-five families in `catalog/templates/moving_heads/` load on every run,
+    including the `zoom_wave` pilot, which needs a zoom axis; `--template-dir` adds JSON templates.
+    Eighteen restored routines recover angular, travel/dwell, organic and fixture
+    arrangement behavior. Some require explicit named rig aims; missing aims exclude
+    that family. [Movement coverage](../catalog/templates/moving_heads/movement-coverage.md).
     Families play in any meter (a repeating cycle grows to whole periods).
   - Silent song edges are held dark; a cue it cannot play honestly is kept dark
     (`on_unplayable`, default `"dark"`).
@@ -251,8 +254,9 @@ hermetic display replay under `tests/regression/`.
 
 A sequential [movement sampler](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-movement-sampler/README.md)
 was rendered in xLights on 2026-11-20: 62 movement examples, two-second dark pauses,
-and labeled video. It uses a synthetic preview rig and adds no application code or
-physical-fixture acceptance.
+and labeled video. Its technical checks passed, but the owner rejected its movement
+coverage: speed/reach presets did not restore the deleted vocabulary. Restoration
+and a replacement sampler are in progress on `codex/restore-movement-vocabulary`.
 
 ## Live evidence
 

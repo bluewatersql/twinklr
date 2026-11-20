@@ -298,7 +298,67 @@ FAMILY_IDS = (
 ZOOM_FAMILY_ID = "zoom_wave"
 """The zoom pilot family (P2.5), left out on a rig without a zoom axis."""
 CATALOG_IDS = tuple(sorted((*FAMILY_IDS, ZOOM_FAMILY_ID)))
-"""The whole family catalog (`TEMPLATE_CATALOG_DIR`), sorted."""
+"""The original seven families whose unchanged output is pinned by regression tests."""
+
+RESTORED_MOVEMENT_IDS = (
+    "asymmetric_orbit",
+    "chevron_pendulum",
+    "split_counter_sweep",
+    "angular_pan",
+    "angular_tilt",
+    "bounce_fan",
+    "diagonal_sweep",
+    "fan_iris",
+    "horizontal_wave",
+    "organic_meander",
+    "pendulum_swing",
+    "pose_pop_lock",
+    "radial_fan",
+    "static_fan",
+    "static_tunnel",
+    "tilt_rock",
+    "vertical_wave",
+    "zigzag_alternating",
+)
+ALL_CATALOG_IDS = tuple(sorted((*CATALOG_IDS, *RESTORED_MOVEMENT_IDS)))
+"""All current families, including restored movement behavior."""
+
+
+def movement_rig(fixture_ids: Sequence[str]) -> FixtureGroup:
+    """Synthetic preview rig with explicit fan, alternating and tunnel aims.
+
+    These are test/preview choices, never defaulted on an owner's physical rig.
+    """
+    rig = zoom_rig(fixture_ids)
+    payload = rig.model_dump(mode="json")
+    count = len(fixture_ids)
+    positions = {}
+    for name in (
+        "movement_fan",
+        "movement_fan_bias",
+        "movement_alternating",
+        "movement_tunnel",
+        "movement_chevron",
+        "movement_asymmetric",
+    ):
+        aims = {}
+        for index, fixture_id in enumerate(fixture_ids):
+            rank = 0.0 if count == 1 else 2 * index / (count - 1) - 1
+            pan, tilt = rank * 35, 30.0
+            if name == "movement_fan_bias":
+                tilt += (1 - abs(rank)) * 20
+            elif name == "movement_alternating":
+                tilt = 45.0 if index % 2 == 0 else 15.0
+            elif name == "movement_chevron":
+                tilt = 20 + abs(rank) * 30
+            elif name == "movement_asymmetric":
+                pan, tilt = rank * 25 + 15, 25 + (rank + 1) * 10
+            elif name == "movement_tunnel":
+                pan, tilt = -rank * 20, 50.0
+            aims[fixture_id] = {"pan_deg": pan, "tilt_deg": tilt}
+        positions[name] = {"fixtures": aims}
+    payload["presets"]["positions"] = positions
+    return FixtureGroup.model_validate(payload)
 
 
 @contextmanager

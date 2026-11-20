@@ -32,6 +32,7 @@ from itertools import pairwise
 import math
 from typing import Any
 
+from noise import pnoise1
 from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.config.fixtures.capabilities import DiscreteCapability, FixtureCapabilities
@@ -620,6 +621,11 @@ def evaluate_path(
     - `sweep`, periodic: `(-cos 2πu, 0)`, from `(-1, 0)` edge to edge and back each
       period; finite: `(-cos π·clamp(u, 0, 1), 0)`, one way, then held at `(1, 0)`.
 
+    - `polyline`: linear interpolation between authored phase/x/y knots, including
+      held segments; periodic phase wraps, finite phase clamps to the endpoints.
+    - `organic`: periodic Perlin fields at eight noise units per cycle, two octaves,
+      repeat eight, bases 0 and 17 for pan and tilt. No mutable random state.
+
     It is rotated by `θ = transform.rotation_deg` (exact at quarter turns),
     `(x', y') = (x cos θ - y sin θ, x sin θ + y cos θ)`, then scaled and added:
     `pose + (s·E_p·x', E_t·y')`. Each extent is that axis's maximum signed displacement
@@ -666,6 +672,21 @@ def _centered_displacement(spec: Movement, n: int, d: int) -> tuple[float, float
     elif spec.shape == "lissajous":
         a, b = spec.lissajous_ratio or (1, 2)
         x, y = math.sin(2 * math.pi * a * u), math.sin(2 * math.pi * b * u)
+    elif spec.shape == "polyline":
+        knots = spec.path_knots
+        assert knots is not None  # Movement validates the endpoints and phase order.
+        phase = min(max(u, 0.0), 1.0) if spec.mode == "finite" else u % 1
+        right = min(bisect.bisect_right([k.phase for k in knots], phase), len(knots) - 1)
+        start, end = knots[right - 1], knots[right]
+        fraction = (phase - start.phase) / (end.phase - start.phase)
+        x = start.x + (end.x - start.x) * fraction
+        y = start.y + (end.y - start.y) * fraction
+    elif spec.shape == "organic":
+        # Fixed periodic noise in musical phase, independent of sample count/order.
+        # The two axes use different deterministic noise fields; no global RNG.
+        phase = (u % 1) * 8
+        x = float(pnoise1(phase, octaves=2, repeat=8, base=0))
+        y = float(pnoise1(phase, octaves=2, repeat=8, base=17))
     elif spec.mode == "finite":
         x, y = -math.cos(math.pi * min(max(u, 0.0), 1.0)), 0.0
     else:

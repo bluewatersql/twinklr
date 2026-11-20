@@ -2,7 +2,7 @@
 type: decision
 status: accepted
 created: 2026-11-17
-updated: 2026-11-17
+updated: 2026-11-20
 confidence: confirmed
 tags: [moving-heads, rendering, owner-acceptance, single-path]
 ---
@@ -68,6 +68,17 @@ was accepted the same day.
 - The accepted look is not a hardware result: no real fixture was driven and the
   profile timings were chosen, not measured. Nor does it accept the missing song intent:
   that render applied no planner intensity, colour, events or cues.
+
+## Movement correction, 2026-11-20
+
+The owner clarified that replacing the template implementation must preserve the
+movement vocabulary. The 62-entry sampler mostly repeated reach/rate variants and
+did not establish coverage. Restore distinct motion and fixture coordination on the
+single renderer; do not restore the removed implementation or count preset changes
+as additional movement types. The source inventory and explicit consolidations live
+in [movement coverage](../../catalog/templates/moving_heads/movement-coverage.md).
+Technical output parity for surviving templates is not proof that removed behaviors
+have replacements.
 
 ## Related
 

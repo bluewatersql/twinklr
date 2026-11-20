@@ -122,14 +122,14 @@ def test_family_catalog_is_admitted_once_into_the_given_registry() -> None:
     loaded = load_template_catalog(registry=registry)
 
     assert loaded == [path.stem for path in sorted(TEMPLATE_CATALOG_DIR.glob("*.json"))]
-    assert len(loaded) == 7  # six P2.4c families and the P2.5 zoom pilot
+    assert len(loaded) == 25  # original seven plus eighteen restored movement arrangements
     for template_id in loaded:
         source = Path(registry.source(template_id).removeprefix("data:"))
         assert source.parent == TEMPLATE_CATALOG_DIR
 
     # A later run in the same process keeps them.
     assert load_template_catalog(registry=registry) == loaded
-    assert len(registry.list_all()) == 7
+    assert len(registry.list_all()) == len(loaded)
 
 
 def test_explicit_override_replaces_python_source(tmp_path: Path) -> None:

@@ -11,7 +11,7 @@ from __future__ import annotations
 from pydantic import ValidationError
 import pytest
 
-from tests.support.moving_heads import CATALOG_IDS, family_catalog
+from tests.support.moving_heads import ALL_CATALOG_IDS, family_catalog
 from twinklr.core.sequencer.models.enum import (
     TemplateCategory,
     TimingMode,
@@ -141,7 +141,7 @@ def test_parallel_steps_are_accepted() -> None:
 
 def test_every_shipped_template_passes_the_validator() -> None:
     with family_catalog() as template_ids:
-        assert sorted(template_ids) == list(CATALOG_IDS)
+        assert sorted(template_ids) == list(ALL_CATALOG_IDS)
         for template_id in template_ids:
             validate_repeat_contract(get_template(template_id).template)
 

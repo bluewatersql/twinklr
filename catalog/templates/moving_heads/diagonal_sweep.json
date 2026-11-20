@@ -1,0 +1,165 @@
+{
+  "template": {
+    "template_id": "diagonal_sweep",
+    "version": 1,
+    "name": "Diagonal Sweep",
+    "category": "medium_energy",
+    "repeat": {
+      "mode": "JOINER",
+      "cycle_bars": 4,
+      "loop_step_ids": [
+        "motion"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "motion",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0,
+            "duration_bars": 4
+          }
+        },
+        "movement": {
+          "shape": "sweep",
+          "mode": "periodic",
+          "pan_extent_deg": 35,
+          "tilt_extent_deg": 25,
+          "period_beats": 4,
+          "start_pan_deg": 0,
+          "start_tilt_deg": 30,
+          "transform": {
+            "rotation_deg": 45
+          }
+        },
+        "dimmer": {
+          "period_beats": 4,
+          "duty_cycle": 1,
+          "low": 0,
+          "high": 1
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.5
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "tags": [
+        "movement_restoration",
+        "sweep"
+      ],
+      "recommended_sections": [
+        "verse",
+        "chorus",
+        "bridge"
+      ],
+      "energy_range": [
+        20,
+        90
+      ],
+      "description": "Coordinated sine motion on both axes along a diagonal. Covers diagonal, corner-to-corner and dual sweep."
+    }
+  },
+  "presets": [
+    {
+      "preset_id": "narrow",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 17.5,
+            "tilt_extent_deg": 12.5
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "slow",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "period_beats": 8
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 52.5,
+            "tilt_extent_deg": 37.5
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "fast",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "period_beats": 2.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+slow",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 17.5,
+            "tilt_extent_deg": 12.5,
+            "period_beats": 8
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+fast",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 17.5,
+            "tilt_extent_deg": 12.5,
+            "period_beats": 2.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+slow",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 52.5,
+            "tilt_extent_deg": 37.5,
+            "period_beats": 8
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+fast",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 52.5,
+            "tilt_extent_deg": 37.5,
+            "period_beats": 2.0
+          }
+        }
+      }
+    }
+  ]
+}

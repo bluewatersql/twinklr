@@ -1,0 +1,181 @@
+{
+  "template": {
+    "template_id": "fan_iris",
+    "version": 1,
+    "name": "Fan Iris",
+    "category": "medium_energy",
+    "repeat": {
+      "mode": "JOINER",
+      "cycle_bars": 4,
+      "loop_step_ids": [
+        "motion"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "motion",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0,
+            "duration_bars": 4
+          }
+        },
+        "movement": {
+          "shape": "polyline",
+          "mode": "periodic",
+          "pan_extent_deg": 30,
+          "tilt_extent_deg": 12,
+          "period_beats": 8,
+          "path_knots": [
+            {
+              "phase": 0,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "phase": 0.5,
+              "x": 1,
+              "y": 1
+            },
+            {
+              "phase": 1,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        },
+        "dimmer": {
+          "period_beats": 4,
+          "duty_cycle": 1,
+          "low": 0,
+          "high": 1
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_fan_bias"
+        },
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.25,
+            "wings": 2
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "tags": [
+        "movement_restoration",
+        "polyline"
+      ],
+      "recommended_sections": [
+        "verse",
+        "chorus",
+        "bridge"
+      ],
+      "energy_range": [
+        20,
+        90
+      ],
+      "description": "Mirrored fan opening and closing from rig fan aims with inner/outer tilt bias, in an outside-in wave. Requires movement_fan_bias positions."
+    }
+  },
+  "presets": [
+    {
+      "preset_id": "narrow",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 15.0,
+            "tilt_extent_deg": 6.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "slow",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "period_beats": 16
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 45.0,
+            "tilt_extent_deg": 18.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "fast",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "period_beats": 4.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+slow",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 15.0,
+            "tilt_extent_deg": 6.0,
+            "period_beats": 16
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "narrow+fast",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 15.0,
+            "tilt_extent_deg": 6.0,
+            "period_beats": 4.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+slow",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 45.0,
+            "tilt_extent_deg": 18.0,
+            "period_beats": 16
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "wide+fast",
+      "step_patches": {
+        "motion": {
+          "movement": {
+            "pan_extent_deg": 45.0,
+            "tilt_extent_deg": 18.0,
+            "period_beats": 4.0
+          }
+        }
+      }
+    }
+  ]
+}
