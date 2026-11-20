@@ -3,7 +3,7 @@
     "template_id": "organic_meander",
     "version": 1,
     "name": "Organic Meander",
-    "category": "medium_energy",
+    "category": "low_energy",
     "repeat": {
       "mode": "JOINER",
       "cycle_bars": 4,
@@ -56,13 +56,14 @@
         "organic"
       ],
       "recommended_sections": [
+        "intro",
         "verse",
-        "chorus",
-        "bridge"
+        "bridge",
+        "outro"
       ],
       "energy_range": [
-        20,
-        90
+        5,
+        60
       ],
       "description": "Deterministic irregular pan/tilt motion, timed by musical phase, drifting across the rig. Covers random walk and groove sway; axes have independent fixed noise fields."
     }

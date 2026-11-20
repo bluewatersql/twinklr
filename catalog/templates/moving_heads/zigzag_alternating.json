@@ -3,7 +3,7 @@
     "template_id": "zigzag_alternating",
     "version": 1,
     "name": "Alternating Zigzag",
-    "category": "medium_energy",
+    "category": "high_energy",
     "repeat": {
       "mode": "JOINER",
       "cycle_bars": 4,
@@ -74,13 +74,12 @@
         "polyline"
       ],
       "recommended_sections": [
-        "verse",
         "chorus",
-        "bridge"
+        "drop"
       ],
       "energy_range": [
-        20,
-        90
+        55,
+        100
       ],
       "description": "Angular two-axis travel from alternating high/low fixture aims with left-to-right phase. Requires movement_alternating positions."
     }

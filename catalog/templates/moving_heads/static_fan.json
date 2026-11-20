@@ -3,7 +3,7 @@
     "template_id": "static_fan",
     "version": 1,
     "name": "Static Fan / Hold",
-    "category": "medium_energy",
+    "category": "low_energy",
     "repeat": {
       "mode": "JOINER",
       "cycle_bars": 4,
@@ -47,13 +47,14 @@
         "hold"
       ],
       "recommended_sections": [
+        "intro",
         "verse",
-        "chorus",
-        "bridge"
+        "bridge",
+        "outro"
       ],
       "energy_range": [
-        20,
-        90
+        0,
+        35
       ],
       "description": "Reference: hold the rig-defined fan aims. The original hold routines changed light, not movement. Requires movement_fan positions."
     }

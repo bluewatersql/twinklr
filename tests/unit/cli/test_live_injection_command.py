@@ -14,7 +14,7 @@ from rich.console import Console
 
 from tests.support.live_xlights import FakeLiveXLights
 from tests.support.moving_heads import (
-    CATALOG_IDS,
+    ALL_CATALOG_IDS,
     SUBSET_TEMPLATE_ID,
     TEMPLATE_ID,
     bars_grid,
@@ -934,7 +934,7 @@ async def test_run_offers_the_planner_the_loaded_templates(tmp_path, monkeypatch
 
     (call,) = calls
     assert sorted(call["available_templates"]) == sorted(
-        [TEMPLATE_ID, SUBSET_TEMPLATE_ID, *CATALOG_IDS]
+        [TEMPLATE_ID, SUBSET_TEMPLATE_ID, *ALL_CATALOG_IDS]
     )
 
 

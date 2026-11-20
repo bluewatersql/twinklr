@@ -3,7 +3,7 @@
     "template_id": "static_tunnel",
     "version": 1,
     "name": "Static Tunnel / Accent Aim",
-    "category": "medium_energy",
+    "category": "low_energy",
     "repeat": {
       "mode": "JOINER",
       "cycle_bars": 4,
@@ -47,13 +47,14 @@
         "hold"
       ],
       "recommended_sections": [
+        "intro",
         "verse",
-        "chorus",
-        "bridge"
+        "bridge",
+        "outro"
       ],
       "energy_range": [
-        20,
-        90
+        0,
+        35
       ],
       "description": "Reference: hold the rig-defined tunnel aims. Original accent_snap used a hold kernel; no invented snap motion. Requires movement_tunnel positions."
     }

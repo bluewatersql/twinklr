@@ -3,7 +3,7 @@
     "template_id": "bounce_fan",
     "version": 1,
     "name": "Bounce Fan",
-    "category": "medium_energy",
+    "category": "high_energy",
     "repeat": {
       "mode": "JOINER",
       "cycle_bars": 4,
@@ -75,13 +75,12 @@
         "polyline"
       ],
       "recommended_sections": [
-        "verse",
         "chorus",
-        "bridge"
+        "drop"
       ],
       "energy_range": [
-        20,
-        90
+        55,
+        100
       ],
       "description": "Two-axis angular bounce about the rig fan aims, with alternating odd/even heads half a cycle apart. Requires movement_fan positions."
     }

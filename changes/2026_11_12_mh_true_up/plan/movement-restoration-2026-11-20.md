@@ -74,3 +74,11 @@ presets. Named catalog routines combine these paths, aims and distributions; the
 speed/reach presets remain secondary. The old SPIRAL and CROSS_PATTERN were identical
 Lissajous scalars on both axes, not a real changing-radius spiral. Record that mapping
 honestly rather than claim those implementations had behavior they never rendered.
+
+## Implementation and delivery status
+
+`493518db` implements polyline/organic motion and eighteen restored arrangements;
+`af774e99` adds public-field accountability tests. Independent code and artifact
+reviews approved. The 24-entry replacement sample (4:02) has passed byte, native
+visibility, pause, label and package checks. Full local gate remains in progress;
+see [dated evidence](../evidence/2026-11-20-movement-restoration/README.md).

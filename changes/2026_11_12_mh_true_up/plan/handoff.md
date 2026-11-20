@@ -10,10 +10,17 @@ updated: 2026-11-20
 
 ## Start here — current state, 2026-11-20
 
-Owner rejected the sampler’s coverage: speed/reach variants do not replace the
-removed movement vocabulary. Continue [movement restoration](movement-restoration-2026-11-20.md)
-on `codex/restore-movement-vocabulary`. The earlier artifact checks below remain
-technically valid but do not establish complete movement coverage.
+Owner rejected the prior sampler’s coverage: speed/reach variants do not replace
+removed movement vocabulary. The restoration is implemented and independently
+reviewed on `codex/restore-movement-vocabulary` (`493518db`, `af774e99`): eighteen
+routines restore distinct paths and fixture coordination, and all original movement
+names/template uses are explicitly mapped. Replacement sample:
+`~/xlights/_twinklr_verify/movement-restored-2026-11-20/movement-sampler-labeled.mp4`
+and `movement-sampler-show.zip`: 24 entries once each, 4:02 total, dark pauses and
+labels, all artifact checks independently approved. Full local gate is running.
+See [restoration evidence](../evidence/2026-11-20-movement-restoration/README.md)
+and [plan](movement-restoration-2026-11-20.md). Owner look judgment remains open.
+The earlier artifact checks below do not establish complete movement coverage.
 
 The requested sequential movement sampler is generated from current production
 renderer frames: 62 movement examples with two-second dark pauses. The native

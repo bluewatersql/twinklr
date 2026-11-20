@@ -3,7 +3,7 @@
     "template_id": "pose_pop_lock",
     "version": 1,
     "name": "Pop Lock / Hit",
-    "category": "medium_energy",
+    "category": "high_energy",
     "repeat": {
       "mode": "JOINER",
       "cycle_bars": 4,
@@ -84,13 +84,12 @@
         "polyline"
       ],
       "recommended_sections": [
-        "verse",
         "chorus",
-        "bridge"
+        "drop"
       ],
       "energy_range": [
-        20,
-        90
+        55,
+        100
       ],
       "description": "Alternating heads switch between two poses, hold each, then return. Explicit eighth-cycle travel replaces the old instantaneous pulse; both old pop lock and hit shared that pulse."
     }
