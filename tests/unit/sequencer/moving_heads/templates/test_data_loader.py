@@ -122,7 +122,7 @@ def test_family_catalog_is_admitted_once_into_the_given_registry() -> None:
     loaded = load_template_catalog(registry=registry)
 
     assert loaded == [path.stem for path in sorted(TEMPLATE_CATALOG_DIR.glob("*.json"))]
-    assert len(loaded) == 25  # original seven plus eighteen restored movement arrangements
+    assert len(loaded) == 62  # previous 25 families plus all 37 historical arrangements
     for template_id in loaded:
         source = Path(registry.source(template_id).removeprefix("data:"))
         assert source.parent == TEMPLATE_CATALOG_DIR

@@ -57,14 +57,18 @@ See [product/overview.md](product/overview.md).
   - The `render_preflight` gate, right after audio analysis and before any planner,
     dry-compiles every offered template and preset on the rig over the song. A family
     is offered through its first passing variant; a run with nothing left is refused.
-  - Twenty-five families in `catalog/templates/moving_heads/` load on every run,
+  - Sixty-two templates in `catalog/templates/moving_heads/` load on every run,
     including the `zoom_wave` pilot, which needs a zoom axis; `--template-dir` adds JSON templates.
-    Eighteen added routines recover angular, travel/dwell, organic and some fixture
-    arrangement behavior. Historical arrangement preservation is incomplete: inner-only
-    targeting, scattered-wave hybrid paths and sequential routines remain missing.
-    [Preservation audit](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-template-preservation/README.md). Some require explicit named rig aims; missing aims exclude
-    that family. [Movement coverage](../catalog/templates/moving_heads/movement-coverage.md).
-    Families play in any meter (a repeating cycle grows to whole periods).
+    All 37 historical named arrangements are restored on the current renderer alongside
+    the previous 25 families. This includes INNER-only targeting, sine-pan/organic-tilt
+    scattered waves, sequential 6/8-bar routines, phase orders and authored light intent.
+    Physical degree extents and safe transitions replace legacy DMX curves; exact old
+    frame parity is not claimed. Some formations require explicit named rig aims;
+    missing aims exclude that family. A synthetic reference aim library is shipped in
+    `catalog/rigs/`. [Movement coverage](../catalog/templates/moving_heads/movement-coverage.md)
+    and [restoration evidence](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-arrangement-restoration/README.md).
+    The gate also checks the song meter: a repeating cycle grows to whole periods,
+    and a family is excluded when the required cycle exceeds its supported length.
   - Silent song edges are held dark; a cue it cannot play honestly is kept dark
     (`on_unplayable`, default `"dark"`).
   - **Song intent rendered so far: section colour and gobo** (W3/W4, 2026-11-17, not
@@ -254,15 +258,14 @@ There are no accepted failures. The gate includes the moving-head output pins an
 hermetic display replay under `tests/regression/`.
 [Movement restoration gate record](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-movement-restoration/README.md#fresh-checks)
 
-The [replacement movement sampler](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-movement-sampler-regeneration/README.md)
-was rendered and independently verified on 2026-11-20: 24 routines/reference entries
-once each, two-second dark pauses, names and 4:02 total. The previous 62-entry
-sample's coverage was rejected because speed/reach variants did not replace lost
-movement behaviors. The restoration adds eighteen routines on the single renderer
-and explicitly maps the original vocabulary and template uses. Mapping is not full
-arrangement preservation; the audit above records confirmed gaps. Some formations need
-named rig aim presets; the preview supplies synthetic aims. Owner look judgment and
-physical-fixture acceptance remain open.
+The [complete arrangement sampler](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-arrangement-restoration/README.md)
+contains 61 labeled base entries, including seven static aim references, with two-second
+dark pauses and 10:40 total duration. This is all 62 catalog templates except Zoom Wave,
+not 61 distinct motion kernels. It includes all 37 restored arrangements and full
+multi-step arcs. The preview uses synthetic rig aims and neutral light to expose
+movement; two authored blackout routines are explicitly labeled as revealed. Authored
+templates retain their light programs. Owner look judgment and physical-fixture
+acceptance remain open.
 
 ## Live evidence
 

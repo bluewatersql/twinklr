@@ -10,27 +10,31 @@ updated: 2026-11-20
 
 ## Start here — current state, 2026-11-20
 
-Owner authorized fixing the audited gaps. Root implements on
-`codex/restore-template-arrangements`: 37 historical IDs restored as current JSON,
-retaining existing25. New scattered-wave kernel, dimmer fades/dark step edges,
-phase-folding without reflection, reference formation aims and source contracts.
-All52 arrangement tests pass; broader focused/config checks and mypy passed.
-Final independent review/full gate and 61-entry video delivery in progress.
+All 37 historical named arrangements are restored on the current renderer, retaining
+all previous 25 catalog files. Current catalog: 62 templates; the new preview shows
+61 bases (all except Zoom Wave), including seven static aim references, over 10:40
+with names and two-second dark pauses. Artifacts are ready under
+`/Users/ondeck/xlights/_twinklr_verify/movement-arrangements-2026-11-20/`:
+`movement-sampler-labeled.mp4` and `movement-sampler-show.zip`.
+
+Root owns `codex/restore-template-arrangements`, current source `d4868e87`.
+Independent code review approved the restored targets, formation aims, hybrid path,
+repeat/order contracts, fades and intrinsic states. All 52 arrangement tests pass.
+Independent artifact review approved the delivery. The fresh full gate is running;
+integration remains pending.
+The video was rendered from `577b242c`; `d4868e87` adds presets only, with all base
+objects independently proved unchanged. Human look judgment is PENDING-OWNER.
 See [plan](arrangement-restoration-2026-11-20.md) and
 [evidence](../evidence/2026-11-20-arrangement-restoration/README.md).
 
+### Earlier preservation audit and sampler — superseded by restoration above
 
-**Preservation audit supersedes any complete-restoration implication below.** No
-families or presets were removed since the 62-entry sample: the seven original
-catalog files remain byte-identical. However, the older 37 templates are only mapped
-to representatives. Confirmed gaps include INNER-only pendulum targeting,
-simultaneous sine-pan/noise-tilt scattered waves and sequential multi-step routines.
-Counts and all 37 IDs are in the [audit evidence](../evidence/2026-11-20-template-preservation/README.md).
-Current catalog: 25 families; video: 24 bases; declared base/preset combinations:
-209 (200 excluding Zoom Wave). Fresh focused tests: 40 passed. No renderer change,
-provider call or new video in this audit; full application gate not rerun.
-The next implementation must preserve arrangements, not just list their ingredients.
-
+The [preservation audit](../evidence/2026-11-20-template-preservation/README.md)
+found that the previous 25-family catalog mapped historical arrangements to
+representatives but omitted INNER-only targeting, scattered-wave hybrid paths and
+sequential routines. Those confirmed gaps are fixed by the restoration above.
+The historical audit counts were 25 families, 24 sampled bases and 209 declared
+base/preset combinations; they do not describe the restored catalog.
 
 Owner requested another fresh regeneration after integration. Latest deliverables
 are now under `~/xlights/_twinklr_verify/movement-sampler-regenerated-2026-11-20/`:
