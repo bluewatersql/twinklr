@@ -258,13 +258,15 @@ There are no accepted failures. The gate includes the moving-head output pins an
 hermetic display replay under `tests/regression/`.
 [Arrangement restoration gate record](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-arrangement-restoration/README.md#final-clean-tree-gate)
 
-The [complete arrangement sampler](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-arrangement-restoration/README.md)
+The [centered arrangement sampler](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-preview-orientation/README.md)
 contains 61 labeled base entries, including seven static aim references, with two-second
 dark pauses and 10:40 total duration. This is all 62 catalog templates except Zoom Wave,
 not 61 distinct motion kernels. It includes all 37 restored arrangements and full
 multi-step arcs. The preview uses synthetic rig aims and neutral light to expose
 movement; two authored blackout routines are explicitly labeled as revealed. Authored
-templates retain their light programs. Owner look judgment and physical-fixture
+templates retain their light programs. Corrected front and angled views replace the
+owner-rejected sideways preview; the angled view exposes depth/tilt motion. Owner
+look judgment and physical-fixture
 acceptance remain open.
 
 ## Live evidence

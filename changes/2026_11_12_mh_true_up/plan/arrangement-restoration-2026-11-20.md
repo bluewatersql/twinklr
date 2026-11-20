@@ -49,3 +49,22 @@ independent code/artifact review approved, and full gate passed on `caafbf9e`:
 portable show are delivered. See the [final evidence](../evidence/2026-11-20-arrangement-restoration/README.md).
 Human look judgment and physical calibration remain PENDING-OWNER; these are not
 claimed by technical completion.
+
+
+## Preview orientation correction, 2026-11-20
+
+Owner rejected the delivered preview because beams point off to one side, making
+movement hard to judge. Root owns `codex/center-movement-preview`. Correct only the
+synthetic xLights display orientation and camera; preserve emitted movement bytes,
+all 61 cases, labels and pauses. The prior artifact checks established integrity,
+not useful framing. Inspect a short neutral/fan probe before full export, then
+inspect representative motion and rerun package/video checks. Production show and
+renderer remain untouched. Owner authorized preview work and integration persist.
+Full application gate is not repeated for scratch layout/video and evidence-only
+changes; the passing `caafbf9e` source gate remains current.
+
+
+Completed: centered front video and matching portable show, plus angled companion
+video for depth/tilt inspection. Both views retain all 61 entries and passed fresh
+artifact checks and independent framing/delivery review. No source changes or
+production-show changes. [Correction evidence](../evidence/2026-11-20-preview-orientation/README.md).

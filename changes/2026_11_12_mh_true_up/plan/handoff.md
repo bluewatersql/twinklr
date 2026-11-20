@@ -10,6 +10,18 @@ updated: 2026-11-20
 
 ## Start here — current state, 2026-11-20
 
+The owner rejected the previous sampler's sideways beam orientation. Corrected
+front and angled views now live under
+`/Users/ondeck/xlights/_twinklr_verify/movement-centered-2026-11-20/`:
+`movement-sampler-labeled.mp4`, `depth-view/movement-sampler-labeled.mp4`, and
+`movement-sampler-show.zip`. The synthetic display zero and camera were corrected;
+61-case movement data and timing are unchanged. See
+[orientation evidence](../evidence/2026-11-20-preview-orientation/README.md).
+Prior artifact integrity approval did not establish useful framing. New owner
+playback judgment remains PENDING-OWNER; CI/Pages remain paused.
+
+### Arrangement implementation and prior delivery
+
 All 37 historical named arrangements are restored on the current renderer, retaining
 all previous 25 catalog files. Current catalog: 62 templates; the new preview shows
 61 bases (all except Zoom Wave), including seven static aim references, over 10:40
