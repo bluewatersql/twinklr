@@ -2658,3 +2658,13 @@ _STALE_EFFECTS = sorted(
     if disposition.test_nodeid is not None and not _names_a_test(disposition.test_nodeid)
 )
 assert not _STALE_EFFECTS, f"ledger entries name missing tests: {_STALE_EFFECTS}"
+
+# Restored angular paths and dwell: each authored knot field changes emitted DMX.
+for _knot_field in ("path_knots", "path_knots.phase", "path_knots.x", "path_knots.y"):
+    _knot_path = f"template.template.steps.movement.{_knot_field}"
+    CONFIG_EFFECTS[_knot_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/integration/test_mh_restored_movements.py::"
+        f"test_path_knot_field_changes_emitted_frames[{_knot_path}]",
+        _TEMPLATE_COMPILED,
+    )

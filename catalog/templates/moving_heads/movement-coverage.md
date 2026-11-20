@@ -59,7 +59,9 @@ tilt_deg}}`. Missing aims fail admission explicitly; there is no fallback to cen
 | `movement_fan_bias` | Fan Iris | Fan aims with inner/outer tilt bias. |
 | `movement_tunnel` | Static Tunnel | Per-head inward/tunnel aims. |
 
-Angles belong to the rig and must fit its physical ranges. The sampler supplies
+To use a position preset on a directly aimed template, set its component reference
+and clear both explicit movement start angles; otherwise explicit values conflict
+with the referenced aim. Angles belong to the rig and must fit its physical ranges. The sampler supplies
 explicit synthetic aims; it does not install them on the owner's hardware profile.
 Other restored families declare their aim directly, as the original seven do.
 

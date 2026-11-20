@@ -89,3 +89,47 @@ def test_too_fast_pose_switch_is_rejected_by_physical_rate_checks():
         slow = type(rig).model_validate(payload)
         with pytest.raises(PhysicalChannelError, match=r"speed|rate|travel"):
             render("pose_pop_lock", rig=slow)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "template.template.steps.movement.path_knots",
+        "template.template.steps.movement.path_knots.phase",
+        "template.template.steps.movement.path_knots.x",
+        "template.template.steps.movement.path_knots.y",
+    ],
+)
+def test_path_knot_field_changes_emitted_frames(path):
+    from tests.config_effects_registry import CONFIG_EFFECTS, ConfigDispositionKind
+
+    assert CONFIG_EFFECTS[path].kind is ConfigDispositionKind.EFFECT_TEST
+    step = m.hold_step("path", 0, tilt=30, duration=4)
+    step["movement"].update(
+        shape="polyline",
+        mode="periodic",
+        period_beats=4,
+        pan_extent_deg=30,
+        tilt_extent_deg=20,
+        path_knots=[
+            {"phase": 0, "x": -1, "y": -1},
+            {"phase": 0.5, "x": 1, "y": 1},
+            {"phase": 1, "x": -1, "y": -1},
+        ],
+    )
+    original = m.loop_template_doc("knots_probe", [step], cycle_bars=4)
+    with m.registered_templates(original):
+        before = render("knots_probe").frames
+    knots = step["movement"]["path_knots"]
+    field = path.rsplit(".", 1)[-1]
+    if field == "path_knots":
+        knots.insert(1, {"phase": 0.25, "x": -0.8, "y": 0.6})
+    elif field == "phase":
+        knots[1]["phase"] = 0.375
+    else:
+        knots[1][field] = 0.25
+    changed = m.loop_template_doc("knots_probe", [step], cycle_bars=4)
+    with m.registered_templates(changed):
+        after = render("knots_probe").frames
+    assert before != after
+    assert any(a.channels != b.channels for a, b in zip(before, after, strict=True))
