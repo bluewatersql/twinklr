@@ -1,0 +1,97 @@
+{
+  "template": {
+    "template_id": "stomp_tilt_bias_pulse",
+    "version": 1,
+    "name": "Stomp Tilt Bias Pulse",
+    "category": "high_energy",
+    "repeat": {
+      "mode": "PING_PONG",
+      "cycle_bars": 4.0,
+      "loop_step_ids": [
+        "main"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 4.0
+          }
+        },
+        "movement": {
+          "shape": "polyline",
+          "mode": "periodic",
+          "pan_extent_deg": 0,
+          "tilt_extent_deg": 20,
+          "period_beats": 4.0,
+          "path_knots": [
+            {
+              "phase": 0,
+              "x": -1,
+              "y": -1
+            },
+            {
+              "phase": 0.5,
+              "x": 1,
+              "y": 1
+            },
+            {
+              "phase": 1,
+              "x": -1,
+              "y": -1
+            }
+          ]
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_tilt_bias"
+        },
+        "dimmer": {
+          "period_beats": 1,
+          "duty_cycle": 0.5,
+          "low": 0.1,
+          "high": 1.0
+        },
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.25,
+            "group_count": 2
+          },
+          {
+            "domains": [
+              "dimmer"
+            ],
+            "spread_cycles": 1.0,
+            "group_count": 2
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "description": "Heavy vertical stomp hits with inner/outer tilt differentiation. Restored arrangement on explicit rig aims; physical degrees and rates are checked.",
+      "recommended_sections": [
+        "drop",
+        "peak"
+      ],
+      "energy_range": [
+        75,
+        95
+      ],
+      "tags": [
+        "arrangement_restoration",
+        "stomp",
+        "tilt_bias",
+        "hit"
+      ]
+    }
+  }
+}

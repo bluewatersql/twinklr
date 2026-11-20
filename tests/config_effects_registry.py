@@ -2668,3 +2668,15 @@ for _knot_field in ("path_knots", "path_knots.phase", "path_knots.x", "path_knot
         f"test_path_knot_field_changes_emitted_frames[{_knot_path}]",
         _TEMPLATE_COMPILED,
     )
+
+# Restored arrangements: each new field has production-frame evidence.
+for _field, _test in {
+    "dimmer.fade": "test_dimmer_fade_field_changes_emitted_frames",
+    "dimmer.edge_dark_beats": "test_step_edge_darkness_changes_emitted_frames_and_leaves_reposition_time",
+    "distribution.mirror_pan": "test_fold_mirroring_field_changes_emitted_pan_without_changing_target_selection",
+}.items():
+    CONFIG_EFFECTS[f"template.template.steps.{_field}"] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        f"tests/integration/test_mh_arrangements.py::{_test}",
+        "field changes production frames for an authored arrangement",
+    )

@@ -1,0 +1,99 @@
+{
+  "template": {
+    "template_id": "bounce_fan_pulse",
+    "version": 1,
+    "name": "Bounce Fan Pulse",
+    "category": "high_energy",
+    "repeat": {
+      "mode": "PING_PONG",
+      "cycle_bars": 4.0,
+      "loop_step_ids": [
+        "main"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 4.0
+          }
+        },
+        "movement": {
+          "shape": "polyline",
+          "mode": "periodic",
+          "pan_extent_deg": 25,
+          "tilt_extent_deg": 18,
+          "period_beats": 8.0,
+          "path_knots": [
+            {
+              "phase": 0,
+              "x": -1,
+              "y": -1
+            },
+            {
+              "phase": 0.5,
+              "x": 1,
+              "y": 1
+            },
+            {
+              "phase": 1,
+              "x": -1,
+              "y": -1
+            }
+          ]
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_fan"
+        },
+        "dimmer": {
+          "period_beats": 5,
+          "duty_cycle": 0.5,
+          "low": 0.2,
+          "high": 1.0,
+          "edge_dark_beats": 0.5
+        },
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.25,
+            "group_count": 2
+          },
+          {
+            "domains": [
+              "dimmer"
+            ],
+            "spread_cycles": 0.4,
+            "group_count": 2
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "description": "Fan bounce with staggered odd/even pulsing dimmer hits. Restored arrangement on explicit rig aims; physical degrees and rates are checked.",
+      "recommended_sections": [
+        "chorus",
+        "drop"
+      ],
+      "energy_range": [
+        55,
+        85
+      ],
+      "tags": [
+        "arrangement_restoration",
+        "bounce",
+        "fan",
+        "pulse",
+        "phase_offset"
+      ]
+    }
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "template": {
+    "template_id": "wave_vertical_spotlight_fade",
+    "version": 1,
+    "name": "Wave Vertical Spotlight Fade",
+    "category": "medium_energy",
+    "repeat": {
+      "mode": "PING_PONG",
+      "cycle_bars": 4.0,
+      "loop_step_ids": [
+        "main"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 4.0
+          }
+        },
+        "movement": {
+          "shape": "sine_tilt",
+          "mode": "periodic",
+          "pan_extent_deg": 0,
+          "tilt_extent_deg": 22,
+          "period_beats": 16.0
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_spotlight"
+        },
+        "dimmer": {
+          "period_beats": 16.0,
+          "duty_cycle": 1,
+          "low": 0.1,
+          "high": 1.0,
+          "fade": "out"
+        },
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.25,
+            "wings": 2,
+            "direction": "reverse",
+            "mirror_pan": false
+          },
+          {
+            "domains": [
+              "dimmer"
+            ],
+            "spread_cycles": 0.25,
+            "wings": 2,
+            "direction": "reverse"
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "description": "Vertical wave over spotlight cluster with fade-out dimmer. Restored arrangement on explicit rig aims; physical degrees and rates are checked.",
+      "recommended_sections": [
+        "outro",
+        "bridge"
+      ],
+      "energy_range": [
+        30,
+        55
+      ],
+      "tags": [
+        "arrangement_restoration",
+        "wave_vertical",
+        "spotlight",
+        "fade_out"
+      ]
+    }
+  }
+}

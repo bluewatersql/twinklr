@@ -1,0 +1,143 @@
+{
+  "template": {
+    "template_id": "crossfade_between_steps",
+    "version": 1,
+    "name": "Crossfade Between Steps",
+    "category": "medium_energy",
+    "repeat": {
+      "mode": "PING_PONG",
+      "cycle_bars": 4.0,
+      "loop_step_ids": [
+        "a",
+        "b"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "a",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 2.0
+          }
+        },
+        "movement": {
+          "shape": "polyline",
+          "mode": "periodic",
+          "pan_extent_deg": 35,
+          "tilt_extent_deg": 0,
+          "period_beats": 8.0,
+          "path_knots": [
+            {
+              "phase": 0,
+              "x": -1,
+              "y": -1
+            },
+            {
+              "phase": 0.5,
+              "x": 1,
+              "y": 1
+            },
+            {
+              "phase": 1,
+              "x": -1,
+              "y": -1
+            }
+          ]
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_fan"
+        },
+        "dimmer": {
+          "period_beats": 5,
+          "duty_cycle": 0.5,
+          "low": 0.2,
+          "high": 1.0,
+          "edge_dark_beats": 0.5
+        },
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.25
+          },
+          {
+            "domains": [
+              "dimmer"
+            ],
+            "spread_cycles": 0.4
+          }
+        ]
+      },
+      {
+        "step_id": "b",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 2.0,
+            "duration_bars": 2.0
+          }
+        },
+        "movement": {
+          "shape": "sine_pan",
+          "mode": "periodic",
+          "pan_extent_deg": 35,
+          "tilt_extent_deg": 0,
+          "period_beats": 8.0
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_chevron"
+        },
+        "dimmer": {
+          "period_beats": 8.0,
+          "duty_cycle": 1,
+          "low": 0.7,
+          "high": 1.0,
+          "edge_dark_beats": 0.5
+        },
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.25,
+            "direction": "reverse"
+          },
+          {
+            "domains": [
+              "dimmer"
+            ],
+            "spread_cycles": 0.25,
+            "direction": "reverse"
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "description": "Two-step crossfade: fan sweep morphs into chevron pendulum. Restored arrangement on explicit rig aims; physical degrees and rates are checked.",
+      "recommended_sections": [
+        "build",
+        "chorus"
+      ],
+      "energy_range": [
+        40,
+        75
+      ],
+      "tags": [
+        "arrangement_restoration",
+        "transition",
+        "crossfade",
+        "multi_step"
+      ]
+    }
+  }
+}

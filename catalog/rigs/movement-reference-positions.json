@@ -1,0 +1,413 @@
+{
+  "positions": {
+    "movement_fan": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": -35.0,
+          "tilt_deg": 30.0
+        },
+        "MH2": {
+          "pan_deg": -11.666666666666668,
+          "tilt_deg": 30.0
+        },
+        "MH3": {
+          "pan_deg": 11.666666666666664,
+          "tilt_deg": 30.0
+        },
+        "MH4": {
+          "pan_deg": 35.0,
+          "tilt_deg": 30.0
+        }
+      },
+      "fallback": null
+    },
+    "movement_fan_bias": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": -35.0,
+          "tilt_deg": 30.0
+        },
+        "MH2": {
+          "pan_deg": -11.666666666666668,
+          "tilt_deg": 43.33333333333333
+        },
+        "MH3": {
+          "pan_deg": 11.666666666666664,
+          "tilt_deg": 43.333333333333336
+        },
+        "MH4": {
+          "pan_deg": 35.0,
+          "tilt_deg": 30.0
+        }
+      },
+      "fallback": null
+    },
+    "movement_alternating": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": -35.0,
+          "tilt_deg": 45.0
+        },
+        "MH2": {
+          "pan_deg": -11.666666666666668,
+          "tilt_deg": 15.0
+        },
+        "MH3": {
+          "pan_deg": 11.666666666666664,
+          "tilt_deg": 45.0
+        },
+        "MH4": {
+          "pan_deg": 35.0,
+          "tilt_deg": 15.0
+        }
+      },
+      "fallback": null
+    },
+    "movement_tunnel": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": 20.0,
+          "tilt_deg": 50.0
+        },
+        "MH2": {
+          "pan_deg": 6.666666666666668,
+          "tilt_deg": 50.0
+        },
+        "MH3": {
+          "pan_deg": -6.666666666666665,
+          "tilt_deg": 50.0
+        },
+        "MH4": {
+          "pan_deg": -20.0,
+          "tilt_deg": 50.0
+        }
+      },
+      "fallback": null
+    },
+    "movement_chevron": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": -35.0,
+          "tilt_deg": 50.0
+        },
+        "MH2": {
+          "pan_deg": -11.666666666666668,
+          "tilt_deg": 30.0
+        },
+        "MH3": {
+          "pan_deg": 11.666666666666664,
+          "tilt_deg": 30.0
+        },
+        "MH4": {
+          "pan_deg": 35.0,
+          "tilt_deg": 50.0
+        }
+      },
+      "fallback": null
+    },
+    "movement_asymmetric": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": -10.0,
+          "tilt_deg": 25.0
+        },
+        "MH2": {
+          "pan_deg": 6.666666666666666,
+          "tilt_deg": 31.666666666666664
+        },
+        "MH3": {
+          "pan_deg": 23.333333333333332,
+          "tilt_deg": 38.33333333333333
+        },
+        "MH4": {
+          "pan_deg": 40.0,
+          "tilt_deg": 45.0
+        }
+      },
+      "fallback": null
+    },
+    "movement_wall_wash": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": -30.0,
+          "tilt_deg": 55.0
+        },
+        "MH2": {
+          "pan_deg": -10.000000000000002,
+          "tilt_deg": 55.0
+        },
+        "MH3": {
+          "pan_deg": 9.999999999999998,
+          "tilt_deg": 55.0
+        },
+        "MH4": {
+          "pan_deg": 30.0,
+          "tilt_deg": 55.0
+        }
+      },
+      "fallback": null
+    },
+    "movement_scattered": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": 28.700000000000003,
+          "tilt_deg": 41.95
+        },
+        "MH2": {
+          "pan_deg": -16.099999999999998,
+          "tilt_deg": 16.75
+        },
+        "MH3": {
+          "pan_deg": 9.8,
+          "tilt_deg": 26.9
+        },
+        "MH4": {
+          "pan_deg": -35.0,
+          "tilt_deg": 37.05
+        }
+      },
+      "fallback": null
+    },
+    "movement_chaos": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": -6.300000000000002,
+          "tilt_deg": 35.3
+        },
+        "MH2": {
+          "pan_deg": 19.6,
+          "tilt_deg": 45.45
+        },
+        "MH3": {
+          "pan_deg": -25.2,
+          "tilt_deg": 20.25
+        },
+        "MH4": {
+          "pan_deg": 0.7000000000000006,
+          "tilt_deg": 30.4
+        }
+      },
+      "fallback": null
+    },
+    "movement_audience": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": -45.0,
+          "tilt_deg": 15.0
+        },
+        "MH2": {
+          "pan_deg": -15.000000000000002,
+          "tilt_deg": 15.0
+        },
+        "MH3": {
+          "pan_deg": 14.999999999999996,
+          "tilt_deg": 15.0
+        },
+        "MH4": {
+          "pan_deg": 45.0,
+          "tilt_deg": 15.0
+        }
+      },
+      "fallback": null
+    },
+    "movement_mirror": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": -35.0,
+          "tilt_deg": 30.0
+        },
+        "MH2": {
+          "pan_deg": -11.666666666666668,
+          "tilt_deg": 30.0
+        },
+        "MH3": {
+          "pan_deg": 11.666666666666664,
+          "tilt_deg": 30.0
+        },
+        "MH4": {
+          "pan_deg": 35.0,
+          "tilt_deg": 30.0
+        }
+      },
+      "fallback": null
+    },
+    "movement_rainbow": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": -40.0,
+          "tilt_deg": 20.0
+        },
+        "MH2": {
+          "pan_deg": -13.333333333333336,
+          "tilt_deg": 51.111111111111114
+        },
+        "MH3": {
+          "pan_deg": 13.33333333333333,
+          "tilt_deg": 51.111111111111114
+        },
+        "MH4": {
+          "pan_deg": 40.0,
+          "tilt_deg": 20.0
+        }
+      },
+      "fallback": null
+    },
+    "movement_center_out": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": -20.0,
+          "tilt_deg": 50.0
+        },
+        "MH2": {
+          "pan_deg": -6.666666666666668,
+          "tilt_deg": 36.66666666666667
+        },
+        "MH3": {
+          "pan_deg": 6.666666666666665,
+          "tilt_deg": 36.666666666666664
+        },
+        "MH4": {
+          "pan_deg": 20.0,
+          "tilt_deg": 50.0
+        }
+      },
+      "fallback": null
+    },
+    "movement_fan_narrow": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": -15.0,
+          "tilt_deg": 30.0
+        },
+        "MH2": {
+          "pan_deg": -5.000000000000001,
+          "tilt_deg": 30.0
+        },
+        "MH3": {
+          "pan_deg": 4.999999999999999,
+          "tilt_deg": 30.0
+        },
+        "MH4": {
+          "pan_deg": 15.0,
+          "tilt_deg": 30.0
+        }
+      },
+      "fallback": null
+    },
+    "movement_lean_right": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": 10.0,
+          "tilt_deg": 30.0
+        },
+        "MH2": {
+          "pan_deg": 20.0,
+          "tilt_deg": 30.0
+        },
+        "MH3": {
+          "pan_deg": 30.0,
+          "tilt_deg": 30.0
+        },
+        "MH4": {
+          "pan_deg": 40.0,
+          "tilt_deg": 30.0
+        }
+      },
+      "fallback": null
+    },
+    "movement_spotlight": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": -4.0,
+          "tilt_deg": 35.0
+        },
+        "MH2": {
+          "pan_deg": -1.3333333333333335,
+          "tilt_deg": 35.0
+        },
+        "MH3": {
+          "pan_deg": 1.333333333333333,
+          "tilt_deg": 35.0
+        },
+        "MH4": {
+          "pan_deg": 4.0,
+          "tilt_deg": 35.0
+        }
+      },
+      "fallback": null
+    },
+    "movement_x_cross": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": 35.0,
+          "tilt_deg": 20.0
+        },
+        "MH2": {
+          "pan_deg": 11.666666666666668,
+          "tilt_deg": 50.0
+        },
+        "MH3": {
+          "pan_deg": -11.666666666666664,
+          "tilt_deg": 20.0
+        },
+        "MH4": {
+          "pan_deg": -35.0,
+          "tilt_deg": 50.0
+        }
+      },
+      "fallback": null
+    },
+    "movement_tilt_bias": {
+      "fixtures": {
+        "MH1": {
+          "pan_deg": -30.0,
+          "tilt_deg": 20.0
+        },
+        "MH2": {
+          "pan_deg": -10.000000000000002,
+          "tilt_deg": 50.0
+        },
+        "MH3": {
+          "pan_deg": 9.999999999999998,
+          "tilt_deg": 50.0
+        },
+        "MH4": {
+          "pan_deg": 30.0,
+          "tilt_deg": 20.0
+        }
+      },
+      "fallback": null
+    }
+  },
+  "attributes": {
+    "flick": {
+      "fixtures": {
+        "MH1": {
+          "shutter": null,
+          "color": "red",
+          "gobo": null,
+          "dimmer": null
+        },
+        "MH2": {
+          "shutter": null,
+          "color": "blue",
+          "gobo": null,
+          "dimmer": null
+        },
+        "MH3": {
+          "shutter": null,
+          "color": "red",
+          "gobo": null,
+          "dimmer": null
+        },
+        "MH4": {
+          "shutter": null,
+          "color": "blue",
+          "gobo": null,
+          "dimmer": null
+        }
+      },
+      "fallback": null
+    }
+  }
+}

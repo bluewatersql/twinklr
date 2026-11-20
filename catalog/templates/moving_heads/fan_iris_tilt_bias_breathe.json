@@ -1,0 +1,100 @@
+{
+  "template": {
+    "template_id": "fan_iris_tilt_bias_breathe",
+    "version": 1,
+    "name": "Fan Iris Tilt Bias Breathe",
+    "category": "low_energy",
+    "repeat": {
+      "mode": "PING_PONG",
+      "cycle_bars": 4.0,
+      "loop_step_ids": [
+        "main"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 4.0
+          }
+        },
+        "movement": {
+          "shape": "polyline",
+          "mode": "periodic",
+          "pan_extent_deg": 30,
+          "tilt_extent_deg": 12,
+          "period_beats": 16.0,
+          "path_knots": [
+            {
+              "phase": 0,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "phase": 0.5,
+              "x": 1,
+              "y": 1
+            },
+            {
+              "phase": 1,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_fan_bias"
+        },
+        "dimmer": {
+          "period_beats": 16,
+          "duty_cycle": 0.5,
+          "low": 0.2,
+          "high": 0.9
+        },
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.125,
+            "wings": 2,
+            "direction": "forward",
+            "mirror_pan": false
+          },
+          {
+            "domains": [
+              "dimmer"
+            ],
+            "spread_cycles": 0.125,
+            "wings": 2,
+            "direction": "forward"
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "description": "Camera-iris open/close motion with tilt bias and breathing dimmer. Restored arrangement on explicit rig aims; physical degrees and rates are checked.",
+      "recommended_sections": [
+        "verse",
+        "bridge"
+      ],
+      "energy_range": [
+        15,
+        40
+      ],
+      "tags": [
+        "arrangement_restoration",
+        "fan_iris",
+        "tilt_bias",
+        "breathe"
+      ]
+    }
+  }
+}

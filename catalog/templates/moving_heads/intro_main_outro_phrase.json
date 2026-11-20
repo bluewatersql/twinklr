@@ -1,0 +1,156 @@
+{
+  "template": {
+    "template_id": "intro_main_outro_phrase",
+    "version": 1,
+    "name": "Intro Main Outro Phrase",
+    "category": "medium_energy",
+    "repeat": {
+      "mode": "JOINER",
+      "cycle_bars": 8.0,
+      "loop_step_ids": [
+        "intro",
+        "main",
+        "outro"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "intro",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 2.0
+          }
+        },
+        "movement": {
+          "shape": "hold",
+          "mode": "periodic",
+          "pan_extent_deg": 0,
+          "tilt_extent_deg": 0
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_fan"
+        },
+        "dimmer": {
+          "period_beats": 8.0,
+          "duty_cycle": 1,
+          "low": 0.1,
+          "high": 1.0,
+          "edge_dark_beats": 0.5,
+          "fade": "in"
+        }
+      },
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 2.0,
+            "duration_bars": 4.0
+          }
+        },
+        "movement": {
+          "shape": "polyline",
+          "mode": "periodic",
+          "pan_extent_deg": 35,
+          "tilt_extent_deg": 0,
+          "period_beats": 16.0,
+          "path_knots": [
+            {
+              "phase": 0,
+              "x": -1,
+              "y": -1
+            },
+            {
+              "phase": 0.5,
+              "x": 1,
+              "y": 1
+            },
+            {
+              "phase": 1,
+              "x": -1,
+              "y": -1
+            }
+          ]
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_fan"
+        },
+        "dimmer": {
+          "period_beats": 5,
+          "duty_cycle": 0.5,
+          "low": 0.15,
+          "high": 1.0,
+          "edge_dark_beats": 0.5
+        },
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.125
+          },
+          {
+            "domains": [
+              "dimmer"
+            ],
+            "spread_cycles": 0.4
+          }
+        ]
+      },
+      {
+        "step_id": "outro",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 6.0,
+            "duration_bars": 2.0
+          }
+        },
+        "movement": {
+          "shape": "hold",
+          "mode": "periodic",
+          "pan_extent_deg": 0,
+          "tilt_extent_deg": 0
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_fan"
+        },
+        "dimmer": {
+          "period_beats": 8.0,
+          "duty_cycle": 1,
+          "low": 0.1,
+          "high": 1.0,
+          "edge_dark_beats": 0.5,
+          "fade": "out"
+        }
+      }
+    ],
+    "metadata": {
+      "description": "Intro \u2192 main loop \u2192 outro with transitions and selective repeat. Restored arrangement on explicit rig aims; physical degrees and rates are checked.",
+      "recommended_sections": [
+        "verse",
+        "chorus"
+      ],
+      "energy_range": [
+        35,
+        70
+      ],
+      "tags": [
+        "arrangement_restoration",
+        "phrase",
+        "multi_step",
+        "repeat"
+      ]
+    }
+  }
+}

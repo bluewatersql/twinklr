@@ -1,0 +1,943 @@
+[
+  {
+    "template_id": "accent_snap_tunnel_hit",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/accent_snap_tunnel_hit.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "ACCENT_SNAP",
+        "geometry_type": "TUNNEL_CONE",
+        "position_id": "movement_tunnel",
+        "phase_order": "INSIDE_OUT",
+        "spread_bars": 0.5,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": "prism"
+      }
+    ]
+  },
+  {
+    "template_id": "ambient_random_wash",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/ambient_random_wash.py",
+    "repeat_mode": "JOINER",
+    "cycle_bars": 8.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 8.0,
+        "movement_type": "RANDOM_WALK",
+        "geometry_type": "WALL_WASH",
+        "position_id": "movement_wall_wash",
+        "phase_order": null,
+        "spread_bars": 0,
+        "dimmer_type": "HOLD",
+        "shutter_state": "open",
+        "color": "blue",
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "ballyhoo_chaos",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/ballyhoo_chaos.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 2.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 2.0,
+        "movement_type": "RANDOM_WALK",
+        "geometry_type": "SCATTERED_CHAOS",
+        "position_id": "movement_chaos",
+        "phase_order": "INSIDE_OUT",
+        "spread_bars": 0.5,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "bounce_fan_pulse",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/bounce_fan_pulse.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "BOUNCE",
+        "geometry_type": "ROLE_POSE",
+        "position_id": "movement_fan",
+        "phase_order": "ODD_EVEN",
+        "spread_bars": 0.5,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "build_drop_recover",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/build_drop_recover.py",
+    "repeat_mode": "JOINER",
+    "cycle_bars": 6.0,
+    "steps": [
+      {
+        "step_id": "build",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 2.0,
+        "movement_type": "SWEEP_LR",
+        "geometry_type": "ROLE_POSE",
+        "position_id": "movement_fan",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 0.5,
+        "dimmer_type": "FADE_IN",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      },
+      {
+        "step_id": "drop",
+        "target": "ALL",
+        "start_bars": 2.0,
+        "duration_bars": 2.0,
+        "movement_type": "ACCENT_SNAP",
+        "geometry_type": "TUNNEL_CONE",
+        "position_id": "movement_tunnel",
+        "phase_order": "ODD_EVEN",
+        "spread_bars": 0.25,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      },
+      {
+        "step_id": "recover",
+        "target": "ALL",
+        "start_bars": 4.0,
+        "duration_bars": 2.0,
+        "movement_type": "GROOVE_SWAY",
+        "geometry_type": "ROLE_POSE",
+        "position_id": "movement_fan",
+        "phase_order": null,
+        "spread_bars": 0,
+        "dimmer_type": "FADE_OUT",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "cascade_pulse_lr",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/cascade_pulse_lr.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "HOLD",
+        "geometry_type": "ROLE_POSE",
+        "position_id": "movement_fan",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 1.0,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "circle_asym_left_strobe",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/circle_asym_left_strobe.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "CIRCLE",
+        "geometry_type": "AUDIENCE_SCAN_ASYM",
+        "position_id": "movement_asymmetric",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 1.0,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "circle_asym_right_pulse",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/circle_asym_right_pulse.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "CIRCLE",
+        "geometry_type": "AUDIENCE_SCAN_ASYM",
+        "position_id": "movement_asymmetric",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 1.0,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "circle_fan_hold",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/circle_fan_hold.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "CIRCLE",
+        "geometry_type": "ROLE_POSE",
+        "position_id": "movement_fan",
+        "phase_order": null,
+        "spread_bars": 0,
+        "dimmer_type": "HOLD",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "crossfade_between_steps",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/crossfade_between_steps.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "a",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 2.0,
+        "movement_type": "SWEEP_LR",
+        "geometry_type": "FAN",
+        "position_id": "movement_fan",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 0.5,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      },
+      {
+        "step_id": "b",
+        "target": "ALL",
+        "start_bars": 2.0,
+        "duration_bars": 2.0,
+        "movement_type": "PENDULUM",
+        "geometry_type": "CHEVRON_V",
+        "position_id": "movement_chevron",
+        "phase_order": "RIGHT_TO_LEFT",
+        "spread_bars": 0.5,
+        "dimmer_type": "HOLD",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "dual_sweep_audience_pulse",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/dual_sweep_audience_pulse.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "DUAL_SWEEP",
+        "geometry_type": "AUDIENCE_SCAN",
+        "position_id": "movement_audience",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 1.0,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "fan_iris_tilt_bias_breathe",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/fan_iris_tilt_bias_breathe.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "FAN_IRIS",
+        "geometry_type": "ROLE_POSE_TILT_BIAS",
+        "position_id": "movement_fan_bias",
+        "phase_order": "OUTSIDE_IN",
+        "spread_bars": 0.5,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "fan_pulse",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/fan_pulse.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "HOLD",
+        "geometry_type": "FAN",
+        "position_id": "movement_fan",
+        "phase_order": null,
+        "spread_bars": 0,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "figure8_mirror_strobe",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/figure8_mirror_strobe.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "FIGURE8",
+        "geometry_type": "MIRROR_LR",
+        "position_id": "movement_mirror",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 0.5,
+        "dimmer_type": "PULSE",
+        "shutter_state": "strobe_fast",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "groove_sway_rainbow_breathe",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/groove_sway_rainbow_breathe.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "GROOVE_SWAY",
+        "geometry_type": "RAINBOW_ARC",
+        "position_id": "movement_rainbow",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 1.0,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "hold_center_out_breathe",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/hold_center_out_breathe.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "HOLD",
+        "geometry_type": "CENTER_OUT",
+        "position_id": "movement_center_out",
+        "phase_order": "INSIDE_OUT",
+        "spread_bars": 1.0,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "infinity_mirror_chase",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/infinity_mirror_chase.py",
+    "repeat_mode": "JOINER",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "INFINITY",
+        "geometry_type": "MIRROR_LR",
+        "position_id": "movement_mirror",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 1.0,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "inner_pendulum_breathe",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/inner_pendulum_breathe.py",
+    "repeat_mode": "JOINER",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "INNER",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "PENDULUM",
+        "geometry_type": "ROLE_POSE",
+        "position_id": "movement_fan_narrow",
+        "phase_order": null,
+        "spread_bars": 0,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "intro_main_outro_phrase",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/intro_main_outro_phrase.py",
+    "repeat_mode": "JOINER",
+    "cycle_bars": 8.0,
+    "steps": [
+      {
+        "step_id": "intro",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 2.0,
+        "movement_type": "HOLD",
+        "geometry_type": "ROLE_POSE",
+        "position_id": "movement_fan",
+        "phase_order": null,
+        "spread_bars": 0,
+        "dimmer_type": "FADE_IN",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      },
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 2.0,
+        "duration_bars": 4.0,
+        "movement_type": "SWEEP_LR",
+        "geometry_type": "ROLE_POSE",
+        "position_id": "movement_fan",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 0.5,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      },
+      {
+        "step_id": "outro",
+        "target": "ALL",
+        "start_bars": 6.0,
+        "duration_bars": 2.0,
+        "movement_type": "HOLD",
+        "geometry_type": "ROLE_POSE",
+        "position_id": "movement_fan",
+        "phase_order": null,
+        "spread_bars": 0,
+        "dimmer_type": "FADE_OUT",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "lean_right_scan",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/lean_right_scan.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "HOLD",
+        "geometry_type": "AUDIENCE_SCAN_ASYM",
+        "position_id": "movement_lean_right",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 1.0,
+        "dimmer_type": "HOLD",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "pendulum_chevron_breathe",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/pendulum_chevron_breathe.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "PENDULUM",
+        "geometry_type": "CHEVRON_V",
+        "position_id": "movement_chevron",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 1.0,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "pop_lock_spotlight_blackout",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/pop_lock_spotlight_blackout.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "POP_LOCK",
+        "geometry_type": "SPOTLIGHT_CLUSTER",
+        "position_id": "movement_spotlight",
+        "phase_order": "ODD_EVEN",
+        "spread_bars": 0.25,
+        "dimmer_type": "BLACKOUT",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "spiral_xross_blackout",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/spiral_xross_blackout.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "SPIRAL",
+        "geometry_type": "X_CROSS",
+        "position_id": "movement_x_cross",
+        "phase_order": "OUTSIDE_IN",
+        "spread_bars": 1.0,
+        "dimmer_type": "BLACKOUT",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "split_lr_sweep_counter",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/split_lr_sweep_counter.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "left_sweep",
+        "target": "LEFT",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "SWEEP_LR",
+        "geometry_type": "WAVE_LR",
+        "position_id": "movement_fan",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 0.5,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      },
+      {
+        "step_id": "right_sweep",
+        "target": "RIGHT",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "SWEEP_LR",
+        "geometry_type": "WAVE_LR",
+        "position_id": "movement_fan",
+        "phase_order": "RIGHT_TO_LEFT",
+        "spread_bars": 0.5,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "stomp_tilt_bias_pulse",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/stomp_tilt_bias_pulse.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "STOMP",
+        "geometry_type": "TILT_BIAS_BY_GROUP",
+        "position_id": "movement_tilt_bias",
+        "phase_order": "ODD_EVEN",
+        "spread_bars": 0.25,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "sweep_lr_chevron_breathe",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/sweep_lr_chevron_breathe.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "SWEEP_LR",
+        "geometry_type": "CHEVRON_V",
+        "position_id": "movement_chevron",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 1.0,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "sweep_lr_continuous_phase",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/sweep_lr_continuous_phase.py",
+    "repeat_mode": "JOINER",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "SWEEP_LR",
+        "geometry_type": "ROLE_POSE",
+        "position_id": "movement_fan",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 1.0,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "sweep_lr_fan_hold",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/sweep_lr_fan_hold.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "SWEEP_LR",
+        "geometry_type": "ROLE_POSE",
+        "position_id": "movement_fan",
+        "phase_order": null,
+        "spread_bars": 0,
+        "dimmer_type": "HOLD",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "sweep_lr_fan_pulse",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/sweep_lr_fan_pulse.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "SWEEP_LR",
+        "geometry_type": "ROLE_POSE",
+        "position_id": "movement_fan",
+        "phase_order": null,
+        "spread_bars": 0,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "sweep_lr_pingpong_phase",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/sweep_lr_pingpong_phase.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "SWEEP_LR",
+        "geometry_type": "ROLE_POSE",
+        "position_id": "movement_fan",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 1.0,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "sweep_ud_chevron_swell",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/sweep_ud_chevron_swell.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "SWEEP_UD",
+        "geometry_type": "CHEVRON_V",
+        "position_id": "movement_chevron",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 1.0,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "tilt_rock_wall_wash_fade",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/tilt_rock_wall_wash_fade.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "TILT_ROCK",
+        "geometry_type": "WALL_WASH",
+        "position_id": "movement_wall_wash",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 1.0,
+        "dimmer_type": "FADE_IN",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "wave_fan_hold",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/wave_fan_hold.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "WAVE_HORIZONTAL",
+        "geometry_type": "FAN",
+        "position_id": "movement_fan",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 1.0,
+        "dimmer_type": "HOLD",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "wave_scattered_fade_in",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/wave_scattered_fade_in.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "WAVE_HORIZONTAL",
+        "geometry_type": "SCATTERED_CHAOS",
+        "position_id": "movement_scattered",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 1.0,
+        "dimmer_type": "FADE_IN",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "wave_scattered_fade_out",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/wave_scattered_fade_out.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "WAVE_HORIZONTAL",
+        "geometry_type": "SCATTERED_CHAOS",
+        "position_id": "movement_scattered",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 1.0,
+        "dimmer_type": "FADE_OUT",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "wave_vertical_spotlight_fade",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/wave_vertical_spotlight_fade.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "WAVE_VERTICAL",
+        "geometry_type": "SPOTLIGHT_CLUSTER",
+        "position_id": "movement_spotlight",
+        "phase_order": "INSIDE_OUT",
+        "spread_bars": 1.0,
+        "dimmer_type": "FADE_OUT",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  },
+  {
+    "template_id": "zigzag_alternating_pulse",
+    "source": "5d50580c:packages/twinklr/core/sequencer/moving_heads/templates/builtins/zigzag_alternating_pulse.py",
+    "repeat_mode": "PING_PONG",
+    "cycle_bars": 4.0,
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "start_bars": 0.0,
+        "duration_bars": 4.0,
+        "movement_type": "ZIGZAG",
+        "geometry_type": "ALTERNATING_UPDOWN",
+        "position_id": "movement_alternating",
+        "phase_order": "LEFT_TO_RIGHT",
+        "spread_bars": 0.5,
+        "dimmer_type": "PULSE",
+        "shutter_state": "open",
+        "color": null,
+        "gobo": null
+      }
+    ]
+  }
+]

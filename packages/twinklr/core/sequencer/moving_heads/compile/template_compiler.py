@@ -332,6 +332,14 @@ def compile_template(
                 for fixture in _resolve_target_fixtures(step, template, context)
             )
             continue
+        if step.dimmer is not None and step.dimmer.edge_dark_beats:
+            # A legal step may be clipped to less than its authored dark edges at
+            # the song/section end. It contributes no lit cue, rather than crashing
+            # or trying to move a head through an entirely dark tail.
+            if musical_phase_fraction(phase_map, t1, origin_ms=t0, period_beats=1) <= (
+                2 * exact_decimal(step.dimmer.edge_dark_beats)
+            ):
+                continue
         targets = _resolve_target_fixtures(step, template, context)
         chain = chains.get(step.step_id)
         anchor = (
@@ -495,7 +503,24 @@ def compile_template(
                     },
                 )
             if step.visibility is None:
-                segments.append(segment)
+                if step.dimmer is not None and step.dimmer.edge_dark_beats:
+                    edge = exact_decimal(step.dimmer.edge_dark_beats)
+                    lit_times = [
+                        t
+                        for t in range(t0, t1, EFFECT_GRID_MS)
+                        if musical_phase_fraction(phase_map, t, origin_ms=t0, period_beats=1)
+                        >= edge
+                        and musical_phase_fraction(phase_map, t1, origin_ms=t, period_beats=1)
+                        >= edge
+                    ]
+                    # Leave the explicitly dark edges to the transaction planner,
+                    # just as a visibility envelope does: it owns repositioning.
+                    if lit_times:
+                        segments.append(
+                            slice_segment(segment, lit_times[0], lit_times[-1] + EFFECT_GRID_MS)
+                        )
+                else:
+                    segments.append(segment)
                 continue
             # After the metadata, so every lit slice carries it.
             try:
@@ -584,12 +609,16 @@ def _hold_states(
 
 def _step_periods(step: TemplateStep) -> set[Fraction]:
     """The periods, in beats, at which a step's motion and pulses repeat: a periodic
-    movement's, and each dimmer or shutter pulse's that is not lit throughout."""
+    movement's, and each dimmer or shutter pulse's that is not lit throughout.
+    A dimmer with explicit dark step edges may restart its pulse there; those
+    edges are removed from cues before the transaction planner repositions."""
     movement = step.movement
     periods = {
         exact_decimal(pulse.period_beats)
         for pulse in (step.dimmer, step.shutter)
-        if pulse is not None and pulse.duty_cycle < 1
+        if pulse is not None
+        and pulse.duty_cycle < 1
+        and not (pulse is step.dimmer and step.dimmer.edge_dark_beats)
     }
     if movement.mode == "periodic" and movement.period_beats is not None:
         periods.add(exact_decimal(movement.period_beats))

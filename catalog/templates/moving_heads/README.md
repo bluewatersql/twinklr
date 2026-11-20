@@ -49,15 +49,19 @@ The presets and `zoom_wave` have not been viewed, and no family has run on hardw
 ## Restored movement vocabulary
 
 Eighteen additional routines restore angular travel, pose-switch holds, organic motion
-and fixture arrangements lost in the renderer replacement. The catalog now has 25
+and fixture arrangements lost in the renderer replacement. The initial restoration brought the catalog to 25
 families, including the optical zoom pilot. Two new static reference families have
 no movement presets. Some restored arrangements require explicit rig position
 presets; they are excluded when those aims are absent. See the complete
 [original movement mapping and authoring contract](movement-coverage.md).
-Speed/reach variants are not counted as additional movement behaviors. Restoration
-is partial at the arrangement level: the [preservation audit](../../../changes/2026_11_12_mh_true_up/evidence/2026-11-20-template-preservation/README.md)
-found missing fixture selection, hybrid motion and sequential routines. The mapping
-does not establish preservation of all 37 historical templates.
+Speed/reach variants are not counted as additional movement behaviors. The subsequent
+arrangement restoration adds all 37 historical template IDs on this same renderer:
+**62 selectable templates total**. The original 25 remain unchanged. Unlike the
+initial representative mapping, these documents preserve INNER/LEFT/RIGHT targets,
+formation references, combined scattered-wave axes, step schedules and repeat modes.
+They retain hold/pulse/fade/blackout intent. See [coverage](movement-coverage.md) for
+intentional physical reauthoring differences and [reference aims](../../rigs/README.md).
+
 
 ## Meter
 

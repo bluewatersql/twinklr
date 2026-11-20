@@ -1,0 +1,86 @@
+{
+  "template": {
+    "template_id": "spiral_xross_blackout",
+    "version": 1,
+    "name": "Spiral X-Cross Blackout",
+    "category": "high_energy",
+    "repeat": {
+      "mode": "PING_PONG",
+      "cycle_bars": 4.0,
+      "loop_step_ids": [
+        "main"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 4.0
+          }
+        },
+        "movement": {
+          "shape": "sweep",
+          "mode": "periodic",
+          "pan_extent_deg": 35,
+          "tilt_extent_deg": 25,
+          "period_beats": 16.0,
+          "transform": {
+            "rotation_deg": 45
+          }
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_x_cross"
+        },
+        "dimmer": {
+          "period_beats": 16.0,
+          "duty_cycle": 1,
+          "low": 0,
+          "high": 0
+        },
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.25,
+            "wings": 2,
+            "direction": "forward",
+            "mirror_pan": false
+          },
+          {
+            "domains": [
+              "dimmer"
+            ],
+            "spread_cycles": 0.25,
+            "wings": 2,
+            "direction": "forward"
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "description": "Spiraling beams in X-cross formation punctuated by blackout. Restored arrangement on explicit rig aims; physical degrees and rates are checked.",
+      "recommended_sections": [
+        "drop",
+        "breakdown"
+      ],
+      "energy_range": [
+        70,
+        95
+      ],
+      "tags": [
+        "arrangement_restoration",
+        "spiral",
+        "x_cross",
+        "blackout"
+      ]
+    }
+  }
+}

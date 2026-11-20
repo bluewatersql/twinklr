@@ -1,0 +1,79 @@
+{
+  "template": {
+    "template_id": "cascade_pulse_lr",
+    "version": 1,
+    "name": "Cascade Pulse (L\u2192R)",
+    "category": "medium_energy",
+    "repeat": {
+      "mode": "PING_PONG",
+      "cycle_bars": 4.0,
+      "loop_step_ids": [
+        "main"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 4.0
+          }
+        },
+        "movement": {
+          "shape": "hold",
+          "mode": "periodic",
+          "pan_extent_deg": 0,
+          "tilt_extent_deg": 0
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_fan"
+        },
+        "dimmer": {
+          "period_beats": 5,
+          "duty_cycle": 0.5,
+          "low": 0.1,
+          "high": 1.0,
+          "edge_dark_beats": 0.5
+        },
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.25
+          },
+          {
+            "domains": [
+              "dimmer"
+            ],
+            "spread_cycles": 0.8
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "description": "Dimmer pulse cascades left-to-right using PhaseOffset. Restored arrangement on explicit rig aims; physical degrees and rates are checked.",
+      "recommended_sections": [
+        "verse",
+        "groove",
+        "build"
+      ],
+      "energy_range": [
+        45,
+        80
+      ],
+      "tags": [
+        "arrangement_restoration",
+        "phase_offset",
+        "cascade",
+        "pulse"
+      ]
+    }
+  }
+}

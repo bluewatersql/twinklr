@@ -1,0 +1,66 @@
+{
+  "template": {
+    "template_id": "ambient_random_wash",
+    "version": 1,
+    "name": "Ambient Random Wash",
+    "category": "low_energy",
+    "repeat": {
+      "mode": "JOINER",
+      "cycle_bars": 8.0,
+      "loop_step_ids": [
+        "main"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 8.0
+          }
+        },
+        "movement": {
+          "shape": "organic",
+          "mode": "periodic",
+          "pan_extent_deg": 18,
+          "tilt_extent_deg": 12,
+          "period_beats": 32.0
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_wall_wash"
+        },
+        "dimmer": {
+          "period_beats": 32.0,
+          "duty_cycle": 1,
+          "low": 0.6,
+          "high": 0.9
+        },
+        "color": "blue"
+      }
+    ],
+    "metadata": {
+      "description": "Ultra-slow random drift across a wall wash for atmospheric ambient moments. Restored arrangement on explicit rig aims; physical degrees and rates are checked.",
+      "recommended_sections": [
+        "intro",
+        "ambient",
+        "verse"
+      ],
+      "energy_range": [
+        5,
+        25
+      ],
+      "tags": [
+        "arrangement_restoration",
+        "ambient",
+        "random_walk",
+        "wall_wash",
+        "atmospheric"
+      ]
+    }
+  }
+}

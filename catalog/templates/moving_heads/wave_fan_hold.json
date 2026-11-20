@@ -1,0 +1,79 @@
+{
+  "template": {
+    "template_id": "wave_fan_hold",
+    "version": 1,
+    "name": "Wave Fan Hold",
+    "category": "low_energy",
+    "repeat": {
+      "mode": "PING_PONG",
+      "cycle_bars": 4.0,
+      "loop_step_ids": [
+        "main"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 4.0
+          }
+        },
+        "movement": {
+          "shape": "sine_pan",
+          "mode": "periodic",
+          "pan_extent_deg": 30,
+          "tilt_extent_deg": 0,
+          "period_beats": 16.0
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_fan"
+        },
+        "dimmer": {
+          "period_beats": 16.0,
+          "duty_cycle": 1,
+          "low": 0.7,
+          "high": 1.0
+        },
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.25
+          },
+          {
+            "domains": [
+              "dimmer"
+            ],
+            "spread_cycles": 0.25
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "description": "Horizontal wave over fan formation with steady dimmer. Restored arrangement on explicit rig aims; physical degrees and rates are checked.",
+      "recommended_sections": [
+        "verse",
+        "intro"
+      ],
+      "energy_range": [
+        25,
+        55
+      ],
+      "tags": [
+        "arrangement_restoration",
+        "wave",
+        "fan",
+        "hold",
+        "gentle"
+      ]
+    }
+  }
+}

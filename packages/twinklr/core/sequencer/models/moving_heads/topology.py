@@ -108,7 +108,11 @@ class DerivedRowTopology(FixtureTopology):
 
 
 class PhaseDistribution(BaseModel):
-    """A phase spread over the rig topology for the listed domains of one step."""
+    """A phase spread over the rig topology for the listed domains of one step.
+
+    With two wings, mirror_pan=False folds phase slots without reflecting pan travel.
+    It requires the pan domain; existing two-wing distributions mirror by default.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -116,11 +120,14 @@ class PhaseDistribution(BaseModel):
     block_size: int = Field(default=1, ge=1)
     group_count: int | None = Field(default=None, ge=1)
     wings: Literal[1, 2] = 1
+    mirror_pan: bool = Field(default=True, exclude_if=lambda value: value)
     spread_cycles: float = Field(default=0.0, ge=0, allow_inf_nan=False)
     direction: Literal["forward", "reverse"] = "forward"
 
     @model_validator(mode="after")
     def _validate_domains(self) -> PhaseDistribution:
+        if not self.mirror_pan and (self.wings != 2 or ChannelName.PAN not in self.domains):
+            raise ValueError("mirror_pan=False requires two wings and the pan domain")
         unphased = [domain.value for domain in self.domains if domain not in PHASE_DOMAINS]
         if unphased:
             raise ValueError(
@@ -182,7 +189,7 @@ def resolve_distribution(
         for spec in specs:
             for domain in spec.domains:
                 offsets[domain] = _offset(spec, rank, count)
-            if ChannelName.PAN in spec.domains and spec.wings == 2:
+            if ChannelName.PAN in spec.domains and spec.wings == 2 and spec.mirror_pan:
                 center = Fraction(count - 1, 2)
                 sign = -1 if rank < center else 1 if rank > center else 0
         resolved[fixture_id] = ResolvedFixturePhase(

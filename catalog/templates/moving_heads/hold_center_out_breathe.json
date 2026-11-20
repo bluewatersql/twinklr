@@ -1,0 +1,83 @@
+{
+  "template": {
+    "template_id": "hold_center_out_breathe",
+    "version": 1,
+    "name": "Hold Center Out Breathe",
+    "category": "low_energy",
+    "repeat": {
+      "mode": "PING_PONG",
+      "cycle_bars": 4.0,
+      "loop_step_ids": [
+        "main"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 4.0
+          }
+        },
+        "movement": {
+          "shape": "hold",
+          "mode": "periodic",
+          "pan_extent_deg": 0,
+          "tilt_extent_deg": 0
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_center_out"
+        },
+        "dimmer": {
+          "period_beats": 16,
+          "duty_cycle": 0.5,
+          "low": 0.3,
+          "high": 0.9
+        },
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.25,
+            "wings": 2,
+            "direction": "reverse",
+            "mirror_pan": false
+          },
+          {
+            "domains": [
+              "dimmer"
+            ],
+            "spread_cycles": 0.25,
+            "wings": 2,
+            "direction": "reverse"
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "description": "Static center-outward formation with breathing dimmer cascade. Restored arrangement on explicit rig aims; physical degrees and rates are checked.",
+      "recommended_sections": [
+        "verse",
+        "bridge"
+      ],
+      "energy_range": [
+        10,
+        35
+      ],
+      "tags": [
+        "arrangement_restoration",
+        "center_out",
+        "breathe",
+        "static",
+        "gentle"
+      ]
+    }
+  }
+}

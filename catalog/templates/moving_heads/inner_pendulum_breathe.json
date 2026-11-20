@@ -1,0 +1,62 @@
+{
+  "template": {
+    "template_id": "inner_pendulum_breathe",
+    "version": 1,
+    "name": "Inner Pendulum Breathe",
+    "category": "low_energy",
+    "repeat": {
+      "mode": "JOINER",
+      "cycle_bars": 4.0,
+      "loop_step_ids": [
+        "main"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "INNER",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 4.0
+          }
+        },
+        "movement": {
+          "shape": "sine_pan",
+          "mode": "periodic",
+          "pan_extent_deg": 35,
+          "tilt_extent_deg": 0,
+          "period_beats": 16.0
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_fan_narrow"
+        },
+        "dimmer": {
+          "period_beats": 16,
+          "duty_cycle": 0.5,
+          "low": 0.2,
+          "high": 1.0
+        }
+      }
+    ],
+    "metadata": {
+      "description": "Inner fixtures only: subtle pendulum sway with breathing dimmer. Restored arrangement on explicit rig aims; physical degrees and rates are checked.",
+      "recommended_sections": [
+        "verse"
+      ],
+      "energy_range": [
+        15,
+        40
+      ],
+      "tags": [
+        "arrangement_restoration",
+        "group_target",
+        "inner",
+        "pendulum"
+      ]
+    }
+  }
+}

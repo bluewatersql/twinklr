@@ -10,6 +10,16 @@ updated: 2026-11-20
 
 ## Start here — current state, 2026-11-20
 
+Owner authorized fixing the audited gaps. Root implements on
+`codex/restore-template-arrangements`: 37 historical IDs restored as current JSON,
+retaining existing25. New scattered-wave kernel, dimmer fades/dark step edges,
+phase-folding without reflection, reference formation aims and source contracts.
+All52 arrangement tests pass; broader focused/config checks and mypy passed.
+Final independent review/full gate and 61-entry video delivery in progress.
+See [plan](arrangement-restoration-2026-11-20.md) and
+[evidence](../evidence/2026-11-20-arrangement-restoration/README.md).
+
+
 **Preservation audit supersedes any complete-restoration implication below.** No
 families or presets were removed since the 62-entry sample: the seven original
 catalog files remain byte-identical. However, the older 37 templates are only mapped

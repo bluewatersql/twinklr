@@ -53,6 +53,7 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
 )
 from twinklr.core.sequencer.models.template import (
     RELATIVE_PATH_SHAPES,
+    DimmerPulse,
     Movement,
     PathTransform,
     PulseSpec,
@@ -245,15 +246,11 @@ def compile_step(
                 points=tuple(
                     PhysicalPoint(
                         t_ms=t,
-                        value=(
-                            dimmer.high
-                            if _pulse_high(dimmer, phase_map, t, t0_ms, offset=offset)
-                            else dimmer.low
-                        ),
+                        value=_dimmer_level(dimmer, phase_map, t, t0_ms, t1_ms, offset=offset),
                     )
                     for t in times
                 ),
-                interpolation="hold",
+                interpolation="linear" if dimmer.fade else "hold",
             )
             _add(segment, ChannelName.DIMMER, levels, profile)
             shared[dimmer_key] = levels
@@ -681,11 +678,15 @@ def _centered_displacement(spec: Movement, n: int, d: int) -> tuple[float, float
         fraction = (phase - start.phase) / (end.phase - start.phase)
         x = start.x + (end.x - start.x) * fraction
         y = start.y + (end.y - start.y) * fraction
-    elif spec.shape == "organic":
+    elif spec.shape in ("organic", "scattered_wave"):
         # Fixed periodic noise in musical phase, independent of sample count/order.
         # The two axes use different deterministic noise fields; no global RNG.
         phase = (u % 1) * 8
-        x = float(pnoise1(phase, octaves=2, repeat=8, base=0))
+        x = (
+            math.sin(2 * math.pi * u)
+            if spec.shape == "scattered_wave"
+            else float(pnoise1(phase, octaves=2, repeat=8, base=0))
+        )
         y = float(pnoise1(phase, octaves=2, repeat=8, base=17))
     elif spec.mode == "finite":
         x, y = -math.cos(math.pi * min(max(u, 0.0), 1.0)), 0.0
@@ -700,6 +701,40 @@ def _centered_displacement(spec: Movement, n: int, d: int) -> tuple[float, float
         angle = math.radians(transform.rotation_deg)
         cos, sin = math.cos(angle), math.sin(angle)
     return x * cos - y * sin, x * sin + y * cos
+
+
+def _dimmer_level(
+    dimmer: DimmerPulse,
+    phase_map: MusicalPhaseMap,
+    time_ms: int,
+    origin_ms: int,
+    end_ms: int,
+    *,
+    offset: Fraction = Fraction(0),
+) -> float:
+    """A pulse, or one musical-period fade followed by its terminal level."""
+    if dimmer.edge_dark_beats:
+        elapsed = musical_phase_fraction(phase_map, time_ms, origin_ms=origin_ms, period_beats=1)
+        remaining = musical_phase_fraction(phase_map, end_ms, origin_ms=time_ms, period_beats=1)
+        if min(elapsed, remaining) < exact_decimal(dimmer.edge_dark_beats):
+            return 0.0
+    if dimmer.fade is None:
+        return (
+            dimmer.high
+            if _pulse_high(dimmer, phase_map, time_ms, origin_ms, offset=offset)
+            else dimmer.low
+        )
+    phase = (
+        musical_phase_fraction(
+            phase_map, time_ms, origin_ms=origin_ms, period_beats=dimmer.period_beats
+        )
+        - offset
+        + exact_decimal(dimmer.phase_cycles)
+    )
+    progress = float(min(max(phase, Fraction(0)), Fraction(1)))
+    if dimmer.fade == "out":
+        progress = 1 - progress
+    return dimmer.low + (dimmer.high - dimmer.low) * progress
 
 
 def _pulse_high(

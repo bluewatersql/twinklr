@@ -1,0 +1,82 @@
+{
+  "template": {
+    "template_id": "figure8_mirror_strobe",
+    "version": 1,
+    "name": "Figure 8 Mirror Strobe",
+    "category": "high_energy",
+    "repeat": {
+      "mode": "PING_PONG",
+      "cycle_bars": 4.0,
+      "loop_step_ids": [
+        "main"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 4.0
+          }
+        },
+        "movement": {
+          "shape": "circle",
+          "mode": "periodic",
+          "pan_extent_deg": 25.0,
+          "tilt_extent_deg": 15.0,
+          "period_beats": 8.0,
+          "transform": {
+            "phase_cycles": -0.25,
+            "reverse": true
+          }
+        },
+        "shutter_state": "strobe_fast",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_mirror"
+        },
+        "dimmer": {
+          "period_beats": 1,
+          "duty_cycle": 0.5,
+          "low": 0.05,
+          "high": 1.0
+        },
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.25
+          },
+          {
+            "domains": [
+              "dimmer"
+            ],
+            "spread_cycles": 2.0
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "description": "Mirrored figure-8 patterns with strobe-rate dimmer pulses. Restored arrangement on explicit rig aims; physical degrees and rates are checked.",
+      "recommended_sections": [
+        "drop",
+        "peak"
+      ],
+      "energy_range": [
+        75,
+        100
+      ],
+      "tags": [
+        "arrangement_restoration",
+        "figure8",
+        "mirror",
+        "strobe"
+      ]
+    }
+  }
+}

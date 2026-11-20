@@ -1,0 +1,78 @@
+{
+  "template": {
+    "template_id": "wave_scattered_fade_out",
+    "version": 1,
+    "name": "Wave Scattered Fade Out",
+    "category": "medium_energy",
+    "repeat": {
+      "mode": "PING_PONG",
+      "cycle_bars": 4.0,
+      "loop_step_ids": [
+        "main"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 4.0
+          }
+        },
+        "movement": {
+          "shape": "scattered_wave",
+          "mode": "periodic",
+          "pan_extent_deg": 30,
+          "tilt_extent_deg": 18,
+          "period_beats": 16.0
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_scattered"
+        },
+        "dimmer": {
+          "period_beats": 16.0,
+          "duty_cycle": 1,
+          "low": 0.1,
+          "high": 1.0,
+          "fade": "out"
+        },
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.25
+          },
+          {
+            "domains": [
+              "dimmer"
+            ],
+            "spread_cycles": 0.25
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "description": "Horizontal wave over scattered chaos with fade-out dimmer. Restored arrangement on explicit rig aims; physical degrees and rates are checked.",
+      "recommended_sections": [
+        "outro"
+      ],
+      "energy_range": [
+        35,
+        60
+      ],
+      "tags": [
+        "arrangement_restoration",
+        "wave_horizontal",
+        "scatter",
+        "fade_out"
+      ]
+    }
+  }
+}

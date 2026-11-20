@@ -320,7 +320,46 @@ RESTORED_MOVEMENT_IDS = (
     "vertical_wave",
     "zigzag_alternating",
 )
-ALL_CATALOG_IDS = tuple(sorted((*CATALOG_IDS, *RESTORED_MOVEMENT_IDS)))
+ARRANGEMENT_IDS = (
+    "accent_snap_tunnel_hit",
+    "ambient_random_wash",
+    "ballyhoo_chaos",
+    "bounce_fan_pulse",
+    "build_drop_recover",
+    "cascade_pulse_lr",
+    "circle_asym_left_strobe",
+    "circle_asym_right_pulse",
+    "circle_fan_hold",
+    "crossfade_between_steps",
+    "dual_sweep_audience_pulse",
+    "fan_iris_tilt_bias_breathe",
+    "fan_pulse",
+    "figure8_mirror_strobe",
+    "groove_sway_rainbow_breathe",
+    "hold_center_out_breathe",
+    "infinity_mirror_chase",
+    "inner_pendulum_breathe",
+    "intro_main_outro_phrase",
+    "lean_right_scan",
+    "pendulum_chevron_breathe",
+    "pop_lock_spotlight_blackout",
+    "spiral_xross_blackout",
+    "split_lr_sweep_counter",
+    "stomp_tilt_bias_pulse",
+    "sweep_lr_chevron_breathe",
+    "sweep_lr_continuous_phase",
+    "sweep_lr_fan_hold",
+    "sweep_lr_fan_pulse",
+    "sweep_lr_pingpong_phase",
+    "sweep_ud_chevron_swell",
+    "tilt_rock_wall_wash_fade",
+    "wave_fan_hold",
+    "wave_scattered_fade_in",
+    "wave_scattered_fade_out",
+    "wave_vertical_spotlight_fade",
+    "zigzag_alternating_pulse",
+)
+ALL_CATALOG_IDS = tuple(sorted((*CATALOG_IDS, *RESTORED_MOVEMENT_IDS, *ARRANGEMENT_IDS)))
 """All current families, including restored movement behavior."""
 
 
@@ -340,6 +379,18 @@ def movement_rig(fixture_ids: Sequence[str]) -> FixtureGroup:
         "movement_tunnel",
         "movement_chevron",
         "movement_asymmetric",
+        "movement_wall_wash",
+        "movement_scattered",
+        "movement_chaos",
+        "movement_audience",
+        "movement_mirror",
+        "movement_rainbow",
+        "movement_center_out",
+        "movement_fan_narrow",
+        "movement_lean_right",
+        "movement_spotlight",
+        "movement_x_cross",
+        "movement_tilt_bias",
     ):
         aims = {}
         for index, fixture_id in enumerate(fixture_ids):
@@ -355,9 +406,48 @@ def movement_rig(fixture_ids: Sequence[str]) -> FixtureGroup:
                 pan, tilt = rank * 25 + 15, 25 + (rank + 1) * 10
             elif name == "movement_tunnel":
                 pan, tilt = -rank * 20, 50.0
+            elif name == "movement_wall_wash":
+                pan, tilt = rank * 30, 55.0
+            elif name in ("movement_scattered", "movement_chaos"):
+                # Explicit deterministic reference aims, distinct seed arrangements.
+                seed = 7 if name == "movement_scattered" else 42
+                pan = (((index * 37 + seed * 13) % 101) / 100 - 0.5) * 70
+                tilt = 15 + ((index * 29 + seed * 11) % 101) / 100 * 35
+            elif name == "movement_audience":
+                pan, tilt = rank * 45, 15.0
+            elif name == "movement_mirror":
+                pan, tilt = rank * 35, 30.0
+            elif name == "movement_rainbow":
+                pan, tilt = rank * 40, 20 + (1 - rank * rank) * 35
+            elif name == "movement_center_out":
+                pan, tilt = rank * 20, 30 + abs(rank) * 20
+            elif name == "movement_fan_narrow":
+                pan, tilt = rank * 15, 30.0
+            elif name == "movement_lean_right":
+                pan, tilt = 25 + rank * 15, 30.0
+            elif name == "movement_spotlight":
+                pan, tilt = rank * 4, 35.0
+            elif name == "movement_x_cross":
+                pan, tilt = -rank * 35, 20 if index % 2 == 0 else 50
+            elif name == "movement_tilt_bias":
+                pan, tilt = rank * 30, 20 if abs(rank) > 0.5 else 50
             aims[fixture_id] = {"pan_deg": pan, "tilt_deg": tilt}
         positions[name] = {"fixtures": aims}
     payload["presets"]["positions"] = positions
+    for fixture in payload["fixtures"]:
+        discrete = fixture["config"]["physical_profile"]["discrete"]
+        discrete["shutter"]["states"]["strobe_fast"] = {
+            "range_min": 32,
+            "range_max": 59,
+            "value": 48,
+            "settle_ms": 0,
+        }
+        discrete["gobo"]["states"]["prism"] = {
+            "range_min": 32,
+            "range_max": 39,
+            "value": 36,
+            "settle_ms": 0,
+        }
     return FixtureGroup.model_validate(payload)
 
 

@@ -6,12 +6,27 @@ are variations, not additional movement types. This inventory accounts for every
 `MovementType` at `0ec65d47^`, based on its actual curve definitions and template use.
 It does not claim byte parity with the removed renderer or physical-rig acceptance.
 
-**Preservation audit correction (2026-11-20): this is a representative mapping,
-not proof that all historical arrangements survived.** Verified gaps include
-inner-only fixture selection, simultaneous sine-pan/noise-tilt scattered waves,
-and authored multi-step routines. All seven families in the catalog used for the 62-entry sampler
-remain unchanged, but the older 37 templates are not preserved one-for-one.
-[Counts, complete ID inventory and source findings](../../../changes/2026_11_12_mh_true_up/evidence/2026-11-20-template-preservation/README.md).
+**Arrangement restoration (2026-11-20): all 37 historical template IDs are now
+selectable current-schema JSON arrangements**, alongside the existing 25 families.
+The earlier representative mapping below describes the first restoration, not the
+new arrangements' complete contract. Each old ID now owns its targets, formation
+reference, phase ordering, step schedule, repeat mode and light intent. The scattered
+wave explicitly combines sine pan and organic tilt; inner pendulum selects INNER;
+6/8-bar narratives and alternating crossfade order are authored in their templates.
+[Restoration plan](../../../changes/2026_11_12_mh_true_up/plan/arrangement-restoration-2026-11-20.md)
+and [reference aims](../../rigs/README.md).
+
+This is preservation of authored choreography structure, not byte parity with the
+retired DMX renderer. Degrees/extents are explicit safe authoring choices; noise is
+periodic, the ambient noise completes one closed cycle over its eight bars, and
+pose switches use finite travel. Historical dramatic pulses retain their five-beat
+cadence. Where a pulse does not divide the cycle, or a routine changes steps, half a
+beat at each step edge is dark for a checked reposition. Original misleading names
+(such as spiral, strobe and breathe) retain their IDs but use the source's actual
+motion/light types. Blackout templates remain dark; the movement sampler explicitly
+reveals their motion with neutral light. Source-derived contracts and production
+frame checks cover these distinctions; no physical or human look parity is asserted.
+
 
 | Original movement | Current representative | Behavior and differences |
 |---|---|---|
@@ -30,7 +45,7 @@ remain unchanged, but the older 37 templates are not preserved one-for-one.
 | POP_LOCK | `pose_pop_lock` | Repeating two-pose hold/travel. Each pose holds 3/8 cycle and each transfer takes 1/8 cycle. |
 | HIT | `pose_pop_lock` | The same old square pulse; old hit timing/offset parameters were unread. Finite transfers deliberately replace instantaneous jumps. |
 | PENDULUM | `pendulum_swing` | Sine pan about fan aims, in unison. |
-| WAVE_HORIZONTAL | `horizontal_wave` | Sine pan with left-to-right phase about fan aims. The old SCATTERED_CHAOS override adds simultaneous Perlin tilt; that combination is missing from the current catalog. |
+| WAVE_HORIZONTAL | `horizontal_wave` | Sine pan with left-to-right phase about fan aims. The old SCATTERED_CHAOS override adds simultaneous Perlin tilt; that combination now lives in `wave_scattered_fade_in` and `wave_scattered_fade_out`. |
 | TILT_ROCK | `tilt_rock` | Sine tilt, in unison. |
 | WAVE_VERTICAL | `vertical_wave` | Sine tilt with center-out phase. |
 | DIAGONAL_SWEEP | `diagonal_sweep` | Same sinusoidal phase on both axes. |
@@ -87,9 +102,10 @@ axis bases 0/17. It has no mutable random state and no sample-count dependence.
 It uses the same transforms and physical checks as other relative paths. Extents
 scale noise displacement; a noise cycle need not reach its full extent.
 
-## Removed template arrangements
+## Earlier representative mapping (superseded by same-ID arrangements)
 
-This table accounts for all 37 removed built-ins. Consolidation means their motion
+The following table records the earlier mapping, whose gaps prompted the current
+same-ID restoration. Each listed ID now has its own JSON. Previously, consolidation meant its motion
 is represented, not that their dimmer/color program or whole-song narrative is
 recreated. Aim-only differences remain explicit rig authoring choices; they are not
 counted as additional motion kernels. No claim of original-show look parity is made.
@@ -107,7 +123,7 @@ counted as additional motion kernels. No claim of original-show look parity is m
 | `dual_sweep_audience_pulse` | `diagonal_sweep`: coordinated two-axis sine with traveling phase. Audience aim belongs to the rig. |
 | `fan_iris_tilt_bias_breathe` | `fan_iris`: fan aim, inner/outer tilt bias, mirrored linear opening/closing, outside-in phase. |
 | `figure8_mirror_strobe`, `infinity_mirror_chase` | `mirror_wings` supplies mirrored figure-eight choreography; the old misnamed scalar curves are detailed above. |
-| `inner_pendulum_breathe` | **Partial:** `pendulum_swing` supplies the sine path but targets ALL; the old template targets INNER only. Fan width/reach cannot replace fixture selection. |
+| `inner_pendulum_breathe` | `inner_pendulum_breathe` restores INNER selection with narrow fan aims. `pendulum_swing` remains the separate all-head routine. |
 | `intro_main_outro_phrase` | Hold → angular sweep → hold is represented by `static_fan`, `angular_pan`; narrative is planner composition. |
 | `lean_right_scan` | Static asymmetric aim, not scanning motion; `static_fan` demonstrates hold, with asymmetric base aims an explicit rig choice. |
 | `pendulum_chevron_breathe` | `chevron_pendulum`: V-shaped aims and traveling pendulum phase. |
@@ -120,7 +136,7 @@ counted as additional motion kernels. No claim of original-show look parity is m
 | `sweep_ud_chevron_swell` | `angular_tilt` supplies vertical triangle; chevron base aims are rig authoring, swell is light only. |
 | `tilt_rock_wall_wash_fade` | `tilt_rock`: smooth vertical oscillation; wall-wash aim is rig authoring, fade is light only. |
 | `wave_fan_hold` | `horizontal_wave`: fan aims with traveling sine. |
-| `wave_scattered_fade_in`, `wave_scattered_fade_out` | **Missing combination:** old WAVE_HORIZONTAL + SCATTERED_CHAOS renders sine pan and Perlin tilt simultaneously. `horizontal_wave` and `organic_meander` separately do not preserve that path. Scattered aims and fade programs are also not reproduced. |
+| `wave_scattered_fade_in`, `wave_scattered_fade_out` | Their restored JSONs use `scattered_wave`: sine pan and Perlin tilt simultaneously, explicit scattered aims, traveling phase and opposite dimmer fades. |
 | `wave_vertical_spotlight_fade` | `vertical_wave`: center-out vertical phase; spotlight base aims are rig authoring, fade is light only. |
 | `zigzag_alternating_pulse` | `zigzag_alternating`: alternating high/low aims and left-to-right angular movement. |
 

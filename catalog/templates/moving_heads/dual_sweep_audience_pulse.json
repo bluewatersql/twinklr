@@ -1,0 +1,82 @@
+{
+  "template": {
+    "template_id": "dual_sweep_audience_pulse",
+    "version": 1,
+    "name": "Dual Sweep Audience Pulse",
+    "category": "high_energy",
+    "repeat": {
+      "mode": "PING_PONG",
+      "cycle_bars": 4.0,
+      "loop_step_ids": [
+        "main"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 4.0
+          }
+        },
+        "movement": {
+          "shape": "sweep",
+          "mode": "periodic",
+          "pan_extent_deg": 35,
+          "tilt_extent_deg": 25,
+          "period_beats": 16.0,
+          "transform": {
+            "rotation_deg": 45
+          }
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_audience"
+        },
+        "dimmer": {
+          "period_beats": 5,
+          "duty_cycle": 0.5,
+          "low": 0.15,
+          "high": 1.0,
+          "edge_dark_beats": 0.5
+        },
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.25
+          },
+          {
+            "domains": [
+              "dimmer"
+            ],
+            "spread_cycles": 0.8
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "description": "Counter-sweeping beams scanning the audience with rapid dimmer pulses. Restored arrangement on explicit rig aims; physical degrees and rates are checked.",
+      "recommended_sections": [
+        "chorus",
+        "drop"
+      ],
+      "energy_range": [
+        70,
+        90
+      ],
+      "tags": [
+        "arrangement_restoration",
+        "dual_sweep",
+        "audience",
+        "pulse"
+      ]
+    }
+  }
+}

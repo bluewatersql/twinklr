@@ -1,0 +1,83 @@
+{
+  "template": {
+    "template_id": "accent_snap_tunnel_hit",
+    "version": 1,
+    "name": "Accent Snap Tunnel Hit",
+    "category": "high_energy",
+    "repeat": {
+      "mode": "PING_PONG",
+      "cycle_bars": 4.0,
+      "loop_step_ids": [
+        "main"
+      ],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 4.0
+          }
+        },
+        "movement": {
+          "shape": "hold",
+          "mode": "periodic",
+          "pan_extent_deg": 0,
+          "tilt_extent_deg": 0
+        },
+        "shutter_state": "open",
+        "reposition_fallback": "drop_accent",
+        "component_refs": {
+          "position_id": "movement_tunnel"
+        },
+        "dimmer": {
+          "period_beats": 1,
+          "duty_cycle": 0.5,
+          "low": 0.1,
+          "high": 1.0
+        },
+        "distribution": [
+          {
+            "domains": [
+              "pan",
+              "tilt"
+            ],
+            "spread_cycles": 0.5,
+            "wings": 2,
+            "direction": "reverse",
+            "mirror_pan": false
+          },
+          {
+            "domains": [
+              "dimmer"
+            ],
+            "spread_cycles": 2.0,
+            "wings": 2,
+            "direction": "reverse"
+          }
+        ],
+        "gobo": "prism"
+      }
+    ],
+    "metadata": {
+      "description": "Rapid accent snaps in tunnel cone formation with matched pulse hits. Restored arrangement on explicit rig aims; physical degrees and rates are checked.",
+      "recommended_sections": [
+        "drop",
+        "peak"
+      ],
+      "energy_range": [
+        80,
+        100
+      ],
+      "tags": [
+        "arrangement_restoration",
+        "accent_snap",
+        "tunnel",
+        "hit"
+      ]
+    }
+  }
+}

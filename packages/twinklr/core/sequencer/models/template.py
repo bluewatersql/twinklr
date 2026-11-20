@@ -116,7 +116,7 @@ MIN_PERIOD_BEATS = 1 / 64
 20 ms frame, so anything shorter is an authoring error rather than a pulse."""
 
 
-RELATIVE_PATH_SHAPES = ("circle", "lissajous", "sweep", "polyline", "organic")
+RELATIVE_PATH_SHAPES = ("circle", "lissajous", "sweep", "polyline", "organic", "scattered_wave")
 """Shapes evaluated as a centered displacement about the base aim; only these take a
 `PathTransform`."""
 
@@ -166,6 +166,7 @@ class Movement(BaseModel):
     tilt cycles per period, default 1:2. `polyline` interpolates explicit phase/x/y
     knots, with equal positions giving dwell; a periodic path must close exactly.
     `organic` is deterministic periodic Perlin motion with independent axis fields.
+    `scattered_wave` combines sine pan with periodic Perlin tilt.
     Both use the same transform and degree extents. A start angle left unset comes from the
     step's position reference (`TemplateStep.component_refs`); a step without one
     must set both.
@@ -183,6 +184,7 @@ class Movement(BaseModel):
         "sweep",
         "polyline",
         "organic",
+        "scattered_wave",
     ]
     mode: Literal["periodic", "finite"]
     start_pan_deg: float | None = Field(default=None, allow_inf_nan=False)
@@ -216,7 +218,10 @@ class Movement(BaseModel):
             raise ValueError("linear motion is finite; periodic linear is not supported")
         if self.shape in ("sine_pan", "sine_tilt") and self.mode != "periodic":
             raise ValueError(f"{self.shape} is periodic; finite sine is not supported")
-        if self.shape in ("circle", "lissajous", "organic") and self.mode != "periodic":
+        if (
+            self.shape in ("circle", "lissajous", "organic", "scattered_wave")
+            and self.mode != "periodic"
+        ):
             raise ValueError(f"{self.shape} is periodic; a finite {self.shape} is not supported")
         if self.lissajous_ratio is not None and self.shape != "lissajous":
             raise ValueError("lissajous_ratio applies only to the lissajous shape")
@@ -277,10 +282,25 @@ class PulseSpec(BaseModel):
 
 
 class DimmerPulse(PulseSpec):
-    """A dimmer pulse between explicit normalized levels; duty 1 holds `high`."""
+    """A pulse between explicit levels; duty 1 holds `high` unless `fade` is set.
+
+    A fade traverses low/high once over period_beats, then holds its terminal level.
+    edge_dark_beats reserves darkness at both step boundaries for repositioning;
+    the compiler removes those edges from cues so the transaction planner owns them.
+    """
 
     low: float = Field(ge=0, le=1)
     high: float = Field(ge=0, le=1)
+    fade: Literal["in", "out"] | None = Field(default=None, exclude_if=lambda value: value is None)
+    edge_dark_beats: float = Field(
+        default=0.0, ge=0, allow_inf_nan=False, exclude_if=lambda value: value == 0
+    )
+
+    @model_validator(mode="after")
+    def _validate_fade(self) -> "DimmerPulse":
+        if self.fade is not None and self.duty_cycle != 1:
+            raise ValueError("a dimmer fade requires duty_cycle=1; it is not a pulse")
+        return self
 
     @model_validator(mode="before")
     @classmethod
