@@ -3,12 +3,24 @@ type: handoff
 status: active
 area: research-and-planning
 change: 2026_11_12_mh_true_up
-updated: 2026-11-19
+updated: 2026-11-20
 ---
 
 # Handoff — Moving-head technical design and implementation plans
 
-## Start here — current state, 2026-11-19
+## Start here — current state, 2026-11-20
+
+The requested sequential movement sampler is generated from current production
+renderer frames: 62 movement examples with two-second dark pauses. The native
+xLights video, labeled version and matching sequence/show package live under
+`~/xlights/_twinklr_verify/movement-sampler-2026-11-20/`. See the
+[sampler evidence](../evidence/2026-11-20-movement-sampler/README.md) and
+[plan](movement-sampler-2026-11-20.md). No application source or catalog changes.
+The sampler uses a synthetic preview profile; physical-rig admission is not implied.
+Final native/video/label/package verification passed; no paid work or hardware
+output. Delivery is complete, with owner playback judgment separate. Source
+`e0376f66` is unchanged; the dated evidence records the artifact checks and the
+explicitly skipped full application gate.
 
 Owner follow-up names Dance Jams house as the problem reference. CI and Jekyll
 Pages builds are manually disabled on owner request to avoid spend during repair;

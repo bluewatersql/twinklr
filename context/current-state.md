@@ -2,7 +2,7 @@
 type: context
 status: active
 area: overview
-updated: 2026-11-19
+updated: 2026-11-20
 ---
 
 # Twinklr — Current State
@@ -244,10 +244,15 @@ See [product/overview.md](product/overview.md).
 ## Quality gate
 
 The latest recorded full `make validate` gate on the history of `main` ran on
-`a1326e31` (2026-11-19) with 7,798 passed, 30 skipped, and 91% coverage.
+`a5e52265` (2026-11-19) with 7,818 passed, 30 skipped, and 91% coverage.
 There are no accepted failures. The gate includes the moving-head output pins and a
 hermetic display replay under `tests/regression/`.
-[Recovered three-song review record](../changes/2026_11_12_mh_true_up/evidence/2026-11-19-combined-review/recovery-review.md)
+[House repair gate record](../changes/2026_11_12_mh_true_up/evidence/2026-11-19-house-musical-sync/README.md#completion-gate)
+
+A sequential [movement sampler](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-movement-sampler/README.md)
+was rendered in xLights on 2026-11-20: 62 movement examples, two-second dark pauses,
+and labeled video. It uses a synthetic preview rig and adds no application code or
+physical-fixture acceptance.
 
 ## Live evidence
 
