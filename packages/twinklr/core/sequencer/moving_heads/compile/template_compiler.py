@@ -332,14 +332,15 @@ def compile_template(
                 for fixture in _resolve_target_fixtures(step, template, context)
             )
             continue
-        if step.dimmer is not None and step.dimmer.edge_dark_beats:
-            # A legal step may be clipped to less than its authored dark edges at
-            # the song/section end. It contributes no lit cue, rather than crashing
-            # or trying to move a head through an entirely dark tail.
-            if musical_phase_fraction(phase_map, t1, origin_ms=t0, period_beats=1) <= (
-                2 * exact_decimal(step.dimmer.edge_dark_beats)
-            ):
-                continue
+        # A legal step may be clipped to less than its authored dark edges at
+        # the song/section end. It contributes no lit cue or movement there.
+        if (
+            step.dimmer is not None
+            and step.dimmer.edge_dark_beats
+            and musical_phase_fraction(phase_map, t1, origin_ms=t0, period_beats=1)
+            <= 2 * exact_decimal(step.dimmer.edge_dark_beats)
+        ):
+            continue
         targets = _resolve_target_fixtures(step, template, context)
         chain = chains.get(step.step_id)
         anchor = (
