@@ -6,6 +6,13 @@ are variations, not additional movement types. This inventory accounts for every
 `MovementType` at `0ec65d47^`, based on its actual curve definitions and template use.
 It does not claim byte parity with the removed renderer or physical-rig acceptance.
 
+**Preservation audit correction (2026-11-20): this is a representative mapping,
+not proof that all historical arrangements survived.** Verified gaps include
+inner-only fixture selection, simultaneous sine-pan/noise-tilt scattered waves,
+and authored multi-step routines. All seven families in the catalog used for the 62-entry sampler
+remain unchanged, but the older 37 templates are not preserved one-for-one.
+[Counts, complete ID inventory and source findings](../../../changes/2026_11_12_mh_true_up/evidence/2026-11-20-template-preservation/README.md).
+
 | Original movement | Current representative | Behavior and differences |
 |---|---|---|
 | SWEEP_LR | `angular_pan` | Constant-speed horizontal triangle with angular reversals. |
@@ -23,7 +30,7 @@ It does not claim byte parity with the removed renderer or physical-rig acceptan
 | POP_LOCK | `pose_pop_lock` | Repeating two-pose hold/travel. Each pose holds 3/8 cycle and each transfer takes 1/8 cycle. |
 | HIT | `pose_pop_lock` | The same old square pulse; old hit timing/offset parameters were unread. Finite transfers deliberately replace instantaneous jumps. |
 | PENDULUM | `pendulum_swing` | Sine pan about fan aims, in unison. |
-| WAVE_HORIZONTAL | `horizontal_wave` | Sine pan with left-to-right phase about fan aims. |
+| WAVE_HORIZONTAL | `horizontal_wave` | Sine pan with left-to-right phase about fan aims. The old SCATTERED_CHAOS override adds simultaneous Perlin tilt; that combination is missing from the current catalog. |
 | TILT_ROCK | `tilt_rock` | Sine tilt, in unison. |
 | WAVE_VERTICAL | `vertical_wave` | Sine tilt with center-out phase. |
 | DIAGONAL_SWEEP | `diagonal_sweep` | Same sinusoidal phase on both axes. |
@@ -100,7 +107,7 @@ counted as additional motion kernels. No claim of original-show look parity is m
 | `dual_sweep_audience_pulse` | `diagonal_sweep`: coordinated two-axis sine with traveling phase. Audience aim belongs to the rig. |
 | `fan_iris_tilt_bias_breathe` | `fan_iris`: fan aim, inner/outer tilt bias, mirrored linear opening/closing, outside-in phase. |
 | `figure8_mirror_strobe`, `infinity_mirror_chase` | `mirror_wings` supplies mirrored figure-eight choreography; the old misnamed scalar curves are detailed above. |
-| `inner_pendulum_breathe` | `pendulum_swing`; fan width is a rig aim choice and reach variant. |
+| `inner_pendulum_breathe` | **Partial:** `pendulum_swing` supplies the sine path but targets ALL; the old template targets INNER only. Fan width/reach cannot replace fixture selection. |
 | `intro_main_outro_phrase` | Hold → angular sweep → hold is represented by `static_fan`, `angular_pan`; narrative is planner composition. |
 | `lean_right_scan` | Static asymmetric aim, not scanning motion; `static_fan` demonstrates hold, with asymmetric base aims an explicit rig choice. |
 | `pendulum_chevron_breathe` | `chevron_pendulum`: V-shaped aims and traveling pendulum phase. |
@@ -113,7 +120,7 @@ counted as additional motion kernels. No claim of original-show look parity is m
 | `sweep_ud_chevron_swell` | `angular_tilt` supplies vertical triangle; chevron base aims are rig authoring, swell is light only. |
 | `tilt_rock_wall_wash_fade` | `tilt_rock`: smooth vertical oscillation; wall-wash aim is rig authoring, fade is light only. |
 | `wave_fan_hold` | `horizontal_wave`: fan aims with traveling sine. |
-| `wave_scattered_fade_in`, `wave_scattered_fade_out` | Traveling wave/organic behavior is represented by `horizontal_wave` and `organic_meander`; scattered aims are rig authoring, fade direction is light only. |
+| `wave_scattered_fade_in`, `wave_scattered_fade_out` | **Missing combination:** old WAVE_HORIZONTAL + SCATTERED_CHAOS renders sine pan and Perlin tilt simultaneously. `horizontal_wave` and `organic_meander` separately do not preserve that path. Scattered aims and fade programs are also not reproduced. |
 | `wave_vertical_spotlight_fade` | `vertical_wave`: center-out vertical phase; spotlight base aims are rig authoring, fade is light only. |
 | `zigzag_alternating_pulse` | `zigzag_alternating`: alternating high/low aims and left-to-right angular movement. |
 

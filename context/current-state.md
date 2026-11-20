@@ -59,8 +59,10 @@ See [product/overview.md](product/overview.md).
     is offered through its first passing variant; a run with nothing left is refused.
   - Twenty-five families in `catalog/templates/moving_heads/` load on every run,
     including the `zoom_wave` pilot, which needs a zoom axis; `--template-dir` adds JSON templates.
-    Eighteen restored routines recover angular, travel/dwell, organic and fixture
-    arrangement behavior. Some require explicit named rig aims; missing aims exclude
+    Eighteen added routines recover angular, travel/dwell, organic and some fixture
+    arrangement behavior. Historical arrangement preservation is incomplete: inner-only
+    targeting, scattered-wave hybrid paths and sequential routines remain missing.
+    [Preservation audit](../changes/2026_11_12_mh_true_up/evidence/2026-11-20-template-preservation/README.md). Some require explicit named rig aims; missing aims exclude
     that family. [Movement coverage](../catalog/templates/moving_heads/movement-coverage.md).
     Families play in any meter (a repeating cycle grows to whole periods).
   - Silent song edges are held dark; a cue it cannot play honestly is kept dark
@@ -257,7 +259,8 @@ was rendered and independently verified on 2026-11-20: 24 routines/reference ent
 once each, two-second dark pauses, names and 4:02 total. The previous 62-entry
 sample's coverage was rejected because speed/reach variants did not replace lost
 movement behaviors. The restoration adds eighteen routines on the single renderer
-and explicitly maps the original vocabulary and template uses. Some formations need
+and explicitly maps the original vocabulary and template uses. Mapping is not full
+arrangement preservation; the audit above records confirmed gaps. Some formations need
 named rig aim presets; the preview supplies synthetic aims. Owner look judgment and
 physical-fixture acceptance remain open.
 

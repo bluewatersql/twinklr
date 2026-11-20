@@ -54,7 +54,10 @@ families, including the optical zoom pilot. Two new static reference families ha
 no movement presets. Some restored arrangements require explicit rig position
 presets; they are excluded when those aims are absent. See the complete
 [original movement mapping and authoring contract](movement-coverage.md).
-Speed/reach variants are not counted as additional movement behaviors.
+Speed/reach variants are not counted as additional movement behaviors. Restoration
+is partial at the arrangement level: the [preservation audit](../../../changes/2026_11_12_mh_true_up/evidence/2026-11-20-template-preservation/README.md)
+found missing fixture selection, hybrid motion and sequential routines. The mapping
+does not establish preservation of all 37 historical templates.
 
 ## Meter
 

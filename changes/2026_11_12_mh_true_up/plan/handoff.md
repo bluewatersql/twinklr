@@ -10,6 +10,18 @@ updated: 2026-11-20
 
 ## Start here — current state, 2026-11-20
 
+**Preservation audit supersedes any complete-restoration implication below.** No
+families or presets were removed since the 62-entry sample: the seven original
+catalog files remain byte-identical. However, the older 37 templates are only mapped
+to representatives. Confirmed gaps include INNER-only pendulum targeting,
+simultaneous sine-pan/noise-tilt scattered waves and sequential multi-step routines.
+Counts and all 37 IDs are in the [audit evidence](../evidence/2026-11-20-template-preservation/README.md).
+Current catalog: 25 families; video: 24 bases; declared base/preset combinations:
+209 (200 excluding Zoom Wave). Fresh focused tests: 40 passed. No renderer change,
+provider call or new video in this audit; full application gate not rerun.
+The next implementation must preserve arrangements, not just list their ingredients.
+
+
 Owner requested another fresh regeneration after integration. Latest deliverables
 are now under `~/xlights/_twinklr_verify/movement-sampler-regenerated-2026-11-20/`:
 `movement-sampler-labeled.mp4` and `movement-sampler-show.zip`. All 24 cases rebuilt
