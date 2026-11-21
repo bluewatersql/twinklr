@@ -10,6 +10,20 @@ updated: 2026-11-20
 
 ## Start here — current state, 2026-11-20
 
+Dance Jams full-catalog rerun is complete on source `0a29876f`.
+All 62 templates were checked; 55 were admitted and fresh Claude planning selected
+nine restored arrangements. Fresh house planning covers 14 sections. The combined
+XSQ and house-focused video are under
+`/Users/ondeck/xlights/_twinklr_verify/dance-full-catalog-2026-11-20/`.
+See [run evidence](../evidence/2026-11-20-dance-full-catalog/README.md) for exact paths,
+verification, exclusions, token usage and transition fallbacks. No dropped MH cues;
+several requested transitions and two speed variations still do not play as requested.
+MH coverage stops at 253.911 s during the audio fade. The house camera clips some
+beam extents, so it does not establish full-motion framing acceptance.
+No source changes; CI/Pages remain paused. Owner musical/look judgment is pending.
+
+### Previous completed movement-preview correction
+
 The owner rejected the previous sampler's sideways beam orientation. Corrected
 front and angled views now live under
 `/Users/ondeck/xlights/_twinklr_verify/movement-centered-2026-11-20/`:
